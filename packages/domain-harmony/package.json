@@ -1,0 +1,10 @@
+{
+  "name": "@hmh/domain-harmony",
+  "version": "0.1.0",
+  "description": "hmharness HarmonyOS domain core: device, toolchain, build, and project lifecycle capabilities. HarmonyOS is the framework's native domain, not an add-on.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

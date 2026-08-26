@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hmh/kernel": ["packages/kernel/src/index.ts"],
+      "@hmh/evolution": ["packages/evolution/src/index.ts"],
+      "@hmh/domain-harmony": ["packages/domain-harmony/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts"]
+}

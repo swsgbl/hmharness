@@ -1,0 +1,10 @@
+{
+  "name": "@hmh/evolution",
+  "version": "0.1.0",
+  "description": "hmharness evolution subsystem: persistent memory, insight capture, skill library, and the bench that gives evolution its fitness signal. First-class kernel citizen, not a plugin.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

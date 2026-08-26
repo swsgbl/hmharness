@@ -1,0 +1,23 @@
+{
+  "name": "hmharness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "hmharness - a next-generation, self-evolving agent framework designed around the full HarmonyOS development lifecycle. Clean-room design; borrows the best 2026 ideas (loop engineering, MCP, skill-library evolution) without inheriting any runtime dependency.",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "hmh": "tsx packages/cli/src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:e2e": "tsx packages/cli/src/main.ts \"reply with exactly: HMH-KERNEL-OK\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
