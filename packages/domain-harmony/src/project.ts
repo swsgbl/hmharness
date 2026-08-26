@@ -77,11 +77,32 @@ function sanitizeIdent(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40) || 'app';
 }
 
-export async function scaffoldProject(dir: string, opts: { name?: string; bundleId?: string } = {}): Promise<{ root: string; bundleId: string; files: number }> {
+export interface ScaffoldModule {
+  name: string;
+  type?: 'feature' | 'har';
+}
+
+export interface ScaffoldOptions {
+  name?: string;
+  bundleId?: string;
+  /** Extra pages beyond Index (PascalCase identifiers). */
+  pages?: string[];
+  /** Extra modules: feature HAPs or har libraries. */
+  modules?: ScaffoldModule[];
+}
+
+const IDENT = /^[A-Z][A-Za-z0-9]*$/;
+
+export async function scaffoldProject(dir: string, opts: ScaffoldOptions = {}): Promise<{ root: string; bundleId: string; files: number }> {
   const root = resolve(dir);
   const name = opts.name ?? basename(root);
   const bundleId = opts.bundleId ?? `com.example.${sanitizeIdent(name)}`;
   const sdk = sdkVersion();
+  const pages = ['Index', ...(opts.pages ?? []).map((p) => String(p).trim()).filter((p) => IDENT.test(p))];
+  const modules = (opts.modules ?? [])
+    .map((m) => ({ name: sanitizeIdent(m.name).replace(/-/g, ''), type: m.type === 'har' ? ('har' as const) : ('feature' as const) }))
+    .filter((m) => m.name.length > 0 && m.name !== 'entry');
+  const harNames = modules.filter((m) => m.type === 'har').map((m) => m.name);
   const W = async (rel: string, content: string | Buffer) => {
     const p = join(root, rel);
     await mkdir(join(p, '..'), { recursive: true });
@@ -117,6 +138,20 @@ export async function scaffoldProject(dir: string, opts: { name?: string; bundle
     '        }',
     '      ]',
     '    }',
+    ...modules.map(
+      (m) => [
+        '    ,{',
+        `      "name": "${m.name}",`,
+        `      "srcPath": "./${m.name}",`,
+        '      "targets": [',
+        '        {',
+        '          "name": "default",',
+        '          "applyToProducts": [ "default" ]',
+        '        }',
+        '      ]',
+        '    }',
+      ].join('\n'),
+    ),
     '  ]',
     '}',
     '',
@@ -173,7 +208,20 @@ export async function scaffoldProject(dir: string, opts: { name?: string; bundle
   ].join('\n'));
   files += await W('AppScope/resources/base/media/app_icon.png', solidPng(96, [0x1f, 0x6f, 0xeb, 0xff]));
 
-  files += await W('entry/oh-package.json5', ['{', '  "name": "entry",', '  "version": "1.0.0",', '  "description": "entry module",', '  "dependencies": {}', '}', ''].join('\n'));
+  files += await W(
+    'entry/oh-package.json5',
+    [
+      '{',
+      '  "name": "entry",',
+      '  "version": "1.0.0",',
+      '  "description": "entry module",',
+      harNames.length > 0
+        ? '  "dependencies": {\n' + harNames.map((h) => `    "${h}": "file:../${h}"`).join(',\n') + '\n  }'
+        : '  "dependencies": {}',
+      '}',
+      '',
+    ].join('\n'),
+  );
   files += await W('entry/build-profile.json5', [
     '{',
     '  "apiType": "stageMode",',
@@ -297,7 +345,82 @@ export async function scaffoldProject(dir: string, opts: { name?: string; bundle
     '',
   ].join('\n'));
   files += await W('entry/src/main/resources/base/media/startIcon.png', solidPng(96, [0x00, 0x00, 0x00, 0xff]));
-  files += await W('entry/src/main/resources/base/profile/main_pages.json', ['{', '  "src": [ "pages/Index" ]', '}', ''].join('\n'));
+  files += await W(
+    'entry/src/main/resources/base/profile/main_pages.json',
+    ['{', '  "src": [', ...pages.map((p) => `    "pages/${p}"${p === pages[pages.length - 1] ? '' : ','}`), '  ]', '}', ''].join('\n'),
+  );
+  // extra pages beyond Index
+  for (const p of pages.slice(1)) {
+    files += await W(
+      `entry/src/main/ets/pages/${p}.ets`,
+      [
+        '@Entry',
+        '@Component',
+        `struct ${p} {`,
+        '  build() {',
+        '    Column() {',
+        `      Text('${p}')`,
+        '        .fontSize(32)',
+        '        .fontWeight(FontWeight.Bold)',
+        '    }',
+        "    .width('100%')",
+        "    .height('100%')",
+        '    .justifyContent(FlexAlign.Center)',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+  }
+
+  // extra modules (feature HAPs / har libraries)
+  for (const m of modules) {
+    const task = m.type === 'har' ? 'harTasks' : 'hapTasks';
+    files += await W(
+      `${m.name}/hvigorfile.ts`,
+      [
+        `import { ${task} } from '@ohos/hvigor-ohos-plugin';`,
+        '',
+        'export default {',
+        `  system: ${task},`,
+        '  plugins: []',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    files += await W(`${m.name}/oh-package.json5`, ['{', `  "name": "${m.name}",`, '  "version": "1.0.0",', `  "description": "${m.type} module",`, '  "main": "Index.ets",', '  "dependencies": {}', '}', ''].join('\n'));
+    files += await W(`${m.name}/build-profile.json5`, ['{', '  "apiType": "stageMode",', '  "buildOption": {},', '  "targets": [', '    { "name": "default" }', '  ]', '}', ''].join('\n'));
+    files += await W(
+      `${m.name}/src/main/module.json5`,
+      [
+        '{',
+        '  "module": {',
+        `    "name": "${m.name}",`,
+        `    "type": "${m.type}",`,
+        `    "description": "$string:module_desc",`,
+        '    "deviceTypes": [ "phone", "tablet", "2in1" ],',
+        '    "deliveryWithInstall": true',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    if (m.type === 'har') {
+      files += await W(
+        `${m.name}/src/main/ets/Index.ets`,
+        [`export const ${m.name.toUpperCase()}_VERSION = '1.0.0';`, '', `export function ${m.name}Hello(): string {`, `  return 'hello from ${m.name}';`, '}', ''].join('\n'),
+      );
+    } else {
+      files += await W(
+        `${m.name}/src/main/ets/${m.name}Api.ets`,
+        [`export const ${m.name.toUpperCase()}_LOADED = true;`, ''].join('\n'),
+      );
+    }
+    files += await W(
+      `${m.name}/src/main/resources/base/element/string.json`,
+      ['{', '  "string": [', '    { "name": "module_desc", "value": "' + m.type + ' module ' + m.name + '" }', '  ]', '}', ''].join('\n'),
+    );
+  }
 
   return { root, bundleId, files };
 }
@@ -305,13 +428,26 @@ export async function scaffoldProject(dir: string, opts: { name?: string; bundle
 export const harmonyProjectCreate: Tool = {
   name: 'harmony_project_create',
   description:
-    'Scaffold a minimal buildable HarmonyOS project (stage model, ArkTS, entry module + one page) at the given path. Requires approval (it writes files). Follow up with harmony_build / harmony_install / harmony_launch.',
+    'Scaffold a buildable HarmonyOS project (stage model, ArkTS) - fully parametric, no DevEco IDE needed. Options: extra pages (PascalCase, e.g. ["Login","Home"] - each gets a routable page file and main_pages registration) and extra modules (e.g. [{"name":"profile","type":"feature"}] HAP-in-app, or [{"name":"uikit","type":"har"}] shared library wired into entry dependencies). Any project shape in one call, then harmony_build. Requires approval (writes files).',
   parameters: {
     type: 'object',
     properties: {
       path: { type: 'string', description: 'directory to create the project in (created if missing)' },
       name: { type: 'string', description: 'display name (default: directory basename)' },
       bundle_id: { type: 'string', description: 'bundle name (default: com.example.<name>)' },
+      pages: { type: 'array', items: { type: 'string' }, description: 'extra page names beyond Index, PascalCase' },
+      modules: {
+        type: 'array',
+        description: 'extra modules; default type is feature',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'module name (letters/digits)' },
+            type: { type: 'string', description: '"feature" (in-app HAP) or "har" (shared library)' },
+          },
+          required: ['name'],
+        },
+      },
     },
     required: ['path'],
   },
@@ -322,6 +458,8 @@ export const harmonyProjectCreate: Tool = {
       const r = await scaffoldProject(dir, {
         name: typeof args.name === 'string' ? args.name : undefined,
         bundleId: typeof args.bundle_id === 'string' ? args.bundle_id : undefined,
+        pages: Array.isArray(args.pages) ? (args.pages as unknown as string[]) : undefined,
+        modules: Array.isArray(args.modules) ? (args.modules as unknown as ScaffoldModule[]) : undefined,
       });
       return { output: `created project at ${r.root} (bundle ${r.bundleId}, ${r.files} files, SDK ${sdkVersion()}). Next: harmony_build.` };
     } catch (err) {

@@ -176,12 +176,18 @@ export const seeImageTool: Tool = {
     }
     const mime = /\.(jpg|jpeg)$/i.test(p) ? 'image/jpeg' : /\.webp$/i.test(p) ? 'image/webp' : 'image/png';
     const url = `data:${mime};base64,${data.toString('base64')}`;
-    try {
-      const answer = await chatVision(cfg.vision, String(args.question ?? 'Describe this image precisely and concisely.'), url);
-      return { output: `[${p}]\n${answer}` };
-    } catch (err) {
-      return { output: String(err), isError: true };
+    const question = String(args.question ?? 'Describe this image precisely and concisely.');
+    const chain = [cfg.vision, ...(cfg.visionFallbacks ?? [])].filter(Boolean);
+    const errors: string[] = [];
+    for (const provider of chain) {
+      try {
+        const answer = await chatVision(provider, question, url);
+        return { output: `[${p}]\n${answer}` };
+      } catch (err) {
+        errors.push(`${(provider as { model?: string }).model ?? '?'}: ${String(err).slice(0, 120)}`);
+      }
     }
+    return { output: `all vision providers failed:\n${errors.join('\n')}`, isError: true };
   },
 };
 

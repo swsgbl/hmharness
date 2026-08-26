@@ -91,6 +91,12 @@ export class McpClient {
     });
     this.proc.stdout!.setEncoding('utf8');
     this.proc.stdout!.on('data', (chunk: string) => this.onStdioChunk(chunk));
+    this.proc.on('error', (err) => {
+      // spawn failure (ENOENT etc.) - fail all in-flight requests loudly
+      const e = new Error(`mcp/${this.serverName}: failed to start server: ${String(err)}`);
+      for (const p of this.pending.values()) p.reject(e);
+      this.pending.clear();
+    });
     this.proc.on('exit', (code) => {
       const detail = this.stderrTail.trim().slice(-300);
       const err = new Error(`mcp/${this.serverName}: server exited (code ${code})${detail ? `: ${detail}` : ''}`);

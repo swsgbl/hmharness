@@ -6,7 +6,7 @@
  */
 import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmh/kernel';
 
@@ -16,24 +16,23 @@ function devecoHome(): string {
   return process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
 }
 
-async function findCodelinter(): Promise<string> {
-  if (process.env.HM_CODELINTER) return process.env.HM_CODELINTER;
+/** Returns a launcher: either the bare command or [node, <run/index.js>]. */
+async function findCodelinter(): Promise<{ cmd: string; args: string[] } | null> {
+  if (process.env.HM_CODELINTER) return { cmd: process.env.HM_CODELINTER, args: [] };
   try {
     await exec('codelinter', ['--version'], { timeout: 8000, windowsHide: true });
-    return 'codelinter';
+    return { cmd: 'codelinter', args: [] };
   } catch {
     /* not on PATH */
   }
-  for (const c of ['codelinter.bat', 'codelinter.exe', 'codelinter']) {
-    const p = join(devecoHome(), 'tools', 'codelinter', 'bin', c);
-    try {
-      await access(p);
-      return p;
-    } catch {
-      /* next */
-    }
+  // DevEco ships codelinter as a plugin with a node CLI entry
+  const entry = join(devecoHome(), 'plugins', 'codelinter', 'run', 'index.js');
+  try {
+    await access(entry);
+    return { cmd: process.execPath, args: [entry] };
+  } catch {
+    return null;
   }
-  return '';
 }
 
 export const harmonyLint: Tool = {
@@ -50,13 +49,14 @@ export const harmonyLint: Tool = {
     const bin = await findCodelinter();
     if (!bin) {
       return {
-        output: 'codelinter not found. Install DevEco Studio Command Line Tools (codelinter component) or set HM_CODELINTER to its executable. Probe checked PATH and ' + join(devecoHome(), 'tools', 'codelinter', 'bin') + '.',
+        output: 'codelinter not found. Install DevEco Studio (its codelinter plugin) or set HM_CODELINTER. Probed PATH and ' + join(devecoHome(), 'plugins', 'codelinter', 'run', 'index.js') + '.',
         isError: true,
       };
     }
-    const dir = typeof args.project === 'string' && args.project ? join(ctx.cwd, args.project) : ctx.cwd;
+    const projArg = typeof args.project === 'string' && args.project ? args.project : ctx.cwd;
+    const dir = isAbsolute(projArg) ? projArg : resolve(ctx.cwd, projArg);
     try {
-      const { stdout, stderr } = await exec(bin, [dir], { timeout: 300_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+      const { stdout, stderr } = await exec(bin.cmd, [...bin.args, dir], { timeout: 300_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
       const out = (stdout || stderr || '(no findings)').trim();
       return { output: out.length > 20_000 ? out.slice(0, 20_000) + '\n...[truncated]' : out };
     } catch (err: unknown) {

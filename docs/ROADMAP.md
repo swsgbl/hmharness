@@ -69,6 +69,21 @@
 - [x] 远程仓库:github.com/swsgbl/hmharness(私有)已建已推;仓库零密钥确认(git grep 扫描通过)
 - 密钥处理:视觉密钥只写 HMH_HOME/config.json(隔离契约),仓库与代码零密钥
 
+## 加固轮(2026-08-27 晚,五项边界全部落地)
+- [x] **脚手架参数化 v2(彻底去 IDE 依赖)**:pages[]+modules[](feature HAP/har 库)一次调用生成任意结构
+      (har 自动接线 entry 依赖,feature/har 分派 hvigor 任务);旧线"多模板"实为复制 DevEco 模板目录——
+      它才依赖 IDE,hmharness 原生生成更彻底。E2E:确定性(3 页+feature+har→BUILD SUCCESSFUL)+
+      **一句话**(真实模型 agnes-2.5-flash 自主参数化调用→BUILD SUCCESSFUL 5.37s)
+- [x] **单元测试体系**:node:test 零依赖,20 用例覆盖 kernel(压缩/MCP stdio 全链路/会话重建)/
+      evolution(技能三态/bench/记忆检索)/domain(参数化脚手架/PNG)/agent(i18n 键一致性);
+      测试逮住并修复 McpClient 缺 spawn error 处理的真缺陷
+- [x] **CI 流水线**:.github/workflows/ci.yml(push/PR→typecheck+test+build+编译版冒烟,ubuntu/node22)
+- [x] **codelinter 端到端**:发现 DevEco 自带 plugins/codelinter/run/index.js CLI→接线(node 启动);
+      官方 CLI 真实跑通一句话工程的检查;顺手修了绝对路径 join 缺陷
+- [x] **视觉多提供商**:config.visionFallbacks[] 备用链(逐个降级尝试);agnes-2.5-flash 实测可作主模型
+      (工具调用干脆)已切换为默认主模型;商汤未找到 base URL(旧线 yaml 为空)留待用户提供
+- [ ] 物理设备真机回路(硬件阻塞:模拟器已全通,脚本 scripts/e2e-device.mts <target> 即绪)
+
 ## 迁移策略(旧线→新线)
 不迁移代码,迁移**知识与验证过的事实**:旧线 6 插件的行为规格、34 工具清单、鸿蒙工具链踩坑(memory 已沉淀)、运维流程门禁设计。旧线保持可用直到新线 Phase 2 末达到功能对齐,再议退役。
 

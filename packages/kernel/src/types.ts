@@ -73,6 +73,8 @@ export interface HmhConfig {
   mcpServers?: Record<string, McpServerImport>;
   /** Vision-capable provider for see_image (any OpenAI-compatible endpoint). */
   vision?: ProviderConfig;
+  /** Tried in order after `vision` fails (multi-provider resilience). */
+  visionFallbacks?: ProviderConfig[];
   /** UI + system-prompt language. Default 'zh'. */
   locale?: 'zh' | 'en';
 }
