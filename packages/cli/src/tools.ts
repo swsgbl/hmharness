@@ -51,6 +51,7 @@ export const writeFileTool: Tool = {
     },
     required: ['path', 'content'],
   },
+  needsApproval: () => true,
   async execute(args, ctx) {
     try {
       const p = safePath(String(args.path), ctx.cwd);
@@ -94,6 +95,7 @@ export const runCommandTool: Tool = {
     },
     required: ['command'],
   },
+  needsApproval: () => true,
   async execute(args, ctx) {
     const command = String(args.command ?? '');
     for (const d of DENY_PATTERNS) {

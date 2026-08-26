@@ -12,6 +12,7 @@ export type SessionEvent =
   | { t: 'user'; time: string; text: string }
   | { t: 'assistant'; time: string; text: string | null; tool_calls?: unknown[] }
   | { t: 'tool'; time: string; name: string; output: string; isError: boolean }
+  | { t: 'approval'; time: string; tool: string; granted: boolean }
   | { t: 'final'; time: string; text: string; turns: number; toolUses: number };
 
 export class Session {
@@ -39,6 +40,9 @@ export class Session {
   }
   tool(name: string, output: string, isError: boolean): Promise<void> {
     return this.append({ t: 'tool', time: new Date().toISOString(), name, output, isError });
+  }
+  approval(tool: string, granted: boolean): Promise<void> {
+    return this.append({ t: 'approval', time: new Date().toISOString(), tool, granted });
   }
   final(text: string, turns: number, toolUses: number): Promise<void> {
     return this.append({ t: 'final', time: new Date().toISOString(), text, turns, toolUses });

@@ -6,13 +6,18 @@
 - [x] 鸿蒙域两把真工具:harmony_devices(hdc 3.2.0d 实测)/harmony_toolchain_check(hvigorw/ohpm 全绿)
 - [x] HMH_HOME 完全隔离;deny-first 命令护栏;typecheck 通过
 
-## Phase 1 — 可日用(目标:2 周)
-- [ ] MCP 客户端接入(stdio+HTTP,工具投影到注册表)
-- [ ] 流式输出(SSE)与思考块展示
-- [ ] 鸿蒙域扩充:工程创建(模板)/hvigor 构建/安装运行(hdc install+shell aa)/日志抓取
-- [ ] 权限与审批门禁(写操作/设备操作须确认,配置化)
-- [ ] 上下文压缩(长会话 token 预算)
+## Phase 1 — 可日用(2026-08-27 完成主体)
+- [x] MCP 客户端接入:零依赖手写 JSON-RPC 2.0,stdio + Streamable HTTP 双传输,
+      远端工具投影为 mcp_<server>_<tool> 进注册表;非 trusted 服务器默认走审批(实测 stdio 全链路含中文往返)
+- [x] 流式输出(SSE):增量文本 + reasoning 思考块分离展示;空闲守卫替代总超时;tool_calls 分片重组
+- [x] 鸿蒙域扩充:harmony_build(hvigorw assembleHap)/harmony_install(hdc install,app install 回退)/
+      harmony_launch(aa start,bundle 名自动从 AppScope/app.json5 解析)/harmony_logs(hilog -x+grep)/harmony_uninstall
+- [x] 权限审批门禁:Tool.needsApproval 声明式标记 + 循环内 ask 门禁;TTY 弹 y/N,非 TTY 默认拒,--yes/approval:auto 放行;
+      审批事件落会话审计;MCP 工具默认受门禁
+- [x] 上下文压缩:transcript 超预算时按字符裁剪最老 tool 输出(保护 system/首条 user/尾部 8 条),确定性无模型调用
 - [ ] tsc 构建+单包发布(bin:hmh)
+- [ ] 工程创建(DevEco 模板命令行化,当前用 DevEco IDE 创建后交给本框架构建)
+- 注:harmony_build/install/launch 的真机回路待有设备/模拟器在位时补实测(当前 hdc/工具链探测全绿)
 
 ## Phase 2 — 自进化转起来(目标:+4 周)
 - [ ] 进化循环:定期任务读 insights→起草技能/提示改进→bench 回归→晋升/回滚

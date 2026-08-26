@@ -31,6 +31,13 @@ export interface Tool {
   name: string;
   description: string;
   parameters: JsonSchema;
+  /**
+   * Declarative risk marker: when this returns true the loop must obtain
+   * user approval before executing (see LoopOptions.approval). Absent or
+   * false means read-only / safe. Remote (MCP) tools default to needing
+   * approval unless their server is marked trusted.
+   */
+  needsApproval?(args: Record<string, unknown>): boolean;
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>;
 }
 
@@ -58,4 +65,22 @@ export interface ProviderConfig {
 export interface HmhConfig {
   provider: ProviderConfig;
   maxTurns: number;
+  /** 'ask' (default) prompts before risky tools; 'auto' approves everything. */
+  approval?: 'ask' | 'auto';
+  /** Rough context budget in chars before old tool outputs get pruned. */
+  maxContextChars?: number;
+  /** MCP servers whose tools are projected into the registry at startup. */
+  mcpServers?: Record<string, McpServerImport>;
+}
+
+/** Shape used in config.json (kernel/src/mcp.ts has the runtime client). */
+export interface McpServerImport {
+  type: 'stdio' | 'http';
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  /** Skip the per-call approval prompt for this server's tools. */
+  trusted?: boolean;
 }
