@@ -36,7 +36,7 @@
       (确定性门禁测试三条路径全过:训练回归拒/保留回归回滚/好技能晋升;修复无快照时晋升者残留 bug)
 - [x] 进化定时化:hmh evolve --every=N [--cycles=N] 常驻循环,单轮失败不断链;skills --promote/--rollback/--unpromote 手工管理
 - [x] runEvolution 预设提案参数(测试与未来 UI 直驱门禁)
-- [ ] TUI 前端(第一版:极简,参考行业 ink 系)
+- [x] TUI 前端:以极简版落地(hmh tui,见 Phase 3——状态头+斜杠命令+流式;全屏 alt-buffer 版主动放弃,Web 已覆盖该体验)
 
 ## Phase 3 — 产品化(进行中)
 - [x] 多智能体/子代理 spawn_agent(提前完成):递归智能体循环,深度上限 2,子代理无 MCP、
