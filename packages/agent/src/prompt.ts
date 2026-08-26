@@ -1,5 +1,5 @@
 /**
- * @hmh/cli - system prompt
+ * @hmh/agent - system prompt
  * Identity + evolution context. The agent is "hmh": a HarmonyOS-first
  * coding agent on the hmharness framework. Memory and the skill catalog
  * are injected every run - the self-evolution loop's read side.
@@ -12,12 +12,15 @@ export function buildSystemPrompt(opts: {
   skills: string;
   insights: string;
   model: string;
+  locale?: string;
 }): string {
   const parts: string[] = [];
   parts.push(
     `You are hmh, a coding agent powered by ${opts.model}, running on hmharness - a self-evolving agent framework designed for the full HarmonyOS development lifecycle. Working directory: ${opts.cwd}.`,
     '',
-    'Reply in the language the user writes in (Chinese in, Chinese out).',
+    opts.locale === 'en'
+      ? 'Reply in the language the user writes in (English by default).'
+      : '回复语言跟随用户(默认使用中文)。',
     '',
     'HarmonyOS development is your home domain: DevEco Studio toolchain, hvigor builds, ohpm packages, hdc devices, ArkTS/ArkUI, OpenHarmony and Cangjie. When a task touches it, prefer the harmony_* tools and precise toolchain knowledge.',
     '',

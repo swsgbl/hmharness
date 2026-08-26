@@ -172,6 +172,62 @@ function endpoint(baseUrl: string): string {
   return b.endsWith('/v1') ? `${b}/chat/completions` : `${b}/v1/chat/completions`;
 }
 
+/**
+ * Single multimodal call: text prompt + one image (data URL). Used by the
+ * see_image tool; deliberately separate from chat() so the streaming path
+ * stays boring. Non-streaming, one retry, hard timeout.
+ */
+export async function chatVision(
+  cfg: ProviderConfig,
+  prompt: string,
+  imageDataUrl: string,
+  opts: { timeoutMs?: number; maxTokens?: number } = {},
+): Promise<string> {
+  const body = {
+    model: cfg.model,
+    max_tokens: opts.maxTokens ?? 800,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+  };
+  let lastError = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 120_000);
+    try {
+      const res = await fetch(endpoint(cfg.baseUrl), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (res.status === 429 || res.status >= 500) {
+        lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
+        await sleep(1500 * (attempt + 1));
+        continue;
+      }
+      if (!res.ok) throw new Error(`provider: HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      const data = (await res.json()) as any;
+      const text = data.choices?.[0]?.message?.content;
+      if (typeof text !== 'string') throw new Error('provider: vision response had no content');
+      return text;
+    } catch (err) {
+      lastError = String(err);
+      if (!/abort|fetch failed|ECONN|timeout/i.test(lastError)) throw err;
+      await sleep(1500 * (attempt + 1));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(`provider: vision call failed after retry (${cfg.baseUrl}): ${lastError}`);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }

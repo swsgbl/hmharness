@@ -66,6 +66,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
     return {
       model: cfg.provider.model,
       home,
+      locale: cfg.locale ?? 'zh',
       busy,
       approvalPending: pendingApproval !== null,
       skills: {

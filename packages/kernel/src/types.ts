@@ -71,6 +71,10 @@ export interface HmhConfig {
   maxContextChars?: number;
   /** MCP servers whose tools are projected into the registry at startup. */
   mcpServers?: Record<string, McpServerImport>;
+  /** Vision-capable provider for see_image (any OpenAI-compatible endpoint). */
+  vision?: ProviderConfig;
+  /** UI + system-prompt language. Default 'zh'. */
+  locale?: 'zh' | 'en';
 }
 
 /** Shape used in config.json (kernel/src/mcp.ts has the runtime client). */

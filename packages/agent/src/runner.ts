@@ -29,6 +29,7 @@ import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
 import { buildSystemPrompt } from './prompt.ts';
+import { strings } from './i18n.ts';
 import { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';
 
 /** Flatten the config.json shape into the runtime discriminated union. */
@@ -109,18 +110,19 @@ export async function contextPack(task: string) {
  * The kernel loop denies by default when no gate is wired at all.
  */
 export function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.Interface): LoopApproval {
+  const t = strings(cfg.locale ?? 'zh');
   return {
     async ask(toolName, args) {
       if (yes || cfg.approval === 'auto') return true;
       const brief = JSON.stringify(args).slice(0, 120);
       if (!stdin.isTTY) {
-        process.stdout.write(`\x1b[33m  [approval] ${toolName} ${brief} — denied (no TTY; use --yes to allow)\x1b[0m\n`);
+        process.stdout.write(`\x1b[33m${t.approvalDeniedNoTty(toolName, brief)}\x1b[0m\n`);
         return false;
       }
       const rl = sharedRl ?? readline.createInterface({ input: stdin, output: process.stdout });
       let answer: string;
       try {
-        answer = (await rl.question(`\x1b[33m  [approval] ${toolName} ${brief} — run it? [y/N] \x1b[0m`)).trim().toLowerCase();
+        answer = (await rl.question(`\x1b[33m${t.approvalPrompt(toolName, brief)}\x1b[0m`)).trim().toLowerCase();
       } finally {
         if (!sharedRl) rl.close();
       }
@@ -163,6 +165,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     skills: pack.skills,
     insights: pack.insights,
     model: cfg.provider.model,
+    locale: cfg.locale,
   });
 
   const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);

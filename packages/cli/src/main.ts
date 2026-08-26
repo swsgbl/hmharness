@@ -7,6 +7,7 @@
  *   hmh                      interactive REPL (conversation memory kept)
  *   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
  *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
+ *   hmh tui                  lite terminal UI (status header + slash commands)
  *   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
@@ -47,12 +48,17 @@ import {
   type CaseRunner,
 } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
-import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask } from '@hmh/agent';
+import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask, strings, type Locale } from '@hmh/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
+
+async function uiStrings(): Promise<ReturnType<typeof strings>> {
+  const cfg = await loadConfig();
+  return strings((cfg.locale ?? 'zh') as Locale);
+}
 
 interface TaskOptions {
   yes?: boolean;
@@ -281,8 +287,9 @@ async function main(): Promise<void> {
     const maxN = Number(rest.find((a) => a.startsWith('--max='))?.slice(6) ?? 2);
     const everyMin = Number(rest.find((a) => a.startsWith('--every='))?.slice(8) ?? 0);
     const maxCycles = Number(rest.find((a) => a.startsWith('--cycles='))?.slice(9) ?? 0);
+    const t = await uiStrings();
     const runCycle = async (n: number) => {
-      stdout.write(CYAN('evolve') + DIM(` · model ${cfg.provider.model} · cycle ${n}${everyMin ? '' : ' (one-shot)'}\n`));
+      stdout.write(CYAN('evolve') + DIM(` · ${t.evolveCycle(cfg.provider.model, n)}${everyMin ? '' : ' (one-shot)'}\n`));
       const report = await runEvolution({
         home: homeDir(),
         provider: cfg.provider,
@@ -291,7 +298,7 @@ async function main(): Promise<void> {
         log: (l) => stdout.write(DIM(`  ${l}\n`)),
       });
       for (const o of report.outcomes) {
-        const tag = o.action === 'promoted' ? GREEN('PROMOTED') : o.action === 'rejected' ? YELLOW('REJECTED') : YELLOW('ERROR');
+        const tag = o.action === 'promoted' ? GREEN(t.promoted) : o.action === 'rejected' ? YELLOW(t.rejected) : YELLOW(t.errorLabel);
         stdout.write(`${tag} ${o.name} — ${o.reason}\n`);
       }
       if (report.memoryDistilled) stdout.write(DIM(`memory distilled: ${report.memoryDistilled}\n`));
@@ -333,6 +340,12 @@ async function main(): Promise<void> {
       const r = await harmonyOpsStatus.execute({}, ctx);
       stdout.write(r.output + '\n');
     }
+    return;
+  }
+  if (cmd === 'tui') {
+    await initHome();
+    const { tui } = await import('./tui.ts');
+    await tui(yes);
     return;
   }
   if (cmd === 'web') {

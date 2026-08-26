@@ -1,14 +1,14 @@
 /**
- * @hmh/cli - base tools
- * The general coding-agent toolset: read, write, list, and a guarded shell
- * runner. Deny-first guard on obviously destructive one-liners; the real
- * sandbox/approval stack is a Phase 1 kernel feature.
+ * @hmh/agent - base tools
+ * The general coding-agent toolset: read, write, list, a guarded shell
+ * runner, long-term memory, and image viewing (vision model). Deny-first
+ * guard on obviously destructive one-liners; approvals live in the kernel.
  */
 import { exec } from 'node:child_process';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import { chatVision, loadConfig, type Tool } from '@hmh/kernel';
 
 const execCb = promisify(exec);
 
@@ -144,4 +144,45 @@ export const rememberTool: Tool = {
   },
 };
 
-export const baseTools: Tool[] = [readFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool];
+export const seeImageTool: Tool = {
+  name: 'see_image',
+  description:
+    'Look at an image file (png/jpg/webp) with the configured vision model and answer a question about it, or describe it. Use for UI screenshots, rendered pages, photos of device screens - anything visual. Requires a vision provider in config.',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'image file path (absolute or relative to cwd)' },
+      question: { type: 'string', description: 'what to answer about the image (default: describe it)' },
+    },
+    required: ['path'],
+  },
+  async execute(args, ctx) {
+    const cfg = await loadConfig();
+    if (!cfg.vision) {
+      return {
+        output: 'No vision provider configured. Add a "vision" block ({ baseUrl, apiKey, model }) to HMH_HOME/config.json.',
+        isError: true,
+      };
+    }
+    const p = safePath(String(args.path ?? ''), ctx.cwd);
+    let data: Buffer;
+    try {
+      data = await readFile(p);
+    } catch (err) {
+      return { output: String(err), isError: true };
+    }
+    if (data.length > 6 * 1024 * 1024) {
+      return { output: `Image too large (${(data.length / 1024 / 1024).toFixed(1)} MB, max 6 MB).`, isError: true };
+    }
+    const mime = /\.(jpg|jpeg)$/i.test(p) ? 'image/jpeg' : /\.webp$/i.test(p) ? 'image/webp' : 'image/png';
+    const url = `data:${mime};base64,${data.toString('base64')}`;
+    try {
+      const answer = await chatVision(cfg.vision, String(args.question ?? 'Describe this image precisely and concisely.'), url);
+      return { output: `[${p}]\n${answer}` };
+    } catch (err) {
+      return { output: String(err), isError: true };
+    }
+  },
+};
+
+export const baseTools: Tool[] = [readFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool];

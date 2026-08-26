@@ -57,15 +57,15 @@ export const PAGE = `<!doctype html>
 </header>
 <main>
   <div id="side">
-    <h3>skills</h3><div id="skills"></div>
-    <h3>recent sessions</h3><div id="sessions"></div>
-    <h3>insights</h3><div id="insights"></div>
-    <h3>evolution</h3><div id="evolution"></div>
+    <h3 id="ph-skills">skills</h3><div id="skills"></div>
+    <h3 id="ph-sessions">recent sessions</h3><div id="sessions"></div>
+    <h3 id="ph-insights">insights</h3><div id="insights"></div>
+    <h3 id="ph-evolution">evolution</h3><div id="evolution"></div>
   </div>
   <div id="stage">
     <div id="log"></div>
     <div id="approval">
-      <div>审批请求:<span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono)"></span></div>
+      <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono)"></span></div>
       <div style="margin-top:8px">
         <button id="ap-yes">批准</button>
         <button id="ap-no" class="danger">拒绝</button>
@@ -81,6 +81,32 @@ export const PAGE = `<!doctype html>
 (function () {
   var log = document.getElementById('log');
   var state = null;
+  var L = null;
+  var LABELS = {
+    zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', approve:'批准', deny:'拒绝',
+          approvalReq:'审批请求:', skills:'技能库', sessions:'最近会话', insights:'近期洞察', evolution:'进化记录',
+          none:'(无)', noCycles:'(尚无进化轮次)', placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
+          end:'--- (以下新任务将开始全新对话) ---', none2:'(无)' },
+    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
+          approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', insights:'insights', evolution:'evolution',
+          none:'(none)', noCycles:'(no cycles yet)', placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
+          end:'--- (new tasks below start a fresh conversation) ---', none2:'(none)' }
+  };
+  function setLabels(loc) {
+    L = LABELS[loc === 'en' ? 'en' : 'zh'];
+    document.title = L.title;
+    document.getElementById('send').textContent = L.send;
+    document.getElementById('ap-yes').textContent = L.approve;
+    document.getElementById('ap-no').textContent = L.deny;
+    document.getElementById('approval-req-label').textContent = L.approvalReq;
+    document.getElementById('input').placeholder = L.placeholder;
+    document.getElementById('ph-skills').textContent = L.skills;
+    document.getElementById('ph-sessions').textContent = L.sessions;
+    document.getElementById('ph-insights').textContent = L.insights;
+    document.getElementById('ph-evolution').textContent = L.evolution;
+    var badge = document.getElementById('busy');
+    badge.textContent = state && state.busy ? L.running : L.idle;
+  }
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -92,13 +118,14 @@ export const PAGE = `<!doctype html>
   }
   function setBusy(b) {
     var badge = document.getElementById('busy');
-    badge.textContent = b ? 'running…' : 'idle';
+    badge.textContent = b ? L.running : L.idle;
     badge.className = b ? 'on' : '';
     document.getElementById('send').disabled = b;
   }
 
   function renderState(s) {
     state = s;
+    setLabels(s.locale || 'zh');
     document.getElementById('model').textContent = s.model;
     document.getElementById('home').textContent = s.home;
     var sk = document.getElementById('skills');
@@ -109,7 +136,7 @@ export const PAGE = `<!doctype html>
     s.skills.drafts.forEach(function (x) {
       sk.innerHTML += '<div class="item"><span>' + x.name + '</span><span class="badge">draft</span><span class="d">' + (x.description || '') + '</span></div>';
     });
-    if (!s.skills.active.length && !s.skills.drafts.length) sk.innerHTML = '<div class="item dim">(none)</div>';
+    if (!s.skills.active.length && !s.skills.drafts.length) sk.innerHTML = '<div class="item dim">' + L.none + '</div>';
     var ins = document.getElementById('insights');
     ins.innerHTML = '';
     s.insights.forEach(function (i) {
@@ -121,7 +148,7 @@ export const PAGE = `<!doctype html>
       var line = (r.time || '') + ' ' + ((r.outcomes || []).map(function (o) { return o.action + ':' + o.name; }).join(' ') || '(no proposals)');
       ev.innerHTML += '<div class="item"><span class="d">' + line + '</span></div>';
     });
-    if (!(s.evolution || []).length) ev.innerHTML = '<div class="item dim">(no cycles yet)</div>';
+    if (!(s.evolution || []).length) ev.innerHTML = '<div class="item dim">' + L.noCycles + '</div>';
   }
 
   function loadSessions() {
@@ -135,7 +162,7 @@ export const PAGE = `<!doctype html>
         div.onclick = function () { viewSession(id, div); };
         box.appendChild(div);
       });
-      if (!d.sessions.length) box.innerHTML = '<div class="item dim">(none)</div>';
+      if (!d.sessions.length) box.innerHTML = '<div class="item dim">' + L.none2 + '</div>';
     });
   }
   function viewSession(id, sourceEl) {
@@ -148,7 +175,7 @@ export const PAGE = `<!doctype html>
         else if (m.role === 'assistant') el('div', m.tools && m.tools.length ? 'tool' : 'say', m.text || ('[calls: ' + (m.tools || []).join(', ') + ']'));
         else el('div', 'toolres', m.text);
       });
-      el('div', 'tool', '--- end (new tasks below will start a fresh conversation) ---');
+      el('div', 'tool', L.end);
       log.scrollTop = log.scrollHeight;
     });
   }

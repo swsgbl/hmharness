@@ -15,6 +15,7 @@
 import { mkdir, readFile, readdir, writeFile, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, type ProviderConfig, type Tool } from '@hmh/kernel';
+import { issueTools } from './issues.ts';
 
 export interface RadarSource {
   key: string;
@@ -269,5 +270,11 @@ export const harmonyOpsStatus: Tool = {
   },
 };
 
-export const opsTools: Tool[] = [harmonyOpsRadarScan, harmonyOpsRadarBrief, harmonyOpsStatus];
+export const opsTools: Tool[] = [
+  harmonyOpsRadarScan,
+  harmonyOpsRadarBrief,
+  harmonyOpsStatus,
+  ...issueTools,
+];
 export { DEFAULT_SOURCES };
+export { harmonyOpsIssueList, harmonyOpsIssueView, harmonyOpsIssueCreate, harmonyOpsIssueComment, harmonyOpsPrDraft } from './issues.ts';

@@ -55,8 +55,19 @@
 - [x] 仓颉(cjpm)工具:harmony_cjpm_build/test(HM_CJPM 覆盖>PATH>已知安装根;仅对绝对路径推导
       CANGJIE_HOME,PATH 别名不注入——错误 CANGJIE_HOME 正是种子技能记录的头号坑);
       体检新增 cjpm 项;真实 E2E:cjpm init → harmony_cjpm_build → "build success"(cangjie 1.1.0)
-- [ ] backlog:codelinter 包装(本机未安装,待装后实现)、see_image、脚手架多模板、ops v2 issue 流
-- [ ] TUI 前端(极简;Web 已覆盖大部分场景,优先级降低)
+- [x] 运维管家 v2:issue 流(@hmh/domain-ops/issues.ts,gh CLI 版)——list/view 只读,
+      create/comment/PR 一律 needsApproval(**审批门禁即发布门禁**,替代旧线精确口令,机制上更严);
+      发布内容自动附 hmh-keeper 署名;PR 恒为 draft+方案卡。
+      E2E 实测(自家远程仓库):创建 #1 → 列表 → 评论 → 关闭 全通
+- [x] see_image 视觉:内核 chatVision(多模态单图调用)+ see_image 工具 + config.vision 独立视觉提供商;
+      实测(NVIDIA 网关 llama-3.2-90b-vision):真实浏览器截图问答,准确读出标题与侧栏板块
+- [x] 国际化 i18n:config.locale(zh/en,默认 zh)——CLI 骨架字符串/审批文案、系统提示默认语言、
+      Web 页面标签三处全量切换(agent/i18n.ts 双语字典,前端零构建)
+- [x] codelinter 探测式包装 harmony_lint(PATH/DevEco/HM_CODELINTER 三级探测,未装给安装指引)
+- [x] TUI 极简版 hmh tui:状态头(模型/语言/技能数/忙闲)+流式彩显+/tools /skills /ops /bench /status 斜杠命令;
+      全屏 alt-buffer 主动放弃(Web 已覆盖该体验,零依赖不破)
+- [x] 远程仓库:github.com/swsgbl/hmharness(私有)已建已推;仓库零密钥确认(git grep 扫描通过)
+- 密钥处理:视觉密钥只写 HMH_HOME/config.json(隔离契约),仓库与代码零密钥
 
 ## 迁移策略(旧线→新线)
 不迁移代码,迁移**知识与验证过的事实**:旧线 6 插件的行为规格、34 工具清单、鸿蒙工具链踩坑(memory 已沉淀)、运维流程门禁设计。旧线保持可用直到新线 Phase 2 末达到功能对齐,再议退役。
