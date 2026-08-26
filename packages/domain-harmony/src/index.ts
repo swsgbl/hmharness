@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmh/kernel';
 import { harmonyProjectCreate } from './project.ts';
+import { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';
 
 const exec = promisify(execFile);
 
@@ -111,6 +112,14 @@ export const harmonyToolchainCheck: Tool = {
       lines.push(`ohpm: OK (${ohpm})`);
     } catch {
       lines.push(`ohpm: MISSING (looked at ${ohpm})`);
+    }
+
+    const cjpm = await findCjpm();
+    if (cjpm) {
+      const v = await run(cjpm, ['--version'], 8000);
+      lines.push(`cjpm: OK (${cjpm}) ${v.out.split('\n')[0] ?? ''}`.trim());
+    } else {
+      lines.push('cjpm: MISSING (set HM_CJPM or add cangjie bin to PATH)');
     }
     return { output: lines.join('\n') };
   },
@@ -403,6 +412,9 @@ export const harmonyTools: Tool[] = [
   harmonyLogs,
   harmonyUninstall,
   harmonyProjectCreate,
+  harmonyCjpmBuild,
+  harmonyCjpmTest,
 ];
 
 export { harmonyProjectCreate, scaffoldProject, solidPng, sdkVersion } from './project.ts';
+export { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';

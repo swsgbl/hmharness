@@ -52,7 +52,10 @@
       快照 diff → 模型中文简报(**网关不可达自动降级模板拼接**)→ 快照/简报/扫描日志落 HMH_HOME/ops/;
       单源失败不拖垮整轮(实测 oh-ets 404 被容错);`hmh ops scan|brief|status` + harmony_ops_* 工具三件套;
       真实 E2E:基线扫描四源全绿 → 二次扫描模型简报正确判"本期无变更"
-- [ ] 运维管家 v2:issue 流(等 GitHub MCP 服务器配置后借力,沿用旧行为规格:AI 只起草+精确口令才发布+draft PR)
+- [x] 仓颉(cjpm)工具:harmony_cjpm_build/test(HM_CJPM 覆盖>PATH>已知安装根;仅对绝对路径推导
+      CANGJIE_HOME,PATH 别名不注入——错误 CANGJIE_HOME 正是种子技能记录的头号坑);
+      体检新增 cjpm 项;真实 E2E:cjpm init → harmony_cjpm_build → "build success"(cangjie 1.1.0)
+- [ ] backlog:codelinter 包装(本机未安装,待装后实现)、see_image、脚手架多模板、ops v2 issue 流
 - [ ] TUI 前端(极简;Web 已覆盖大部分场景,优先级降低)
 
 ## 迁移策略(旧线→新线)
