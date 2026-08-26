@@ -8,6 +8,7 @@
 import {
   homeDir,
   loadConfig,
+  resolveProvider,
   mcpServerTools,
   Registry,
   runLoop,
@@ -173,7 +174,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
 
   const approval: LoopApproval = opts.approvalAsk ? { ask: opts.approvalAsk } : makeApproval(cfg, opts.yes === true);
   spawnBase.current = {
-    provider: cfg.provider,
+    provider: resolveProvider(cfg, 'chat'),
     ctx,
     approval,
     session,
@@ -188,7 +189,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
 
   const toolsUsed: string[] = [];
   const result = await runLoop({
-    provider: cfg.provider,
+    provider: resolveProvider(cfg, 'chat'),
     registry: opts.registry,
     messages,
     ctx,

@@ -1,7 +1,7 @@
 /**
  * @hmh/kernel - provider
  * OpenAI-compatible chat adapter. Works with any /v1/chat/completions
- * endpoint: zhipu GLM, OpenRouter, FreeRide gateway, vLLM, Ollama, ...
+ * endpoint: zhipu GLM, OpenAI, OpenRouter, NVIDIA NIM, vLLM, Ollama, ...
  * Streaming (SSE) activates when onDelta is provided; reasoning deltas are
  * surfaced separately so frontends can show the model thinking. One retry on
  * transient 429/5xx before the stream starts; mid-stream failures surface.

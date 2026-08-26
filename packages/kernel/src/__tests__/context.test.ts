@@ -33,3 +33,27 @@ test('compactMessages: prunes oldest tool outputs, protects opening and tail', (
 test('default budget is sane', () => {
   assert.ok(DEFAULT_CONTEXT_CHARS >= 50_000);
 });
+
+import { resolveProvider, type HmhConfig } from '../types.ts';
+
+test('resolveProvider: routing wins, falls back to legacy fields', () => {
+  const base: HmhConfig = {
+    provider: { baseUrl: 'http://legacy', apiKey: 'k', model: 'm' },
+    vision: { baseUrl: 'http://legacy-v', apiKey: 'k', model: 'v' },
+    maxTurns: 1,
+  };
+  assert.equal(resolveProvider(base, 'chat').baseUrl, 'http://legacy');
+  assert.equal(resolveProvider(base, 'vision').baseUrl, 'http://legacy-v');
+  const routed: HmhConfig = {
+    ...base,
+    providers: {
+      strong: { baseUrl: 'http://strong', apiKey: 'k', model: 's' },
+      eye: { baseUrl: 'http://eye', apiKey: 'k', model: 'e' },
+    },
+    routing: { chat: 'strong', vision: 'eye' },
+  };
+  assert.equal(resolveProvider(routed, 'chat').baseUrl, 'http://strong');
+  assert.equal(resolveProvider(routed, 'vision').baseUrl, 'http://eye');
+  assert.equal(resolveProvider(routed, 'evolve').baseUrl, 'http://strong'); // evolve/bench inherit the chat route
+  assert.equal(resolveProvider(routed, 'bench').baseUrl, 'http://strong');
+});

@@ -8,8 +8,8 @@
  */
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { loadConfig, homeDir, type ChatMessage } from '@hmh/kernel';
-import { listDrafts, listSkills, runBench } from '@hmh/evolution';
+import { loadConfig, homeDir, resolveProvider, type ChatMessage } from '@hmh/kernel';
+import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -41,6 +41,63 @@ export async function tui(yes: boolean): Promise<void> {
       if (!line) continue;
       if (line === '/exit' || line === '/quit') break;
 
+      if (line === '/help') {
+        stdout.write([
+          '  /tools    list registered tools (gated marked)',
+          '  /skills   skill library (active + drafts)',
+          '  /ops      ops keeper status · /ops scan  ecosystem radar',
+          '  /bench    quick bench (non-loop cases)',
+          '  /evolve   one evolution cycle',
+          '  /mcp      configured MCP servers',
+          '  /status   refresh header · /clear empty the screen',
+          '  /exit     quit',
+        ].join('\n') + '\n');
+        continue;
+      }
+      if (line === '/clear') {
+        stdout.write('\x1b[2J\x1b[H');
+        await header();
+        continue;
+      }
+      if (line === '/mcp') {
+        const cfg = await loadConfig();
+        const servers = Object.entries(cfg.mcpServers ?? {});
+        if (servers.length === 0) stdout.write('  (no MCP servers configured)\n');
+        for (const [name, c] of servers) stdout.write(`  ${name} — ${c.type}${c.trusted ? ' · trusted' : ' · gated'}\n`);
+        continue;
+      }
+      if (line === '/evolve') {
+        await header(true);
+        try {
+          const cfg = await loadConfig();
+          const report = await runEvolution({
+            home,
+            provider: resolveProvider(cfg, 'evolve'),
+            runCase: async (c) => {
+              if (!c.tools) {
+                const { chat } = await import('@hmh/kernel');
+                const r = await chat(resolveProvider(cfg, 'bench'), [{ role: 'user', content: c.prompt }]);
+                return r.message.content ?? '';
+              }
+              return `(skipped in tui; run 'hmh evolve')`;
+            },
+            log: (l) => stdout.write(DIM(`  ${l}\n`)),
+          });
+          for (const o of report.outcomes) stdout.write(`  ${o.action === 'promoted' ? GREEN(t.promoted) : YELLOW(o.action === 'rejected' ? t.rejected : t.errorLabel)} ${o.name} — ${o.reason}\n`);
+        } catch (err) {
+          stdout.write(YELLOW(`evolve failed: ${String(err).slice(0, 140)}\n`));
+        }
+        await header();
+        continue;
+      }
+      if (line === '/ops scan') {
+        const { harmonyOpsRadarScan } = await import('@hmh/domain-ops');
+        await header(true);
+        const r = await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
+        stdout.write(r.output.split('\n').slice(0, 12).join('\n') + '\n');
+        await header();
+        continue;
+      }
       if (line === '/tools') {
         for (const tool of reg.list()) {
           stdout.write(`  ${tool.name}${tool.needsApproval ? YELLOW(' [gated]') : ''} — ${tool.description.split('\n')[0].slice(0, 90)}\n`);

@@ -22,6 +22,7 @@ import { stdin, stdout } from 'node:process';
 import {
   chat,
   homeDir,
+  resolveProvider,
   initHome,
   latestSession,
   loadConfig,
@@ -159,7 +160,7 @@ function makeCaseRunner(): CaseRunner {
   return async (c: BenchCase, skillsPrompt: string) => {
     const cfg = await loadConfig();
     if (!c.tools) {
-      const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+      const r = await chat(resolveProvider(cfg, 'bench'), [{ role: 'user', content: c.prompt }]);
       return r.message.content ?? '';
     }
     const reg = new Registry();
@@ -172,7 +173,7 @@ function makeCaseRunner(): CaseRunner {
       model: cfg.provider.model,
     });
     const res = await runLoop({
-      provider: cfg.provider,
+      provider: resolveProvider(cfg, 'bench'),
       registry: reg,
       messages: [
         { role: 'system', content: system },
@@ -292,7 +293,7 @@ async function main(): Promise<void> {
       stdout.write(CYAN('evolve') + DIM(` · ${t.evolveCycle(cfg.provider.model, n)}${everyMin ? '' : ' (one-shot)'}\n`));
       const report = await runEvolution({
         home: homeDir(),
-        provider: cfg.provider,
+        provider: resolveProvider(cfg, 'evolve'),
         runCase: makeCaseRunner(),
         maxProposals: Number.isFinite(maxN) ? Math.min(Math.max(maxN, 0), 4) : 2,
         log: (l) => stdout.write(DIM(`  ${l}\n`)),

@@ -8,7 +8,7 @@ import { exec } from 'node:child_process';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, loadConfig, type Tool } from '@hmh/kernel';
+import { chatVision, loadConfig, resolveProvider, type ProviderConfig, type Tool } from '@hmh/kernel';
 
 const execCb = promisify(exec);
 
@@ -158,9 +158,10 @@ export const seeImageTool: Tool = {
   },
   async execute(args, ctx) {
     const cfg = await loadConfig();
-    if (!cfg.vision) {
+    const hasVision = Boolean(cfg.vision || (cfg.routing?.vision && cfg.providers?.[cfg.routing.vision]));
+    if (!hasVision) {
       return {
-        output: 'No vision provider configured. Add a "vision" block ({ baseUrl, apiKey, model }) to HMH_HOME/config.json.',
+        output: 'No vision provider configured. Add a "vision" block or providers+routing.vision to HMH_HOME/config.json.',
         isError: true,
       };
     }
@@ -177,7 +178,7 @@ export const seeImageTool: Tool = {
     const mime = /\.(jpg|jpeg)$/i.test(p) ? 'image/jpeg' : /\.webp$/i.test(p) ? 'image/webp' : 'image/png';
     const url = `data:${mime};base64,${data.toString('base64')}`;
     const question = String(args.question ?? 'Describe this image precisely and concisely.');
-    const chain = [cfg.vision, ...(cfg.visionFallbacks ?? [])].filter(Boolean);
+    const chain: ProviderConfig[] = [resolveProvider(cfg, 'vision'), ...(cfg.visionFallbacks ?? [])].filter((x) => x.baseUrl);
     const errors: string[] = [];
     for (const provider of chain) {
       try {

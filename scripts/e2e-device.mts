@@ -3,10 +3,12 @@
  * against a connected device/emulator. Run: npx tsx scripts/e2e-device.mts [target]
  */
 import { harmonyBuild, harmonyInstall, harmonyLaunch, harmonyLogs, scaffoldProject } from '../packages/domain-harmony/src/index.ts';
+import { tmpdir, homedir } from 'node:os';
+import { join } from 'node:path';
 
 const target = process.argv[2] ?? '127.0.0.1:5555';
-const root = 'C:/Users/hongfu/AppData/Local/Temp/hmh-device-e2e/DevE2E';
-const ctx = { cwd: root, home: 'C:/Users/hongfu/.hmharness' };
+const root = join(tmpdir(), 'hmh-device-e2e', 'DevE2E');
+const ctx = { cwd: root, home: join(homedir(), '.hmharness') };
 
 const banner = (s: string) => console.log(`\n=== ${s} ===`);
 const die = (step: string, out: string): never => {

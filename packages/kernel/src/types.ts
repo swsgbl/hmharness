@@ -77,6 +77,27 @@ export interface HmhConfig {
   visionFallbacks?: ProviderConfig[];
   /** UI + system-prompt language. Default 'zh'. */
   locale?: 'zh' | 'en';
+  /** Named vendor endpoints for multi-provider routing. */
+  providers?: Record<string, ProviderConfig>;
+  /** Per-purpose provider names resolved against `providers`. */
+  routing?: {
+    /** main chat loop (default: `provider`) */
+    chat?: string;
+    /** see_image (default: `vision`) */
+    vision?: string;
+    /** evolution meta-calls (default: chat) */
+    evolve?: string;
+    /** bench runner (default: chat) */
+    bench?: string;
+  };
+}
+
+/** Resolve a purpose to a concrete provider config (routing > legacy fields). */
+export function resolveProvider(cfg: HmhConfig, purpose: 'chat' | 'vision' | 'evolve' | 'bench'): ProviderConfig {
+  const named = cfg.routing?.[purpose] ?? (purpose === 'vision' ? undefined : cfg.routing?.chat);
+  if (named && cfg.providers?.[named]) return cfg.providers[named];
+  if (purpose === 'vision') return cfg.vision ?? cfg.provider;
+  return cfg.provider;
 }
 
 /** Shape used in config.json (kernel/src/mcp.ts has the runtime client). */

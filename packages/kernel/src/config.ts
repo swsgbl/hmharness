@@ -18,12 +18,11 @@ export function homeDir(): string {
 
 export function defaultConfig(): HmhConfig {
   return {
-    // Defaults target the machine-local FreeRide gateway (OpenAI-compatible,
-    // no real key needed). Override via config.json or env for any vendor.
+    // Point at any OpenAI-compatible endpoint via config.json or env vars.
     provider: {
-      baseUrl: process.env.HMH_BASE_URL ?? 'http://localhost:11343/v1',
-      apiKey: process.env.HMH_API_KEY ?? 'any',
-      model: process.env.HMH_MODEL ?? 'nvidia/nemotron-3.5-lightning:free',
+      baseUrl: process.env.HMH_BASE_URL ?? '',
+      apiKey: process.env.HMH_API_KEY ?? '',
+      model: process.env.HMH_MODEL ?? '',
     },
     maxTurns: 25,
   };

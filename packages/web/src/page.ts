@@ -54,6 +54,7 @@ export const PAGE = `<!doctype html>
   <span class="dim" id="model"></span>
   <span class="dim" id="home"></span>
   <span id="busy">idle</span>
+  <button id="clear" class="ghost" style="padding:2px 10px;font-size:12px">clear</button>
 </header>
 <main>
   <div id="side">
@@ -73,6 +74,7 @@ export const PAGE = `<!doctype html>
     </div>
     <form id="form">
       <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--dim)"><input type="checkbox" id="yes"><span id="yes-label">自动批准</span></label>
       <button id="send" type="submit">运行</button>
     </form>
   </div>
@@ -99,7 +101,9 @@ export const PAGE = `<!doctype html>
     document.getElementById('ap-yes').textContent = L.approve;
     document.getElementById('ap-no').textContent = L.deny;
     document.getElementById('approval-req-label').textContent = L.approvalReq;
+    document.getElementById('clear').textContent = loc === 'en' ? 'clear' : '清屏';
     document.getElementById('input').placeholder = L.placeholder;
+    document.getElementById('yes-label').textContent = loc === 'en' ? 'auto-approve' : '自动批准';
     document.getElementById('ph-skills').textContent = L.skills;
     document.getElementById('ph-sessions').textContent = L.sessions;
     document.getElementById('ph-insights').textContent = L.insights;
@@ -219,7 +223,8 @@ export const PAGE = `<!doctype html>
   es.addEventListener('toolResult', function (e) {
     flushStream();
     var d = JSON.parse(e.data);
-    if (d.isError) el('div', 'toolres err', '  [' + d.name + ' ERROR] ' + d.preview.slice(0, 160));
+    el('div', d.isError ? 'toolres err' : 'toolres', '  [' + d.name + (d.isError ? ' ERROR' : ' ok') + '] ' + d.preview.slice(0, d.isError ? 160 : 120).replace(/
+/g, ' '));
     autoscroll();
   });
   es.addEventListener('approvalReq', function (e) {
@@ -265,7 +270,7 @@ export const PAGE = `<!doctype html>
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify({ text: text, yes: document.getElementById('yes').checked })
     }).then(function (r) {
       if (r.status === 409) { el('div', 'err', 'a task is already running'); }
       return r.json();
@@ -277,6 +282,8 @@ export const PAGE = `<!doctype html>
       document.getElementById('form').requestSubmit();
     }
   };
+
+  document.getElementById('clear').onclick = function () { flushStream(); log.innerHTML = ''; };
 
   fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
   loadSessions();
