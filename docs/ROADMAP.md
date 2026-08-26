@@ -84,6 +84,24 @@
       (工具调用干脆)已切换为默认主模型;商汤未找到 base URL(旧线 yaml 为空)留待用户提供
 - [ ] 物理设备真机回路(硬件阻塞:模拟器已全通,脚本 scripts/e2e-device.mts <target> 即绪)
 
+## 模拟器自治轮(2026-08-27 深夜,零 GUI)
+- [x] **模拟器管理五件套(无 DevEco GUI)**:发现 Emulator.exe 本身就是无头 CLI
+      (`-hvd <名> -path <deployed> -imageRoot <镜像根>`),设备实例=lists.json 条目+两份 key=value INI
+      (qcow2 覆盖层首启自建)——harmony_emulator_list/start/stop/create/delete 全程命令行;
+      create 克隆现有硬件档+新 uuid(装新"类型"的镜像仍需一次组件管理器,已装镜像可无限开实例)
+- [x] E2E:创建 HmhTest→无 GUI 启动(hdc 出现第二台 127.0.0.1:5557)→按名停→删除,全通;
+      顺手修了 -hvd 带空格设备名的运行态误报
+- [x] **一句话模拟器供给(真实模型实测)**:"创建叫 Demo 的模拟器并启动,报告设备数"→模型自主
+      编排 list/create/start/devices,双 target 验证后正确汇报"2 台"
+- [x] **全系机型目录 + 变体物化**:harmony_emulator_catalog 读取 DevEco productConfig.json
+      (Phone 全系 Pura/nova/Mate/Enjoy/Pocket + Foldable/WideFold/TripleFold 完整档案);
+      harmony_emulator_create 新增 model= 参数——任意机型屏幕规格即刻物化为可启动实例
+      (E2E:ProTest 以 Pura 90 Pro 规格 1256x2760@560 创建成功)
+- 诚实边界:**镜像级下载无公开通道**——华为模拟器系统镜像的下载绑定 DevEco 组件管理器+账号签名 URL,
+      OpenHarmony 公开镜像(repo.huaweicloud.com/openharmony)只有真机 ROM 与 SDK、无模拟器镜像
+      (CI 的 qemu 镜像质量/配套差距大,不接)。故"各种设备"=已装镜像的全机型变体自由开;
+      新"类型"镜像(tablet/wearable)仍需一次 GUI 侧组件下载,此后又归 hmharness 全权管理
+
 ## 迁移策略(旧线→新线)
 不迁移代码,迁移**知识与验证过的事实**:旧线 6 插件的行为规格、34 工具清单、鸿蒙工具链踩坑(memory 已沉淀)、运维流程门禁设计。旧线保持可用直到新线 Phase 2 末达到功能对齐,再议退役。
 

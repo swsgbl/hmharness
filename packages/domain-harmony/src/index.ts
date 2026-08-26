@@ -14,6 +14,7 @@ import type { Tool } from '@hmh/kernel';
 import { harmonyProjectCreate } from './project.ts';
 import { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';
 import { harmonyLint } from './lint.ts';
+import { emulatorTools } from './emulator.ts';
 
 const exec = promisify(execFile);
 
@@ -416,6 +417,7 @@ export const harmonyTools: Tool[] = [
   harmonyCjpmBuild,
   harmonyCjpmTest,
   harmonyLint,
+  ...emulatorTools,
 ];
 
 export { harmonyProjectCreate, scaffoldProject, solidPng, sdkVersion } from './project.ts';
