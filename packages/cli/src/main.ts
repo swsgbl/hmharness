@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 /**
- * @hmh/cli - main
+ * @hmh/cli - main (terminal frontend)
  * Usage:
  *   hmh init                 create HMH_HOME skeleton + config
  *   hmh "do something"       one-shot task (full agent loop, streaming)
  *   hmh                      interactive REPL (conversation memory kept)
  *   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
+ *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
  *   hmh mcp                  show configured MCP servers and their tools
- *   hmh evolve               run one self-evolution cycle (mine insights ->
- *                           draft skills -> bench A/B gate -> promote/rollback)
- *                           --every=30 [--cycles=N]  keep cycling every N min
+ *   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
  *   hmh bench                run the evolution bench
- *   hmh skills               list the skill library (active + drafts)
- *                           --promote|--rollback|--unpromote <name>
+ *   hmh skills [--promote|--rollback|--unpromote <name>]
  * Flags: --yes / -y auto-approve gated tools (else they prompt; non-TTY denies).
  */
 import readline from 'node:readline/promises';
@@ -29,180 +27,46 @@ import {
   mcpServerTools,
   Registry,
   runLoop,
-  Session,
   type ChatMessage,
-  type HmhConfig,
-  type LoopApproval,
-  type LoopResult,
   type McpClient,
-  type McpServerConfig,
   type McpServerImport,
+  type McpServerConfig,
   type Tool,
 } from '@hmh/kernel';
 import {
   listSkills,
   listDrafts,
   promoteSkill,
-  recentInsights,
-  recordInsight,
-  retrieveMemory,
-  rollbackSkill,
   runBench,
   runEvolution,
+  rollbackSkill,
   skillsToPrompt,
   unpromoteSkill,
   type BenchCase,
   type CaseRunner,
 } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
-import { baseTools } from './tools.ts';
-import { buildSystemPrompt } from './prompt.ts';
-import { makeSpawnTool, MAX_SPAWN_DEPTH } from './spawn.ts';
+import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask } from '@hmh/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
 
-/** Flatten the config.json shape into the runtime discriminated union. */
-function toServerConfig(c: McpServerImport): McpServerConfig {
-  if (c.type === 'http') return { type: 'http', url: c.url ?? '', headers: c.headers, trusted: c.trusted };
-  return { type: 'stdio', command: c.command ?? '', args: c.args, env: c.env, trusted: c.trusted };
-}
-
-/**
- * Registry factory: depth 0 is the loop the user talks to; children built by
- * spawn_agent get the same native tools plus a deeper spawn tool until the
- * depth cap. MCP tools attach to depth 0 only (children stay fast and
- * deterministic). The spawn base resolves lazily per execution so REPL
- * registries always see the current task's session/approval.
- */
-const spawnBase = { current: undefined as undefined | import('./spawn.ts').SpawnBase };
-
-function nativeRegistry(depth: number): Registry {
-  const reg = new Registry();
-  reg.registerAll(baseTools).registerAll(harmonyTools);
-  if (depth < MAX_SPAWN_DEPTH) {
-    reg.register(
-      makeSpawnTool({
-        depth,
-        getBase: () => spawnBase.current ?? { provider: { baseUrl: '', apiKey: '', model: '' }, ctx: { cwd: process.cwd(), home: homeDir() } },
-        buildChildRegistry: nativeRegistry,
-      }),
-    );
-  }
-  return reg;
-}
-
-async function buildRegistry(opts: { mcp?: boolean } = {}): Promise<{ reg: Registry; clients: McpClient[] }> {
-  const reg = nativeRegistry(0);
-  const clients: McpClient[] = [];
-  if (opts.mcp !== false) {
-    const cfg = await loadConfig();
-    const servers = Object.entries(cfg.mcpServers ?? {});
-    if (servers.length > 0) {
-      await Promise.all(
-        servers.map(async ([name, raw]) => {
-          try {
-            const { client, tools } = await mcpServerTools(name, toServerConfig(raw));
-            for (const t of tools) {
-              try {
-                reg.register(t);
-              } catch {
-                /* name collision after sanitization - first server wins */
-              }
-            }
-            clients.push(client);
-            stdout.write(DIM(`  [mcp] ${name}: ${tools.length} tools attached\n`));
-          } catch (err) {
-            stdout.write(YELLOW(`  [mcp] ${name}: unavailable (${String(err).slice(0, 140)})\n`));
-          }
-        }),
-      );
-    }
-  }
-  return { reg, clients };
-}
-
-/** Retrieval-based context pack: task-relevant memories, not the whole file. */
-async function contextPack(task: string) {
-  const home = homeDir();
-  const [memory, skills, insights] = await Promise.all([
-    retrieveMemory(home, task),
-    listSkills(home),
-    recentInsights(home),
-  ]);
-  return { memory, skills: skillsToPrompt(skills), insights };
-}
-
-/**
- * The approval gate: --yes or approval:'auto' passes everything; a TTY gets
- * a y/N prompt (reusing the REPL readline when we're inside one); a pipe
- * gets a safe deny. The kernel loop enforces the safe default without this.
- */
-function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.Interface): LoopApproval {
-  return {
-    async ask(toolName, args) {
-      if (yes || cfg.approval === 'auto') return true;
-      const brief = JSON.stringify(args).slice(0, 120);
-      if (!stdin.isTTY) {
-        stdout.write(YELLOW(`  [approval] ${toolName} ${brief} — denied (no TTY; use --yes to allow)\n`));
-        return false;
-      }
-      const rl = sharedRl ?? readline.createInterface({ input: stdin, output: stdout });
-      let answer: string;
-      try {
-        answer = (await rl.question(YELLOW(`  [approval] ${toolName} ${brief} — run it? [y/N] `))).trim().toLowerCase();
-      } finally {
-        if (!sharedRl) rl.close();
-      }
-      return answer === 'y' || answer === 'yes';
-    },
-  };
-}
-
 interface TaskOptions {
   yes?: boolean;
   sharedRl?: readline.Interface;
   registry?: Registry;
   clients?: McpClient[];
-  /** Prior turns to continue from (resume / multi-turn REPL). */
   resumeMessages?: ChatMessage[];
 }
 
-async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<LoopResult> {
-  const home = homeDir();
+async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ messages: ChatMessage[]; sessionId: string }> {
   const cfg = await loadConfig();
   const { reg, clients } = taskOpts.registry
     ? { reg: taskOpts.registry, clients: taskOpts.clients ?? [] }
-    : await buildRegistry();
-  const ctx = { cwd: process.cwd(), home };
-  const pack = await contextPack(task);
-
-  const system = buildSystemPrompt({
-    cwd: ctx.cwd,
-    memory: pack.memory,
-    skills: pack.skills,
-    insights: pack.insights,
-    model: cfg.provider.model,
-  });
-
-  const session = new Session(home, ctx.cwd, cfg.provider.model);
-  await session.user(task);
-  // Current spawn base for this task (sub-agents see this session + gate).
-  spawnBase.current = {
-    provider: cfg.provider,
-    ctx,
-    approval: makeApproval(cfg, taskOpts.yes === true, taskOpts.sharedRl),
-    session,
-    onLine: (l) => stdout.write(DIM(`  ${l}\n`)),
-  };
-
-  const messages: ChatMessage[] = [
-    { role: 'system', content: system },
-    ...(taskOpts.resumeMessages ?? []),
-    { role: 'user', content: task },
-  ];
+    : await buildRegistry({ announce: false });
+  void clients;
 
   // Live output state: reasoning arrives dimmed and prefixed, final text plain.
   let displayMode: 'none' | 'reasoning' | 'text' = 'none';
@@ -215,16 +79,14 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<LoopRe
     }
   };
 
-  const toolsUsed: string[] = [];
-  const result = await runLoop({
-    provider: cfg.provider,
+  const result = await runAgentTask({
+    task,
     registry: reg,
-    messages,
-    ctx,
-    maxTurns: cfg.maxTurns,
-    maxContextChars: cfg.maxContextChars,
-    approval: spawnBase.current!.approval,
+    cfg,
+    yes: taskOpts.yes,
+    resumeMessages: taskOpts.resumeMessages,
     events: {
+      onLine: (l) => stdout.write(DIM(`  ${l}\n`)),
       onDelta: (kind, chunk) => {
         if (kind === 'reasoning') {
           openMode('reasoning');
@@ -240,36 +102,18 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<LoopRe
           stdout.write('\n');
           displayMode = 'none';
         }
-        toolsUsed.push(name);
-        const brief = JSON.stringify(args).slice(0, 100);
-        stdout.write(DIM(`  [tool] ${name} ${brief}\n`));
+        stdout.write(DIM(`  [tool] ${name} ${JSON.stringify(args).slice(0, 100)}\n`));
       },
       onToolResult: (name, output, isError) => {
         if (isError) stdout.write(DIM(`  [${name} ERROR] ${output.slice(0, 160)}\n`));
-        void session.tool(name, output, isError);
-      },
-      onApproval: (name, _args, granted) => {
-        void session.approval(name, granted);
-      },
-      onAssistant: async (m) => {
-        await session.assistant(m.content ?? null, m.tool_calls);
       },
     },
   });
 
   stdout.write(streamedText ? '\n\n' : '\n' + result.text + '\n\n');
-  await session.final(result.text, result.turns, result.toolUses);
-  await recordInsight(home, {
-    time: new Date().toISOString(),
-    session: session.id,
-    task: task.slice(0, 120),
-    outcome: result.turns >= cfg.maxTurns ? 'turn-budget' : 'ok',
-    turns: result.turns,
-    toolUses: result.toolUses,
-    toolsUsed: [...new Set(toolsUsed)],
-  });
-  stdout.write(DIM(`(session ${session.id} · ${result.turns} turns · ${result.toolUses} tool uses)\n`));
-  return result;
+  stdout.write(DIM(`(session ${result.sessionId} · ${result.turns} turns · ${result.toolUses} tool uses)\n`));
+  // working transcript minus the system prompt and the task line we appended
+  return { messages: result.messages, sessionId: result.sessionId };
 }
 
 async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void> {
@@ -287,8 +131,8 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
       if (!line) continue;
       if (line === '/exit' || line === '/quit') break;
       try {
-        const result = await runTask(line, { yes, sharedRl: rl, registry: reg, clients, resumeMessages: history });
-        history = [...history, { role: 'user', content: line }, ...result.messages.slice(2)];
+        const r = await runTask(line, { yes, sharedRl: rl, registry: reg, clients, resumeMessages: history });
+        history = [...history, { role: 'user', content: line }, ...r.messages.slice(2)];
       } catch (err) {
         stdout.write(`error: ${String(err)}\n`);
       }
@@ -352,7 +196,7 @@ async function main(): Promise<void> {
   }
   if (cmd === 'devices' || cmd === 'check') {
     await initHome();
-    const { reg } = await buildRegistry({ mcp: false });
+    const { reg } = await buildRegistry({ mcp: false, announce: false });
     const tool = reg.get(cmd === 'devices' ? 'harmony_devices' : 'harmony_toolchain_check')!;
     const r = await tool.execute({}, { cwd: process.cwd(), home: homeDir() });
     stdout.write(r.output + '\n');
@@ -360,7 +204,7 @@ async function main(): Promise<void> {
   }
   if (cmd === 'tools') {
     await initHome();
-    const { reg, clients } = await buildRegistry();
+    const { reg, clients } = await buildRegistry({ announce: false });
     stdout.write(CYAN('native tools\n'));
     for (const t of reg.list()) if (!t.name.startsWith('mcp_')) printTool(t);
     const mcp = reg.list().filter((t) => t.name.startsWith('mcp_'));
@@ -382,7 +226,10 @@ async function main(): Promise<void> {
     }
     for (const [name, raw] of servers) {
       try {
-        const { client, tools } = await mcpServerTools(name, toServerConfig(raw));
+        const sc: McpServerConfig = raw.type === 'http'
+          ? { type: 'http', url: raw.url ?? '', headers: raw.headers, trusted: raw.trusted }
+          : { type: 'stdio', command: raw.command ?? '', args: raw.args, env: raw.env, trusted: raw.trusted };
+        const { client, tools } = await mcpServerTools(name, sc);
         stdout.write(CYAN(`${name}`) + DIM(` (${raw.type}${raw.trusted ? ', trusted' : ''}) — ${tools.length} tools\n`));
         for (const t of tools) printTool(t);
         client.close();
@@ -470,6 +317,13 @@ async function main(): Promise<void> {
     stdout.write(DIM(`log: ${homeDir()}/evolution/log.jsonl\n`));
     return;
   }
+  if (cmd === 'web') {
+    await initHome();
+    const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);
+    const { startServer } = await import('@hmh/web');
+    await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
+    return; // startServer keeps the process alive
+  }
   if (cmd === 'resume') {
     await initHome();
     const file = await latestSession(homeDir(), arg);
@@ -488,7 +342,7 @@ async function main(): Promise<void> {
   }
   if (cmd && !cmd.startsWith('-')) {
     await initHome();
-    const { reg, clients } = await buildRegistry();
+    const { reg, clients } = await buildRegistry({ announce: false });
     try {
       await runTask([cmd, ...rest].join(' '), { yes, registry: reg, clients });
     } finally {

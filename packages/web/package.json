@@ -1,0 +1,17 @@
+{
+  "name": "@hmh/web",
+  "version": "0.1.0",
+  "description": "hmharness web frontend: local node:http server with SSE streaming, remote approval gate, and an embedded zero-build single page app.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

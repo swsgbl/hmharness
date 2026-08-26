@@ -14,22 +14,29 @@
 
 ```bash
 npm install
-npm run build               # tsc 编译四包产物(首次使用编译版 CLI 前执行)
+npm run build               # tsc 编译六包产物(首次使用编译版 CLI 前执行)
 npm run hmh -- init         # 建立 ~/.hmharness(配置+状态目录)
 npm run hmh -- check        # 鸿蒙工具链体检(hdc/hvigorw/ohpm)
 npm run hmh -- devices      # 列出连接的鸿蒙设备/模拟器
 npm run hmh -- "你的任务"   # 一次性任务(完整智能体循环,流式输出)
-npm run hmh                 # 交互 REPL(跨行保留对话记忆)
+npm run hmh                  # 交互 REPL(跨行保留对话记忆)
 npm run hmh -- resume       # 继续最近一次会话(或 resume <id前缀>)
+npm run hmh -- web          # 本地 Web 前端 http://127.0.0.1:7788
 npm run hmh -- tools        # 全部工具清单(含 [gated] 审批标记)
 npm run hmh -- mcp          # MCP 服务器状态与其工具
-npm run hmh -- evolve       # 跑一轮自进化循环
+npm run hmh -- evolve       # 跑一轮自进化循环(--every=30 常驻)
 npm run hmh -- bench        # 进化基准测试
 npm run hmh -- skills       # 技能库清单(active + drafts)
 npx hmh ...                 # 编译版入口(npm run build 之后)
 ```
 
 模型接入:默认走本机 OpenAI 兼容网关(FreeRide `localhost:11343`);改 `~/.hmharness/config.json` 或环境变量 `HMH_BASE_URL / HMH_API_KEY / HMH_MODEL` 指向任意厂商(GLM/OpenRouter/vLLM/Ollama…)。
+
+## Web 前端
+
+`hmh web [--port=7788]` 启动零依赖本地服务(仅绑定 127.0.0.1):浏览器里流式看思考与回答、
+工具调用实时滚动、**受门禁工具弹出批准/拒绝**(5 分钟不决策自动安全拒),侧栏是技能库/近期洞察/
+进化记录/历史会话(点击回放转录)。E2E 实测:远程批准 `write_file` → 文件真实落盘。
 
 ## 鸿蒙全流程(真机实测)
 
@@ -83,16 +90,22 @@ SDK 目标版本可用 `HM_SDK_VERSION` 覆盖(默认 `6.1.1(24)`,modelVersion �
 ```
 packages/
   kernel/          @hmh/kernel        注册表·循环·提供商(流式)·会话(审计/resume)·配置·上下文压缩·MCP 客户端(零依赖)
-  evolution/       @hmh/evolution     记忆(检索式)·洞察·技能库(三态管线)·基准·进化循环
+  evolution/       @hmh/evolution     记忆(检索式)·洞察·技能库(三态管线)·基准(含保留集)·进化循环
   domain-harmony/  @hmh/domain-harmony 鸿蒙域工具(设备·工具链·工程脚手架·构建·安装·运行·日志)
-  cli/             @hmh/cli           命令行(REPL·一次性任务·resume·evolve·bench·MCP 状态)
+  agent/           @hmh/agent         执行层:基础工具·系统提示·spawn_agent·共享任务 runner
+  cli/             @hmh/cli           终端前端(REPL·一次性任务·resume·evolve·bench·web 启动)
+  web/             @hmh/web           Web 前端(node:http+SSE+远程审批+内嵌无构建 SPA)
 scripts/
-  test-mcp-server.mjs  本地测试用 MCP 服务器(stdio,验证 MCP 客户端用)
-  e2e-scaffold.mts     工程脚手架 E2E 探针(脚手架→真实 hvigor 构建)
+  test-mcp-server.mjs   本地测试用 MCP 服务器(stdio)
+  e2e-device.mts        真机全回路 E2E(脚手架→构建→安装→启动→日志)
+  e2e-scaffold.mts      脚手架→hvigor 构建 E2E
+  e2e-evolve-gate.mts   进化门禁真实模型 E2E
+  test-evolve-gate.mts  进化门禁确定性测试(桩信号,三路径断言)
 docs/
   ARCHITECTURE.md  架构蓝图
   ROADMAP.md       路线图(Phase 0→3)
   RESEARCH-2026.md 立项调研依据
+  MIGRATION-ASSESSMENT.md 旧线能力迁移评估(34 工具逐项判定)
 ```
 
 ## 与 harmony-harness(旧线)的关系

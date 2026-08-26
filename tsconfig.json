@@ -12,10 +12,24 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@hmh/kernel": ["packages/kernel/src/index.ts"],
-      "@hmh/evolution": ["packages/evolution/src/index.ts"],
-      "@hmh/domain-harmony": ["packages/domain-harmony/src/index.ts"]
+      "@hmh/kernel": [
+        "packages/kernel/src/index.ts"
+      ],
+      "@hmh/evolution": [
+        "packages/evolution/src/index.ts"
+      ],
+      "@hmh/domain-harmony": [
+        "packages/domain-harmony/src/index.ts"
+      ],
+      "@hmh/web": [
+        "packages/web/src/index.ts"
+      ],
+      "@hmh/agent": [
+        "packages/agent/src/index.ts"
+      ]
     }
   },
-  "include": ["packages/*/src/**/*.ts"]
+  "include": [
+    "packages/*/src/**/*.ts"
+  ]
 }
