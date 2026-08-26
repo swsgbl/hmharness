@@ -38,6 +38,13 @@ npx hmh ...                 # 编译版入口(npm run build 之后)
 工具调用实时滚动、**受门禁工具弹出批准/拒绝**(5 分钟不决策自动安全拒),侧栏是技能库/近期洞察/
 进化记录/历史会话(点击回放转录)。E2E 实测:远程批准 `write_file` → 文件真实落盘。
 
+## 运维管家(生态雷达)
+
+`hmh ops scan` 扫描 OpenHarmony 生态(文档/ArkUI/ArkTS 编译器/Ability 运行时四源,
+gitee releases + github tags 双通道),与上次快照 diff 后生成中文简报——模型写简报,
+**网关不可达自动降级为模板拼接**,单源失败不拖垮整轮。`hmh ops brief` 看最新简报,
+`hmh ops status` 看扫描健康;智能体内可用 `harmony_ops_radar_scan/brief/status` 工具三件套。
+
 ## 鸿蒙全流程(真机实测)
 
 ```text

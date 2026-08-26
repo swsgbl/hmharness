@@ -1,0 +1,17 @@
+{
+  "name": "@hmh/domain-ops",
+  "version": "0.1.0",
+  "description": "hmharness ops keeper: ecosystem radar (OpenHarmony release tracking, snapshot diff, model brief with template fallback). Rewrite of the old line's hm-keeper per its captured behavior spec.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

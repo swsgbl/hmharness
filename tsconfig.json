@@ -26,6 +26,9 @@
       ],
       "@hmh/agent": [
         "packages/agent/src/index.ts"
+      ],
+      "@hmh/domain-ops": [
+        "packages/domain-ops/src/index.ts"
       ]
     }
   },

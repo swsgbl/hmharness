@@ -7,6 +7,7 @@
  *   hmh                      interactive REPL (conversation memory kept)
  *   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
  *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
+ *   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
  *   hmh mcp                  show configured MCP servers and their tools
@@ -315,6 +316,23 @@ async function main(): Promise<void> {
     }
     await runCycle(1);
     stdout.write(DIM(`log: ${homeDir()}/evolution/log.jsonl\n`));
+    return;
+  }
+  if (cmd === 'ops') {
+    await initHome();
+    const { harmonyOpsRadarScan, harmonyOpsRadarBrief, harmonyOpsStatus } = await import('@hmh/domain-ops');
+    const sub = rest[0] ?? 'status';
+    const ctx = { cwd: process.cwd(), home: homeDir() };
+    if (sub === 'scan') {
+      const r = await harmonyOpsRadarScan.execute({}, ctx);
+      stdout.write(r.output + '\n');
+    } else if (sub === 'brief') {
+      const r = await harmonyOpsRadarBrief.execute({}, ctx);
+      stdout.write(r.output + '\n');
+    } else {
+      const r = await harmonyOpsStatus.execute({}, ctx);
+      stdout.write(r.output + '\n');
+    }
     return;
   }
   if (cmd === 'web') {

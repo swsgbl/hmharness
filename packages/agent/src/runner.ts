@@ -1,5 +1,5 @@
 /**
- * @hmh/cli - runner
+ * @hmh/agent - runner
  * The shared agent-task execution layer. CLI maps its events to terminal
  * output; the web frontend maps them to SSE - one behavior, two frontends.
  * Also owns the native registry factory (spawn_agent recursion) and the
@@ -24,6 +24,7 @@ import {
 } from '@hmh/kernel';
 import { listSkills, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
+import { opsTools } from '@hmh/domain-ops';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -44,7 +45,7 @@ export const spawnBase: { current?: SpawnBase } = {};
 
 export function nativeRegistry(depth: number): Registry {
   const reg = new Registry();
-  reg.registerAll(baseTools).registerAll(harmonyTools);
+  reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
   if (depth < MAX_SPAWN_DEPTH) {
     reg.register(
       makeSpawnTool({

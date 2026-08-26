@@ -48,7 +48,11 @@
       (仓颉踩坑/cjpm 修复/hdc 手册)已全文导入新线技能库;hm-keeper 运维管家行为规格成文待重写;
       backlog:cjpm 工具、see_image、codelinter 包装、多模板脚手架
 - [x] 架构分层定型:六包 kernel→evolution/domain-harmony→agent(执行层:工具/提示/spawn/runner)→cli/web(双前端)
-- [ ] 运维管家移植(@hmh/domain-ops:生态雷达+issue 流,行为规格见迁移评估)
+- [x] 运维管家 v1(@hmh/domain-ops,生态雷达):多源拉取(gitee releases + github tags 双通道)→
+      快照 diff → 模型中文简报(**网关不可达自动降级模板拼接**)→ 快照/简报/扫描日志落 HMH_HOME/ops/;
+      单源失败不拖垮整轮(实测 oh-ets 404 被容错);`hmh ops scan|brief|status` + harmony_ops_* 工具三件套;
+      真实 E2E:基线扫描四源全绿 → 二次扫描模型简报正确判"本期无变更"
+- [ ] 运维管家 v2:issue 流(等 GitHub MCP 服务器配置后借力,沿用旧行为规格:AI 只起草+精确口令才发布+draft PR)
 - [ ] TUI 前端(极简;Web 已覆盖大部分场景,优先级降低)
 
 ## 迁移策略(旧线→新线)
