@@ -5,7 +5,7 @@
  * the raw feed the future evolution loop mines for skill and prompt
  * improvements - the DGM lesson: evolution needs an archive plus a signal.
  */
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface Insight {
@@ -22,6 +22,25 @@ export async function recordInsight(home: string, insight: Insight): Promise<voi
   const dir = join(home, 'insights');
   await mkdir(dir, { recursive: true });
   await appendFile(join(dir, 'insights.jsonl'), JSON.stringify(insight) + '\n', 'utf8');
+}
+
+/** Read recent insights as structured records (the evolve loop's raw feed). */
+export async function readInsights(home: string, limit = 40): Promise<Insight[]> {
+  try {
+    const text = await readFile(join(home, 'insights', 'insights.jsonl'), 'utf8');
+    const lines = text.trim().split('\n').filter(Boolean).slice(-limit);
+    const out: Insight[] = [];
+    for (const l of lines) {
+      try {
+        out.push(JSON.parse(l) as Insight);
+      } catch {
+        /* skip corrupt line */
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 /** Summarize recent insights for the system prompt (bounded). */

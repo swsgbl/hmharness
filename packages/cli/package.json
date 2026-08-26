@@ -3,8 +3,18 @@
   "version": "0.1.0",
   "description": "hmharness command line: one-shot tasks, an interactive REPL, direct tool invocation, and the bench runner.",
   "type": "module",
-  "main": "src/main.ts",
+  "main": "dist/main.js",
   "exports": {
-    ".": "./src/main.ts"
+    ".": {
+      "types": "./dist/main.d.ts",
+      "default": "./dist/main.js"
+    }
+  },
+  "types": "dist/main.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "bin": {
+    "hmh": "./dist/main.js"
   }
 }

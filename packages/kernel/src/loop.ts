@@ -30,6 +30,8 @@ export interface LoopResult {
   text: string;
   turns: number;
   toolUses: number;
+  /** The full working transcript (system + task + all turns), uncompacted. */
+  messages: ChatMessage[];
 }
 
 export async function runLoop(opts: {
@@ -58,7 +60,7 @@ export async function runLoop(opts: {
     if (calls.length === 0) {
       const text = message.content ?? '';
       events?.onFinal?.(text, turn);
-      return { text, turns: turn, toolUses };
+      return { text, turns: turn, toolUses, messages: working };
     }
 
     working.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
@@ -110,5 +112,5 @@ export async function runLoop(opts: {
   }
   const text = `Turn budget exhausted (${maxTurns}). Last state preserved in the session log.`;
   events?.onFinal?.(text, maxTurns);
-  return { text, turns: maxTurns, toolUses };
+  return { text, turns: maxTurns, toolUses, messages: working };
 }

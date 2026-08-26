@@ -6,10 +6,12 @@
  * needsApproval - the kernel loop gates them behind user confirmation.
  */
 import { execFile } from 'node:child_process';
+import { accessSync } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmh/kernel';
+import { harmonyProjectCreate } from './project.ts';
 
 const exec = promisify(execFile);
 
@@ -17,9 +19,21 @@ function devecoHome(): string {
   return process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
 }
 
-async function run(cmd: string, args: string[], timeoutMs = 20_000, cwd?: string): Promise<{ ok: boolean; out: string }> {
+async function run(
+  cmd: string,
+  args: string[],
+  timeoutMs = 20_000,
+  cwd?: string,
+  extraEnv?: Record<string, string>,
+): Promise<{ ok: boolean; out: string }> {
   try {
-    const { stdout, stderr } = await exec(cmd, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024 * 1024, cwd });
+    const { stdout, stderr } = await exec(cmd, args, {
+      timeout: timeoutMs,
+      windowsHide: true,
+      maxBuffer: 16 * 1024 * 1024,
+      cwd,
+      ...(extraEnv ? { env: { ...process.env, ...extraEnv } } : {}),
+    });
     return { ok: true, out: (stdout || stderr || '(no output)').trim() };
   } catch (err: unknown) {
     const e = err as { stdout?: string; stderr?: string; message?: string };
@@ -113,11 +127,40 @@ function ohpmName(): string {
   return process.platform === 'win32' ? 'ohpm.bat' : 'ohpm';
 }
 /** Windows .bat scripts must go through cmd; posix scripts run directly. */
-async function runScript(scriptPath: string, args: string[], timeoutMs: number, cwd: string) {
+async function runScript(scriptPath: string, args: string[], timeoutMs: number, cwd: string, extraEnv?: Record<string, string>) {
   if (process.platform === 'win32') {
-    return run('cmd', ['/c', scriptPath, ...args], timeoutMs, cwd);
+    return run('cmd', ['/c', scriptPath, ...args], timeoutMs, cwd, buildEnv(extraEnv));
   }
-  return run('sh', [scriptPath, ...args], timeoutMs, cwd);
+  return run('sh', [scriptPath, ...args], timeoutMs, cwd, buildEnv(extraEnv));
+}
+
+/** hvigor/ohpm ship with a bundled node - make sure they can find it. */
+function buildEnv(extra?: Record<string, string>): Record<string, string> | undefined {
+  const env: Record<string, string> = { ...extra };
+  const nodeDir = join(devecoHome(), 'tools', 'node');
+  try {
+    accessSyncOrIgnore(nodeDir);
+    if (!process.env.NODE_HOME) env.NODE_HOME = nodeDir;
+    if (!process.env.NODE_PATH) env.NODE_PATH = join(nodeDir, 'node_modules', 'npm');
+  } catch {
+    /* DevEco node layout differs - fall back to inherited env */
+  }
+  // Standalone hvigorw runs need the SDK root; DevEco sets this globally,
+  // shells without it get "Invalid value of DEVECO_SDK_HOME".
+  if (!process.env.DEVECO_SDK_HOME) {
+    const sdkRoot = join(devecoHome(), 'sdk');
+    try {
+      accessSyncOrIgnore(sdkRoot);
+      env.DEVECO_SDK_HOME = sdkRoot;
+    } catch {
+      /* no sdk dir - let hvigor report it */
+    }
+  }
+  return Object.keys(env).length > 0 ? env : undefined;
+}
+
+function accessSyncOrIgnore(p: string): void {
+  accessSync(p);
 }
 
 /** Walk up from `start` looking for the hvigor project marker. */
@@ -166,12 +209,12 @@ async function bundleNameOf(projectRoot: string): Promise<string> {
   return (mod as unknown as { module?: { name?: string } } | null)?.module?.name ?? '';
 }
 
-/** Newest .hap under the project's build outputs (recursive, bounded). */
+/** Newest .hap under the project's build outputs (module dirs: entry/build/...). */
 async function newestHap(projectRoot: string): Promise<string> {
   let best = '';
   let bestMtime = 0;
-  const stack = [join(projectRoot, 'build')];
-  for (let depth = 0; stack.length > 0 && depth < 500; depth++) {
+  const stack = [projectRoot];
+  for (let depth = 0; stack.length > 0 && depth < 1000; depth++) {
     const dir = stack.pop()!;
     let entries;
     try {
@@ -182,7 +225,7 @@ async function newestHap(projectRoot: string): Promise<string> {
     for (const e of entries) {
       const p = join(dir, e.name);
       if (e.isDirectory()) {
-        if (e.name === 'node_modules' || e.name === '.preview') continue;
+        if (['node_modules', 'oh_modules', '.hvigor', '.preview', 'src'].includes(e.name)) continue;
         stack.push(p);
       } else if (e.name.endsWith('.hap')) {
         const m = (await stat(p)).mtimeMs;
@@ -358,4 +401,7 @@ export const harmonyTools: Tool[] = [
   harmonyLaunch,
   harmonyLogs,
   harmonyUninstall,
+  harmonyProjectCreate,
 ];
+
+export { harmonyProjectCreate, scaffoldProject, solidPng, sdkVersion } from './project.ts';
