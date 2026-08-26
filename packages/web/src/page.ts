@@ -139,6 +139,7 @@ export const PAGE = `<!doctype html>
     });
   }
   function viewSession(id, sourceEl) {
+    flushStream();
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
       log.innerHTML = '';
       el('div', 'tool', '--- session ' + d.id + ' (' + d.model + ') ---');
@@ -153,27 +154,46 @@ export const PAGE = `<!doctype html>
   }
 
   // ---- SSE ----
-  var pendingDecision = null;
+  // Streaming display: one element per assistant segment (thinking / text);
+  // chunks APPEND to it until the segment changes. Creating an element per
+  // chunk shreds CJK text into vertical confetti - never again.
+  var curEl = null;
+  var curKind = null;
+  function flushStream() { curEl = null; curKind = null; }
+  function nearBottom() { return log.scrollHeight - log.scrollTop - log.clientHeight < 80; }
+  function autoscroll() { if (nearBottom()) log.scrollTop = log.scrollHeight; }
+
   var es = new EventSource('/api/events');
   es.addEventListener('hello', function (e) { renderState(JSON.parse(e.data)); });
   es.addEventListener('state', function (e) { renderState(JSON.parse(e.data)); });
   es.addEventListener('busy', function (e) {
     var d = JSON.parse(e.data);
     setBusy(d.busy);
+    flushStream();
     if (d.busy) el('div', 'tool', '▶ ' + d.task);
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
-    el('div', d.kind === 'reasoning' ? 'think' : 'say', d.chunk);
+    if (curKind !== d.kind) {
+      flushStream();
+      curKind = d.kind;
+      curEl = el('div', d.kind === 'reasoning' ? 'think' : 'say');
+    }
+    curEl.textContent += d.chunk;
+    autoscroll();
   });
-  es.addEventListener('line', function (e) { el('div', 'toolres', '  ' + JSON.parse(e.data).text); });
+  es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', '  ' + JSON.parse(e.data).text); autoscroll(); });
   es.addEventListener('tool', function (e) {
+    flushStream();
     var d = JSON.parse(e.data);
     el('div', 'tool', '  [tool] ' + d.name + ' ' + JSON.stringify(d.args).slice(0, 120));
+    autoscroll();
   });
   es.addEventListener('toolResult', function (e) {
+    flushStream();
     var d = JSON.parse(e.data);
     if (d.isError) el('div', 'toolres err', '  [' + d.name + ' ERROR] ' + d.preview.slice(0, 160));
+    autoscroll();
   });
   es.addEventListener('approvalReq', function (e) {
     var d = JSON.parse(e.data);
@@ -183,10 +203,12 @@ export const PAGE = `<!doctype html>
   });
   es.addEventListener('approvalDone', function (e) {
     document.getElementById('approval').style.display = 'none';
+    flushStream();
     var d = JSON.parse(e.data);
     el('div', 'toolres', '  [approval ' + d.name + ': ' + (d.granted ? 'granted' : 'DENIED') + ']');
   });
   es.addEventListener('final', function (e) {
+    flushStream();
     var d = JSON.parse(e.data);
     el('div', 'toolres final', '(done · ' + d.turns + ' turns · ' + d.toolUses + ' tool uses · session ' + d.sessionId + ')');
     loadSessions();
