@@ -202,9 +202,10 @@ async function readJson5(p: string): Promise<Record<string, unknown> | null> {
 
 async function bundleNameOf(projectRoot: string): Promise<string> {
   const app = await readJson5(join(projectRoot, 'AppScope', 'app.json5'));
-  const b = (app as { bundleName?: string } | null)?.bundleName;
+  const b = (app as { app?: { bundleName?: string } } | null)?.app?.bundleName;
   if (b) return b;
-  // entry/src/main/module.json5 fallback
+  // entry/src/main/module.json5 fallback (module name - a weak substitute,
+  // real bundleName lives in AppScope)
   const mod = await readJson5(join(projectRoot, 'entry', 'src', 'main', 'module.json5'));
   return (mod as unknown as { module?: { name?: string } } | null)?.module?.name ?? '';
 }

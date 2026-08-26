@@ -17,7 +17,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, type ProviderConfig } from '@hmh/kernel';
 import { listCases, matchExpect, seedCases, type BenchCase } from './bench.ts';
-import { deleteDraft, listDrafts, listSkills, promoteSkill, skillsToPrompt, writeDraft } from './skills.ts';
+import { deleteDraft, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';
 import { readInsights } from './insights.ts';
 
@@ -33,6 +33,7 @@ export interface ProposalOutcome {
   reason: string;
   baseline?: { passRate: number; cases: string };
   candidate?: { passRate: number; cases: string };
+  holdout?: { baselineRate: number; candidateRate: number };
 }
 
 export interface EvolveReport {
@@ -54,6 +55,8 @@ export async function runEvolution(opts: {
   provider: ProviderConfig;
   runCase: CaseRunner;
   maxProposals?: number;
+  /** Skip the meta-model call and evaluate these proposals directly (tests / future UIs). */
+  presetProposals?: SkillProposal[];
   log?: (line: string) => void;
 }): Promise<EvolveReport> {
   const { home, provider, runCase } = opts;
@@ -73,8 +76,10 @@ export async function runEvolution(opts: {
   // 1. Seed bench cases on a fresh home so the gate always has a signal.
   report.seededCases = await seedCases(home);
   const cases = await listCases(home);
-  if (cases.length === 0) {
-    report.outcomes.push({ name: '(bench)', action: 'error', reason: 'no bench cases available' });
+  const train = cases.filter((c) => !c.holdout);
+  const holdout = cases.filter((c) => c.holdout);
+  if (train.length === 0) {
+    report.outcomes.push({ name: '(bench)', action: 'error', reason: 'no train bench cases available' });
     return report;
   }
 
@@ -96,10 +101,10 @@ export async function runEvolution(opts: {
     recentNotes: notes.slice(-10).map((n) => n.text),
   };
 
-  // 3. Baseline bench (current active skills).
-  say(`baseline bench: ${cases.length} cases`);
+  // 3. Baseline bench (train gates promotion; holdout re-verifies after).
+  say(`baseline bench: ${train.length} train + ${holdout.length} holdout cases`);
   const baseResults: Array<{ name: string; pass: boolean }> = [];
-  for (const c of cases) {
+  for (const c of train) {
     try {
       baseResults.push({ name: c.name, pass: matchExpect(await runCase(c, skillsToPrompt(active)), c.expect) });
     } catch (err) {
@@ -108,22 +113,32 @@ export async function runEvolution(opts: {
     }
   }
   const baseRate = baseResults.filter((r) => r.pass).length / baseResults.length;
-  say(`baseline pass rate: ${(baseRate * 100).toFixed(0)}%`);
+  const holdoutBase: Array<{ name: string; pass: boolean }> = [];
+  for (const c of holdout) {
+    try {
+      holdoutBase.push({ name: c.name, pass: matchExpect(await runCase(c, skillsToPrompt(active)), c.expect) });
+    } catch {
+      holdoutBase.push({ name: c.name, pass: false });
+    }
+  }
+  const holdoutBaseRate = holdoutBase.length === 0 ? 1 : holdoutBase.filter((r) => r.pass).length / holdoutBase.length;
+  say(`baseline: train ${(baseRate * 100).toFixed(0)}%, holdout ${(holdoutBaseRate * 100).toFixed(0)}%`);
 
-  // 4. Meta-call: propose skill drafts from the signals.
-  const proposals = await proposeSkills(provider, signals, say);
+  // 4. Proposals: preset (tests/UI) or meta-model call.
+  const proposals = opts.presetProposals ?? (await proposeSkills(provider, signals, say));
   report.proposals = proposals;
 
-  // 5. A/B gate each proposal.
+  // 5. A/B gate each proposal on the train set.
   for (const p of proposals.slice(0, maxProposals)) {
     say(`candidate "${p.name}": drafting + candidate bench`);
     try {
       await writeDraft(home, p.name, p.skill_md);
       const draftBlock = `## Draft skill under evaluation: ${p.name}\n\n${p.skill_md.slice(0, 4000)}`;
+      const candidateInjection = `${skillsToPrompt(active)}\n${draftBlock}`;
       const candResults: Array<{ name: string; pass: boolean }> = [];
-      for (const c of cases) {
+      for (const c of train) {
         try {
-          candResults.push({ name: c.name, pass: matchExpect(await runCase(c, `${skillsToPrompt(active)}\n${draftBlock}`), c.expect) });
+          candResults.push({ name: c.name, pass: matchExpect(await runCase(c, candidateInjection), c.expect) });
         } catch {
           candResults.push({ name: c.name, pass: false });
         }
@@ -141,17 +156,52 @@ export async function runEvolution(opts: {
           candidate: { passRate: candRate, cases: summary(candResults) },
         });
         say(`  rejected (${regression ? 'regression' : 'lower pass rate'})`);
-      } else {
-        const { archivedPrevious } = await promoteSkill(home, p.name);
-        report.outcomes.push({
-          name: p.name,
-          action: 'promoted',
-          reason: `no regression (candidate ${(candRate * 100).toFixed(0)}% vs baseline ${(baseRate * 100).toFixed(0)}%)${archivedPrevious ? '; previous version archived' : ''}`,
-          baseline: { passRate: baseRate, cases: summary(baseResults) },
-          candidate: { passRate: candRate, cases: summary(candResults) },
-        });
-        say(`  promoted`);
+        continue;
       }
+      const { archivedPrevious } = await promoteSkill(home, p.name);
+      // Holdout re-verification (GDPevo anti-memorization): the gate saw the
+      // train cases; holdout cases check the skill generalizes. Regression
+      // here rolls the promotion back.
+      let holdoutRate = 1;
+      if (holdout.length > 0) {
+        const holdoutCand: Array<{ name: string; pass: boolean }> = [];
+        for (const c of holdout) {
+          try {
+            holdoutCand.push({ name: c.name, pass: matchExpect(await runCase(c, candidateInjection), c.expect) });
+          } catch {
+            holdoutCand.push({ name: c.name, pass: false });
+          }
+        }
+        holdoutRate = holdoutCand.filter((r) => r.pass).length / holdoutCand.length;
+        if (holdoutRate < holdoutBaseRate) {
+          // Restore the previous version; when there is none (first-time
+          // promotion), demote the new skill back out of active and delete.
+          const restored = await rollbackSkill(home, p.name);
+          if (!restored) {
+            await unpromoteSkill(home, p.name);
+            await deleteDraft(home, p.name);
+          }
+          report.outcomes.push({
+            name: p.name,
+            action: 'rejected',
+            reason: `holdout regression after promotion (train ${candRate} vs ${baseRate}, holdout ${holdoutRate} vs ${holdoutBaseRate}) - rolled back`,
+            baseline: { passRate: baseRate, cases: summary(baseResults) },
+            candidate: { passRate: candRate, cases: summary(candResults) },
+            holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate },
+          });
+          say(`  rolled back (holdout regression: ${(holdoutRate * 100).toFixed(0)}% < ${(holdoutBaseRate * 100).toFixed(0)}%)`);
+          continue;
+        }
+      }
+      report.outcomes.push({
+        name: p.name,
+        action: 'promoted',
+        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''})${archivedPrevious ? '; previous version archived' : ''}`,
+        baseline: { passRate: baseRate, cases: summary(baseResults) },
+        candidate: { passRate: candRate, cases: summary(candResults) },
+        ...(holdout.length ? { holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate } } : {}),
+      });
+      say(`  promoted${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ''}`);
     } catch (err) {
       report.outcomes.push({ name: p.name, action: 'error', reason: String(err).slice(0, 200) });
       say(`  error: ${String(err).slice(0, 120)}`);

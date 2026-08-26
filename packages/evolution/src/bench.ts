@@ -17,6 +17,8 @@ export interface BenchCase {
   expect: string[];
   /** When true the case runs through the full agent loop with tools. */
   tools: boolean;
+  /** Holdout cases are excluded from the promotion gate and re-verify after promotion (anti-memorization, GDPevo style). */
+  holdout: boolean;
 }
 
 export interface BenchResult {
@@ -45,11 +47,13 @@ export async function listCases(home: string): Promise<BenchCase[]> {
     const prompt = lines[0];
     const expectLine = lines.find((l) => l.startsWith('expect:'));
     const toolsLine = lines.find((l) => l.startsWith('tools:'));
+    const holdoutLine = lines.find((l) => l.startsWith('holdout:'));
     cases.push({
       name: f.replace(/\.task$/, ''),
       prompt,
       expect: expectLine ? expectLine.slice(7).split('&&').map((s) => s.trim()).filter(Boolean) : [],
       tools: toolsLine ? toolsLine.slice(6).trim() === 'loop' : false,
+      holdout: holdoutLine ? holdoutLine.slice(8).trim() === 'true' : false,
     });
   }
   return cases;
@@ -81,6 +85,7 @@ export async function seedCases(home: string): Promise<string[]> {
   const seeds: Array<[string, string]> = [
     ['toolchain-report.task', '运行鸿蒙工具链体检,然后逐项说出一共检查了哪三个工具的名称\nexpect: hdc && hvigorw && ohpm\ntools: loop\n'],
     ['reply-determinism.task', '只回复这六个字符,不要任何其他内容:HMH-OK\nexpect: HMH-OK\n'],
+    ['toolchain-ohpm-status.task', '运行鸿蒙工具链体检,然后只回答 ohpm 的状态是 OK 还是 MISSING\nexpect: OK\ntools: loop\nholdout: true\n'],
   ];
   let existing: string[] = [];
   try {

@@ -20,9 +20,11 @@
       真实 hvigor 构建实测通过(harmonyOS 6.1.1 SDK / hvigor 6.24.1,BUILD SUCCESSFUL 5.5s,产出 entry-default-unsigned.hap)
 - 踩坑记录(已固化进代码):根 oh-package.json5 必须携带与 hvigor-config 相同的 modelVersion,否则报误导性的"结构需升级";
   独立运行 hvigorw 需注入 DEVECO_SDK_HOME;hap 产物在 entry/build/ 而非根 build/
-- 注:harmony_install/launch 真机回路待设备在位补测
+- 注:~~harmony_install/launch 真机回路待设备在位补测~~ **2026-08-27 模拟器(127.0.0.1:5555)全回路实测通过:
+  脚手架→构建→安装("install bundle successfully")→启动("start ability successfully",页面 pages.Index 加载)→
+  日志(抓到脚手架埋点 A00000/hmh: EntryAbility onCreate)→卸载;顺手修了 bundleNameOf 误读模块名的 bug**
 
-## Phase 2 — 自进化转起来(2026-08-27 主体完成)
+## Phase 2 — 自进化转起来(2026-08-27 完结)
 - [x] 进化循环 hmh evolve:读洞察→元模型起草技能→bench A/B 基线/候选门禁(回归即拒)→晋升或回滚;
       进化日志 evolution/log.jsonl;循环只写 skills/ 与 memory/,碰不到配置与安全设置(实测一轮,模型正确返回"无需沉淀")
 - [x] 技能晋升管线:skills/draft→active→archive 三态,promote 自动快照现任版本,rollback 可恢复(确定性实测通过)
@@ -30,12 +32,16 @@
 - [x] 会话 --resume:hmh resume [前缀] 从 jsonl 重建消息历史(含 tool_call_id 顺序配对),REPL 连续对话记忆
 - [x] bench 升级:expect 支持 && 多条件;tools: loop 用例走完整智能体回路;种子用例自动播种
 - [x] 审计补全:工具执行结果(session.tool)此前未落盘,已接线
-- [ ] 记忆蒸馏的保留集验证(防"背题",参考 GDPevo)与进化循环定时化(cron/任务计划)
+- [x] 保留集防背题(GDPevo 式):holdout: true 用例不进门禁,晋升后复验,回归即回滚清退
+      (确定性门禁测试三条路径全过:训练回归拒/保留回归回滚/好技能晋升;修复无快照时晋升者残留 bug)
+- [x] 进化定时化:hmh evolve --every=N [--cycles=N] 常驻循环,单轮失败不断链;skills --promote/--rollback/--unpromote 手工管理
+- [x] runEvolution 预设提案参数(测试与未来 UI 直驱门禁)
 - [ ] TUI 前端(第一版:极简,参考行业 ink 系)
 
 ## Phase 3 — 产品化(目标:+8 周)
+- [x] 多智能体/子代理 spawn_agent(提前完成):递归智能体循环,深度上限 2,子代理无 MCP、
+      共享审批门禁,审计以 sub1> 前缀落同一会话(真实模型实测:父代理委派→子代理 list_dir→汇报总结)
 - [ ] Web 前端(自研,不复用任何上游 UI)
-- [ ] 多智能体/子代理 spawn(fork 模式)
 - [ ] 运维管家移植(雷达/issue 流,复用旧线经验)
 - [ ] 旧线 harmony-harness 的能力迁移评估(逐项:重写 or 复用其 TS 源)
 

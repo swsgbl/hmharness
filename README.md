@@ -31,25 +31,32 @@ npx hmh ...                 # 编译版入口(npm run build 之后)
 
 模型接入:默认走本机 OpenAI 兼容网关(FreeRide `localhost:11343`);改 `~/.hmharness/config.json` 或环境变量 `HMH_BASE_URL / HMH_API_KEY / HMH_MODEL` 指向任意厂商(GLM/OpenRouter/vLLM/Ollama…)。
 
-## 鸿蒙全流程(实测)
+## 鸿蒙全流程(真机实测)
 
 ```text
 harmony_project_create → harmony_build → harmony_install → harmony_launch → harmony_logs
 ```
 
-`harmony_project_create` 在指定目录生成最小可构建工程(stage 模型,ArkTS,16 文件,含生成的 PNG 图标);
-`harmony_build` 调用真实 hvigor(自动注入 DEVECO_SDK_HOME/NODE_HOME)。本机已实测:
-脚手架 → `BUILD SUCCESSFUL in 5.5s` → 产出 `entry-default-unsigned.hap`。
+`harmony_project_create` 在指定目录生成最小可构建工程(stage 模型,ArkTS,含生成的 PNG 图标);
+`harmony_build` 调用真实 hvigor(自动注入 DEVECO_SDK_HOME/NODE_HOME)。**已在模拟器(127.0.0.1:5555)全回路实测**:
+脚手架 → `BUILD SUCCESSFUL 5.5s` → 安装成功 → `aa start` 启动成功(pages.Index 加载)→ hilog 抓到脚手架埋点 → 卸载。
 SDK 目标版本可用 `HM_SDK_VERSION` 覆盖(默认 `6.1.1(24)`,modelVersion 固定 5.0.0 兼容当前 hvigor)。
 
-## 自进化(Phase 2)
+## 子代理
 
-`hmh evolve` 跑一轮完整进化循环:读会话洞察 → 元模型起草候选技能(写入 `skills/draft/`)→
-bench A/B 门禁(候选注入 vs 基线,任何用例回归即拒)→ 晋升(自动快照现任版本)或回滚 →
-记忆蒸馏(append-only)→ 全程落 `evolution/log.jsonl`。
+`spawn_agent` 工具把一个自包含的子任务委派给**全新上下文**的子代理(同工具集、无 MCP、无父对话历史),
+返回其最终答案——上下文隔离让长任务的探索不再撑爆主对话。深度上限 2 层,子代理工具流量以
+`sub1>` 前缀审计进同一会话日志,共享同一审批门禁。
+
+## 自进化(Phase 2 完结)
+
+`hmh evolve [--every=30] [--cycles=N]` 跑进化循环(单次或常驻):读会话洞察 → 元模型起草候选技能
+(写入 `skills/draft/`)→ **训练集** A/B 门禁(候选注入 vs 基线,回归即拒)→ 晋升(自动快照现任版本)
+→ **保留集**复验(防背题,回归即回滚清退)→ 记忆蒸馏(append-only)→ 全程落 `evolution/log.jsonl`。
+手工管理:`hmh skills --promote|--rollback|--unpromote <name>`。
 
 安全设计:草稿永不进入真实会话;进化循环只写 `skills/` 与 `memory/`,无法触碰配置与安全设置;
-记忆只增不删(ACE 教训);bench 绿是晋升的唯一通道(DGM/GDPevo 教训)。
+记忆只增不删(ACE 教训);训练/保留双集都绿是晋升的唯一通道(DGM/GDPevo 教训)。
 
 ## MCP 生态接入
 

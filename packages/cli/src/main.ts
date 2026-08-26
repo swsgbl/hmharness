@@ -11,8 +11,10 @@
  *   hmh mcp                  show configured MCP servers and their tools
  *   hmh evolve               run one self-evolution cycle (mine insights ->
  *                           draft skills -> bench A/B gate -> promote/rollback)
+ *                           --every=30 [--cycles=N]  keep cycling every N min
  *   hmh bench                run the evolution bench
  *   hmh skills               list the skill library (active + drafts)
+ *                           --promote|--rollback|--unpromote <name>
  * Flags: --yes / -y auto-approve gated tools (else they prompt; non-TTY denies).
  */
 import readline from 'node:readline/promises';
@@ -40,18 +42,22 @@ import {
 import {
   listSkills,
   listDrafts,
+  promoteSkill,
   recentInsights,
   recordInsight,
   retrieveMemory,
+  rollbackSkill,
   runBench,
   runEvolution,
   skillsToPrompt,
+  unpromoteSkill,
   type BenchCase,
   type CaseRunner,
 } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
 import { baseTools } from './tools.ts';
 import { buildSystemPrompt } from './prompt.ts';
+import { makeSpawnTool, MAX_SPAWN_DEPTH } from './spawn.ts';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
@@ -64,9 +70,32 @@ function toServerConfig(c: McpServerImport): McpServerConfig {
   return { type: 'stdio', command: c.command ?? '', args: c.args, env: c.env, trusted: c.trusted };
 }
 
-async function buildRegistry(opts: { mcp?: boolean } = {}): Promise<{ reg: Registry; clients: McpClient[] }> {
+/**
+ * Registry factory: depth 0 is the loop the user talks to; children built by
+ * spawn_agent get the same native tools plus a deeper spawn tool until the
+ * depth cap. MCP tools attach to depth 0 only (children stay fast and
+ * deterministic). The spawn base resolves lazily per execution so REPL
+ * registries always see the current task's session/approval.
+ */
+const spawnBase = { current: undefined as undefined | import('./spawn.ts').SpawnBase };
+
+function nativeRegistry(depth: number): Registry {
   const reg = new Registry();
   reg.registerAll(baseTools).registerAll(harmonyTools);
+  if (depth < MAX_SPAWN_DEPTH) {
+    reg.register(
+      makeSpawnTool({
+        depth,
+        getBase: () => spawnBase.current ?? { provider: { baseUrl: '', apiKey: '', model: '' }, ctx: { cwd: process.cwd(), home: homeDir() } },
+        buildChildRegistry: nativeRegistry,
+      }),
+    );
+  }
+  return reg;
+}
+
+async function buildRegistry(opts: { mcp?: boolean } = {}): Promise<{ reg: Registry; clients: McpClient[] }> {
+  const reg = nativeRegistry(0);
   const clients: McpClient[] = [];
   if (opts.mcp !== false) {
     const cfg = await loadConfig();
@@ -160,6 +189,14 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<LoopRe
 
   const session = new Session(home, ctx.cwd, cfg.provider.model);
   await session.user(task);
+  // Current spawn base for this task (sub-agents see this session + gate).
+  spawnBase.current = {
+    provider: cfg.provider,
+    ctx,
+    approval: makeApproval(cfg, taskOpts.yes === true, taskOpts.sharedRl),
+    session,
+    onLine: (l) => stdout.write(DIM(`  ${l}\n`)),
+  };
 
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
@@ -186,7 +223,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<LoopRe
     ctx,
     maxTurns: cfg.maxTurns,
     maxContextChars: cfg.maxContextChars,
-    approval: makeApproval(cfg, taskOpts.yes === true, taskOpts.sharedRl),
+    approval: spawnBase.current!.approval,
     events: {
       onDelta: (kind, chunk) => {
         if (kind === 'reasoning') {
@@ -357,6 +394,23 @@ async function main(): Promise<void> {
   }
   if (cmd === 'skills') {
     const home = homeDir();
+    const flag = rest.find((a) => a.startsWith('--'));
+    const skillName = rest.find((a) => !a.startsWith('-') && !a.startsWith('--'));
+    if (flag === '--promote' || flag === '--rollback' || flag === '--unpromote') {
+      if (!skillName) {
+        stdout.write(`usage: hmh skills --promote|--rollback|--unpromote <name>\n`);
+        return;
+      }
+      if (flag === '--promote') {
+        const r = await promoteSkill(home, skillName);
+        stdout.write(`promoted ${skillName} -> active (${r.file}${r.archivedPrevious ? '; previous archived' : ''})\n`);
+      } else if (flag === '--rollback') {
+        stdout.write((await rollbackSkill(home, skillName)) ? `rolled back ${skillName} to the previous archived version\n` : `no archived snapshot of ${skillName}\n`);
+      } else {
+        stdout.write((await unpromoteSkill(home, skillName)) ? `moved ${skillName} back to drafts\n` : `${skillName} is not active\n`);
+      }
+      return;
+    }
     const active = await listSkills(home);
     const drafts = await listDrafts(home);
     stdout.write(CYAN(`active (${active.length})\n`));
@@ -377,19 +431,42 @@ async function main(): Promise<void> {
     await initHome();
     const cfg = await loadConfig();
     const maxN = Number(rest.find((a) => a.startsWith('--max='))?.slice(6) ?? 2);
-    stdout.write(CYAN('evolve') + DIM(` · model ${cfg.provider.model} · one cycle\n`));
-    const report = await runEvolution({
-      home: homeDir(),
-      provider: cfg.provider,
-      runCase: makeCaseRunner(),
-      maxProposals: Number.isFinite(maxN) ? Math.min(Math.max(maxN, 0), 4) : 2,
-      log: (l) => stdout.write(DIM(`  ${l}\n`)),
-    });
-    for (const o of report.outcomes) {
-      const tag = o.action === 'promoted' ? GREEN('PROMOTED') : o.action === 'rejected' ? YELLOW('REJECTED') : YELLOW('ERROR');
-      stdout.write(`${tag} ${o.name} — ${o.reason}\n`);
+    const everyMin = Number(rest.find((a) => a.startsWith('--every='))?.slice(8) ?? 0);
+    const maxCycles = Number(rest.find((a) => a.startsWith('--cycles='))?.slice(9) ?? 0);
+    const runCycle = async (n: number) => {
+      stdout.write(CYAN('evolve') + DIM(` · model ${cfg.provider.model} · cycle ${n}${everyMin ? '' : ' (one-shot)'}\n`));
+      const report = await runEvolution({
+        home: homeDir(),
+        provider: cfg.provider,
+        runCase: makeCaseRunner(),
+        maxProposals: Number.isFinite(maxN) ? Math.min(Math.max(maxN, 0), 4) : 2,
+        log: (l) => stdout.write(DIM(`  ${l}\n`)),
+      });
+      for (const o of report.outcomes) {
+        const tag = o.action === 'promoted' ? GREEN('PROMOTED') : o.action === 'rejected' ? YELLOW('REJECTED') : YELLOW('ERROR');
+        stdout.write(`${tag} ${o.name} — ${o.reason}\n`);
+      }
+      if (report.memoryDistilled) stdout.write(DIM(`memory distilled: ${report.memoryDistilled}\n`));
+    };
+    if (everyMin >= 1) {
+      // Scheduled mode: run a cycle, sleep, repeat. Errors don't kill the
+      // loop (transient gateway failures are expected); Ctrl-C exits.
+      const waitMs = Math.max(everyMin, 5) * 60_000;
+      const cap = maxCycles > 0 ? maxCycles : Infinity;
+      for (let n = 1; n <= cap; n++) {
+        try {
+          await runCycle(n);
+        } catch (err) {
+          stdout.write(YELLOW(`cycle ${n} failed: ${String(err).slice(0, 160)} (continuing)\n`));
+        }
+        if (n >= cap) break;
+        stdout.write(DIM(`next cycle in ${Math.max(everyMin, 5)} min (Ctrl-C to stop)\n`));
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+      stdout.write(DIM(`log: ${homeDir()}/evolution/log.jsonl\n`));
+      return;
     }
-    if (report.memoryDistilled) stdout.write(DIM(`memory distilled: ${report.memoryDistilled}\n`));
+    await runCycle(1);
     stdout.write(DIM(`log: ${homeDir()}/evolution/log.jsonl\n`));
     return;
   }
