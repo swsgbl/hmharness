@@ -9,7 +9,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readdir, readFile, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { join, basename, isAbsolute, resolve } from 'node:path';
+import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
 import { homeDir, loadConfig, loadTranscript, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
 import { buildRegistry, runAgentTask } from '@hmh/agent';
@@ -254,6 +254,75 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         wsItems = wsItems.filter((w) => w.id !== body.id);
         await saveWorkspaces();
         json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/fs') {
+        // Directory browser backing the workspace picker: lists drives
+        // (no path) or the subdirectories of one absolute path. Read-only,
+        // directories only - never file contents.
+        const q = url.searchParams.get('path') ?? '';
+        if (!q) {
+          const roots: Array<{ name: string; path: string }> = [];
+          if (process.platform === 'win32') {
+            for (let c = 65; c <= 90; c++) {
+              const drive = `${String.fromCharCode(c)}:\\`;
+              try {
+                if ((await stat(drive)).isDirectory()) roots.push({ name: drive, path: drive });
+              } catch {
+                /* absent drive */
+              }
+            }
+          } else {
+            roots.push({ name: '/', path: '/' });
+          }
+          json(res, 200, { path: '', segments: [], parent: '', dirs: roots });
+          return;
+        }
+        const target = isAbsolute(q) ? resolve(q) : '';
+        if (!target) {
+          json(res, 400, { error: 'absolute path required' });
+          return;
+        }
+        try {
+          if (!(await stat(target)).isDirectory()) {
+            json(res, 400, { error: `not a directory: ${target}` });
+            return;
+          }
+        } catch {
+          json(res, 404, { error: `not found: ${target}` });
+          return;
+        }
+        let entries;
+        try {
+          entries = await readdir(target, { withFileTypes: true });
+        } catch {
+          json(res, 200, { path: target, segments: [{ name: basename(target) || target, path: target }], parent: dirname(target) === target ? '' : dirname(target), dirs: [] });
+          return;
+        }
+        const dirs = entries
+          .filter((e) => e.isDirectory() || e.isSymbolicLink())
+          .map((e) => ({ name: e.name, path: join(target, e.name) }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        // breadcrumb segments, e.g. C: > Users > hongfu
+        const segments: Array<{ name: string; path: string }> = [];
+        if (process.platform === 'win32') {
+          const parts = target.split(/[\\/]+/).filter(Boolean);
+          let acc = '';
+          for (const p of parts) {
+            acc = acc ? join(acc, p) : `${p}\\`;
+            segments.push({ name: p.endsWith(':') ? p : p, path: acc });
+          }
+        } else {
+          const parts = target.split('/').filter(Boolean);
+          let acc = '';
+          segments.push({ name: '/', path: '/' });
+          for (const p of parts) {
+            acc = `${acc}/${p}`;
+            segments.push({ name: p, path: acc });
+          }
+        }
+        const parent = dirname(target) === target ? '' : dirname(target);
+        json(res, 200, { path: target, segments, parent, dirs });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/sessions') {

@@ -70,10 +70,31 @@ export const PAGE = `<!doctype html>
   .wsi .wsx:hover { color:var(--err); }
   .wsadd { font-size:12px; color:var(--dim); padding:6px 8px; cursor:pointer; border-top:1px dashed var(--line); margin-top:2px; }
   .wsadd:hover { color:var(--accent); }
-  #wsform { display:none; gap:4px; padding:6px 6px 4px; }
-  #wsform.on { display:flex; }
-  #wsform input { flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:5px; padding:3px 6px; font:11.5px inherit; outline:none; }
-  #wsform input:focus { border-color:var(--accent); }
+
+  /* ---- workspace directory picker ---- */
+  #wspick { display:none; position:fixed; inset:0; background:rgba(4,8,12,.62); z-index:50; align-items:center; justify-content:center; }
+  #wspick.on { display:flex; }
+  #wsp-card { width:540px; max-width:92vw; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  #wsp-head { display:flex; align-items:center; font-weight:600; font-size:14px; }
+  #wsp-close { margin-left:auto; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:2px 6px; border-radius:6px; }
+  #wsp-close:hover { color:var(--text); background:var(--panel2); }
+  #wsp-path { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:6px 9px; font:12px var(--mono); outline:none; }
+  #wsp-path:focus { border-color:var(--accent); }
+  #wsp-crumb { display:flex; flex-wrap:wrap; gap:2px; font-size:12px; color:var(--dim); font-family:var(--mono); align-items:center; }
+  #wsp-crumb span.pc { color:var(--accent); cursor:pointer; }
+  #wsp-crumb span.pc:hover { text-decoration:underline; }
+  #wsp-crumb span.sep { color:var(--line); }
+  #wsp-crumb span.seg { cursor:pointer; }
+  #wsp-crumb span.seg:hover { color:var(--text); text-decoration:underline; }
+  #wsp-list { min-height:180px; max-height:300px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:4px; }
+  .wsp-item { display:flex; gap:8px; align-items:center; padding:5px 9px; border-radius:6px; cursor:pointer; font-size:12.5px; }
+  .wsp-item:hover { background:var(--panel2); }
+  .wsp-item .ic { color:var(--warn); flex:none; }
+  .wsp-item.up { color:var(--dim); border-bottom:1px dashed var(--line); margin-bottom:2px; border-radius:0; }
+  #wsp-foot { display:flex; gap:8px; align-items:center; }
+  #wsp-sel { color:var(--dim); font-size:11px; font-family:var(--mono); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #wsp-name { width:150px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:5px 8px; font:12px inherit; outline:none; }
+  #wsp-name:focus { border-color:var(--accent); }
   #search { margin:4px 12px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px;
             padding:6px 9px; font:12.5px inherit; outline:none; width:calc(100% - 24px); }
   #search:focus { border-color:var(--accent); }
@@ -201,11 +222,6 @@ export const PAGE = `<!doctype html>
       <div id="wslist">
         <div id="ws-items"></div>
         <div class="wsadd" id="ws-add">＋ 添加工作区</div>
-        <div id="wsform">
-          <input id="ws-name" placeholder="名称">
-          <input id="ws-path" placeholder="绝对路径">
-          <button id="ws-ok" type="button" class="primary sm">添加</button>
-        </div>
       </div>
     </div>
     <input id="search" class="minhide" placeholder="搜索会话…">
@@ -259,6 +275,20 @@ export const PAGE = `<!doctype html>
     <div id="dhead"><span id="dname"></span><button id="dclose" class="ghost sm" style="margin-left:auto">✕</button></div>
     <div id="dbody"><div id="dempty">点击对话流中的工具行查看详情</div></div>
   </div>
+  <div id="wspick">
+    <div id="wsp-card">
+      <div id="wsp-head"><span id="wsp-title">选择工作区目录</span><button id="wsp-close" type="button">✕</button></div>
+      <input id="wsp-path" placeholder="或直接输入绝对路径, 回车前往">
+      <div id="wsp-crumb"></div>
+      <div id="wsp-list"></div>
+      <div id="wsp-foot">
+        <span id="wsp-sel"></span>
+        <input id="wsp-name" placeholder="名称(默认目录名)">
+        <button id="wsp-cancel" type="button" class="ghost sm">取消</button>
+        <button id="wsp-ok" type="button" class="primary sm">添加</button>
+      </div>
+    </div>
+  </div>
 </div>
 <style>
   button.primary { background:var(--accent); color:#08243a; border:0; border-radius:8px; padding:7px 16px; font-weight:600; cursor:pointer; }
@@ -292,7 +322,8 @@ export const PAGE = `<!doctype html>
           noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
-          wsAdd:'＋ 添加工作区', wsName:'名称', wsPath:'绝对路径，如 G:\\\\myapp', wsOk:'添加',
+          wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
+          pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)',
@@ -307,7 +338,8 @@ export const PAGE = `<!doctype html>
           noHdc:'hdc not found - install DevEco Studio / command-line tools and add to PATH',
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
-          wsAdd:'＋ add workspace', wsName:'name', wsPath:'absolute path', wsOk:'Add',
+          wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
+          pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped' }
   };
   function setLabels(loc) {
@@ -338,9 +370,11 @@ export const PAGE = `<!doctype html>
     document.getElementById('ph-sessions').textContent = L.curSessions;
     document.getElementById('ph-other').textContent = L.otherSessions;
     document.getElementById('ws-add').textContent = L.wsAdd;
-    document.getElementById('ws-name').placeholder = L.wsName;
-    document.getElementById('ws-path').placeholder = L.wsPath;
-    document.getElementById('ws-ok').textContent = L.wsOk;
+    document.getElementById('wsp-title').textContent = L.pickTitle;
+    document.getElementById('wsp-path').placeholder = L.wsPath;
+    document.getElementById('wsp-name').placeholder = L.wsName;
+    document.getElementById('wsp-cancel').textContent = L.cancel;
+    document.getElementById('wsp-ok').textContent = L.wsOk;
     document.getElementById('wscur').title = L.wsSwitch;
     var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, skills:L.navSk };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
@@ -545,29 +579,97 @@ export const PAGE = `<!doctype html>
   document.getElementById('wscur').onclick = function () {
     document.getElementById('wsbox').classList.toggle('open');
   };
-  document.getElementById('ws-add').onclick = function () {
-    document.getElementById('wsform').classList.toggle('on');
-    if (document.getElementById('wsform').classList.contains('on')) document.getElementById('ws-path').focus();
+  document.getElementById('ws-add').onclick = openPick;
+
+  /* ---- workspace directory picker (server-side drive/folder listing) ---- */
+  var pickPath = '';
+  function openPick() {
+    document.getElementById('wsbox').classList.remove('open');
+    document.getElementById('wspick').classList.add('on');
+    document.getElementById('wsp-name').value = '';
+    loadFs('');
+  }
+  function closePick() {
+    document.getElementById('wspick').classList.remove('on');
+  }
+  document.getElementById('wsp-close').onclick = closePick;
+  document.getElementById('wsp-cancel').onclick = closePick;
+  document.getElementById('wspick').onclick = function (e) {
+    if (e.target === this) closePick();
   };
-  function submitWs() {
-    var name = document.getElementById('ws-name').value.trim();
-    var path = document.getElementById('ws-path').value.trim();
-    if (!path) return;
+  document.getElementById('wsp-path').onkeydown = function (e) {
+    if (e.key === 'Enter' && !e.isComposing) loadFs(this.value.trim());
+  };
+  function renderCrumb(segs) {
+    var c = document.getElementById('wsp-crumb');
+    c.innerHTML = '';
+    var pc = document.createElement('span');
+    pc.className = 'pc';
+    pc.textContent = L ? L.thisPC : 'This PC';
+    pc.onclick = function () { loadFs(''); };
+    c.appendChild(pc);
+    segs.forEach(function (s) {
+      var sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = ' \\u203A ';
+      c.appendChild(sep);
+      var seg = document.createElement('span');
+      seg.className = 'seg';
+      seg.textContent = s.name;
+      seg.title = s.path;
+      seg.onclick = function () { loadFs(s.path); };
+      c.appendChild(seg);
+    });
+  }
+  function loadFs(path) {
+    var list = document.getElementById('wsp-list');
+    list.innerHTML = '<div class="hint">' + (L ? L.loading : '...') + '</div>';
+    fetch('/api/fs' + (path ? '?path=' + encodeURIComponent(path) : '')).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      if (!res.ok) { list.innerHTML = '<div class="hint err">' + ((res.d && res.d.error) || 'failed') + '</div>'; return; }
+      var d = res.d;
+      pickPath = d.path || '';
+      document.getElementById('wsp-path').value = d.path || '';
+      document.getElementById('wsp-sel').textContent = pickPath || (L ? L.thisPC : '');
+      renderCrumb(d.segments || []);
+      list.innerHTML = '';
+      if (d.parent) {
+        var up = document.createElement('div');
+        up.className = 'wsp-item up';
+        up.innerHTML = '<span class="ic">\\u2191</span> ' + (L ? L.up : 'up');
+        up.onclick = function () { loadFs(d.parent); };
+        list.appendChild(up);
+      }
+      (d.dirs || []).forEach(function (dir) {
+        var item = document.createElement('div');
+        item.className = 'wsp-item';
+        var ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = '\\uD83D\\uDCC1';
+        var nm = document.createElement('span'); nm.textContent = dir.name;
+        item.appendChild(ic); item.appendChild(nm);
+        item.onclick = function () { loadFs(dir.path); };
+        list.appendChild(item);
+      });
+      if (!(d.dirs || []).length && !d.parent) {
+        list.innerHTML += '<div class="hint">' + L.none2 + '</div>';
+      }
+    }).catch(function (e) { list.innerHTML = '<div class="hint err">' + String(e) + '</div>'; });
+  }
+  function submitPick() {
+    if (!pickPath) return;
     fetch('/api/workspaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, path: path })
+      body: JSON.stringify({ name: document.getElementById('wsp-name').value.trim(), path: pickPath })
     }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (res) {
       if (!res.ok) { alert(res.d && res.d.error ? res.d.error : 'failed'); return; }
-      document.getElementById('ws-name').value = '';
-      document.getElementById('ws-path').value = '';
-      document.getElementById('wsform').classList.remove('on');
       if (res.d.items) { wsItems = res.d.items; renderWsList(); }
+      closePick();
     }).catch(function (e) { alert(String(e)); });
   }
-  document.getElementById('ws-ok').onclick = submitWs;
-  document.getElementById('ws-path').onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.isComposing) submitWs();
+  document.getElementById('wsp-ok').onclick = submitPick;
+  document.getElementById('wsp-name').onkeydown = function (e) {
+    if (e.key === 'Enter' && !e.isComposing) submitPick();
   };
 
   /* ---- board / devices / skills views ---- */
