@@ -8,6 +8,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readdir, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { homeDir, loadConfig, loadTranscript, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
@@ -119,6 +120,30 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         req.on('close', () => sseClients.delete(res));
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/devices') {
+        // Read-only device inventory via hdc (local dev tool). Never mutates.
+        const probe = await new Promise<{ ok: boolean; devices: Array<{ target: string; kind: string }> }>((resolve) => {
+          execFile('hdc', ['list', 'targets'], { timeout: 4000, windowsHide: true }, (err, out) => {
+            if (err || typeof out !== 'string') {
+              resolve({ ok: false, devices: [] });
+              return;
+            }
+            resolve({
+              ok: true,
+              devices: out
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter((l) => l && !/^\[Empty\]$/.test(l) && !l.startsWith('OHOS'))
+                .map((target) => ({
+                  target,
+                  kind: /^127\.0\.0\.1:\d+$/.test(target) ? 'emulator' : 'usb',
+                })),
+            });
+          });
+        });
+        json(res, 200, { devices: probe.devices, hdcAvailable: probe.ok });
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
         let files: string[] = [];
         try {
@@ -126,13 +151,20 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         } catch {
           /* none */
         }
-        // join the task title for each session from recent insights
-        const titles = new Map<string, string>();
-        for (const i of await readInsights(home, 200)) titles.set(i.session, i.task);
+        // board cards come from the insight archive (task/outcome/turns/tools)
+        const bySession = new Map((await readInsights(home, 200)).map((i) => [i.session, i]));
         json(res, 200, {
           sessions: files.map((f) => {
             const id = f.replace(/\.jsonl$/, '');
-            return { id, task: titles.get(id) ?? '' };
+            const i = bySession.get(id);
+            return {
+              id,
+              task: i?.task ?? '',
+              outcome: i?.outcome ?? '',
+              turns: i?.turns ?? 0,
+              toolUses: i?.toolUses ?? 0,
+              time: i?.time ?? '',
+            };
           }),
         });
         return;

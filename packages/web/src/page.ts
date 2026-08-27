@@ -1,8 +1,10 @@
 /**
- * @hmh/web - page (three-column layout, dsh-web inspired)
- * Sidebar (brand / new session / search / session tree) | main (topbar,
- * chat flow, composer-takeover approvals, rich input card) | details
- * (selected tool call: args + full output). Vanilla JS, no build step.
+ * @hmh/web - page (three-column layout, deepseek-harness inspired)
+ * Sidebar (brand / new session / nav: chat·board·devices·skills / workspace
+ * search / session tree, collapsible to an icon rail) | main (topbar, view
+ * switcher, chat flow with user bubbles + collapsible thinking + code blocks
+ * with copy + regenerate, composer-takeover approvals) | details (selected
+ * tool call: args + full output). Vanilla JS, no build step.
  * Template-literal rules: no raw backticks in the page body (use \u0060),
  * regex backslashes doubled, no ${} inside the page JS (string concat only).
  */
@@ -19,6 +21,7 @@ export const PAGE = `<!doctype html>
   html, body { height:100%; }
   body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,"Segoe UI",sans-serif; overflow:hidden; }
   #app { display:grid; grid-template-columns:264px 1fr auto; grid-template-rows:100vh; height:100vh; }
+  body.sidemin #app { grid-template-columns:56px 1fr auto; }
   /* min-height:0 everywhere content must shrink inside the grid/flex chain,
      otherwise the transcript grows past 100vh and pushes the composer
      off-screen (invisible with overflow:hidden) */
@@ -28,11 +31,25 @@ export const PAGE = `<!doctype html>
 
   /* ---- sidebar ---- */
   #side { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:0; }
-  #brand { display:flex; align-items:center; gap:8px; padding:12px 14px; cursor:pointer; border-bottom:1px solid var(--line); }
-  #brand:hover { background:var(--panel2); }
+  #brand { display:flex; align-items:center; gap:8px; padding:12px 12px; border-bottom:1px solid var(--line); }
   #brand .logo { color:var(--accent); font-size:18px; font-weight:700; }
-  #brand .ver { color:var(--dim); font-size:11px; }
-  #newbtn { margin:10px 12px 6px; }
+  #brand .badge { font-size:9.5px; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:0 4px; letter-spacing:.06em; }
+  #collapse { margin-left:auto; background:none; border:0; color:var(--dim); cursor:pointer; font-size:14px; padding:2px 6px; border-radius:6px; }
+  #collapse:hover { color:var(--text); background:var(--panel2); }
+  body.sidemin #brand { justify-content:center; padding:12px 4px; }
+  #newbtn { margin:10px 12px 6px; white-space:nowrap; overflow:hidden; }
+  body.sidemin #newbtn { padding:7px 0; text-align:center; }
+  nav { display:flex; flex-direction:column; gap:2px; padding:4px 10px; }
+  .nav { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; background:none; border:0; color:var(--dim); cursor:pointer; font:13px inherit; text-align:left; }
+  .nav:hover { background:var(--panel2); color:var(--text); }
+  .nav.on { background:var(--panel2); color:var(--accent); }
+  .nav .ico { width:18px; text-align:center; flex:none; }
+  body.sidemin nav { padding:4px 6px; }
+  body.sidemin .nav { justify-content:center; padding:8px 0; }
+  .wshead { display:flex; align-items:center; padding:10px 14px 4px; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
+  .wsacts { margin-left:auto; display:flex; gap:2px; }
+  .wsacts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:2px 6px; border-radius:6px; }
+  .wsacts button:hover { color:var(--text); background:var(--panel2); }
   #search { margin:4px 12px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px;
             padding:6px 9px; font:12.5px inherit; outline:none; width:calc(100% - 24px); }
   #search:focus { border-color:var(--accent); }
@@ -44,23 +61,48 @@ export const PAGE = `<!doctype html>
   .sess .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }
   .sess .time { color:var(--dim); font-family:var(--mono); font-size:11px; flex:none; }
   .sess .task { color:var(--dim); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #sidefoot { border-top:1px solid var(--line); padding:8px 14px; font-size:11.5px; color:var(--dim); }
+  #sidefoot { border-top:1px solid var(--line); padding:8px 14px; font-size:11.5px; color:var(--dim); white-space:nowrap; overflow:hidden; }
+  body.sidemin .minhide { display:none !important; }
+  body.sidemin #sidefoot { text-align:center; padding:8px 2px; font-size:10px; }
 
-  /* ---- main ---- */
+  /* ---- main + views ---- */
   #main { display:flex; flex-direction:column; min-width:0; }
   #topbar { display:flex; gap:10px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
   .chip { font-size:11.5px; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
   .chip.model { color:var(--accent); }
   #busy { margin-left:auto; font-size:12px; color:var(--dim); }
   #busy.on { color:var(--warn); }
+  .vwrap { display:none; flex-direction:column; flex:1; min-height:0; }
+  .vwrap.on { display:flex; }
+  .view { display:none; overflow-y:auto; flex:1; padding:18px 26px; }
+  .view.on { display:block; }
+  .vhead { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .vhead h2 { margin:0; font-size:16px; }
+  .hint { color:var(--dim); font-size:13px; padding:6px 0; }
+
+  /* ---- chat ---- */
   #log { flex:1; overflow-y:auto; padding:18px 26px; scroll-behavior:smooth; }
   .think { color:var(--dim); font-style:italic; white-space:pre-wrap; }
   .say { white-space:pre-wrap; }
   .say code { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; font-family:var(--mono); font-size:12.5px; }
   .say pre { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.5; }
   .say b { color:#fff; }
-  .msg-user { color:var(--text); background:var(--panel2); border-radius:8px; padding:6px 12px; margin:10px 0 6px; white-space:pre-wrap; }
-  .msg-user::before { content:"\\276F  "; color:var(--dim); }
+  .msg-user { color:var(--text); background:var(--panel2); border-radius:12px; padding:8px 14px; margin:10px 0 6px auto; width:fit-content; max-width:74%; white-space:pre-wrap; }
+  .thinkbox { border:1px solid var(--line); border-left:3px solid var(--dim); border-radius:8px; margin:8px 0; background:var(--panel); }
+  .thinkhead { width:100%; display:flex; gap:8px; align-items:center; background:none; border:0; color:var(--dim); padding:6px 10px; cursor:pointer; font-size:12.5px; }
+  .thinkhead:hover { color:var(--text); }
+  .tri { display:inline-block; transition:transform .12s; }
+  .thinkbox.open .tri { transform:rotate(90deg); }
+  .thinkbody { display:none; padding:2px 14px 10px; color:var(--dim); font-style:italic; white-space:pre-wrap; }
+  .thinkbox.open .thinkbody { display:block; }
+  .codeblk { border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:8px 0; }
+  .codebar { display:flex; justify-content:space-between; align-items:center; background:var(--panel2); padding:3px 10px; font-size:11px; color:var(--dim); font-family:var(--mono); }
+  .codebar .copy { background:none; border:0; color:var(--dim); cursor:pointer; font-size:11px; padding:1px 4px; }
+  .codebar .copy:hover { color:var(--accent); }
+  .codeblk pre { margin:0; border:0; border-radius:0; }
+  .acts { display:flex; gap:14px; margin:2px 0 12px; }
+  .acts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:12px; padding:2px 4px; }
+  .acts button:hover { color:var(--accent); }
   .toolrow { font-family:var(--mono); font-size:12.5px; margin:6px 0 2px; cursor:pointer; padding:3px 6px; border-radius:6px; }
   .toolrow:hover { background:var(--panel2); }
   .toolrow .st { margin-right:7px; }
@@ -75,6 +117,23 @@ export const PAGE = `<!doctype html>
   #empty { color:var(--dim); text-align:center; margin:auto; max-width:430px; }
   #empty .ex { font-family:var(--mono); font-size:12.5px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:6px 0; cursor:pointer; }
   #empty .ex:hover { border-color:var(--accent); color:var(--text); }
+
+  /* ---- board / devices / skills ---- */
+  .bgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; cursor:pointer; }
+  .card:hover { border-color:var(--accent); }
+  .card .crow { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); font-family:var(--mono); }
+  .ob { font-size:10.5px; padding:0 7px; border-radius:8px; background:var(--bg); }
+  .ob.ok { color:var(--ok); } .ob.err { color:var(--err); } .ob.tb { color:var(--warn); } .ob.none { color:var(--dim); }
+  .ctask { font-size:13px; margin:7px 0 5px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .cmeta { font-size:11.5px; color:var(--dim); font-family:var(--mono); }
+  .devrow { display:flex; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; font-family:var(--mono); font-size:13px; }
+  .devrow .st { color:var(--ok); }
+  .devrow .kind { color:var(--dim); font-size:11.5px; margin-left:auto; }
+  .skrow { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+  .skrow .nm { color:var(--accent); font-family:var(--mono); font-weight:600; }
+  .skrow .ds { color:var(--dim); font-size:12.5px; margin-top:2px; }
+  h3.sec { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin:20px 0 8px; }
 
   /* ---- composer (input card / approval takeover) ---- */
   #composer { border-top:1px solid var(--line); background:var(--panel); padding:10px 16px 12px; }
@@ -104,38 +163,60 @@ export const PAGE = `<!doctype html>
 <body>
 <div id="app">
   <div id="side">
-    <div id="brand" title="new session"><span class="logo">hmh</span><span class="ver">web · hmharness</span></div>
-    <button id="newbtn" class="primary">＋ <span id="new-label">新会话</span></button>
-    <input id="search" placeholder="搜索会话…">
+    <div id="brand"><span class="logo">hmh</span><span class="badge minhide">HARNESS</span><button id="collapse" title="收起侧栏">«</button></div>
+    <button id="newbtn" class="primary">＋ <span id="new-label" class="minhide">新会话</span></button>
+    <nav>
+      <button class="nav on" data-view="chat"><span class="ico">💬</span><span class="txt minhide">对话</span></button>
+      <button class="nav" data-view="board"><span class="ico">🗒</span><span class="txt minhide">任务看板</span></button>
+      <button class="nav" data-view="devices"><span class="ico">📟</span><span class="txt minhide">设备</span></button>
+      <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
+    </nav>
+    <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="新会话">＋</button></span></div>
+    <input id="search" class="minhide" placeholder="搜索会话…">
     <div id="sesslist"><div class="grp" id="ph-sessions">最近会话</div><div id="sessions"></div></div>
-    <div id="sidefoot"><span id="skills-n">0</span> <span id="skills-label">技能</span> · <span id="model2"></span></div>
+    <div id="sidefoot" class="minhide"><span id="skills-n">0</span> <span id="skills-label">技能</span> · <span id="model2"></span></div>
   </div>
   <div id="main" style="position:relative;">
     <div id="topbar">
       <span class="chip model" id="model"></span>
+      <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
       <span class="chip" id="locale-chip">zh</span>
       <span id="busy">idle</span>
       <button id="clear" class="ghost sm">clear</button>
     </div>
-    <div id="log"><div id="empty"><div style="font-size:30px">⚙️</div><div id="empty-title" style="margin:8px 0 4px;font-size:16px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px"></div><div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div><div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div></div>
-    <button id="tobot" class="ghost sm">↓</button>
-    <div id="composer">
-      <div id="approval">
-        <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
-        <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
-      </div>
-      <div id="inputcard">
-        <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
-        <div id="tools-row">
-          <select id="mode" title="approval mode">
-            <option value="ask">🔒 审批询问</option>
-            <option value="auto">⚡ 自动批准</option>
-          </select>
-          <span id="tokchip"></span>
-          <button id="send" class="primary">运行</button>
+    <div id="view-chat" class="vwrap on">
+      <div id="log"><div id="empty"><div style="font-size:30px">⚙️</div><div id="empty-title" style="margin:8px 0 4px;font-size:16px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px"></div><div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div><div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div></div>
+      <button id="tobot" class="ghost sm">↓</button>
+      <div id="composer">
+        <div id="approval">
+          <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
+          <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
+        </div>
+        <div id="inputcard">
+          <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
+          <div id="tools-row">
+            <select id="mode" title="approval mode">
+              <option value="ask">🔒 审批询问</option>
+              <option value="auto">⚡ 自动批准</option>
+            </select>
+            <span id="tokchip"></span>
+            <button id="send" class="primary">运行</button>
+          </div>
         </div>
       </div>
+    </div>
+    <div id="view-board" class="view">
+      <div class="vhead"><h2 id="board-title">任务看板</h2><button id="board-refresh" class="ghost sm">↻ 刷新</button></div>
+      <div id="board-grid" class="bgrid"></div>
+    </div>
+    <div id="view-devices" class="view">
+      <div class="vhead"><h2 id="dev-title">设备</h2><button id="dev-refresh" class="ghost sm">↻ 刷新</button></div>
+      <div id="dev-body"></div>
+    </div>
+    <div id="view-skills" class="view">
+      <div class="vhead"><h2 id="sk-title">技能中心</h2></div>
+      <div id="sk-body"></div>
     </div>
   </div>
   <div id="details">
@@ -155,9 +236,12 @@ export const PAGE = `<!doctype html>
   var log = document.getElementById('log');
   var state = null;
   var L = null;
+  var curView = 'chat';
   var toolRegistry = {};   // seq -> {name, args, output}
   var seq = 0;
   var sessData = [];
+  var lastTask = '';
+  var lastAssistantText = '';
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', approve:'批准', deny:'拒绝',
@@ -165,13 +249,26 @@ export const PAGE = `<!doctype html>
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
           emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行',
-          dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏' },
+          dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏',
+          navChat:'对话', navBoard:'任务看板', navDev:'设备', navSk:'技能中心', ws:'工作区',
+          viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
+          thinkL:'思考过程', copy:'复制', regen:'重新生成', refresh:'刷新',
+          noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
+          devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
+          noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…' },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
           emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running',
-          dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear' }
+          dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear',
+          navChat:'Chat', navBoard:'Task board', navDev:'Devices', navSk:'Skills', ws:'Workspace',
+          viewChat:'Chat', viewBoard:'Task board', viewDev:'Devices', viewSk:'Skills',
+          thinkL:'Thinking', copy:'Copy', regen:'Regenerate', refresh:'Refresh',
+          noDev:'No devices found - plug in a device or start an emulator, then refresh',
+          noHdc:'hdc not found - install DevEco Studio / command-line tools and add to PATH',
+          devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
+          noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…' }
   };
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
@@ -192,9 +289,53 @@ export const PAGE = `<!doctype html>
     document.getElementById('locale-chip').textContent = loc || 'zh';
     document.getElementById('mode').options[0].text = L.ask;
     document.getElementById('mode').options[1].text = L.auto;
+    document.getElementById('ws-label').textContent = L.ws;
+    document.getElementById('board-title').textContent = L.viewBoard;
+    document.getElementById('dev-title').textContent = L.viewDev;
+    document.getElementById('sk-title').textContent = L.viewSk;
+    document.getElementById('board-refresh').textContent = '\\u21BB ' + L.refresh;
+    document.getElementById('dev-refresh').textContent = '\\u21BB ' + L.refresh;
+    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, skills:L.navSk };
+    Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
+      var txt = n.querySelector('.txt');
+      if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
+    });
+    document.getElementById('viewchip').textContent =
+      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[curView] || curView;
     var badge = document.getElementById('busy');
     badge.textContent = state && state.busy ? L.running : L.idle;
   }
+
+  /* ---- view switching / sidebar collapse ---- */
+  function switchView(v) {
+    curView = v;
+    Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
+      n.classList.toggle('on', n.getAttribute('data-view') === v);
+    });
+    ['chat', 'board', 'devices', 'skills'].forEach(function (k) {
+      var elv = document.getElementById('view-' + k);
+      if (elv) elv.classList.toggle('on', k === v);
+    });
+    if (L) {
+      document.getElementById('viewchip').textContent =
+        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[v] || v;
+    }
+    if (v === 'board') loadBoard();
+    if (v === 'devices') loadDevices();
+    if (v === 'skills') renderSkills();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
+    n.onclick = function () { switchView(n.getAttribute('data-view')); };
+  });
+  function applySide(min) {
+    document.body.classList.toggle('sidemin', min);
+    document.getElementById('collapse').textContent = min ? '\\u00BB' : '\\u00AB';
+    try { localStorage.setItem('hmh-side-min', min ? '1' : '0'); } catch (e) {}
+  }
+  document.getElementById('collapse').onclick = function () {
+    applySide(!document.body.classList.contains('sidemin'));
+  };
+  try { if (localStorage.getItem('hmh-side-min') === '1') applySide(true); } catch (e) {}
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -208,13 +349,29 @@ export const PAGE = `<!doctype html>
     var e = document.getElementById('empty');
     if (e) e.remove();
   }
+  function copyText(s) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(s);
+      return;
+    }
+    var ta = document.createElement('textarea');
+    ta.value = s;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
   function mdLite(text) {
     var esc = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var parts = esc.split(/\\u0060\\u0060\\u0060/);
     var out = '';
     for (var i = 0; i < parts.length; i++) {
       if (i % 2 === 1) {
-        out += '<pre>' + parts[i].replace(/^[a-zA-Z0-9_-]*\\n/, '') + '</pre>';
+        var m = parts[i].match(/^([a-zA-Z0-9_+#-]*)\\n([\\s\\S]*)$/);
+        var lang = (m && m[1]) || '';
+        var body = m ? m[2] : parts[i];
+        out += '<div class="codeblk"><div class="codebar"><span>' + (lang || 'text') +
+               '</span><button type="button" class="copy">' + (L ? L.copy : 'copy') + '</button></div><pre>' + body + '</pre></div>';
       } else {
         out += parts[i]
           .replace(/\\u0060([^\\u0060\\n]+)\\u0060/g, '<code>$1</code>')
@@ -223,16 +380,40 @@ export const PAGE = `<!doctype html>
     }
     return out;
   }
+  function thinkBlock() {
+    clearEmpty();
+    var box = document.createElement('div');
+    box.className = 'thinkbox open';
+    var head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'thinkhead';
+    var tri = document.createElement('span'); tri.className = 'tri'; tri.textContent = '\\u25B8';
+    var lbl = document.createElement('span'); lbl.textContent = (L ? L.thinkL : 'thinking');
+    head.appendChild(tri); head.appendChild(lbl);
+    var body = document.createElement('div');
+    body.className = 'thinkbody';
+    box.appendChild(head); box.appendChild(body);
+    log.appendChild(box);
+    log.scrollTop = log.scrollHeight;
+    return {
+      add: function (c) { body.textContent += c; autoscroll(); },
+      finalize: function () { box.classList.remove('open'); }
+    };
+  }
   function sayBlock() {
     clearEmpty();
     var e = el('div', 'say');
-    return { add: function (c) { e.textContent += c; }, finalize: function () { e.innerHTML = mdLite(e.textContent); autoscroll(); } };
+    var txt = '';
+    return {
+      add: function (c) { txt += c; e.textContent = txt; autoscroll(); },
+      finalize: function () { e.innerHTML = mdLite(txt); lastAssistantText = txt; autoscroll(); }
+    };
   }
   function setBusy(b) {
     var badge = document.getElementById('busy');
     badge.textContent = b ? L.running : L.idle;
     badge.className = b ? 'on' : '';
-    document.title = b ? '● ' + L.running : L.title;
+    document.title = b ? '\\u25CF ' + L.running : L.title;
     document.getElementById('send').disabled = b;
     document.getElementById('input').disabled = b;
   }
@@ -244,6 +425,103 @@ export const PAGE = `<!doctype html>
     document.getElementById('model2').textContent = s.model;
     document.getElementById('home').textContent = s.home;
     document.getElementById('skills-n').textContent = s.skills.active.length + s.skills.drafts.length;
+    if (curView === 'skills') renderSkills();
+  }
+
+  /* ---- board / devices / skills views ---- */
+  function sessTime(id) {
+    var m = id.match(/^(\\d{4}-\\d{2}-\\d{2})T(\\d{2})-(\\d{2})/);
+    return m ? m[1].slice(5) + ' ' + m[2] + ':' + m[3] : id.slice(0, 12);
+  }
+  function obFor(o) {
+    var s = document.createElement('span');
+    s.className = 'ob ' + (o === 'ok' ? 'ok' : o === 'error' ? 'err' : o === 'turn-budget' ? 'tb' : 'none');
+    s.textContent = o || '\\u2014';
+    return s;
+  }
+  function loadBoard() {
+    var grid = document.getElementById('board-grid');
+    grid.innerHTML = '<div class="hint">' + L.loading + '</div>';
+    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (d) {
+      grid.innerHTML = '';
+      var list = (d.sessions || []).slice(0, 24);
+      if (!list.length) { grid.innerHTML = '<div class="hint">' + L.none2 + '</div>'; return; }
+      list.forEach(function (s) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        var crow = document.createElement('div'); crow.className = 'crow';
+        crow.appendChild(obFor(s.outcome));
+        var tm = document.createElement('span'); tm.textContent = sessTime(s.id);
+        crow.appendChild(tm);
+        var task = document.createElement('div'); task.className = 'ctask';
+        task.textContent = s.task || s.id;
+        var meta = document.createElement('div'); meta.className = 'cmeta';
+        meta.textContent = (s.turns || 0) + ' ' + L.turnsL + ' \\u00B7 ' + (s.toolUses || 0) + ' ' + L.toolsL;
+        card.appendChild(crow); card.appendChild(task); card.appendChild(meta);
+        card.onclick = function () { viewSession(s.id); switchView('chat'); };
+        grid.appendChild(card);
+      });
+    }).catch(function (e) { grid.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+  }
+  function loadDevices() {
+    var box = document.getElementById('dev-body');
+    box.innerHTML = '<div class="hint">' + L.loading + '</div>';
+    fetch('/api/devices').then(function (r) { return r.json(); }).then(function (d) {
+      box.innerHTML = '';
+      if (!d.hdcAvailable) { box.innerHTML = '<div class="hint">' + L.noHdc + '</div>'; return; }
+      if (!d.devices.length) { box.innerHTML = '<div class="hint">' + L.noDev + '</div>'; return; }
+      d.devices.forEach(function (v) {
+        var row = document.createElement('div'); row.className = 'devrow';
+        var st = document.createElement('span'); st.className = 'st'; st.textContent = '\\u25CF';
+        var tg = document.createElement('span'); tg.textContent = v.target;
+        var kd = document.createElement('span'); kd.className = 'kind';
+        kd.textContent = v.kind === 'emulator' ? L.devEmu : L.devUsb;
+        row.appendChild(st); row.appendChild(tg); row.appendChild(kd);
+        box.appendChild(row);
+      });
+    }).catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+  }
+  function skRow(name, desc, mark) {
+    var r = document.createElement('div'); r.className = 'skrow';
+    var nm = document.createElement('div'); nm.className = 'nm';
+    nm.textContent = mark + ' ' + name;
+    var ds = document.createElement('div'); ds.className = 'ds';
+    ds.textContent = desc || '';
+    r.appendChild(nm); r.appendChild(ds);
+    return r;
+  }
+  function renderSkills() {
+    var box = document.getElementById('sk-body');
+    box.innerHTML = '';
+    if (!state) { box.innerHTML = '<div class="hint">' + L.loading + '</div>'; return; }
+    var h1 = document.createElement('h3'); h1.className = 'sec'; h1.textContent = L.skActive;
+    box.appendChild(h1);
+    if (!state.skills.active.length) box.appendChild(Object.assign(document.createElement('div'), { className: 'hint', textContent: L.noSkills }));
+    state.skills.active.forEach(function (s) { box.appendChild(skRow(s.name, s.description, '+')); });
+    var h2 = document.createElement('h3'); h2.className = 'sec'; h2.textContent = L.skDrafts;
+    box.appendChild(h2);
+    if (!state.skills.drafts.length) box.appendChild(Object.assign(document.createElement('div'), { className: 'hint', textContent: L.noSkills }));
+    state.skills.drafts.forEach(function (s) { box.appendChild(skRow(s.name, s.description, '~')); });
+    var h3 = document.createElement('h3'); h3.className = 'sec'; h3.textContent = L.skInsights;
+    box.appendChild(h3);
+    (state.insights || []).forEach(function (i) {
+      var r = document.createElement('div'); r.className = 'skrow';
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '[' + i.outcome + '] ' + (i.task || '').slice(0, 70);
+      var ds = document.createElement('div'); ds.className = 'ds';
+      ds.textContent = (i.time || '').slice(0, 16) + ' \\u00B7 ' + (i.tools || []).join(',');
+      r.appendChild(nm); r.appendChild(ds);
+      box.appendChild(r);
+    });
+    var h4 = document.createElement('h3'); h4.className = 'sec'; h4.textContent = L.skEvo;
+    box.appendChild(h4);
+    if (!(state.evolution || []).length) box.appendChild(Object.assign(document.createElement('div'), { className: 'hint', textContent: L.noSkills }));
+    (state.evolution || []).forEach(function (e) {
+      var r = document.createElement('div'); r.className = 'skrow';
+      var ds = document.createElement('div'); ds.className = 'ds';
+      ds.textContent = JSON.stringify(e).slice(0, 220);
+      r.appendChild(ds);
+      box.appendChild(r);
+    });
   }
 
   function renderSessions(filter) {
@@ -255,11 +533,10 @@ export const PAGE = `<!doctype html>
       var b = document.createElement('button');
       b.className = 'sess';
       b.title = s.id;
-      var m = s.id.match(/^(\\d{4}-\\d{2}-\\d{2})T(\\d{2})-(\\d{2})/);
       var t1 = document.createElement('div'); t1.className = 't1';
       var dot = document.createElement('span'); dot.className = 'dot';
       var time = document.createElement('span'); time.className = 'time';
-      time.textContent = m ? m[1].slice(5) + ' ' + m[2] + ':' + m[3] : s.id.slice(0, 12);
+      time.textContent = sessTime(s.id);
       t1.appendChild(dot); t1.appendChild(time);
       if (s.task) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = s.task.slice(0, 40); t1.appendChild(tk); }
       b.appendChild(t1);
@@ -277,9 +554,10 @@ export const PAGE = `<!doctype html>
   }
   function viewSession(id) {
     flushStream();
+    switchView('chat');
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
       log.innerHTML = '';
-      el('div', 'stats', '--- session ' + d.id + ' · ' + d.model + ' ---');
+      el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---');
       d.messages.forEach(function (m) {
         if (m.role === 'user') el('div', 'msg-user', m.text);
         else if (m.role === 'assistant') el('div', m.tools && m.tools.length ? 'toolrow' : 'say', m.text || ('[calls: ' + (m.tools || []).join(', ') + ']'));
@@ -321,6 +599,22 @@ export const PAGE = `<!doctype html>
     document.getElementById('tobot').style.display = nearBottom() ? 'none' : 'block';
   });
   document.getElementById('tobot').onclick = function () { log.scrollTop = log.scrollHeight; };
+  // delegated: code-copy buttons + thinking-box toggles
+  log.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var cp = t.closest('.copy');
+    if (cp) {
+      var blk = cp.closest('.codeblk');
+      var pre = blk ? blk.querySelector('pre') : null;
+      if (pre) copyText(pre.textContent);
+      cp.textContent = '\\u2713';
+      setTimeout(function () { cp.textContent = L ? L.copy : 'copy'; }, 1200);
+      return;
+    }
+    var th = t.closest('.thinkhead');
+    if (th) { th.parentNode.classList.toggle('open'); }
+  });
 
   var pendingToolRow = null;   // running tool row awaiting its result
   var es = new EventSource('/api/events');
@@ -330,7 +624,7 @@ export const PAGE = `<!doctype html>
     var d = JSON.parse(e.data);
     setBusy(d.busy);
     flushStream();
-    if (d.busy) { clearEmpty(); el('div', 'msg-user', d.task); }
+    if (d.busy) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
@@ -338,15 +632,9 @@ export const PAGE = `<!doctype html>
       flushStream();
       clearEmpty();
       curKind = d.kind;
-      if (d.kind === 'reasoning') {
-        var t = el('div', 'think');
-        curBlock = { add: function (c) { t.textContent += c; }, finalize: function () {} };
-      } else {
-        curBlock = sayBlock();
-      }
+      curBlock = d.kind === 'reasoning' ? thinkBlock() : sayBlock();
     }
     curBlock.add(d.chunk);
-    autoscroll();
   });
   es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', JSON.parse(e.data).text); autoscroll(); });
   es.addEventListener('tool', function (e) {
@@ -375,7 +663,6 @@ export const PAGE = `<!doctype html>
       pendingToolRow.st.textContent = d.isError ? '\\u2717' : '\\u2022';
       pendingToolRow = null;
     }
-    if (toolRegistry[d.seq] === undefined && d.full !== undefined) { /* noop */ }
     // attach output to the most recent matching entry without output
     for (var k in toolRegistry) {
       if (toolRegistry[k].name === d.name && toolRegistry[k].output === '') { toolRegistry[k].output = d.full || d.preview || ''; break; }
@@ -402,9 +689,19 @@ export const PAGE = `<!doctype html>
   es.addEventListener('final', function (e) {
     flushStream();
     var d = JSON.parse(e.data);
-    var tok = (d.usage && (d.usage.promptTokens + d.usage.completionTokens) > 0) ? ' · \\u2191' + d.usage.promptTokens + ' \\u2193' + d.usage.completionTokens + ' tok' : '';
+    var tok = (d.usage && (d.usage.promptTokens + d.usage.completionTokens) > 0) ? ' \\u00B7 \\u2191' + d.usage.promptTokens + ' \\u2193' + d.usage.completionTokens + ' tok' : '';
     el('div', 'stats', d.turns + ' turns \\u00B7 ' + d.toolUses + ' tool uses' + tok + ' \\u00B7 session ' + d.sessionId.slice(11));
     if (tok) document.getElementById('tokchip').textContent = tok.replace(' \\u00B7 ', '');
+    if (lastAssistantText && lastTask) {
+      var acts = document.createElement('div'); acts.className = 'acts';
+      var bc = document.createElement('button'); bc.type = 'button'; bc.textContent = '\\u29C9 ' + L.copy;
+      bc.onclick = function () { copyText(lastAssistantText); bc.textContent = '\\u2713'; setTimeout(function () { bc.textContent = '\\u29C9 ' + L.copy; }, 1200); };
+      var br = document.createElement('button'); br.type = 'button'; br.textContent = '\\u27F3 ' + L.regen;
+      br.onclick = function () { sendTask(lastTask); };
+      acts.appendChild(bc); acts.appendChild(br);
+      log.appendChild(acts);
+      autoscroll();
+    }
     loadSessions();
   });
   es.addEventListener('error', function (e) {
@@ -424,20 +721,23 @@ export const PAGE = `<!doctype html>
   document.getElementById('ap-no').onclick = function () { decide(false); };
 
   // ---- composer ----
-  document.getElementById('form') && null;
-  document.getElementById('send').onclick = function () {
-    var input = document.getElementById('input');
-    var text = input.value.trim();
+  function sendTask(text) {
     if (!text) return;
-    input.value = '';
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text, yes: document.getElementById('mode').value === 'auto' })
     }).then(function (r) {
-      if (r.status === 409) { clearEmpty(); el('div', 'err', L.alreadyRunning); }
+      if (r.status === 409) { clearEmpty(); switchView('chat'); el('div', 'err', L.alreadyRunning); }
       return r.json();
     }).catch(function (err) { clearEmpty(); el('div', 'err', String(err)); });
+  }
+  document.getElementById('send').onclick = function () {
+    var input = document.getElementById('input');
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    sendTask(text);
   };
   document.getElementById('input').onkeydown = function (e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -449,7 +749,8 @@ export const PAGE = `<!doctype html>
   // ---- sidebar actions ----
   function newSession() {
     flushStream();
-    log.innerHTML = '<div id="empty"><div style="font-size:30px">⚙️</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
+    switchView('chat');
+    log.innerHTML = '<div id="empty"><div style="font-size:30px">\\u2699\\uFE0F</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
       '<div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div>' +
       '<div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div>' +
       '<div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div>';
@@ -465,8 +766,11 @@ export const PAGE = `<!doctype html>
     });
   }
   document.getElementById('newbtn').onclick = newSession;
-  document.getElementById('brand').onclick = newSession;
+  document.getElementById('ws-new').onclick = newSession;
   document.getElementById('clear').onclick = newSession;
+  document.getElementById('ws-refresh').onclick = loadSessions;
+  document.getElementById('board-refresh').onclick = loadBoard;
+  document.getElementById('dev-refresh').onclick = loadDevices;
   document.getElementById('search').oninput = function () { renderSessions(this.value); };
   wireExamples();
 
