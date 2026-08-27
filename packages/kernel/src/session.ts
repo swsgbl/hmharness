@@ -19,18 +19,25 @@ export type SessionEvent =
 export class Session {
   readonly id: string;
   readonly file: string;
+  /** Append chain: events serialize in call order, even fire-and-forget ones. */
+  private tail: Promise<void> = Promise.resolve();
 
   constructor(home: string, cwd: string, model: string) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     this.id = `${stamp}-${Math.random().toString(36).slice(2, 8)}`;
     this.file = join(home, 'sessions', `${this.id}.jsonl`);
-    void this.append({ t: 'session/start', id: this.id, time: new Date().toISOString(), cwd, model });
+    this.append({ t: 'session/start', id: this.id, time: new Date().toISOString(), cwd, model }).catch(() => undefined);
   }
 
   async append(event: SessionEvent): Promise<void> {
-    const dir = join(this.file, '..');
-    await mkdir(dir, { recursive: true });
-    await appendFile(this.file, JSON.stringify(event) + '\n', 'utf8');
+    const write = this.tail.then(async () => {
+      const dir = join(this.file, '..');
+      await mkdir(dir, { recursive: true });
+      await appendFile(this.file, JSON.stringify(event) + '\n', 'utf8');
+    });
+    // keep the chain going even if this write fails
+    this.tail = write.catch(() => undefined);
+    await write;
   }
 
   user(text: string): Promise<void> {

@@ -126,7 +126,15 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         } catch {
           /* none */
         }
-        json(res, 200, { sessions: files.map((f) => f.replace(/\.jsonl$/, '')) });
+        // join the task title for each session from recent insights
+        const titles = new Map<string, string>();
+        for (const i of await readInsights(home, 200)) titles.set(i.session, i.task);
+        json(res, 200, {
+          sessions: files.map((f) => {
+            const id = f.replace(/\.jsonl$/, '');
+            return { id, task: titles.get(id) ?? '' };
+          }),
+        });
         return;
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
@@ -182,7 +190,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
                 onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
                 onToolCall: (name, args) => broadcast('tool', { name, args }),
                 onToolResult: (name, output, isError) =>
-                  broadcast('toolResult', { name, isError, preview: output.slice(0, 300) }),
+                  broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
                 onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
                 onFinal: (r) => broadcast('final', r),
               },

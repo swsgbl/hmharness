@@ -39,14 +39,16 @@ export async function tui(yes: boolean): Promise<void> {
     while (true) {
       let line: string;
       try {
-        line = (await rl.question(CYAN('hmh> '))).trim();
+        // dsh-style one-line status above the prompt each turn
+        stdout.write(DIM(`  ${cfg.provider.model} · ${(cfg.locale ?? 'zh')} · ? help · /exit\n`));
+        line = (await rl.question(CYAN('\u276F '))).trim();
       } catch {
         break; // stdin closed (EOF / Ctrl-D) - exit cleanly
       }
       if (!line) continue;
       if (line === '/exit' || line === '/quit') break;
 
-      if (line === '/help') {
+      if (line === '?' || line === '/help') {
         stdout.write([
           '  /tools    list registered tools (gated marked)',
           '  /skills   skill library (active + drafts)',
@@ -148,13 +150,17 @@ export async function tui(yes: boolean): Promise<void> {
       await header(true);
       let displayMode: 'none' | 'reasoning' | 'text' = 'none';
       let streamed = false;
+      // dsh-tui style line types: user bubble / thinking / tool cards with gutter
       const openMode = (m: 'reasoning' | 'text') => {
         if (displayMode !== m) {
           if (displayMode === 'reasoning') stdout.write('\n');
-          if (m === 'reasoning') stdout.write(DIM('\n[thinking] '));
+          if (m === 'reasoning') stdout.write(DIM('\u2234 Thinking\u2026 '));
           displayMode = m;
         }
       };
+      stdout.write(`\x1b[48;5;236m \x1b[0m ${BOLD('\u276F')} ${line}\n`);
+      let tokIn = 0;
+      let tokOut = 0;
       try {
         const result = await runAgentTask({
           task: line,
@@ -179,15 +185,21 @@ export async function tui(yes: boolean): Promise<void> {
                 stdout.write('\n');
                 displayMode = 'none';
               }
-              stdout.write(DIM(`  [tool] ${name} ${JSON.stringify(args).slice(0, 90)}\n`));
+              stdout.write(`${YELLOW('\u25CF')} ${CYAN(BOLD(name))} ${DIM(JSON.stringify(args).slice(0, 90))}\n`);
             },
             onToolResult: (name, output, isError) => {
-              if (isError) stdout.write(DIM(`  [${name} ERROR] ${output.slice(0, 140)}\n`));
+              const dot = isError ? YELLOW('\u2717') : GREEN('\u2022');
+              stdout.write(`  ${dot} ${DIM('\u23BF ' + output.split('\n').slice(0, 3).join(' ').slice(0, 120))}\n`);
             },
           },
         });
+        tokIn += result.usage.promptTokens;
+        tokOut += result.usage.completionTokens;
         stdout.write(streamed ? '\n\n' : '\n' + result.text + '\n\n');
         stdout.write(DIM(t.sessionFooter(result.sessionId, result.turns, result.toolUses) + '\n'));
+        if (tokIn + tokOut > 0) {
+          stdout.write(DIM('\u2191' + tokIn + ' \u2193' + tokOut + ' tok\n'));
+        }
         // only the NEW turns (past the replayed prefix) extend history
         history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
       } catch (err) {
