@@ -140,7 +140,9 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
       if (line === '/exit' || line === '/quit') break;
       try {
         const r = await runTask(line, { yes, sharedRl: rl, registry: reg, clients, resumeMessages: history });
-        history = [...history, { role: 'user', content: line }, ...r.messages.slice(2)];
+        // working transcript = [system, ...resumeMessages, user, ...new turns];
+        // only the NEW turns (past the replayed prefix) extend history.
+        history = [...history, { role: 'user', content: line }, ...r.messages.slice(history.length + 2)];
       } catch (err) {
         stdout.write(`error: ${String(err)}\n`);
       }

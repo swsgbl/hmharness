@@ -132,6 +132,16 @@ export async function runEvolution(opts: {
   for (const p of proposals.slice(0, maxProposals)) {
     say(`candidate "${p.name}": drafting + candidate bench`);
     try {
+      // Write-channel anti-poisoning (Misevolve lesson): the behavior gate
+      // only sees bench output, so instructions the model merely IGNORES
+      // slip through. Screen drafted content for attempts to suppress tool
+      // use, rename toolchain identifiers, or bypass the approval gate.
+      const poison = screenForPoison(p.skill_md);
+      if (poison) {
+        report.outcomes.push({ name: p.name, action: 'rejected', reason: `poisoning screen: ${poison}` });
+        say(`  rejected by poisoning screen (${poison.slice(0, 60)})`);
+        continue;
+      }
       await writeDraft(home, p.name, p.skill_md);
       const draftBlock = `## Draft skill under evaluation: ${p.name}\n\n${p.skill_md.slice(0, 4000)}`;
       const candidateInjection = `${skillsToPrompt(active)}\n${draftBlock}`;
@@ -193,15 +203,18 @@ export async function runEvolution(opts: {
           continue;
         }
       }
+      // A promotion without any holdout case is a WEAK gate (behavior-only
+      // signal); surfaced in the log so weakly-gated skills are auditable.
+      const weakGate = holdout.length === 0;
       report.outcomes.push({
         name: p.name,
         action: 'promoted',
-        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''})${archivedPrevious ? '; previous version archived' : ''}`,
+        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''})${archivedPrevious ? '; previous version archived' : ''}${weakGate ? ' [WEAK GATE: no holdout cases defined]' : ''}`,
         baseline: { passRate: baseRate, cases: summary(baseResults) },
         candidate: { passRate: candRate, cases: summary(candResults) },
         ...(holdout.length ? { holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate } } : {}),
       });
-      say(`  promoted${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ''}`);
+      say(`  promoted${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ' [weak gate: no holdout]'}`);
     } catch (err) {
       report.outcomes.push({ name: p.name, action: 'error', reason: String(err).slice(0, 200) });
       say(`  error: ${String(err).slice(0, 120)}`);
@@ -211,7 +224,10 @@ export async function runEvolution(opts: {
   // 6. Append-only memory distillation.
   if (notes.length >= 4) {
     const distilled = await distillMemory(provider, notes.map((n) => n.text).slice(-20), say);
-    if (distilled) {
+    const distillPoison = distilled ? screenForPoison(distilled) : null;
+    if (distillPoison) {
+      say(`memory distillation rejected by poisoning screen (${distillPoison})`);
+    } else if (distilled) {
       await appendMemory(home, `(distilled) ${distilled}`);
       report.memoryDistilled = distilled;
     }
@@ -304,4 +320,26 @@ function parseJsonArray(text: string): unknown[] {
     }
   }
   return [];
+}
+
+/**
+ * Write-channel poisoning screen. Conservative pattern set; a hit rejects
+ * the draft outright (the bench cannot see instructions the model ignores).
+ * Deliberately窄: catches suppression/renaming/bypass directives, not
+ * ordinary technical content.
+ */
+const POISON_PATTERNS: Array<{ re: RegExp; why: string }> = [
+  { re: /(不要|别|never|don'?t)\s*(调用|使用|执行|call|use|run)[^。\n]{0,20}(工具|tool)/i, why: 'suppresses tool usage' },
+  { re: /(凭记忆|from memory|without (calling|using))[^。\n]{0,20}(回答|工具|tool)/i, why: 'answers from memory instead of tools' },
+  { re: /(一律|always|永远|never)[^。\n]{0,30}(写成|写作|rename|称作|call it)\s*["'"]?[a-z_]+["'"]?/i, why: 'renames a toolchain identifier' },
+  { re: /(跳过|绕过|忽略|bypass|skip|ignore)[^。\n]{0,20}(审批|批准|门禁|approval|confirm|guard|deny)/i, why: 'attempts to bypass the approval gate' },
+  { re: /(自动批准|auto[- ]?approve|always approve)/i, why: 'attempts to force auto-approval' },
+  { re: /(删除|disable|remove)[^。\n]{0,20}(护栏|防护|safety|deny|guard)/i, why: 'attempts to disable safety guards' },
+];
+
+export function screenForPoison(text: string): string | null {
+  for (const p of POISON_PATTERNS) {
+    if (p.re.test(text)) return p.why;
+  }
+  return null;
 }

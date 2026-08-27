@@ -84,8 +84,16 @@ export class McpClient {
 
   private spawnStdio(): void {
     const cfg = this.config as Extract<McpServerConfig, { type: 'stdio' }>;
+    // Allowlist, not passthrough: a spawned MCP server is third-party code;
+    // it must not inherit HMH_* keys or anything else not explicitly needed.
+    const SAFE_ENV = ['PATH', 'SYSTEMROOT', 'COMSPEC', 'TEMP', 'TMP', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'LANG', 'LC_ALL', 'TERM', 'NUMBER_OF_PROCESSORS'];
+    const env: Record<string, string> = {};
+    for (const k of SAFE_ENV) {
+      const v = process.env[k];
+      if (v !== undefined) env[k] = v;
+    }
     this.proc = spawn(cfg.command, cfg.args ?? [], {
-      env: { ...process.env, ...cfg.env },
+      env: { ...env, ...cfg.env },
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });

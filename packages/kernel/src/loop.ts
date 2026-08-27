@@ -32,6 +32,8 @@ export interface LoopResult {
   toolUses: number;
   /** The full working transcript (system + task + all turns), uncompacted. */
   messages: ChatMessage[];
+  /** Token usage summed across all model calls in this run (when reported). */
+  usage: { promptTokens: number; completionTokens: number };
 }
 
 export async function runLoop(opts: {
@@ -48,29 +50,34 @@ export async function runLoop(opts: {
   const maxTurns = opts.maxTurns ?? 25;
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
+  const usage = { promptTokens: 0, completionTokens: 0 };
   const tools = registry.toOpenAITools();
 
   for (let turn = 1; turn <= maxTurns; turn++) {
-    const { message } = await chat(provider, compactMessages(working, opts.maxContextChars), tools, {
+    const chatRes = await chat(provider, compactMessages(working, opts.maxContextChars), tools, {
       onDelta: events?.onDelta,
     });
+    usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
+    usage.completionTokens += chatRes.usage?.completion_tokens ?? 0;
+    const { message } = chatRes;
     events?.onAssistant?.(message);
 
     const calls = message.tool_calls ?? [];
     if (calls.length === 0) {
       const text = message.content ?? '';
       events?.onFinal?.(text, turn);
-      return { text, turns: turn, toolUses, messages: working };
+      return { text, turns: turn, toolUses, messages: working, usage };
     }
 
     working.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
     for (const call of calls) {
       const name = call.function.name;
       let args: Record<string, unknown> = {};
+      let badArgs = false;
       try {
         args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
       } catch {
-        args = {};
+        badArgs = true;
       }
       events?.onToolCall?.(name, args);
       const tool = registry.get(name);
@@ -78,6 +85,10 @@ export async function runLoop(opts: {
       let isError = false;
       if (!tool) {
         output = `unknown tool: ${name}`;
+        isError = true;
+      } else if (badArgs) {
+        // surface instead of silently executing with {}
+        output = `unparseable tool arguments for ${name}: ${call.function.arguments.slice(0, 200)}`;
         isError = true;
       } else {
         if (tool.needsApproval?.(args)) {
@@ -112,5 +123,5 @@ export async function runLoop(opts: {
   }
   const text = `Turn budget exhausted (${maxTurns}). Last state preserved in the session log.`;
   events?.onFinal?.(text, maxTurns);
-  return { text, turns: maxTurns, toolUses, messages: working };
+  return { text, turns: maxTurns, toolUses, messages: working, usage };
 }

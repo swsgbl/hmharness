@@ -3,17 +3,18 @@
  * regression) and one good proposal (should be PROMOTED, holdout verified).
  * Run: npx tsx scripts/e2e-evolve-gate.mts
  */
-import { chat, loadConfig, homeDir, Registry, runLoop } from '../packages/kernel/src/index.ts';
+import { chat, homeDir, loadConfig, Registry, resolveProvider, runLoop } from '../packages/kernel/src/index.ts';
 import { runEvolution, type BenchCase, type CaseRunner, type SkillProposal } from '../packages/evolution/src/index.ts';
 import { harmonyTools } from '../packages/domain-harmony/src/index.ts';
-import { baseTools } from '../packages/cli/src/tools.ts';
-import { buildSystemPrompt } from '../packages/cli/src/prompt.ts';
+import { baseTools } from '../packages/agent/src/tools.ts';
+import { buildSystemPrompt } from '../packages/agent/src/prompt.ts';
 
 const cfg = await loadConfig();
+const benchProvider = resolveProvider(cfg, 'bench');
 
 const runner: CaseRunner = async (c: BenchCase, skillsPrompt: string) => {
   if (!c.tools) {
-    const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+    const r = await chat(benchProvider, [{ role: 'user', content: c.prompt }]);
     return r.message.content ?? '';
   }
   const reg = new Registry();
@@ -23,10 +24,10 @@ const runner: CaseRunner = async (c: BenchCase, skillsPrompt: string) => {
     memory: '',
     skills: skillsPrompt,
     insights: '',
-    model: cfg.provider.model,
+    model: benchProvider.model,
   });
   const res = await runLoop({
-    provider: cfg.provider,
+    provider: benchProvider,
     registry: reg,
     messages: [
       { role: 'system', content: system },
@@ -63,7 +64,7 @@ const good: SkillProposal = {
 
 const report = await runEvolution({
   home: homeDir(),
-  provider: cfg.provider,
+  provider: resolveProvider(cfg, 'evolve'),
   runCase: runner,
   presetProposals: [junk, good],
   log: (l) => console.log('  ' + l),

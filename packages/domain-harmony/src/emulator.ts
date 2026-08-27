@@ -177,7 +177,7 @@ export const harmonyEmulatorStart: Tool = {
 export const harmonyEmulatorStop: Tool = {
   name: 'harmony_emulator_stop',
   description:
-    'Stop running emulator(s). With a name, stops only that instance (graceful hdc poweroff, then process kill). With no name, stops ALL running emulators. Requires approval.',
+    'Stop running emulator(s) by terminating their exact Emulator.exe process (matched via -hvd name; state on disk is preserved like a power loss - Android-style cold stop). With a name, stops only that instance; with no name, stops ALL running emulators. Requires approval.',
   parameters: {
     type: 'object',
     properties: { name: { type: 'string', description: 'device name (omit to stop all running emulators)' } },

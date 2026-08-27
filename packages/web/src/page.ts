@@ -242,7 +242,8 @@ export const PAGE = `<!doctype html>
   es.addEventListener('final', function (e) {
     flushStream();
     var d = JSON.parse(e.data);
-    el('div', 'toolres final', '(done · ' + d.turns + ' turns · ' + d.toolUses + ' tool uses · session ' + d.sessionId + ')');
+    var tok = (d.usage && (d.usage.promptTokens + d.usage.completionTokens) > 0) ? ' · ~' + d.usage.promptTokens + '/' + d.usage.completionTokens + ' tok' : '';
+    el('div', 'toolres final', '(done · ' + d.turns + ' turns · ' + d.toolUses + ' tool uses' + tok + ' · session ' + d.sessionId + ')');
     loadSessions();
   });
   es.addEventListener('error', function (e) {

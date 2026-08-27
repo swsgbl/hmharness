@@ -182,7 +182,8 @@ export async function tui(yes: boolean): Promise<void> {
         });
         stdout.write(streamed ? '\n\n' : '\n' + result.text + '\n\n');
         stdout.write(DIM(t.sessionFooter(result.sessionId, result.turns, result.toolUses) + '\n'));
-        history = [...history, { role: 'user', content: line }, ...result.messages.slice(2)];
+        // only the NEW turns (past the replayed prefix) extend history
+        history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
       } catch (err) {
         stdout.write(YELLOW(`error: ${String(err)}\n`));
       }

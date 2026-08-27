@@ -138,7 +138,7 @@ export interface RunnerEvents {
   onToolCall?(name: string, args: Record<string, unknown>): void;
   onToolResult?(name: string, output: string, isError: boolean): void;
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
-  onFinal?(r: { text: string; turns: number; toolUses: number; sessionId: string }): void;
+  onFinal?(r: { text: string; turns: number; toolUses: number; sessionId: string; usage?: { promptTokens: number; completionTokens: number } }): void;
 }
 
 export interface AgentTaskOptions {
@@ -226,6 +226,6 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     toolUses: result.toolUses,
     toolsUsed: [...new Set(toolsUsed)],
   });
-  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id });
+  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage });
   return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)] };
 }

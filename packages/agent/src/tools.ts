@@ -8,14 +8,17 @@ import { exec } from 'node:child_process';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, loadConfig, resolveProvider, type ProviderConfig, type Tool } from '@hmh/kernel';
+import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool } from '@hmh/kernel';
 
 const execCb = promisify(exec);
 
 const DENY_PATTERNS: Array<{ re: RegExp; why: string }> = [
-  { re: /rm\s+-rf?\s+[/~C:\\]|format\s+[a-z]:|del\s+\/[sq]/i, why: 'recursive delete of a root/home path' },
+  // recursive deletes of root/home paths, incl. quoted and PowerShell/rd variants
+  { re: /rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\s+["']?[/~"']|rm\s+-rf?\s+[CcJj]:\\?/i, why: 'recursive delete of a root/home path' },
+  { re: /rd\s+\/s|remove-item\s+[^|;&]{0,40}-recurse\s+[^|;&]{0,12}-force\s+[a-z]:\\|format\s+[a-z]:|del\s+\/[sq]/i, why: 'recursive delete of a root/home path' },
   { re: /shutdown|restart\s+computer|taskkill\s+\/f\s+\/im\s+explorer/i, why: 'system power/shell action' },
   { re: /reg\s+(delete|add).*(Run|CurrentVersion)/i, why: 'autostart registry mutation' },
+  { re: /curl[^|;&]{0,80}\|\s*(ba)?sh|iwr[^|;&]{0,80}\|\s*iex|set-executionpolicy\s+unrestricted/i, why: 'remote-script-to-shell pipe / unrestricted execution policy' },
 ];
 
 function safePath(p: string, cwd: string): string {
@@ -133,10 +136,7 @@ export const rememberTool: Tool = {
   async execute(args) {
     try {
       const { appendMemory } = await import('@hmh/evolution');
-      await appendMemory(
-        process.env.HMH_HOME ?? join(process.env.USERPROFILE ?? '.', '.hmharness'),
-        String(args.note ?? ''),
-      );
+      await appendMemory(homeDir(), String(args.note ?? ''));
       return { output: 'remembered.' };
     } catch (err) {
       return { output: String(err), isError: true };

@@ -79,6 +79,23 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   };
 
   const server = createServer(async (req, res) => {
+    // DNS-rebinding guard: this server is loopback-only, so any request whose
+    // Host (or Origin, when present) is not our own loopback origin is a
+    // rebinding probe -> refuse before touching a route. The approval
+    // endpoint is effectively remote-code-execution; it must never answer a
+    // foreign origin.
+    const port = String(opts.port);
+    const host = (req.headers.host ?? '').toLowerCase();
+    const origin = (req.headers.origin ?? '').toLowerCase();
+    const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+    if (!allowedHosts.has(host)) {
+      json(res, 403, { error: 'forbidden host' });
+      return;
+    }
+    if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) {
+      json(res, 403, { error: 'forbidden origin' });
+      return;
+    }
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     try {
       if (req.method === 'GET' && url.pathname === '/') {
