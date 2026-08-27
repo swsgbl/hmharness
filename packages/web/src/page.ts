@@ -216,7 +216,7 @@ export const PAGE = `<!doctype html>
       <button class="nav" data-view="devices"><span class="ico">📟</span><span class="txt minhide">设备</span></button>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
     </nav>
-    <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="新会话">＋</button></span></div>
+    <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="添加工作区">＋</button></span></div>
     <div id="wsbox" class="minhide">
       <button id="wscur" type="button" title="切换工作区"><span class="tri">▾</span><span id="wscur-name">…</span></button>
       <div id="wslist">
@@ -375,6 +375,7 @@ export const PAGE = `<!doctype html>
     document.getElementById('wsp-name').placeholder = L.wsName;
     document.getElementById('wsp-cancel').textContent = L.cancel;
     document.getElementById('wsp-ok').textContent = L.wsOk;
+    document.getElementById('ws-new').title = L.pickTitle;
     document.getElementById('wscur').title = L.wsSwitch;
     var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, skills:L.navSk };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
@@ -1023,7 +1024,7 @@ export const PAGE = `<!doctype html>
     });
   }
   document.getElementById('newbtn').onclick = newSession;
-  document.getElementById('ws-new').onclick = newSession;
+  document.getElementById('ws-new').onclick = openPick;
   document.getElementById('clear').onclick = newSession;
   document.getElementById('ws-refresh').onclick = loadSessions;
   document.getElementById('board-refresh').onclick = loadBoard;
