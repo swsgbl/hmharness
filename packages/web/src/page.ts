@@ -46,6 +46,16 @@ export const PAGE = `<!doctype html>
   button.danger { background:var(--err); color:#fff; }
   button:disabled { opacity:.45; cursor:default; }
   .badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; background:var(--panel); color:var(--dim); margin-left:6px; }
+  .say code { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 4px; font-family:var(--mono); font-size:12.5px; }
+  .say pre { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.5; }
+  .say b { color:#fff; }
+  #empty { color:var(--dim); text-align:center; margin:auto; max-width:420px; }
+  #empty .ex { font-family:var(--mono); font-size:12.5px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:6px 0; cursor:pointer; }
+  #empty .ex:hover { border-color:var(--accent); color:var(--text); }
+  #approval.pulse { animation:pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,179,65,0); } 50% { box-shadow:0 0 0 4px rgba(227,179,65,.25); } }
+  #side .sess { display:flex; gap:8px; align-items:baseline; }
+  #side .sess .t { color:var(--accent); font-family:var(--mono); font-size:11px; flex:none; }
 </style>
 </head>
 <body>
@@ -64,7 +74,7 @@ export const PAGE = `<!doctype html>
     <h3 id="ph-evolution">evolution</h3><div id="evolution"></div>
   </div>
   <div id="stage">
-    <div id="log"></div>
+    <div id="log"><div id="empty"><div style="font-size:28px">⚙️</div><div id="empty-title" style="margin:8px 0 4px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px" class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="用一句话介绍你自己">用一句话介绍你自己</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div></div></div>
     <div id="approval">
       <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono)"></span></div>
       <div style="margin-top:8px">
@@ -88,11 +98,13 @@ export const PAGE = `<!doctype html>
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', approve:'批准', deny:'拒绝',
           approvalReq:'审批请求:', skills:'技能库', sessions:'最近会话', insights:'近期洞察', evolution:'进化记录',
           none:'(无)', noCycles:'(尚无进化轮次)', placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
-          end:'--- (以下新任务将开始全新对话) ---', none2:'(无)' },
+          end:'--- (以下新任务将开始全新对话) ---', none2:'(无)',
+          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行' },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', insights:'insights', evolution:'evolution',
           none:'(none)', noCycles:'(no cycles yet)', placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
-          end:'--- (new tasks below start a fresh conversation) ---', none2:'(none)' }
+          end:'--- (new tasks below start a fresh conversation) ---', none2:'(none)',
+          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running' }
   };
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
@@ -102,6 +114,8 @@ export const PAGE = `<!doctype html>
     document.getElementById('ap-no').textContent = L.deny;
     document.getElementById('approval-req-label').textContent = L.approvalReq;
     document.getElementById('clear').textContent = loc === 'en' ? 'clear' : '清屏';
+    document.getElementById('empty-title').textContent = L.emptyTitle;
+    document.getElementById('empty-sub').textContent = L.emptySub;
     document.getElementById('input').placeholder = L.placeholder;
     document.getElementById('yes-label').textContent = loc === 'en' ? 'auto-approve' : '自动批准';
     document.getElementById('ph-skills').textContent = L.skills;
@@ -120,11 +134,43 @@ export const PAGE = `<!doctype html>
     log.scrollTop = log.scrollHeight;
     return e;
   }
+  function clearEmpty() {
+    var e = document.getElementById('empty');
+    if (e) e.remove();
+  }
+  // minimal markdown for model answers: fenced blocks, inline code, bold.
+  // escape FIRST - model output is never trusted as HTML.
+  function mdLite(text) {
+    var esc = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var parts = esc.split(/\u0060\u0060\u0060/);
+    var out = '';
+    for (var i = 0; i < parts.length; i++) {
+      if (i % 2 === 1) {
+        var body = parts[i].replace(/^[a-zA-Z0-9_-]*\\n/, '');
+        out += '<pre>' + body + '</pre>';
+      } else {
+        out += parts[i]
+          .replace(/\u0060([^\u0060\\n]+)\u0060/g, '<code>$1</code>')
+          .replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');
+      }
+    }
+    return out;
+  }
+  function sayBlock() {
+    clearEmpty();
+    var e = el('div', 'say');
+    return {
+      add: function (chunk) { e.textContent += chunk; },
+      finalize: function () { e.innerHTML = mdLite(e.textContent); autoscroll(); }
+    };
+  }
   function setBusy(b) {
     var badge = document.getElementById('busy');
     badge.textContent = b ? L.running : L.idle;
     badge.className = b ? 'on' : '';
+    document.title = b ? '● ' + L.running : L.title;
     document.getElementById('send').disabled = b;
+    document.getElementById('input').disabled = b;
   }
 
   function renderState(s) {
@@ -161,8 +207,18 @@ export const PAGE = `<!doctype html>
       box.innerHTML = '';
       d.sessions.slice(0, 12).forEach(function (id) {
         var div = document.createElement('div');
-        div.className = 'item click';
-        div.textContent = id;
+        div.className = 'item click sess';
+        div.title = id;
+        // id = "YYYY-MM-DDTHH-MM-SS-xxxxxx": show compact date+time
+        var m = id.match(/^(\\d{4}-\\d{2}-\\d{2})T(\\d{2})-(\\d{2})/);
+        var t = document.createElement('span');
+        t.className = 't';
+        t.textContent = m ? m[1].slice(5) + ' ' + m[2] + ':' + m[3] : id.slice(0, 12);
+        var tail = document.createElement('span');
+        tail.className = 'd';
+        tail.textContent = id.slice(-6);
+        div.appendChild(t);
+        div.appendChild(tail);
         div.onclick = function () { viewSession(id, div); };
         box.appendChild(div);
       });
@@ -188,9 +244,13 @@ export const PAGE = `<!doctype html>
   // Streaming display: one element per assistant segment (thinking / text);
   // chunks APPEND to it until the segment changes. Creating an element per
   // chunk shreds CJK text into vertical confetti - never again.
-  var curEl = null;
+  var curBlock = null;   // streaming {add,finalize}
   var curKind = null;
-  function flushStream() { curEl = null; curKind = null; }
+  function flushStream() {
+    if (curBlock) curBlock.finalize();
+    curBlock = null;
+    curKind = null;
+  }
   function nearBottom() { return log.scrollHeight - log.scrollTop - log.clientHeight < 80; }
   function autoscroll() { if (nearBottom()) log.scrollTop = log.scrollHeight; }
 
@@ -201,21 +261,28 @@ export const PAGE = `<!doctype html>
     var d = JSON.parse(e.data);
     setBusy(d.busy);
     flushStream();
-    if (d.busy) el('div', 'tool', '▶ ' + d.task);
+    if (d.busy) { clearEmpty(); el('div', 'tool', '▶ ' + d.task); }
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
     if (curKind !== d.kind) {
       flushStream();
+      clearEmpty();
       curKind = d.kind;
-      curEl = el('div', d.kind === 'reasoning' ? 'think' : 'say');
+      if (d.kind === 'reasoning') {
+        var t = el('div', 'think');
+        curBlock = { add: function (c) { t.textContent += c; }, finalize: function () {} };
+      } else {
+        curBlock = sayBlock();
+      }
     }
-    curEl.textContent += d.chunk;
+    curBlock.add(d.chunk);
     autoscroll();
   });
   es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', '  ' + JSON.parse(e.data).text); autoscroll(); });
   es.addEventListener('tool', function (e) {
     flushStream();
+    clearEmpty();
     var d = JSON.parse(e.data);
     el('div', 'tool', '  [tool] ' + d.name + ' ' + JSON.stringify(d.args).slice(0, 120));
     autoscroll();
@@ -223,18 +290,21 @@ export const PAGE = `<!doctype html>
   es.addEventListener('toolResult', function (e) {
     flushStream();
     var d = JSON.parse(e.data);
-    el('div', d.isError ? 'toolres err' : 'toolres', '  [' + d.name + (d.isError ? ' ERROR' : ' ok') + '] ' + d.preview.slice(0, d.isError ? 160 : 120).replace(/
-/g, ' '));
+    var prev = String(d.preview).slice(0, d.isError ? 160 : 120).split('\\n').join(' ');
+    el('div', d.isError ? 'toolres err' : 'toolres', '  [' + d.name + (d.isError ? ' ERROR' : ' ok') + '] ' + prev);
     autoscroll();
   });
   es.addEventListener('approvalReq', function (e) {
     var d = JSON.parse(e.data);
     document.getElementById('ap-name').textContent = d.name;
     document.getElementById('ap-args').textContent = JSON.stringify(d.args).slice(0, 200);
-    document.getElementById('approval').style.display = 'block';
+    var box = document.getElementById('approval');
+    box.style.display = 'block';
+    box.classList.add('pulse');
   });
   es.addEventListener('approvalDone', function (e) {
     document.getElementById('approval').style.display = 'none';
+    document.getElementById('approval').classList.remove('pulse');
     flushStream();
     var d = JSON.parse(e.data);
     el('div', 'toolres', '  [approval ' + d.name + ': ' + (d.granted ? 'granted' : 'DENIED') + ']');
@@ -247,7 +317,7 @@ export const PAGE = `<!doctype html>
     loadSessions();
   });
   es.addEventListener('error', function (e) {
-    if (e.data) el('div', 'err', 'error: ' + JSON.parse(e.data).message);
+    if (e.data) { flushStream(); el('div', 'err', 'error: ' + JSON.parse(e.data).message); }
   });
 
   function decide(granted) {
@@ -257,6 +327,7 @@ export const PAGE = `<!doctype html>
       body: JSON.stringify({ granted: granted })
     });
     document.getElementById('approval').style.display = 'none';
+    document.getElementById('approval').classList.remove('pulse');
   }
   document.getElementById('ap-yes').onclick = function () { decide(true); };
   document.getElementById('ap-no').onclick = function () { decide(false); };
@@ -273,18 +344,26 @@ export const PAGE = `<!doctype html>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text, yes: document.getElementById('yes').checked })
     }).then(function (r) {
-      if (r.status === 409) { el('div', 'err', 'a task is already running'); }
+      if (r.status === 409) { clearEmpty(); el('div', 'err', L.alreadyRunning); }
       return r.json();
-    }).catch(function (err) { el('div', 'err', String(err)); });
+    }).catch(function (err) { clearEmpty(); el('div', 'err', String(err)); });
   };
   document.getElementById('input').onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // isComposing: Enter during IME composition (Chinese input) must NOT send
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       document.getElementById('form').requestSubmit();
     }
   };
 
   document.getElementById('clear').onclick = function () { flushStream(); log.innerHTML = ''; };
+  // empty-state examples fill the input and submit
+  Array.prototype.forEach.call(document.querySelectorAll('#empty .ex'), function (ex) {
+    ex.onclick = function () {
+      document.getElementById('input').value = ex.getAttribute('data-ex');
+      document.getElementById('form').requestSubmit();
+    };
+  });
 
   fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
   loadSessions();

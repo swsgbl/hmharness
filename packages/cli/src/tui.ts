@@ -32,12 +32,17 @@ export async function tui(yes: boolean): Promise<void> {
   };
 
   await header();
-  stdout.write(DIM(t.replHint + ' · /tools /skills /ops /bench /status /exit\n\n'));
+  stdout.write(DIM(t.replHint + ' · /help 查看命令\n\n'));
 
   let history: ChatMessage[] = [];
   try {
     while (true) {
-      const line = (await rl.question(CYAN('hmh> '))).trim();
+      let line: string;
+      try {
+        line = (await rl.question(CYAN('hmh> '))).trim();
+      } catch {
+        break; // stdin closed (EOF / Ctrl-D) - exit cleanly
+      }
       if (!line) continue;
       if (line === '/exit' || line === '/quit') break;
 
@@ -50,6 +55,7 @@ export async function tui(yes: boolean): Promise<void> {
           '  /evolve   one evolution cycle',
           '  /mcp      configured MCP servers',
           '  /status   refresh header · /clear empty the screen',
+          '  /web      hint: launch the browser UI (hmh web --port=7788)',
           '  /exit     quit',
         ].join('\n') + '\n');
         continue;
