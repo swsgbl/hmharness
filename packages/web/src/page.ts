@@ -18,7 +18,13 @@ export const PAGE = `<!doctype html>
   * { box-sizing:border-box; }
   html, body { height:100%; }
   body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,"Segoe UI",sans-serif; overflow:hidden; }
-  #app { display:grid; grid-template-columns:264px 1fr auto; height:100vh; }
+  #app { display:grid; grid-template-columns:264px 1fr auto; grid-template-rows:100vh; height:100vh; }
+  /* min-height:0 everywhere content must shrink inside the grid/flex chain,
+     otherwise the transcript grows past 100vh and pushes the composer
+     off-screen (invisible with overflow:hidden) */
+  #main { min-height:0; }
+  #log { min-height:0; }
+  #composer { flex-shrink:0; }
 
   /* ---- sidebar ---- */
   #side { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:0; }
@@ -30,7 +36,7 @@ export const PAGE = `<!doctype html>
   #search { margin:4px 12px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px;
             padding:6px 9px; font:12.5px inherit; outline:none; width:calc(100% - 24px); }
   #search:focus { border-color:var(--accent); }
-  #sesslist { flex:1; overflow-y:auto; padding:2px 6px; }
+  #sesslist { flex:1; overflow-y:auto; padding:2px 6px; min-height:0; }
   #sesslist .grp { font-size:11px; color:var(--dim); padding:8px 8px 4px; text-transform:uppercase; letter-spacing:.08em; }
   .sess { display:block; width:100%; text-align:left; background:none; border:0; color:var(--text); padding:6px 8px; border-radius:7px; cursor:pointer; }
   .sess:hover { background:var(--panel2); }
