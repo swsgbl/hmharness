@@ -7,9 +7,9 @@
  * this is a local companion, never exposed.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { join } from 'node:path';
+import { join, basename, isAbsolute, resolve } from 'node:path';
 import { homeDir, loadConfig, loadTranscript, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
 import { buildRegistry, runAgentTask } from '@hmh/agent';
@@ -22,6 +22,12 @@ interface PendingApproval {
   args: Record<string, unknown>;
   resolve(granted: boolean): void;
   timer: NodeJS.Timeout;
+}
+
+interface WsItem {
+  id: string;
+  name: string;
+  path: string;
 }
 
 async function readBody(req: IncomingMessage, limit = 100_000): Promise<string> {
@@ -42,6 +48,41 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   let busy = false;
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
+
+  // ---- workspaces: the agent's project contexts ----
+  // A workspace is a project directory; switching one chdirs the server so
+  // every task (and its session audit cwd) runs inside that project, and the
+  // sidebar groups sessions by workspace path.
+  let wsItems: WsItem[] = [];
+  let wsCurrent = '';
+  const wsFile = join(home, 'workspaces.json');
+  const saveWorkspaces = () =>
+    writeFile(wsFile, JSON.stringify({ current: wsCurrent, items: wsItems }, null, 2), 'utf8');
+  const currentWs = (): WsItem | undefined => wsItems.find((w) => w.id === wsCurrent);
+  try {
+    const d = JSON.parse(await readFile(wsFile, 'utf8')) as { current?: string; items?: WsItem[] };
+    wsItems = Array.isArray(d.items) ? d.items : [];
+    wsCurrent = typeof d.current === 'string' ? d.current : '';
+  } catch {
+    wsItems = [];
+    wsCurrent = '';
+  }
+  if (!wsItems.length) {
+    wsItems = [{ id: `ws-${Math.random().toString(36).slice(2, 8)}`, name: basename(process.cwd()) || 'workspace', path: process.cwd() }];
+    wsCurrent = wsItems[0].id;
+    await saveWorkspaces();
+  }
+  if (!wsItems.some((w) => w.id === wsCurrent)) wsCurrent = wsItems[0].id;
+  {
+    const cur = currentWs();
+    if (cur) {
+      try {
+        process.chdir(cur.path);
+      } catch {
+        /* recorded directory vanished; keep server cwd */
+      }
+    }
+  }
 
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -70,6 +111,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       locale: cfg.locale ?? 'zh',
       busy,
       approvalPending: pendingApproval !== null,
+      workspace: currentWs() ?? null,
       skills: {
         active: active.map((s) => ({ name: s.name, description: s.description })),
         drafts: drafts.map((s) => ({ name: s.name, description: s.description })),
@@ -144,6 +186,76 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         json(res, 200, { devices: probe.devices, hdcAvailable: probe.ok });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/workspaces') {
+        json(res, 200, { current: wsCurrent, items: wsItems });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/workspaces') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { name?: string; path?: string };
+        const path = isAbsolute(String(body.path ?? '')) ? resolve(String(body.path)) : '';
+        const name = String(body.name ?? '').trim() || (path ? basename(path) : '');
+        if (!path || !name) {
+          json(res, 400, { error: 'absolute path and name required' });
+          return;
+        }
+        let isDir = false;
+        try {
+          isDir = (await stat(path)).isDirectory();
+        } catch {
+          /* missing */
+        }
+        if (!isDir) {
+          json(res, 400, { error: `not a directory: ${path}` });
+          return;
+        }
+        if (wsItems.some((w) => w.path.toLowerCase() === path.toLowerCase())) {
+          json(res, 409, { error: 'workspace already registered' });
+          return;
+        }
+        const item: WsItem = { id: `ws-${Math.random().toString(36).slice(2, 8)}`, name, path };
+        wsItems.push(item);
+        await saveWorkspaces();
+        json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/workspaces/use') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { id?: string };
+        const target = wsItems.find((w) => w.id === body.id);
+        if (!target) {
+          json(res, 404, { error: 'workspace not found' });
+          return;
+        }
+        if (busy) {
+          json(res, 409, { error: 'a task is already running' });
+          return;
+        }
+        try {
+          process.chdir(target.path);
+        } catch (err) {
+          json(res, 400, { error: `cannot enter ${target.path}: ${String(err).slice(0, 120)}` });
+          return;
+        }
+        wsCurrent = target.id;
+        await saveWorkspaces();
+        broadcast('state', await stateObject());
+        json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/workspaces/delete') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { id?: string };
+        if (wsItems.length <= 1) {
+          json(res, 400, { error: 'at least one workspace must remain' });
+          return;
+        }
+        if (body.id === wsCurrent) {
+          json(res, 400, { error: 'cannot delete the active workspace' });
+          return;
+        }
+        wsItems = wsItems.filter((w) => w.id !== body.id);
+        await saveWorkspaces();
+        json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
         let files: string[] = [];
         try {
@@ -151,10 +263,22 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         } catch {
           /* none */
         }
+        // first line of each jsonl is session/start with the workspace cwd
+        const cwdOf = async (file: string): Promise<string> => {
+          try {
+            const fd = await open(file, 'r');
+            const buf = Buffer.alloc(600);
+            await fd.read(buf, 0, 600, 0);
+            await fd.close();
+            return String(JSON.parse(buf.toString('utf8').split('\n')[0] ?? '{}').cwd ?? '');
+          } catch {
+            return '';
+          }
+        };
         // board cards come from the insight archive (task/outcome/turns/tools)
         const bySession = new Map((await readInsights(home, 200)).map((i) => [i.session, i]));
-        json(res, 200, {
-          sessions: files.map((f) => {
+        const sessions = await Promise.all(
+          files.map(async (f) => {
             const id = f.replace(/\.jsonl$/, '');
             const i = bySession.get(id);
             return {
@@ -164,9 +288,11 @@ export async function startServer(opts: { port: number; host?: string }): Promis
               turns: i?.turns ?? 0,
               toolUses: i?.toolUses ?? 0,
               time: i?.time ?? '',
+              cwd: await cwdOf(join(home, 'sessions', f)),
             };
           }),
-        });
+        );
+        json(res, 200, { sessions, workspace: currentWs() ?? null });
         return;
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {

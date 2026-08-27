@@ -50,6 +50,30 @@ export const PAGE = `<!doctype html>
   .wsacts { margin-left:auto; display:flex; gap:2px; }
   .wsacts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:2px 6px; border-radius:6px; }
   .wsacts button:hover { color:var(--text); background:var(--panel2); }
+  #wsbox { padding:0 10px 2px; position:relative; }
+  #wscur { width:100%; display:flex; gap:7px; align-items:center; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:6px 9px; cursor:pointer; font:12.5px inherit; text-align:left; }
+  #wscur:hover { border-color:var(--accent); }
+  #wscur .tri { color:var(--dim); font-size:10px; transition:transform .12s; }
+  #wsbox.open #wscur .tri { transform:rotate(180deg); }
+  #wscur #wscur-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  #wslist { display:none; background:var(--panel2); border:1px solid var(--line); border-radius:8px; margin-top:4px; padding:4px; max-height:240px; overflow-y:auto; }
+  #wsbox.open #wslist { display:block; }
+  .wsi { position:relative; padding:6px 8px 6px 10px; border-radius:6px; cursor:pointer; }
+  .wsi:hover { background:var(--bg); }
+  .wsi.on { background:var(--bg); }
+  .wsi .nm { font-size:12.5px; display:flex; gap:7px; align-items:center; padding-right:18px; }
+  .wsi .nm .dot { width:6px; height:6px; border-radius:50%; background:var(--line); flex:none; }
+  .wsi.on .nm .dot { background:var(--ok); }
+  .wsi .pt { font-size:10.5px; color:var(--dim); font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+  .wsi .wsx { position:absolute; right:5px; top:5px; visibility:hidden; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 4px; border-radius:4px; }
+  .wsi:hover .wsx { visibility:visible; }
+  .wsi .wsx:hover { color:var(--err); }
+  .wsadd { font-size:12px; color:var(--dim); padding:6px 8px; cursor:pointer; border-top:1px dashed var(--line); margin-top:2px; }
+  .wsadd:hover { color:var(--accent); }
+  #wsform { display:none; gap:4px; padding:6px 6px 4px; }
+  #wsform.on { display:flex; }
+  #wsform input { flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:5px; padding:3px 6px; font:11.5px inherit; outline:none; }
+  #wsform input:focus { border-color:var(--accent); }
   #search { margin:4px 12px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px;
             padding:6px 9px; font:12.5px inherit; outline:none; width:calc(100% - 24px); }
   #search:focus { border-color:var(--accent); }
@@ -172,8 +196,20 @@ export const PAGE = `<!doctype html>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
     </nav>
     <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="新会话">＋</button></span></div>
+    <div id="wsbox" class="minhide">
+      <button id="wscur" type="button" title="切换工作区"><span class="tri">▾</span><span id="wscur-name">…</span></button>
+      <div id="wslist">
+        <div id="ws-items"></div>
+        <div class="wsadd" id="ws-add">＋ 添加工作区</div>
+        <div id="wsform">
+          <input id="ws-name" placeholder="名称">
+          <input id="ws-path" placeholder="绝对路径">
+          <button id="ws-ok" type="button" class="primary sm">添加</button>
+        </div>
+      </div>
+    </div>
     <input id="search" class="minhide" placeholder="搜索会话…">
-    <div id="sesslist"><div class="grp" id="ph-sessions">最近会话</div><div id="sessions"></div></div>
+    <div id="sesslist"><div class="grp" id="ph-sessions">最近会话</div><div id="sessions"></div><div class="grp" id="ph-other" style="display:none">其他 / 未分组</div><div id="sessions-other" style="display:none"></div></div>
     <div id="sidefoot" class="minhide"><span id="skills-n">0</span> <span id="skills-label">技能</span> · <span id="model2"></span></div>
   </div>
   <div id="main" style="position:relative;">
@@ -255,7 +291,9 @@ export const PAGE = `<!doctype html>
           thinkL:'思考过程', copy:'复制', regen:'重新生成', refresh:'刷新',
           noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
-          noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…' },
+          noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
+          wsAdd:'＋ 添加工作区', wsName:'名称', wsPath:'绝对路径，如 G:\\\\myapp', wsOk:'添加',
+          wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
@@ -268,7 +306,9 @@ export const PAGE = `<!doctype html>
           noDev:'No devices found - plug in a device or start an emulator, then refresh',
           noHdc:'hdc not found - install DevEco Studio / command-line tools and add to PATH',
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
-          noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…' }
+          noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
+          wsAdd:'＋ add workspace', wsName:'name', wsPath:'absolute path', wsOk:'Add',
+          wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped' }
   };
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
@@ -295,6 +335,13 @@ export const PAGE = `<!doctype html>
     document.getElementById('sk-title').textContent = L.viewSk;
     document.getElementById('board-refresh').textContent = '\\u21BB ' + L.refresh;
     document.getElementById('dev-refresh').textContent = '\\u21BB ' + L.refresh;
+    document.getElementById('ph-sessions').textContent = L.curSessions;
+    document.getElementById('ph-other').textContent = L.otherSessions;
+    document.getElementById('ws-add').textContent = L.wsAdd;
+    document.getElementById('ws-name').placeholder = L.wsName;
+    document.getElementById('ws-path').placeholder = L.wsPath;
+    document.getElementById('ws-ok').textContent = L.wsOk;
+    document.getElementById('wscur').title = L.wsSwitch;
     var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, skills:L.navSk };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
@@ -423,10 +470,105 @@ export const PAGE = `<!doctype html>
     setLabels(s.locale || 'zh');
     document.getElementById('model').textContent = s.model;
     document.getElementById('model2').textContent = s.model;
-    document.getElementById('home').textContent = s.home;
+    var hp = s.workspace && s.workspace.path ? s.workspace.path : s.home;
+    document.getElementById('home').textContent = hp;
+    document.getElementById('home').title = hp;
+    if (s.workspace) {
+      curWs = s.workspace;
+      var n = document.getElementById('wscur-name');
+      if (n && n.textContent !== s.workspace.name) n.textContent = s.workspace.name;
+      renderSessions(document.getElementById('search').value);
+    }
     document.getElementById('skills-n').textContent = s.skills.active.length + s.skills.drafts.length;
     if (curView === 'skills') renderSkills();
   }
+
+  /* ---- workspaces (the agent's project contexts) ---- */
+  var wsItems = [];
+  var curWs = { id: '', name: '', path: '' };
+  function loadWorkspaces() {
+    fetch('/api/workspaces').then(function (r) { return r.json(); }).then(function (d) {
+      wsItems = d.items || [];
+      if (d.current && d.items) {
+        for (var i = 0; i < d.items.length; i++) {
+          if (d.items[i].id === d.current) { curWs = d.items[i]; break; }
+        }
+      }
+      renderWsList();
+      renderSessions(document.getElementById('search').value);
+    });
+  }
+  function renderWsList() {
+    document.getElementById('wscur-name').textContent = curWs.name || '…';
+    var box = document.getElementById('ws-items');
+    box.innerHTML = '';
+    wsItems.forEach(function (w) {
+      var item = document.createElement('div');
+      item.className = 'wsi' + (w.id === curWs.id ? ' on' : '');
+      var nm = document.createElement('div'); nm.className = 'nm';
+      var dot = document.createElement('span'); dot.className = 'dot';
+      var t = document.createElement('span');
+      t.style.whiteSpace = 'nowrap'; t.style.overflow = 'hidden'; t.style.textOverflow = 'ellipsis';
+      t.textContent = w.name;
+      nm.appendChild(dot); nm.appendChild(t);
+      var pt = document.createElement('div'); pt.className = 'pt'; pt.textContent = w.path;
+      var x = document.createElement('button'); x.className = 'wsx'; x.type = 'button'; x.textContent = '\\u00D7';
+      x.title = L ? L.wsRemove : 'remove';
+      x.onclick = function (ev) {
+        ev.stopPropagation();
+        fetch('/api/workspaces/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.items) { wsItems = d.items; renderWsList(); }
+            else if (d.error) { alert(d.error); }
+          })
+          .catch(function (e) { alert(String(e)); });
+      };
+      item.appendChild(nm); item.appendChild(pt); item.appendChild(x);
+      item.onclick = function () {
+        if (w.id === curWs.id) { document.getElementById('wsbox').classList.remove('open'); return; }
+        fetch('/api/workspaces/use', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            document.getElementById('wsbox').classList.remove('open');
+            if (d.error) { alert(d.error); return; }
+            if (d.items) wsItems = d.items;
+            curWs = w;
+            renderWsList();
+            loadSessions();
+          })
+          .catch(function (e) { alert(String(e)); });
+      };
+      box.appendChild(item);
+    });
+  }
+  document.getElementById('wscur').onclick = function () {
+    document.getElementById('wsbox').classList.toggle('open');
+  };
+  document.getElementById('ws-add').onclick = function () {
+    document.getElementById('wsform').classList.toggle('on');
+    if (document.getElementById('wsform').classList.contains('on')) document.getElementById('ws-path').focus();
+  };
+  function submitWs() {
+    var name = document.getElementById('ws-name').value.trim();
+    var path = document.getElementById('ws-path').value.trim();
+    if (!path) return;
+    fetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, path: path })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (res) {
+      if (!res.ok) { alert(res.d && res.d.error ? res.d.error : 'failed'); return; }
+      document.getElementById('ws-name').value = '';
+      document.getElementById('ws-path').value = '';
+      document.getElementById('wsform').classList.remove('on');
+      if (res.d.items) { wsItems = res.d.items; renderWsList(); }
+    }).catch(function (e) { alert(String(e)); });
+  }
+  document.getElementById('ws-ok').onclick = submitWs;
+  document.getElementById('ws-path').onkeydown = function (e) {
+    if (e.key === 'Enter' && !e.isComposing) submitWs();
+  };
 
   /* ---- board / devices / skills views ---- */
   function sessTime(id) {
@@ -524,31 +666,44 @@ export const PAGE = `<!doctype html>
     });
   }
 
+  function sessRow(s) {
+    var b = document.createElement('button');
+    b.className = 'sess';
+    b.title = s.id;
+    var t1 = document.createElement('div'); t1.className = 't1';
+    var dot = document.createElement('span'); dot.className = 'dot';
+    var time = document.createElement('span'); time.className = 'time';
+    time.textContent = sessTime(s.id);
+    t1.appendChild(dot); t1.appendChild(time);
+    if (s.task) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = s.task.slice(0, 40); t1.appendChild(tk); }
+    b.appendChild(t1);
+    if (s.task) { var t2 = document.createElement('div'); t2.className = 'task'; t2.textContent = s.task; b.appendChild(t2); }
+    b.onclick = function () { viewSession(s.id); };
+    return b;
+  }
   function renderSessions(filter) {
-    var box = document.getElementById('sessions');
-    box.innerHTML = '';
+    var mine = document.getElementById('sessions');
+    var other = document.getElementById('sessions-other');
+    mine.innerHTML = '';
+    other.innerHTML = '';
     var f = (filter || '').toLowerCase();
-    sessData.slice(0, 30).forEach(function (s) {
+    var curPath = (curWs.path || '').toLowerCase();
+    var otherCount = 0;
+    sessData.slice(0, 50).forEach(function (s) {
       if (f && (s.id + ' ' + s.task).toLowerCase().indexOf(f) < 0) return;
-      var b = document.createElement('button');
-      b.className = 'sess';
-      b.title = s.id;
-      var t1 = document.createElement('div'); t1.className = 't1';
-      var dot = document.createElement('span'); dot.className = 'dot';
-      var time = document.createElement('span'); time.className = 'time';
-      time.textContent = sessTime(s.id);
-      t1.appendChild(dot); t1.appendChild(time);
-      if (s.task) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = s.task.slice(0, 40); t1.appendChild(tk); }
-      b.appendChild(t1);
-      if (s.task) { var t2 = document.createElement('div'); t2.className = 'task'; t2.textContent = s.task; b.appendChild(t2); }
-      b.onclick = function () { viewSession(s.id); };
-      box.appendChild(b);
+      var inWs = !!curPath && String(s.cwd || '').toLowerCase() === curPath;
+      if (inWs) mine.appendChild(sessRow(s));
+      else { other.appendChild(sessRow(s)); otherCount++; }
     });
-    if (!box.children.length) box.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + L.none2 + '</div>';
+    var showOther = otherCount > 0;
+    document.getElementById('ph-other').style.display = showOther ? '' : 'none';
+    other.style.display = showOther ? '' : 'none';
+    if (!mine.children.length) mine.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + L.none2 + '</div>';
   }
   function loadSessions() {
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (d) {
       sessData = d.sessions || [];
+      if (d.workspace) curWs = d.workspace;
       renderSessions(document.getElementById('search').value);
     });
   }
@@ -775,6 +930,7 @@ export const PAGE = `<!doctype html>
   wireExamples();
 
   fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
+  loadWorkspaces();
   loadSessions();
 })();
 </script>
