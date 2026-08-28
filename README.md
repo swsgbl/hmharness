@@ -96,7 +96,7 @@ packages/
   cli/  web/       终端与浏览器双前端（同一事件协议）
 ```
 
-详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与 [docs/ROADMAP.md](docs/ROADMAP.md)。
+详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 、[docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/PROVIDERS.md](docs/PROVIDERS.md)(常用厂商配置参考)。
 
 ## 参与贡献
 
