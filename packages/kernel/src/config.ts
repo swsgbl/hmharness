@@ -45,6 +45,28 @@ export async function loadConfig(): Promise<HmhConfig> {
   }
 }
 
+/**
+ * Point routing.chat at a named provider (`/model <name>` in the TUI/REPL,
+ * the model picker in the web UI). Preserves every other config field; the
+ * returned config reflects the new route (HMH_LOCALE override reapplied).
+ */
+export async function setChatRoute(name: string): Promise<HmhConfig> {
+  const home = homeDir();
+  const file = join(home, 'config.json');
+  let raw: Record<string, unknown> = {};
+  try {
+    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    /* fresh config */
+  }
+  if (!raw.providers || !(name in (raw.providers as Record<string, unknown>))) {
+    throw new Error(`unknown provider "${name}" - configure it under providers in config.json first`);
+  }
+  raw.routing = { ...(raw.routing as Record<string, unknown> ?? {}), chat: name };
+  await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
+  return loadConfig();
+}
+
 export async function initHome(): Promise<{ home: string; created: string[] }> {
   const home = homeDir();
   const created: string[] = [];

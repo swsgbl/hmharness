@@ -100,6 +100,30 @@ export function resolveProvider(cfg: HmhConfig, purpose: 'chat' | 'vision' | 'ev
   return cfg.provider;
 }
 
+/** One row of `/model` listings: a named provider and what it currently serves. */
+export interface ProviderView {
+  name: string;
+  model: string;
+  baseUrl: string;
+  /** purposes this provider resolves for right now (chat/vision/evolve/bench) */
+  purposes: string[];
+}
+
+export function listProviders(cfg: HmhConfig): ProviderView[] {
+  const purposesOf = (n: string): string[] => {
+    const out: string[] = [];
+    for (const p of ['chat', 'vision', 'evolve', 'bench'] as const) {
+      const named = cfg.routing?.[p] ?? (p !== 'vision' ? cfg.routing?.chat : undefined);
+      if (named === n) out.push(p);
+    }
+    return out;
+  };
+  if (cfg.providers && Object.keys(cfg.providers).length) {
+    return Object.entries(cfg.providers).map(([name, p]) => ({ name, model: p.model, baseUrl: p.baseUrl, purposes: purposesOf(name) }));
+  }
+  return [{ name: 'default', model: cfg.provider.model, baseUrl: cfg.provider.baseUrl, purposes: ['chat', 'vision', 'evolve', 'bench'] }];
+}
+
 /** Shape used in config.json (kernel/src/mcp.ts has the runtime client). */
 export interface McpServerImport {
   type: 'stdio' | 'http';

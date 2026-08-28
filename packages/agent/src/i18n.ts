@@ -63,6 +63,7 @@ export interface Strings {
   cmdHelp: string;
   cmdTools: string;
   cmdSkills: string;
+  cmdModel: string;
   cmdOps: string;
   cmdOpsScan: string;
   cmdBench: string;
@@ -133,6 +134,7 @@ const zh: Strings = {
   cmdHelp: '命令帮助',
   cmdTools: '已注册工具(gated 标记)',
   cmdSkills: '技能库(启用 + 草稿)',
+  cmdModel: '列出/切换模型路由(/model <name>)',
   cmdOps: '运维看板状态',
   cmdOpsScan: '扫描生态雷达并生成简报',
   cmdBench: '快速基准(非 loop 用例)',
@@ -202,6 +204,7 @@ const en: Strings = {
   cmdHelp: 'command help',
   cmdTools: 'registered tools (gated marked)',
   cmdSkills: 'skill library (active + drafts)',
+  cmdModel: 'list/switch model route (/model <name>)',
   cmdOps: 'ops keeper status',
   cmdOpsScan: 'scan the ecosystem radar and write a brief',
   cmdBench: 'quick bench (non-loop cases)',

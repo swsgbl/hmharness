@@ -10,7 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readdir, readFile, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, loadConfig, loadTranscript, type ChatMessage } from '@hmh/kernel';
+import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
 import { buildRegistry, runAgentTask } from '@hmh/agent';
 import { PAGE } from './page.ts';
@@ -106,12 +106,13 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       /* no evolution history yet */
     }
     return {
-      model: cfg.provider.model,
+      model: resolveProvider(cfg, 'chat').model,
       home,
       locale: cfg.locale ?? 'zh',
       busy,
       approvalPending: pendingApproval !== null,
       workspace: currentWs() ?? null,
+      providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
       skills: {
         active: active.map((s) => ({ name: s.name, description: s.description })),
         drafts: drafts.map((s) => ({ name: s.name, description: s.description })),
@@ -453,6 +454,24 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         cfg.locale = body.locale;
         broadcast('state', await stateObject());
         json(res, 200, { ok: true, locale: body.locale });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/model') {
+        // switch routing.chat to a named provider; config.json is rewritten
+        // in place (all other fields kept) and the in-memory cfg follows so
+        // the next task already uses the new route
+        const body = JSON.parse((await readBody(req)) || '{}') as { name?: string };
+        const name = String(body.name ?? '');
+        try {
+          const fresh = await setChatRoute(name);
+          cfg.provider = fresh.provider;
+          cfg.providers = fresh.providers;
+          cfg.routing = fresh.routing;
+          broadcast('state', await stateObject());
+          json(res, 200, { ok: true, model: resolveProvider(cfg, 'chat').model });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/approve') {

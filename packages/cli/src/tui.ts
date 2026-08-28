@@ -12,7 +12,7 @@
  */
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
-import { loadConfig, homeDir, resolveProvider, type ChatMessage } from '@hmh/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
@@ -90,6 +90,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/help', key: 'cmdHelp' },
   { name: '/tools', key: 'cmdTools' },
   { name: '/skills', key: 'cmdSkills' },
+  { name: '/model', key: 'cmdModel' },
   { name: '/ops', key: 'cmdOps' },
   { name: '/ops scan', key: 'cmdOpsScan' },
   { name: '/bench', key: 'cmdBench' },
@@ -453,7 +454,7 @@ export class TuiRuntime {
 /* ---------------- driver ---------------- */
 
 export async function tui(yes: boolean, noWeb = false): Promise<void> {
-  const cfg = await loadConfig();
+  let cfg = await loadConfig();
   if (!stdin.isTTY) {
     stdout.write(strings((cfg.locale ?? 'zh') as Locale).tuiNeedsTty + '\n');
     process.exitCode = 1;
@@ -510,6 +511,27 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       const up = await ensureWebDaemon(DEFAULT_WEB_PORT);
       rt.setBusy(false);
       rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
+      return;
+    }
+    if (line === '/model' || line.startsWith('/model ')) {
+      const arg = line.slice(7).trim();
+      if (!arg) {
+        const rows = listProviders(cfg).map((v) => {
+          const cur = v.purposes.includes('chat');
+          return `${cur ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`;
+        });
+        rt.addText(rows.join('\n') + '\n' + DIM('/model <name> 切换 chat 路由'), 'plain');
+        return;
+      }
+      rt.setBusy(true, '/model');
+      try {
+        cfg = await setChatRoute(arg);
+        rt.addText(GREEN('✓') + ` chat → ${arg} · ${resolveProvider(cfg, 'chat').model}`);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
       return;
     }
     if (line === '/ops') {

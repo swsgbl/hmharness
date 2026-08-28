@@ -114,7 +114,17 @@ export const PAGE = `<!doctype html>
   #main { display:flex; flex-direction:column; min-width:0; }
   #topbar { display:flex; gap:10px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
   .chip { font-size:11.5px; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
-  .chip.model { color:var(--accent); }
+  .chip.model { color:var(--accent); cursor:pointer; position:relative; }
+  .chip.model:hover { background:var(--panel); }
+  #modelpick { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; min-width:250px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:4px; box-shadow:0 12px 36px rgba(0,0,0,.5); }
+  #modelpick.on { display:block; }
+  .mp-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:7px; cursor:pointer; font-size:12.5px; }
+  .mp-row:hover { background:var(--panel2); }
+  .mp-row .dot2 { width:7px; height:7px; border-radius:50%; background:var(--line); flex:none; }
+  .mp-row.cur .dot2 { background:var(--ok); }
+  .mp-row .mm { font-family:var(--mono); color:var(--accent); }
+  .mp-row .mp-p { color:var(--dim); font-size:10.5px; margin-left:auto; }
+  .mp-empty { color:var(--dim); font-size:11.5px; padding:8px 10px; max-width:280px; }
   button.chip.locale { border:0; cursor:pointer; }
   button.chip.locale:hover { color:var(--accent); }
   #busy { margin-left:auto; font-size:12px; color:var(--dim); }
@@ -232,7 +242,7 @@ export const PAGE = `<!doctype html>
   </div>
   <div id="main" style="position:relative;">
     <div id="topbar">
-      <span class="chip model" id="model"></span>
+      <span class="chip model" id="model" style="position:relative"></span>
       <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
       <button class="chip locale" id="locale-chip" type="button" title="切换界面语言 / switch UI language">zh</button>
@@ -507,6 +517,7 @@ export const PAGE = `<!doctype html>
     setLabels(s.locale || 'zh');
     document.getElementById('model').textContent = s.model;
     document.getElementById('model2').textContent = s.model;
+    renderModelPick(s);
     var hp = s.workspace && s.workspace.path ? s.workspace.path : s.home;
     document.getElementById('home').textContent = hp;
     document.getElementById('home').title = hp;
@@ -519,6 +530,49 @@ export const PAGE = `<!doctype html>
     document.getElementById('skills-n').textContent = s.skills.active.length + s.skills.drafts.length;
     if (curView === 'skills') renderSkills();
   }
+
+  /* ---- model picker (switches routing.chat; server persists + broadcasts) ---- */
+  function renderModelPick(s) {
+    var chip = document.getElementById('model');
+    var old = document.getElementById('modelpick');
+    if (old) old.remove();
+    var pick = document.createElement('div');
+    pick.id = 'modelpick';
+    var list = (s.providers || []);
+    if (!list.length) {
+      var e = document.createElement('div');
+      e.className = 'mp-empty';
+      e.textContent = '\\u672A\\u914D\\u7F6E\\u591A\\u5382\\u5546 providers \\u2014 \\u624B\\u52A8\\u7F16\\u8F91 config.json (\\u89C1 docs/PROVIDERS.md)';
+      pick.appendChild(e);
+    }
+    list.forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'mp-row' + (p.purposes && p.purposes.indexOf('chat') >= 0 ? ' cur' : '');
+      var d = document.createElement('span'); d.className = 'dot2';
+      var nm = document.createElement('span'); nm.textContent = p.name;
+      var mm = document.createElement('span'); mm.className = 'mm'; mm.textContent = p.model;
+      var pp = document.createElement('span'); pp.className = 'mp-p'; pp.textContent = (p.purposes || []).join('/');
+      row.appendChild(d); row.appendChild(nm); row.appendChild(mm); row.appendChild(pp);
+      row.onclick = function () {
+        pick.classList.remove('on');
+        fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d2) { if (d2 && d2.error) alert(d2.error); })
+          .catch(function (err) { alert(String(err)); });
+      };
+      pick.appendChild(row);
+    });
+    chip.appendChild(pick);
+    chip.onclick = function (ev) {
+      if (ev.target.closest && ev.target.closest('.mp-row')) return;
+      pick.classList.toggle('on');
+    };
+  }
+  document.addEventListener('click', function (ev) {
+    var pick = document.getElementById('modelpick');
+    var chip = document.getElementById('model');
+    if (pick && pick.classList.contains('on') && !chip.contains(ev.target)) pick.classList.remove('on');
+  });
 
   /* ---- workspaces (the agent's project contexts) ---- */
   var wsItems = [];

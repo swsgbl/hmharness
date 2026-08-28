@@ -28,11 +28,13 @@ import {
   resolveProvider,
   initHome,
   latestSession,
+  listProviders,
   loadConfig,
   loadTranscript,
   mcpServerTools,
   Registry,
   runLoop,
+  setChatRoute,
   type ChatMessage,
   type McpClient,
   type McpServerImport,
@@ -129,7 +131,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
 
 async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void> {
   const home = homeDir();
-  const cfg = await loadConfig();
+  let cfg = await loadConfig();
   const t = strings((cfg.locale ?? 'zh') as Locale);
   const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
   stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
@@ -157,6 +159,21 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
         if (line === '/help' || line === '?') {
           const { COMMANDS } = await import('./tui.ts');
           stdout.write(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n') + '\n');
+          continue;
+        }
+        if (line === '/model' || line.startsWith('/model ')) {
+          const mArg = line.slice(7).trim();
+          if (!mArg) {
+            const rows = listProviders(cfg).map((v) => `  ${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`);
+            stdout.write(rows.join('\n') + '\n' + DIM('  /model <name> 切换 chat 路由') + '\n');
+            continue;
+          }
+          try {
+            cfg = await setChatRoute(mArg);
+            stdout.write(GREEN('✓') + ` chat → ${mArg} · ${resolveProvider(cfg, 'chat').model}\n`);
+          } catch (err) {
+            stdout.write(YELLOW(`${String(err)}\n`));
+          }
           continue;
         }
         if (line === '/tools') {
