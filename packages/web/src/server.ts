@@ -463,7 +463,17 @@ export async function startServer(opts: { port: number; host?: string }): Promis
     console.error(`[hmh web] uncaught: ${String(err).slice(0, 400)}`);
   });
 
-  await new Promise<void>((resolve) => server.listen(opts.port, host, resolve));
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(opts.port, host, resolve);
+  }).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`port ${opts.port} is already in use - hmh web may already be running.`);
+      console.error(`open http://127.0.0.1:${opts.port} in a browser, or start with --port=<another>.`);
+      process.exit(1);
+    }
+    throw err;
+  });
   console.log(`hmh web · http://${host}:${opts.port} · model ${cfg.provider.model} · home ${home}`);
   console.log('(local only; Ctrl-C to stop)');
 
