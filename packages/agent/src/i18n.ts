@@ -73,6 +73,11 @@ export interface Strings {
   cmdWeb: string;
   cmdExit: string;
   helpAlias: string;
+  // web service daemon (start/stop/status)
+  webStarted: (port: number, log: string) => string;
+  webStopped: string;
+  webNotRunning: string;
+  webRunning: (pid: number, port: number) => string;
 }
 
 const zh: Strings = {
@@ -137,6 +142,10 @@ const zh: Strings = {
   cmdWeb: '提示启动浏览器界面',
   cmdExit: '退出',
   helpAlias: '? 同义',
+  webStarted: (port, log) => `hmh web 已后台启动 → http://127.0.0.1:${port}\n日志 ${log}\n状态 hmh web status · 停止 hmh web stop`,
+  webStopped: 'hmh web 已停止',
+  webNotRunning: 'hmh web 未在运行',
+  webRunning: (pid, port) => `hmh web 运行中 (pid ${pid}) → http://127.0.0.1:${port}`,
 };
 
 const en: Strings = {
@@ -201,6 +210,10 @@ const en: Strings = {
   cmdWeb: 'hint to launch the web UI',
   cmdExit: 'quit',
   helpAlias: '? alias',
+  webStarted: (port, log) => `hmh web started in the background -> http://127.0.0.1:${port}\nlog ${log}\nstatus: hmh web status · stop: hmh web stop`,
+  webStopped: 'hmh web stopped',
+  webNotRunning: 'hmh web is not running',
+  webRunning: (pid, port) => `hmh web running (pid ${pid}) -> http://127.0.0.1:${port}`,
 };
 
 export function strings(locale: Locale = 'zh'): Strings {

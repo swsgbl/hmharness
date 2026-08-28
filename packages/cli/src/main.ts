@@ -20,6 +20,9 @@
  */
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { spawn } from 'node:child_process';
+import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   chat,
   homeDir,
@@ -284,7 +287,9 @@ usage:
   hmh "do something"       one-shot task (full agent loop, streaming)
   hmh                      interactive REPL (conversation memory kept, /help for commands)
   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
-  hmh web [--port=7788]    local web frontend (SSE streaming + approvals + workspaces)
+  hmh web start|stop|status   web UI as a silent background daemon (no window,
+                             survives closing everything; log ~/.hmharness/web.log)
+  hmh web [--port=7788]       web UI in the foreground (debugging)
   hmh tui                  fullscreen terminal UI (slash palette, mouse wheel)
   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
   hmh devices|check        direct tool run, no model
@@ -456,6 +461,65 @@ flags:
   if (cmd === 'web') {
     await initHome();
     const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);
+    const home = homeDir();
+    const pidFile = join(home, 'web.pid');
+    const readPid = (): number => {
+      try {
+        const p = Number(readFileSync(pidFile, 'utf8').trim());
+        return Number.isFinite(p) && p > 0 ? p : 0;
+      } catch {
+        return 0;
+      }
+    };
+    const alive = (pid: number): boolean => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const t = await uiStrings();
+    const sub = rest.find((a) => !a.startsWith('-'));
+    if (sub === 'stop') {
+      const pid = readPid();
+      if (!pid || !alive(pid)) {
+        try { unlinkSync(pidFile); } catch { /* absent */ }
+        stdout.write(t.webNotRunning + '\n');
+        return;
+      }
+      if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+      else { try { process.kill(pid); } catch { /* gone */ } }
+      try { unlinkSync(pidFile); } catch { /* absent */ }
+      stdout.write(t.webStopped + '\n');
+      return;
+    }
+    if (sub === 'status') {
+      const pid = readPid();
+      stdout.write(pid && alive(pid) ? t.webRunning(pid, port) + '\n' : t.webNotRunning + '\n');
+      return;
+    }
+    if (sub === 'start') {
+      // detached + windowsHide: no console window at all, survives every
+      // terminal; stdout/stderr land in ~/.hmharness/web.log
+      const pid = readPid();
+      if (pid && alive(pid)) {
+        stdout.write(t.webRunning(pid, port) + '\n');
+        return;
+      }
+      const log = openSync(join(home, 'web.log'), 'a');
+      const child = spawn(process.execPath, [process.argv[1], 'web', `--port=${port}`], {
+        detached: true,
+        stdio: ['ignore', log, log],
+        windowsHide: true,
+        cwd: process.cwd(),
+      });
+      child.unref();
+      writeFileSync(pidFile, String(child.pid));
+      stdout.write(t.webStarted(Number.isFinite(port) ? port : 7788, join(home, 'web.log')) + '\n');
+      return;
+    }
+    // default: foreground server (handy for debugging)
     const { startServer } = await import('@hmh/web');
     await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
     return; // startServer keeps the process alive

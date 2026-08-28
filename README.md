@@ -56,7 +56,8 @@ hmh init               # 建立 ~/.hmharness（配置 + 状态目录）
 hmh "你的任务"             # 一次性任务（完整智能体循环,流式）
 hmh                         # 交互 REPL（跨行对话记忆,/help 命令集）
 hmh tui                     # 全屏 TUI（斜杠面板 ↑↓ 选择、滚轮翻页转录）
-hmh web [--port=7788]       # Web 前端（浏览器审批、会话回放、工作区切换）
+hmh web start               # Web 前端后台静默启动(无窗口,关终端不影响;stop 停止/status 看状态)
+hmh web [--port=7788]       # Web 前端前台运行(调试用)
 hmh resume [id前缀]          # 继续历史会话
 hmh tools | mcp             # 工具清单 / MCP 服务器状态
 hmh check | devices         # 工具链体检 / 设备列表

@@ -58,7 +58,8 @@ Multi-provider routing is optional:
 hmh "your task"              # one-shot task (full agent loop, streaming)
 hmh                          # interactive REPL (cross-line conversation memory)
 hmh tui                      # fullscreen TUI (palette, mouse-wheel transcript)
-hmh web [--port=7788]        # web UI (browser approvals, session replay, workspaces)
+hmh web start               # web UI as a silent background daemon (no window, survives terminals; stop/status)
+hmh web [--port=7788]        # web UI in the foreground (debugging)
 hmh resume [id-prefix]       # continue a past session
 hmh tools | mcp              # tool inventory / MCP server status
 hmh check | devices          # toolchain health check / device list
