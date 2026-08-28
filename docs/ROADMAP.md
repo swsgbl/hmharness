@@ -71,6 +71,14 @@
       module.json5/build-profile.json5 schema 校验
 - [ ] 门禁方法学:bench 断言从子串匹配升级(精确/结构化校验+评测集滚动窗口)、
       候选多样本重测、成本纳入双指标门禁
+- [ ] 旧线(codelin / harmony-harness,2026-08-28 退役)资产甄别出的域缺口,按价值排序:
+      HarmonyOS API 知识图谱(dts 解析+证据链检索,codelin api_kg)、
+      编译-修复闭环(错误分类→修复 agent→patch 应用,codelin icf)、
+      工程质量三件套(项目画像/视觉回归/质量评分,harmony-harness quality 包)、
+      消息通道接入(小艺/DevEco/飞书/钉钉,codelin channel)、
+      控制论事件域(感知→世界模型→反馈,harmony-harness cybernetics,实验性评估)
+      可搬数据资产已归档:38 厂商路由模板/营销物料/实战记忆(insights 已并入
+      HMH_HOME 长期记忆)存 ~/.hmharness/local-docs/harmony-harness-archive/
 
 注:外部审核报告(2026-08-27)与旧线迁移评估为私有文档,存 HMH_HOME/local-docs/,
 不入库(仓库公众化红线)。
