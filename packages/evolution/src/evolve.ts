@@ -148,7 +148,11 @@ export async function runEvolution(opts: {
       const candResults: Array<{ name: string; pass: boolean }> = [];
       for (const c of train) {
         try {
-          candResults.push({ name: c.name, pass: matchExpect(await runCase(c, candidateInjection), c.expect) });
+          // two independent samples: a candidate passes only if it passes
+          // BOTH runs - a single lucky output must not clear the gate
+          const a = matchExpect(await runCase(c, candidateInjection), c.expect);
+          const b = a ? matchExpect(await runCase(c, candidateInjection), c.expect) : false;
+          candResults.push({ name: c.name, pass: a && b });
         } catch {
           candResults.push({ name: c.name, pass: false });
         }
@@ -177,7 +181,10 @@ export async function runEvolution(opts: {
         const holdoutCand: Array<{ name: string; pass: boolean }> = [];
         for (const c of holdout) {
           try {
-            holdoutCand.push({ name: c.name, pass: matchExpect(await runCase(c, candidateInjection), c.expect) });
+            // same double-sample rule as the training gate
+            const a = matchExpect(await runCase(c, candidateInjection), c.expect);
+            const b = a ? matchExpect(await runCase(c, candidateInjection), c.expect) : false;
+            holdoutCand.push({ name: c.name, pass: a && b });
           } catch {
             holdoutCand.push({ name: c.name, pass: false });
           }

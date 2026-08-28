@@ -1,0 +1,5 @@
+[36mhmh[0m[2m · agnes-2.5-flash · C:\Users\hongfu\.hmharness
+[0m[2m输入任务,/exit 退出 · /help 命令帮助
+
+[0m  [mcp] test: 2 tools attached
+[36mhmh> [0m

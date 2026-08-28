@@ -128,17 +128,89 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
 async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void> {
   const home = homeDir();
   const cfg = await loadConfig();
-  stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM('type a task, or /exit to quit\n\n'));
+  const t = strings((cfg.locale ?? 'zh') as Locale);
+  const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
+  stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
   const { reg, clients } = await buildRegistry();
   const rl = readline.createInterface({ input: stdin, output: stdout });
+  // stdin EOF (piped input, closed terminal) must exit the loop - a bare
+  // rl.question() promise never settles after close, which would hang
+  const closed = new Promise<never>((_, reject) => rl.on('close', () => reject(new Error('stdin closed'))));
   // The REPL keeps conversation memory across its own lines (and any
   // resumed history); each line re-injects fresh memory/skills.
   let history: ChatMessage[] = initialHistory ? [...initialHistory] : [];
   try {
     while (true) {
-      const line = (await rl.question(CYAN('hmh> '))).trim();
+      let line: string;
+      try {
+        line = await Promise.race([rl.question(CYAN('hmh> ')), closed]);
+      } catch {
+        break;
+      }
+      line = line.trim();
       if (!line) continue;
       if (line === '/exit' || line === '/quit') break;
+      if (line.startsWith('/')) {
+        // same command set as the TUI palette, line-mode
+        if (line === '/help' || line === '?') {
+          const { COMMANDS } = await import('./tui.ts');
+          stdout.write(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n') + '\n');
+          continue;
+        }
+        if (line === '/tools') {
+          for (const tool of reg.list()) printTool(tool);
+          continue;
+        }
+        if (line === '/skills') {
+          const active = await listSkills(home);
+          const drafts = await listDrafts(home);
+          stdout.write(CYAN(`${t.active} (${active.length})\n`));
+          stdout.write(active.length ? active.map((s) => `  ${s.name} — ${s.description}`).join('\n') + '\n' : DIM(`  ${t.none}\n`));
+          stdout.write(CYAN(`${t.drafts} (${drafts.length})\n`));
+          stdout.write(drafts.length ? drafts.map((s) => `  ${s.name} — ${s.description}`).join('\n') + '\n' : DIM(`  ${t.none}\n`));
+          continue;
+        }
+        if (line === '/mcp') {
+          for (const [name, c] of Object.entries(cfg.mcpServers ?? {})) {
+            stdout.write(`  ${name} — ${c.type}${c.trusted ? ' · trusted' : ' · gated'}\n`);
+          }
+          continue;
+        }
+        if (line === '/status') {
+          header();
+          continue;
+        }
+        if (line === '/web') {
+          stdout.write(DIM(t.tuiWebHint + '\n'));
+          continue;
+        }
+        if (line === '/ops' || line === '/ops scan') {
+          const { harmonyOpsStatus, harmonyOpsRadarScan } = await import('@hmh/domain-ops');
+          const r = line === '/ops'
+            ? await harmonyOpsStatus.execute({}, { cwd: process.cwd(), home })
+            : await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
+          stdout.write(r.output + '\n');
+          continue;
+        }
+        if (line === '/bench') {
+          const { results, passRate } = await runBench(home, (c) => makeCaseRunner()(c, ''));
+          for (const r of results) stdout.write(`${r.pass ? GREEN(t.pass) : YELLOW(t.fail)} ${r.name} — ${r.detail}\n`);
+          stdout.write(`pass rate: ${(passRate * 100).toFixed(0)}%\n`);
+          continue;
+        }
+        if (line === '/evolve') {
+          const report = await runEvolution({
+            home,
+            provider: resolveProvider(cfg, 'evolve'),
+            runCase: makeCaseRunner(),
+            log: (l) => stdout.write(DIM(`  ${l}\n`)),
+          });
+          stdout.write(t.tuiEvolveDone(report.proposals.length, report.insightCount, report.noteCount) + '\n');
+          continue;
+        }
+        stdout.write(YELLOW(`unknown command: ${line} (/help)\n`));
+        continue;
+      }
       try {
         const r = await runTask(line, { yes, sharedRl: rl, registry: reg, clients, resumeMessages: history });
         // working transcript = [system, ...resumeMessages, user, ...new turns];
@@ -205,6 +277,30 @@ async function main(): Promise<void> {
   const [cmd, ...rest] = args;
   const arg = rest.join(' ');
 
+  if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
+    stdout.write(`hmh - self-evolving agent harness for HarmonyOS development
+
+usage:
+  hmh "do something"       one-shot task (full agent loop, streaming)
+  hmh                      interactive REPL (conversation memory kept, /help for commands)
+  hmh resume [id-prefix]   continue a past session by id prefix (or latest)
+  hmh web [--port=7788]    local web frontend (SSE streaming + approvals + workspaces)
+  hmh tui                  fullscreen terminal UI (slash palette, mouse wheel)
+  hmh ops [scan|brief|status]  ops keeper: ecosystem radar
+  hmh devices|check        direct tool run, no model
+  hmh tools                list all registered tools (native + MCP)
+  hmh mcp                  show configured MCP servers and their tools
+  hmh evolve [--every=N]   self-evolution cycle (or resident loop)
+  hmh bench                run the evolution bench
+  hmh skills [--promote|--rollback|--unpromote <name>]
+
+flags:
+  --yes / -y          auto-approve gated tools (else they prompt; non-TTY denies)
+  --locale=zh|en      override the UI locale for this run
+  --help | -h         this help
+`);
+    return;
+  }
   if (cmd === 'init') {
     const { home, created } = await initHome();
     stdout.write(`home: ${home}\n${created.length ? 'created: ' + created.join(', ') : 'already initialized.'}\n`);

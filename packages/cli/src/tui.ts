@@ -130,6 +130,7 @@ export class TuiRuntime {
   private histIdx = -1;
   private busy = false;
   private spinnerFrame = 0;
+  private cmdIdx = 0;   // selected row in the slash palette (arrow keys)
   private spinnerTimer?: NodeJS.Timeout;
   private status = '';
   private approval: { name: string; args: unknown } | null = null;
@@ -292,12 +293,23 @@ export class TuiRuntime {
       this.dirty = true;
       return;
     }
-    if (data === '\r') { this.driver?.(); return; }
+    if (data === '\r') {
+      // palette is open: Enter runs the highlighted command, not the raw input
+      const hits = matchCommands(this.input);
+      if (hits.length) {
+        this.input = hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
+        this.caret = this.input.length;
+        this.cmdIdx = 0;
+      }
+      this.driver?.();
+      return;
+    }
     if (data === '\t') {
       const hits = matchCommands(this.input);
       if (hits.length) {
-        this.input = hits[0].name + ' ';
+        this.input = hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
         this.caret = this.input.length;
+        this.cmdIdx = 0;
         this.dirty = true;
       }
       return;
@@ -307,19 +319,34 @@ export class TuiRuntime {
         this.input = this.input.slice(0, this.caret - 1) + this.input.slice(this.caret);
         this.caret--;
       }
+      this.cmdIdx = 0;
       this.dirty = true;
       return;
     }
+    // with the palette open the arrows move the selection, not the history
     if (data === '\x1b[A') {
+      const hits = matchCommands(this.input);
+      if (hits.length) {
+        this.cmdIdx = Math.max(0, this.cmdIdx - 1);
+        this.dirty = true;
+        return;
+      }
       if (this.histIdx < this.history.length - 1) {
         this.histIdx++;
         this.input = this.history[this.histIdx] ?? '';
         this.caret = this.input.length;
+        this.cmdIdx = 0;
         this.dirty = true;
       }
       return;
     }
     if (data === '\x1b[B') {
+      const hits = matchCommands(this.input);
+      if (hits.length) {
+        this.cmdIdx = Math.min(hits.length - 1, this.cmdIdx + 1);
+        this.dirty = true;
+        return;
+      }
       if (this.histIdx > 0) {
         this.histIdx--;
         this.input = this.history[this.histIdx] ?? '';
@@ -328,6 +355,7 @@ export class TuiRuntime {
         this.input = '';
       }
       this.caret = this.input.length;
+      this.cmdIdx = 0;
       this.dirty = true;
       return;
     }
@@ -337,13 +365,14 @@ export class TuiRuntime {
     if (data === '\x1b[6~') { this.scrollFromBottom = Math.max(0, this.scrollFromBottom - 10); this.dirty = true; return; }
     if (data === '\x1b[H') { this.scrollFromBottom = 100000; this.dirty = true; return; }
     if (data === '\x1b[F') { this.scrollFromBottom = 0; this.dirty = true; return; }
-    if (data === '\x1b') { this.input = ''; this.caret = 0; this.dirty = true; return; }
+    if (data === '\x1b') { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; return; }
     if (data === '\x0c') { this.dirty = true; return; }
     if (data.startsWith('\x1b') || data < ' ') return;
 
     // printable text (CJK / IME preedit arrives as normal chunks)
     this.input = this.input.slice(0, this.caret) + data + this.input.slice(this.caret);
     this.caret += data.length;
+    this.cmdIdx = 0;
     this.dirty = true;
   }
 
@@ -379,12 +408,18 @@ export class TuiRuntime {
       frame.push(DIM('─'.repeat(W)));
     }
 
-    // slash-command palette: shows while the input starts with '/', first
-    // match highlighted (Tab completes to it)
-    for (let i = 0; i < cmdRows; i++) {
-      const c = cmdHits[i];
-      const desc = String(this.t[c.key as keyof typeof this.t]);
-      frame.push(truncateTo('  ' + (i === 0 ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(desc), W - 1));
+    // slash-command palette: shows while the input starts with '/'; arrows
+    // move the selection (kept visible via a scrolling 6-row window),
+    // Enter/Tab run/complete the highlighted command
+    if (cmdRows) {
+      const from = Math.max(0, Math.min(this.cmdIdx - 5, cmdHits.length - 6));
+      for (let i = 0; i < cmdRows; i++) {
+        const gi = from + i;
+        const c = cmdHits[gi];
+        const sel = gi === this.cmdIdx;
+        const desc = String(this.t[c.key as keyof typeof this.t]);
+        frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(desc), W - 1));
+      }
     }
 
     const iw = Math.max(10, W - 4);
