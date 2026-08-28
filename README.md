@@ -1,7 +1,7 @@
 ﻿# hmharness
 
 **涓洪缚钂?HarmonyOS/OpenHarmony)寮€鍙戝叏娴佺▼鑰岀敓鐨勮嚜杩涘寲鏅鸿兘浣撴鏋躲€?* 闆朵緷璧栧唴鏍?+ 鑷繘鍖栦竴绛夊叕姘?+ MCP 鐢熸€佸€熷姏鈥斺€斾笉缁ф壙浠讳綍涓婃父杩愯鏃?鑳藉姏鍏ㄩ儴鑷寔鎴栫粡鏍囧噯鍗忚澶栧€熴€?
-[![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
+[English](README.en.md) · [![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
 ![node](https://img.shields.io/badge/node-%3E%3D22-339933)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-000000)
 

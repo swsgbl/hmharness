@@ -44,6 +44,35 @@ export interface Strings {
   noCycles: string;
   alreadyRunning: string;
   viewingNote: string;
+  // fullscreen TUI
+  tuiNeedsTty: string;
+  tuiWelcome: (model: string) => string;
+  tuiApproval: string;
+  tuiApprove: string;
+  tuiDeny: string;
+  tuiApprovalHint: string;
+  tuiHints: string;
+  tuiScrolled: string;
+  tuiIdle: string;
+  tuiWebHint: string;
+  tuiRadarScanning: string;
+  tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
+  tuiPassRate: (pct: string) => string;
+  tuiStatus: (locale: string, skills: number, model: string) => string;
+  tuiSkills: string;
+  cmdHelp: string;
+  cmdTools: string;
+  cmdSkills: string;
+  cmdOps: string;
+  cmdOpsScan: string;
+  cmdBench: string;
+  cmdEvolve: string;
+  cmdMcp: string;
+  cmdStatus: string;
+  cmdClear: string;
+  cmdWeb: string;
+  cmdExit: string;
+  helpAlias: string;
 }
 
 const zh: Strings = {
@@ -80,6 +109,34 @@ const zh: Strings = {
   noCycles: '(尚无进化轮次)',
   alreadyRunning: '已有一个任务在运行',
   viewingNote: '正在查看历史会话',
+  tuiNeedsTty: 'hmh tui 需要交互终端(raw mode)。非交互环境请用:hmh "任务"(一次性)或 hmh web(浏览器)。',
+  tuiWelcome: (model) => `hmh tui · ${model} · 输入 / 查看命令 · 直接输入任务回车运行`,
+  tuiApproval: '⚠ 审批',
+  tuiApprove: '批准',
+  tuiDeny: '拒绝',
+  tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
+  tuiHints: 'enter 发送 · ↑↓ 历史 · esc 清空 · pgup/滚轮 翻页 · ^C 退出 · /help 命令',
+  tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
+  tuiIdle: '○ 空闲',
+  tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
+  tuiRadarScanning: '雷达扫描中…',
+  tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
+  tuiPassRate: (pct) => `pass rate: ${pct}`,
+  tuiStatus: (locale, skills, model) => `${locale} · ${skills} 技能 · ${model}`,
+  tuiSkills: '技能',
+  cmdHelp: '命令帮助',
+  cmdTools: '已注册工具(gated 标记)',
+  cmdSkills: '技能库(启用 + 草稿)',
+  cmdOps: '运维看板状态',
+  cmdOpsScan: '扫描生态雷达并生成简报',
+  cmdBench: '快速基准(非 loop 用例)',
+  cmdEvolve: '运行一轮自进化循环',
+  cmdMcp: '已配置 MCP 服务器',
+  cmdStatus: '刷新状态',
+  cmdClear: '清空转录',
+  cmdWeb: '提示启动浏览器界面',
+  cmdExit: '退出',
+  helpAlias: '? 同义',
 };
 
 const en: Strings = {
@@ -116,6 +173,34 @@ const en: Strings = {
   noCycles: '(no cycles yet)',
   alreadyRunning: 'a task is already running',
   viewingNote: 'viewing a past session',
+  tuiNeedsTty: 'hmh tui needs an interactive terminal (raw mode). Non-interactive: use hmh "task" (one-shot) or hmh web (browser).',
+  tuiWelcome: (model) => `hmh tui · ${model} · type / for commands · type a task and press Enter to run`,
+  tuiApproval: '⚠ approval',
+  tuiApprove: 'Approve',
+  tuiDeny: 'Deny',
+  tuiApprovalHint: 'enter/y approve · esc/n deny',
+  tuiHints: 'enter send · ↑↓ history · esc clear · pgup/wheel scroll · ^C quit · /help commands',
+  tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
+  tuiIdle: '○ idle',
+  tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
+  tuiRadarScanning: 'scanning radar…',
+  tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
+  tuiPassRate: (pct) => `pass rate: ${pct}`,
+  tuiStatus: (locale, skills, model) => `${locale} · ${skills} skills · ${model}`,
+  tuiSkills: 'skills',
+  cmdHelp: 'command help',
+  cmdTools: 'registered tools (gated marked)',
+  cmdSkills: 'skill library (active + drafts)',
+  cmdOps: 'ops keeper status',
+  cmdOpsScan: 'scan the ecosystem radar and write a brief',
+  cmdBench: 'quick bench (non-loop cases)',
+  cmdEvolve: 'run one self-evolution cycle',
+  cmdMcp: 'configured MCP servers',
+  cmdStatus: 'refresh status',
+  cmdClear: 'clear the transcript',
+  cmdWeb: 'hint to launch the web UI',
+  cmdExit: 'quit',
+  helpAlias: '? alias',
 };
 
 export function strings(locale: Locale = 'zh'): Strings {

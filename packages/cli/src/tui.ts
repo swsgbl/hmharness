@@ -84,23 +84,24 @@ interface Entry {
 
 /* ---------------- slash commands + mouse wheel (pure, testable) ---------------- */
 
-export const COMMANDS: Array<{ name: string; desc: string }> = [
-  { name: '/help', desc: '命令帮助 (? 同义)' },
-  { name: '/tools', desc: '已注册工具(gated 标记)' },
-  { name: '/skills', desc: '技能库(启用 + 草稿)' },
-  { name: '/ops', desc: '运维看板状态' },
-  { name: '/ops scan', desc: '扫描生态雷达并生成简报' },
-  { name: '/bench', desc: '快速基准(非 loop 用例)' },
-  { name: '/evolve', desc: '运行一轮自进化循环' },
-  { name: '/mcp', desc: '已配置 MCP 服务器' },
-  { name: '/status', desc: '刷新状态' },
-  { name: '/clear', desc: '清空转录' },
-  { name: '/web', desc: '提示启动浏览器界面' },
-  { name: '/exit', desc: '退出' },
+/** desc keys index into Strings (agent i18n); matched by name at runtime. */
+export const COMMANDS: Array<{ name: string; key: string }> = [
+  { name: '/help', key: 'cmdHelp' },
+  { name: '/tools', key: 'cmdTools' },
+  { name: '/skills', key: 'cmdSkills' },
+  { name: '/ops', key: 'cmdOps' },
+  { name: '/ops scan', key: 'cmdOpsScan' },
+  { name: '/bench', key: 'cmdBench' },
+  { name: '/evolve', key: 'cmdEvolve' },
+  { name: '/mcp', key: 'cmdMcp' },
+  { name: '/status', key: 'cmdStatus' },
+  { name: '/clear', key: 'cmdClear' },
+  { name: '/web', key: 'cmdWeb' },
+  { name: '/exit', key: 'cmdExit' },
 ];
 
 /** Commands whose name starts with the input (input must start with '/'). */
-export function matchCommands(input: string): Array<{ name: string; desc: string }> {
+export function matchCommands(input: string): Array<{ name: string; key: string }> {
   if (!input.startsWith('/')) return [];
   const q = input.toLowerCase();
   return COMMANDS.filter((c) => c.name.startsWith(q));
@@ -356,8 +357,8 @@ export class TuiRuntime {
     const frame: string[] = [];
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
-    const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} skills`;
-    const headRight = this.busy ? YELLOW(`${spin} ${this.status || '…'}`) : GREEN('○ idle');
+    const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
+    const headRight = this.busy ? YELLOW(`${spin} ${this.status || '…'}`) : GREEN(this.t.tuiIdle);
     frame.push(truncateTo(headLeft + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(headLeft)) - strWidth(stripAnsi(headRight)))) + headRight, W));
     frame.push(DIM('─'.repeat(W)));
 
@@ -373,8 +374,8 @@ export class TuiRuntime {
 
     if (this.approval) {
       const argsTxt = JSON.stringify(this.approval.args);
-      frame.push(YELLOW('⚠ 审批') + ' ' + YELLOW(BOLD(this.approval.name)) + ' ' + DIM(truncateTo(argsTxt, Math.max(0, W - 24))));
-      frame.push(`  [y] ${GREEN('批准')}   [n] ${RED('拒绝')}   ${DIM('enter/y 批准 · esc/n 拒绝')}`);
+      frame.push(YELLOW(this.t.tuiApproval) + ' ' + YELLOW(BOLD(this.approval.name)) + ' ' + DIM(truncateTo(argsTxt, Math.max(0, W - 24))));
+      frame.push(`  [y] ${GREEN(this.t.tuiApprove)}   [n] ${RED(this.t.tuiDeny)}   ${DIM(this.t.tuiApprovalHint)}`);
       frame.push(DIM('─'.repeat(W)));
     }
 
@@ -382,7 +383,8 @@ export class TuiRuntime {
     // match highlighted (Tab completes to it)
     for (let i = 0; i < cmdRows; i++) {
       const c = cmdHits[i];
-      frame.push(truncateTo('  ' + (i === 0 ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(c.desc), W - 1));
+      const desc = String(this.t[c.key as keyof typeof this.t]);
+      frame.push(truncateTo('  ' + (i === 0 ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(desc), W - 1));
     }
 
     const iw = Math.max(10, W - 4);
@@ -396,8 +398,8 @@ export class TuiRuntime {
     frame.push(DIM('└' + '─'.repeat(iw + 2) + '┘'));
 
     const hints = this.scrollFromBottom > 0
-      ? `${DIM('↑ 已上滚 · PgDn/End 回底')}`
-      : `${DIM('enter 发送 · ↑↓ 历史 · esc 清空 · pgup 翻页 · ^C 退出 · /help 命令')}`;
+      ? `${DIM(this.t.tuiScrolled)}`
+      : `${DIM(this.t.tuiHints)}`;
     const stat = this.status && !this.busy ? DIM(this.status) : '';
     frame.push(truncateTo(hints + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(hints)) - strWidth(stat))) + stat, W - 1));
 
@@ -415,20 +417,20 @@ export class TuiRuntime {
 /* ---------------- driver ---------------- */
 
 export async function tui(yes: boolean): Promise<void> {
+  const cfg = await loadConfig();
   if (!stdin.isTTY) {
-    stdout.write('hmh tui 需要交互终端(raw mode)。非交互环境请用:hmh "任务"(一次性)或 hmh web(浏览器)。\n');
+    stdout.write(strings((cfg.locale ?? 'zh') as Locale).tuiNeedsTty + '\n');
     process.exitCode = 1;
     return;
   }
   const home = homeDir();
-  const cfg = await loadConfig();
   const t = strings((cfg.locale ?? 'zh') as Locale);
   const { reg, clients } = await buildRegistry({ announce: false });
   const rt = new TuiRuntime();
   const skills = await listSkills(home);
   const chatModel = resolveProvider(cfg, 'chat').model;
   rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale);
-  rt.addText(`hmh tui · ${chatModel} · ? 或 /help 查看命令 · 直接输入任务回车运行`, 'dim');
+  rt.addText(t.tuiWelcome(chatModel), 'dim');
 
   let history: ChatMessage[] = [];
   rt.onSubmit(() => {
@@ -444,11 +446,11 @@ export async function tui(yes: boolean): Promise<void> {
       process.exit(0);
     }
     if (line === '?' || line === '/help') {
-      rt.addText(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + c.desc).join('\n'), 'dim');
+      rt.addText(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n'), 'dim');
       return;
     }
     if (line === '/clear') { rt.clearScreen(); return; }
-    if (line === '/status') { rt.setStatus(`${(cfg.locale ?? 'zh')} · ${skills.length} skills · ${chatModel}`); return; }
+    if (line === '/status') { rt.setStatus(t.tuiStatus(cfg.locale ?? 'zh', skills.length, chatModel)); return; }
     if (line === '/tools') {
       for (const tool of reg.list()) rt.addText(`${tool.name}${tool.needsApproval ? YELLOW(' [gated]') : ''} — ${tool.description.split('\n')[0].slice(0, 80)}`);
       return;
@@ -465,7 +467,7 @@ export async function tui(yes: boolean): Promise<void> {
       return;
     }
     if (line === '/web') {
-      rt.addText('浏览器界面: 在另一个终端运行 hmh web --port=7788', 'dim');
+      rt.addText(t.tuiWebHint, 'dim');
       return;
     }
     if (line === '/ops') {
@@ -482,7 +484,7 @@ export async function tui(yes: boolean): Promise<void> {
       return;
     }
     if (line === '/ops scan') {
-      rt.setBusy(true, '雷达扫描中…');
+      rt.setBusy(true, t.tuiRadarScanning);
       try {
         const { harmonyOpsRadarScan } = await import('@hmh/domain-ops');
         const r = await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
@@ -506,7 +508,7 @@ export async function tui(yes: boolean): Promise<void> {
           return r.message.content ?? '';
         });
         for (const r of results) rt.addText(`${r.pass ? GREEN('PASS') : YELLOW('FAIL')} ${r.name} — ${r.detail}`);
-        rt.addText(`pass rate: ${(passRate * 100).toFixed(0)}%`);
+        rt.addText(t.tuiPassRate(`${(passRate * 100).toFixed(0)}%`));
       } catch (err) {
         rt.addText(String(err), 'err');
       } finally {
@@ -528,7 +530,7 @@ export async function tui(yes: boolean): Promise<void> {
           },
           log: (l) => rt.addText(l, 'dim'),
         });
-        rt.addText(`evolve 完成: ${report.proposals.length} 提案 · 洞察 ${report.insightCount} · 记忆 ${report.noteCount}`);
+        rt.addText(t.tuiEvolveDone(report.proposals.length, report.insightCount, report.noteCount));
       } catch (err) {
         rt.addText(String(err), 'err');
       } finally {

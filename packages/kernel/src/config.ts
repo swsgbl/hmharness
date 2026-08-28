@@ -28,14 +28,20 @@ export function defaultConfig(): HmhConfig {
   };
 }
 
+/** HMH_LOCALE env (zh|en) overrides the configured locale - used by --locale. */
+function applyLocaleOverride(cfg: HmhConfig): HmhConfig {
+  const env = process.env.HMH_LOCALE;
+  return env === 'zh' || env === 'en' ? { ...cfg, locale: env } : cfg;
+}
+
 export async function loadConfig(): Promise<HmhConfig> {
   const home = homeDir();
   const file = join(home, 'config.json');
   try {
     const raw = JSON.parse(await readFile(file, 'utf8')) as HmhConfig;
-    return { ...defaultConfig(), ...raw, provider: { ...defaultConfig().provider, ...raw.provider } };
+    return applyLocaleOverride({ ...defaultConfig(), ...raw, provider: { ...defaultConfig().provider, ...raw.provider } });
   } catch {
-    return defaultConfig();
+    return applyLocaleOverride(defaultConfig());
   }
 }
 
