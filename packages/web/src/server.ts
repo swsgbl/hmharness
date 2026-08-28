@@ -456,6 +456,13 @@ export async function startServer(opts: { port: number; host?: string }): Promis
     for (const r of sseClients) r.write(': ping\n\n');
   }, 15_000);
 
+  // keep the resident local companion alive: log and continue instead of
+  // dying bare (a dead detached process is invisible until the user notices
+  // the browser can't connect)
+  process.on('uncaughtException', (err) => {
+    console.error(`[hmh web] uncaught: ${String(err).slice(0, 400)}`);
+  });
+
   await new Promise<void>((resolve) => server.listen(opts.port, host, resolve));
   console.log(`hmh web · http://${host}:${opts.port} · model ${cfg.provider.model} · home ${home}`);
   console.log('(local only; Ctrl-C to stop)');
