@@ -67,6 +67,32 @@ export async function setChatRoute(name: string): Promise<HmhConfig> {
   return loadConfig();
 }
 
+/**
+ * Merge detected providers into config.json (`hmh providers --scan`).
+ * Same-name entries never overwrite what is already configured; returns the
+ * refreshed config and the names actually added.
+ */
+export async function addProviders(items: Array<{ name: string; baseUrl: string; model: string; apiKey?: string }>): Promise<{ cfg: HmhConfig; added: string[] }> {
+  const home = homeDir();
+  const file = join(home, 'config.json');
+  let raw: Record<string, unknown> = {};
+  try {
+    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    /* fresh config */
+  }
+  const providers = (raw.providers ?? {}) as Record<string, unknown>;
+  const added: string[] = [];
+  for (const it of items) {
+    if (providers[it.name]) continue;
+    providers[it.name] = { baseUrl: it.baseUrl, model: it.model, ...(it.apiKey ? { apiKey: it.apiKey } : {}) };
+    added.push(it.name);
+  }
+  raw.providers = providers;
+  await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
+  return { cfg: await loadConfig(), added };
+}
+
 export async function initHome(): Promise<{ home: string; created: string[] }> {
   const home = homeDir();
   const created: string[] = [];

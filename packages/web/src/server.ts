@@ -10,7 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readdir, readFile, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, type ChatMessage } from '@hmh/kernel';
+import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
 import { buildRegistry, runAgentTask } from '@hmh/agent';
 import { PAGE } from './page.ts';
@@ -113,6 +113,9 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       approvalPending: pendingApproval !== null,
       workspace: currentWs() ?? null,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
+      providerPresets: PROVIDER_PRESETS
+        .filter((p) => !cfg.providers?.[p.name])
+        .map((p) => ({ name: p.name, model: p.model, envVar: p.envVar, local: p.envVar === '' })),
       skills: {
         active: active.map((s) => ({ name: s.name, description: s.description })),
         drafts: drafts.map((s) => ({ name: s.name, description: s.description })),

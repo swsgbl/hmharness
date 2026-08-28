@@ -452,6 +452,31 @@ flags:
     stdout.write(DIM(`log: ${homeDir()}/evolution/log.jsonl\n`));
     return;
   }
+  if (cmd === 'providers') {
+    await initHome();
+    const cfg = await loadConfig();
+    const { readFile } = await import('node:fs/promises');
+    const { detectLocalProviders, listProviders, PROVIDER_PRESETS, addProviders } = await import('@hmh/kernel');
+    stdout.write(CYAN(`configured (${listProviders(cfg).length})\n`));
+    for (const v of listProviders(cfg)) {
+      stdout.write(`  ${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}\n`);
+    }
+    const found = await detectLocalProviders(cfg, readFile);
+    if (!found.length) {
+      stdout.write(DIM('no new local providers detected (env vars / opencode config)\n'));
+      return;
+    }
+    stdout.write(CYAN(`detected locally (${found.length})\n`));
+    for (const p of found) stdout.write(`  ${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})\n`);
+    if (rest.includes('--scan')) {
+      const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
+      stdout.write(GREEN('✓') + ` added ${r.added.length}: ${r.added.join(', ')} — hmh /model or hmh tui "/model <name>" to use\n`);
+    } else {
+      stdout.write(DIM('run "hmh providers --scan" to add them to config.json\n'));
+    }
+    void PROVIDER_PRESETS;
+    return;
+  }
   if (cmd === 'ops') {
     await initHome();
     const { harmonyOpsRadarScan, harmonyOpsRadarBrief, harmonyOpsStatus } = await import('@hmh/domain-ops');

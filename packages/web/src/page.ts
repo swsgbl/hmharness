@@ -562,6 +562,20 @@ export const PAGE = `<!doctype html>
       };
       pick.appendChild(row);
     });
+    // not-yet-configured built-in presets below, dimmed, with setup hints
+    (s.providerPresets || []).slice(0, 30).forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'mp-row';
+      row.style.opacity = '.55';
+      var d = document.createElement('span'); d.className = 'dot2';
+      var nm = document.createElement('span'); nm.textContent = p.name;
+      var mm = document.createElement('span'); mm.className = 'mm'; mm.textContent = p.model;
+      var pp = document.createElement('span'); pp.className = 'mp-p';
+      pp.textContent = p.local ? 'local' : 'set ' + p.envVar;
+      row.appendChild(d); row.appendChild(nm); row.appendChild(mm); row.appendChild(pp);
+      row.title = p.local ? '\\u672C\\u5730\\u63A8\\u7406\\u7AEF\\u70B9,\\u624B\\u5DE5\\u5199\\u5165 config.json \\u5373\\u53EF' : '\\u8BBE\\u7F6E\\u73AF\\u5883\\u53D8\\u91CF ' + p.envVar + ' \\u540E\\u8FD0\\u884C hmh providers --scan';
+      pick.appendChild(row);
+    });
     chip.appendChild(pick);
     chip.onclick = function (ev) {
       if (ev.target.closest && ev.target.closest('.mp-row')) return;

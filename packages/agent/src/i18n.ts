@@ -52,6 +52,7 @@ export interface Strings {
   tuiDeny: string;
   tuiApprovalHint: string;
   tuiHints: string;
+  mouseOff: string;
   tuiScrolled: string;
   tuiIdle: string;
   tuiWebHint: string;
@@ -64,6 +65,8 @@ export interface Strings {
   cmdTools: string;
   cmdSkills: string;
   cmdModel: string;
+  cmdMouse: string;
+  cmdProviders: string;
   cmdOps: string;
   cmdOpsScan: string;
   cmdBench: string;
@@ -122,7 +125,8 @@ const zh: Strings = {
   tuiApprove: '批准',
   tuiDeny: '拒绝',
   tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
-  tuiHints: 'enter 发送 · ↑↓ 历史 · esc 清空 · pgup/滚轮 翻页 · ^C 退出 · /help 命令',
+  tuiHints: 'enter 发送 · ↑↓ 历史 · esc 清空 · pgup 翻页 · ^C 退出 · /help 命令',
+  mouseOff: '开滚轮翻页',
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiIdle: '○ 空闲',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
@@ -135,6 +139,8 @@ const zh: Strings = {
   cmdTools: '已注册工具(gated 标记)',
   cmdSkills: '技能库(启用 + 草稿)',
   cmdModel: '列出/切换模型路由(/model <name>)',
+  cmdMouse: '切换鼠标滚轮捕获(默认关,保留终端选择复制)',
+  cmdProviders: '探测本地密钥并自动添加厂商(/providers scan)',
   cmdOps: '运维看板状态',
   cmdOpsScan: '扫描生态雷达并生成简报',
   cmdBench: '快速基准(非 loop 用例)',
@@ -192,7 +198,8 @@ const en: Strings = {
   tuiApprove: 'Approve',
   tuiDeny: 'Deny',
   tuiApprovalHint: 'enter/y approve · esc/n deny',
-  tuiHints: 'enter send · ↑↓ history · esc clear · pgup/wheel scroll · ^C quit · /help commands',
+  tuiHints: 'enter send · ↑↓ history · esc clear · pgup scroll · ^C quit · /help commands',
+  mouseOff: 'enable wheel',
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiIdle: '○ idle',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
@@ -205,6 +212,8 @@ const en: Strings = {
   cmdTools: 'registered tools (gated marked)',
   cmdSkills: 'skill library (active + drafts)',
   cmdModel: 'list/switch model route (/model <name>)',
+  cmdMouse: 'toggle mouse-wheel capture (off by default; keeps native select/copy)',
+  cmdProviders: 'detect local keys and add providers (/providers scan)',
   cmdOps: 'ops keeper status',
   cmdOpsScan: 'scan the ecosystem radar and write a brief',
   cmdBench: 'quick bench (non-loop cases)',

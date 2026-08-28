@@ -124,6 +124,72 @@ export function listProviders(cfg: HmhConfig): ProviderView[] {
   return [{ name: 'default', model: cfg.provider.model, baseUrl: cfg.provider.baseUrl, purposes: ['chat', 'vision', 'evolve', 'bench'] }];
 }
 
+/** Built-in OpenAI-compatible presets (source of truth for docs/PROVIDERS.md). */
+export interface ProviderPreset {
+  name: string;
+  baseUrl: string;
+  envVar: string;
+  model: string;
+}
+
+export const PROVIDER_PRESETS: ProviderPreset[] = [
+  { name: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', envVar: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
+  { name: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', envVar: 'MOONSHOT_API_KEY', model: 'kimi-latest' },
+  { name: 'glm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', envVar: 'ZHIPU_API_KEY', model: 'glm-4.7' },
+  { name: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', envVar: 'DASHSCOPE_API_KEY', model: 'qwen3-max' },
+  { name: 'openai', baseUrl: 'https://api.openai.com/v1', envVar: 'OPENAI_API_KEY', model: 'gpt-5' },
+  { name: 'siliconflow', baseUrl: 'https://api.siliconflow.cn/v1', envVar: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3.2-Exp' },
+  { name: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', envVar: 'OPENROUTER_API_KEY', model: 'openrouter/auto' },
+  { name: 'nvidia-nim', baseUrl: 'https://integrate.api.nvidia.com/v1', envVar: 'NVIDIA_API_KEY', model: 'meta/llama-3.2-90b-vision-instruct' },
+  { name: 'groq', baseUrl: 'https://api.groq.com/openai/v1', envVar: 'GROQ_API_KEY', model: 'llama-3.3-70b-versatile' },
+  { name: 'together', baseUrl: 'https://api.together.xyz/v1', envVar: 'TOGETHER_API_KEY', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' },
+  { name: 'xai', baseUrl: 'https://api.x.ai/v1', envVar: 'XAI_API_KEY', model: 'grok-4' },
+  { name: 'minimax', baseUrl: 'https://api.minimaxi.com/v1', envVar: 'MINIMAX_API_KEY', model: 'MiniMax-M2' },
+  { name: 'volc-ark', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', envVar: 'ARK_API_KEY', model: 'doubao-seed-1-6' },
+  { name: 'stepfun', baseUrl: 'https://api.stepfun.com/v1', envVar: 'STEPFUN_API_KEY', model: 'step-3' },
+  { name: 'hunyuan', baseUrl: 'https://api.hunyuan.cloud.tencent.com/v1', envVar: 'HUNYUAN_API_KEY', model: 'hunyuan-turbos-latest' },
+  { name: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', envVar: '', model: 'qwen3:8b' },
+  { name: 'lm-studio', baseUrl: 'http://127.0.0.1:1234/v1', envVar: '', model: 'local-model' },
+];
+
+/**
+ * Detect locally available providers, dsh-style: presets whose env var is
+ * set, plus anything configured in ~/.opencode (opencode.json providers).
+ * Already-configured names are excluded. Read-only - callers decide whether
+ * to merge into config via addProviders().
+ */
+export async function detectLocalProviders(cfg: HmhConfig, readFileFn: typeof import('node:fs/promises')['readFile']): Promise<ProviderPreset[]> {
+  const known = new Set(Object.keys(cfg.providers ?? {}));
+  const found: ProviderPreset[] = [];
+  for (const p of PROVIDER_PRESETS) {
+    if (known.has(p.name)) continue;
+    // cloud presets: available when their env var is set; local-inference
+    // presets are intentionally NOT auto-added (caller opts in by hand)
+    if (p.envVar && process.env[p.envVar]) found.push(p);
+  }
+  // opencode config carries provider ids + baseURLs + models
+  try {
+    const { homedir } = await import('node:os');
+    const { join } = await import('node:path');
+    for (const f of [join(homedir(), '.opencode', 'opencode.json'), join(process.cwd(), '.opencode.json')]) {
+      let raw: string;
+      try { raw = await readFileFn(f, 'utf8'); } catch { continue; }
+      const oc = JSON.parse(raw) as { provider?: Record<string, { npm?: string; models?: Record<string, unknown>; options?: { baseURL?: string } }> };
+      for (const [id, def] of Object.entries(oc.provider ?? {})) {
+        if (known.has(id) || found.some((x) => x.name === id)) continue;
+        const baseURL = def.options?.baseURL ?? '';
+        const firstModel = Object.keys(def.models ?? {})[0] ?? '';
+        if (baseURL && firstModel) {
+          found.push({ name: id, baseUrl: baseURL, envVar: `(opencode: ${f.includes('.opencode.json') && !f.includes(homedir()) ? 'project' : 'user'})`, model: firstModel });
+        }
+      }
+    }
+  } catch {
+    /* unreadable opencode config is fine */
+  }
+  return found;
+}
+
 /** Shape used in config.json (kernel/src/mcp.ts has the runtime client). */
 export interface McpServerImport {
   type: 'stdio' | 'http';

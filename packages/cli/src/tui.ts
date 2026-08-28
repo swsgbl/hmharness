@@ -12,7 +12,7 @@
  */
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, type ChatMessage } from '@hmh/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
@@ -91,6 +91,8 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/tools', key: 'cmdTools' },
   { name: '/skills', key: 'cmdSkills' },
   { name: '/model', key: 'cmdModel' },
+  { name: '/providers', key: 'cmdProviders' },
+  { name: '/mouse', key: 'cmdMouse' },
   { name: '/ops', key: 'cmdOps' },
   { name: '/ops scan', key: 'cmdOpsScan' },
   { name: '/bench', key: 'cmdBench' },
@@ -145,18 +147,49 @@ export class TuiRuntime {
   private cwdName = '';
   private skillCount = 0;
   private t = strings();
+  /** rows for the `/model ` picker (configured providers first, set by driver) */
+  private modelChoices: Array<{ name: string; desc: string }> = [];
+  /** mouse capture off by default so the terminal keeps native select/copy;
+   *  `/mouse` turns it on (wheel then scrolls the transcript) */
+  private mouse = false;
 
   constructor() {
-    // 1000+1006: SGR mouse reporting - without it the terminal scrolls its
-    // own (alternate-screen) buffer on wheel, shearing the frame instead of
-    // scrolling the transcript viewport
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J');
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
     stdin.on('data', (d: string) => this.onKey(d));
     stdout.on('resize', () => { this.dirty = true; });
     this.renderTimer = setInterval(() => this.render(), 90);
+  }
+
+  setModelChoices(list: Array<{ name: string; desc: string }>): void {
+    this.modelChoices = list;
+    this.dirty = true;
+  }
+
+  toggleMouse(): boolean {
+    this.mouse = !this.mouse;
+    // 1000+1006: SGR mouse reporting - wheel drives the transcript viewport
+    // while on; off restores the terminal's native selection/copy behaviour
+    stdout.write(this.mouse ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1006l\x1b[?1000l');
+    this.dirty = true;
+    return this.mouse;
+  }
+
+  /** The palette data source: `/model ` opens the model picker, otherwise
+   *  slash commands. Rows are {name, desc} so both share one renderer. */
+  private panelItems(input: string): Array<{ name: string; desc: string }> {
+    if (input === '/model' || input.startsWith('/model ')) {
+      const q = input.slice(6).trim().toLowerCase();
+      const configured = this.modelChoices;
+      const rest = PROVIDER_PRESETS
+        .filter((p) => !configured.some((c) => c.name === p.name))
+        .map((p) => ({ name: p.name, desc: `${p.model}${p.envVar ? ' · set ' + p.envVar : ' · local'}` }));
+      const all = [...configured, ...rest];
+      return q ? all.filter((i) => i.name.toLowerCase().startsWith(q)) : all;
+    }
+    return matchCommands(input).map((c) => ({ name: c.name, desc: String(this.t[c.key as keyof typeof this.t]) }));
   }
 
   configure(model: string, cwdName: string, skillCount: number, locale: Locale): void {
@@ -296,10 +329,14 @@ export class TuiRuntime {
       return;
     }
     if (data === '\r') {
-      // palette is open: Enter runs the highlighted command, not the raw input
-      const hits = matchCommands(this.input);
+      // palette is open: Enter runs the highlighted row (a command, or a
+      // /model target), not the raw input
+      const hits = this.panelItems(this.input);
       if (hits.length) {
-        this.input = hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
+        const pick = hits[Math.min(this.cmdIdx, hits.length - 1)].name;
+        this.input = this.input.startsWith('/model')
+          ? `/model ${pick} `
+          : pick + ' ';
         this.caret = this.input.length;
         this.cmdIdx = 0;
       }
@@ -307,9 +344,11 @@ export class TuiRuntime {
       return;
     }
     if (data === '\t') {
-      const hits = matchCommands(this.input);
+      const hits = this.panelItems(this.input);
       if (hits.length) {
-        this.input = hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
+        this.input = this.input.startsWith('/model')
+          ? `/model ${hits[Math.min(this.cmdIdx, hits.length - 1)].name} `
+          : hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
         this.caret = this.input.length;
         this.cmdIdx = 0;
         this.dirty = true;
@@ -327,7 +366,7 @@ export class TuiRuntime {
     }
     // with the palette open the arrows move the selection, not the history
     if (data === '\x1b[A') {
-      const hits = matchCommands(this.input);
+      const hits = this.panelItems(this.input);
       if (hits.length) {
         this.cmdIdx = Math.max(0, this.cmdIdx - 1);
         this.dirty = true;
@@ -343,7 +382,7 @@ export class TuiRuntime {
       return;
     }
     if (data === '\x1b[B') {
-      const hits = matchCommands(this.input);
+      const hits = this.panelItems(this.input);
       if (hits.length) {
         this.cmdIdx = Math.min(hits.length - 1, this.cmdIdx + 1);
         this.dirty = true;
@@ -395,7 +434,7 @@ export class TuiRuntime {
 
     const allLines: string[] = [];
     for (const e of this.entries) allLines.push(...e.lines);
-    const cmdHits = matchCommands(this.input);
+    const cmdHits = this.panelItems(this.input);
     const cmdRows = cmdHits.length ? Math.min(cmdHits.length, 6) : 0;
     const approvalRows = this.approval ? 3 : 0;
     const viewH = Math.max(3, H - 6 - approvalRows - cmdRows);
@@ -410,17 +449,16 @@ export class TuiRuntime {
       frame.push(DIM('─'.repeat(W)));
     }
 
-    // slash-command palette: shows while the input starts with '/'; arrows
-    // move the selection (kept visible via a scrolling 6-row window),
-    // Enter/Tab run/complete the highlighted command
+    // palette (slash commands or the /model picker): shows while the input
+    // starts with '/'; arrows move the selection (scrolling 6-row window),
+    // Enter/Tab run/complete the highlighted row
     if (cmdRows) {
       const from = Math.max(0, Math.min(this.cmdIdx - 5, cmdHits.length - 6));
       for (let i = 0; i < cmdRows; i++) {
         const gi = from + i;
         const c = cmdHits[gi];
         const sel = gi === this.cmdIdx;
-        const desc = String(this.t[c.key as keyof typeof this.t]);
-        frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(desc), W - 1));
+        frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(truncateTo(c.desc, 46)), W - 1));
       }
     }
 
@@ -436,7 +474,7 @@ export class TuiRuntime {
 
     const hints = this.scrollFromBottom > 0
       ? `${DIM(this.t.tuiScrolled)}`
-      : `${DIM(this.t.tuiHints)}`;
+      : `${DIM(this.t.tuiHints + (this.mouse ? '' : '  · /mouse ' + this.t.mouseOff))}`;
     const stat = this.status && !this.busy ? DIM(this.status) : '';
     frame.push(truncateTo(hints + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(hints)) - strWidth(stat))) + stat, W - 1));
 
@@ -469,6 +507,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   const skills = await listSkills(home);
   const chatModel = resolveProvider(cfg, 'chat').model;
   rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale);
+  rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
   rt.addText(t.tuiWelcome(chatModel), 'dim');
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
 
@@ -516,22 +555,55 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/model' || line.startsWith('/model ')) {
       const arg = line.slice(7).trim();
       if (!arg) {
-        const rows = listProviders(cfg).map((v) => {
-          const cur = v.purposes.includes('chat');
-          return `${cur ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`;
-        });
-        rt.addText(rows.join('\n') + '\n' + DIM('/model <name> 切换 chat 路由'), 'plain');
+        // bare /model: the palette opens as soon as you type the space -
+        // listing here too for the transcript record
+        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM('/model <name> 切换 chat 路由'), 'plain');
         return;
       }
       rt.setBusy(true, '/model');
       try {
         cfg = await setChatRoute(arg);
+        rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
         rt.addText(GREEN('✓') + ` chat → ${arg} · ${resolveProvider(cfg, 'chat').model}`);
+      } catch (err) {
+        const preset = PROVIDER_PRESETS.find((p) => p.name === arg);
+        rt.addText(preset
+          ? `${arg} 尚未配置 — 设置环境变量 ${preset.envVar || '(local)'} 后运行 /providers scan 添加`
+          : String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
+      return;
+    }
+    if (line === '/providers' || line === '/providers scan') {
+      rt.setBusy(true, '/providers scan');
+      try {
+        const { readFile } = await import('node:fs/promises');
+        const found = await detectLocalProviders(cfg, readFile);
+        if (line === '/providers') {
+          rt.addText(found.length
+            ? found.map((p) => `${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n' + DIM('/providers scan 将它们写入配置')
+            : DIM('未探测到新的本地厂商(环境变量/opencode 配置)'), 'plain');
+        } else {
+          if (!found.length) {
+            rt.addText(DIM('未探测到新的厂商;已配置: ') + Object.keys(cfg.providers ?? {}).join(', '), 'plain');
+          } else {
+            const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
+            cfg = r.cfg;
+            rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
+            rt.addText(GREEN('✓') + ` 已添加 ${r.added.length} 个厂商: ${r.added.join(', ')} — /model <name> 启用`);
+          }
+        }
       } catch (err) {
         rt.addText(String(err), 'err');
       } finally {
         rt.setBusy(false);
       }
+      return;
+    }
+    if (line === '/mouse') {
+      const on = rt.toggleMouse();
+      rt.addText(on ? '鼠标滚轮: 已开启(滚轮控制转录;多数终端可 Shift+拖动 选择复制)' : '鼠标滚轮: 已关闭(终端原生选择/复制恢复)', 'dim');
       return;
     }
     if (line === '/ops') {
