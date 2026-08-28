@@ -20,9 +20,8 @@
  */
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { spawn } from 'node:child_process';
-import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid } from './web-daemon.ts';
 import {
   chat,
   homeDir,
@@ -290,7 +289,8 @@ usage:
   hmh web start|stop|status   web UI as a silent background daemon (no window,
                              survives closing everything; log ~/.hmharness/web.log)
   hmh web [--port=7788]       web UI in the foreground (debugging)
-  hmh tui                  fullscreen terminal UI (slash palette, mouse wheel)
+  hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
+                           also starts the web UI in the background (--no-web skips)
   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
   hmh devices|check        direct tool run, no model
   hmh tools                list all registered tools (native + MCP)
@@ -454,69 +454,32 @@ flags:
   }
   if (cmd === 'tui') {
     await initHome();
+    // tui(yes, noWeb): inside the TTY check the TUI auto-links the web UI
     const { tui } = await import('./tui.ts');
-    await tui(yes);
+    await tui(yes, rest.includes('--no-web'));
     return;
   }
   if (cmd === 'web') {
     await initHome();
     const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);
-    const home = homeDir();
-    const pidFile = join(home, 'web.pid');
-    const readPid = (): number => {
-      try {
-        const p = Number(readFileSync(pidFile, 'utf8').trim());
-        return Number.isFinite(p) && p > 0 ? p : 0;
-      } catch {
-        return 0;
-      }
-    };
-    const alive = (pid: number): boolean => {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
     const t = await uiStrings();
     const sub = rest.find((a) => !a.startsWith('-'));
     if (sub === 'stop') {
-      const pid = readPid();
-      if (!pid || !alive(pid)) {
-        try { unlinkSync(pidFile); } catch { /* absent */ }
-        stdout.write(t.webNotRunning + '\n');
-        return;
-      }
-      if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-      else { try { process.kill(pid); } catch { /* gone */ } }
-      try { unlinkSync(pidFile); } catch { /* absent */ }
-      stdout.write(t.webStopped + '\n');
+      stdout.write(stopWebDaemon() ? t.webStopped + '\n' : t.webNotRunning + '\n');
       return;
     }
     if (sub === 'status') {
-      const pid = readPid();
-      stdout.write(pid && alive(pid) ? t.webRunning(pid, port) + '\n' : t.webNotRunning + '\n');
+      const up = await hmhWebUp(Number.isFinite(port) ? port : 7788);
+      stdout.write(up ? t.webRunning(readWebPid() || 0, port) + '\n' : t.webNotRunning + '\n');
       return;
     }
     if (sub === 'start') {
-      // detached + windowsHide: no console window at all, survives every
-      // terminal; stdout/stderr land in ~/.hmharness/web.log
-      const pid = readPid();
-      if (pid && alive(pid)) {
-        stdout.write(t.webRunning(pid, port) + '\n');
-        return;
+      const r = startWebDaemon(Number.isFinite(port) ? port : 7788);
+      if (r.already) {
+        stdout.write(t.webRunning(r.pid, port) + '\n');
+      } else {
+        stdout.write(t.webStarted(Number.isFinite(port) ? port : 7788, join(homeDir(), 'web.log')) + '\n');
       }
-      const log = openSync(join(home, 'web.log'), 'a');
-      const child = spawn(process.execPath, [process.argv[1], 'web', `--port=${port}`], {
-        detached: true,
-        stdio: ['ignore', log, log],
-        windowsHide: true,
-        cwd: process.cwd(),
-      });
-      child.unref();
-      writeFileSync(pidFile, String(child.pid));
-      stdout.write(t.webStarted(Number.isFinite(port) ? port : 7788, join(home, 'web.log')) + '\n');
       return;
     }
     // default: foreground server (handy for debugging)

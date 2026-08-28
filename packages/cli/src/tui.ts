@@ -15,6 +15,7 @@ import { basename } from 'node:path';
 import { loadConfig, homeDir, resolveProvider, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
+import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
 
 const RESET = '\x1b[0m';
 const DIM = (s: string) => `\x1b[2m${s}${RESET}`;
@@ -451,7 +452,7 @@ export class TuiRuntime {
 
 /* ---------------- driver ---------------- */
 
-export async function tui(yes: boolean): Promise<void> {
+export async function tui(yes: boolean, noWeb = false): Promise<void> {
   const cfg = await loadConfig();
   if (!stdin.isTTY) {
     stdout.write(strings((cfg.locale ?? 'zh') as Locale).tuiNeedsTty + '\n');
@@ -461,11 +462,14 @@ export async function tui(yes: boolean): Promise<void> {
   const home = homeDir();
   const t = strings((cfg.locale ?? 'zh') as Locale);
   const { reg, clients } = await buildRegistry({ announce: false });
+  // auto-link: bring the web UI up in the background (hmh tui --no-web skips)
+  const webUp = noWeb ? false : await ensureWebDaemon(DEFAULT_WEB_PORT);
   const rt = new TuiRuntime();
   const skills = await listSkills(home);
   const chatModel = resolveProvider(cfg, 'chat').model;
   rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale);
   rt.addText(t.tuiWelcome(chatModel), 'dim');
+  if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
 
   let history: ChatMessage[] = [];
   rt.onSubmit(() => {
@@ -502,7 +506,10 @@ export async function tui(yes: boolean): Promise<void> {
       return;
     }
     if (line === '/web') {
-      rt.addText(t.tuiWebHint, 'dim');
+      rt.setBusy(true, '/web');
+      const up = await ensureWebDaemon(DEFAULT_WEB_PORT);
+      rt.setBusy(false);
+      rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
       return;
     }
     if (line === '/ops') {

@@ -78,6 +78,7 @@ export interface Strings {
   webStopped: string;
   webNotRunning: string;
   webRunning: (pid: number, port: number) => string;
+  tuiWebLinked: (port: number) => string;
 }
 
 const zh: Strings = {
@@ -146,6 +147,7 @@ const zh: Strings = {
   webStopped: 'hmh web 已停止',
   webNotRunning: 'hmh web 未在运行',
   webRunning: (pid, port) => `hmh web 运行中 (pid ${pid}) → http://127.0.0.1:${port}`,
+  tuiWebLinked: (port) => `网页端已就绪 → http://127.0.0.1:${port}（本对话可在浏览器继续;hmh web stop 停止）`,
 };
 
 const en: Strings = {
@@ -214,6 +216,7 @@ const en: Strings = {
   webStopped: 'hmh web stopped',
   webNotRunning: 'hmh web is not running',
   webRunning: (pid, port) => `hmh web running (pid ${pid}) -> http://127.0.0.1:${port}`,
+  tuiWebLinked: (port) => `web UI ready -> http://127.0.0.1:${port} (this conversation continues in the browser; hmh web stop to stop)`,
 };
 
 export function strings(locale: Locale = 'zh'): Strings {
