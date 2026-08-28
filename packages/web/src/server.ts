@@ -433,6 +433,28 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         })();
         return;
       }
+      if (req.method === 'POST' && url.pathname === '/api/locale') {
+        // persist the UI locale preference into config.json (all other
+        // fields, including provider keys, preserved untouched) and fan out
+        const body = JSON.parse((await readBody(req)) || '{}') as { locale?: string };
+        if (body.locale !== 'zh' && body.locale !== 'en') {
+          json(res, 400, { error: 'locale must be zh|en' });
+          return;
+        }
+        const file = join(home, 'config.json');
+        let raw: Record<string, unknown> = {};
+        try {
+          raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+        } catch {
+          /* fresh config */
+        }
+        raw.locale = body.locale;
+        await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
+        cfg.locale = body.locale;
+        broadcast('state', await stateObject());
+        json(res, 200, { ok: true, locale: body.locale });
+        return;
+      }
       if (req.method === 'POST' && url.pathname === '/api/approve') {
         const body = JSON.parse((await readBody(req)) || '{}') as { granted?: boolean };
         if (!pendingApproval) {

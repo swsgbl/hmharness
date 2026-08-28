@@ -115,6 +115,8 @@ export const PAGE = `<!doctype html>
   #topbar { display:flex; gap:10px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
   .chip { font-size:11.5px; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
   .chip.model { color:var(--accent); }
+  button.chip.locale { border:0; cursor:pointer; }
+  button.chip.locale:hover { color:var(--accent); }
   #busy { margin-left:auto; font-size:12px; color:var(--dim); }
   #busy.on { color:var(--warn); }
   .vwrap { display:none; flex-direction:column; flex:1; min-height:0; }
@@ -233,7 +235,7 @@ export const PAGE = `<!doctype html>
       <span class="chip model" id="model"></span>
       <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
-      <span class="chip" id="locale-chip">zh</span>
+      <button class="chip locale" id="locale-chip" type="button" title="切换界面语言 / switch UI language">zh</button>
       <span id="busy">idle</span>
       <button id="clear" class="ghost sm">clear</button>
     </div>
@@ -977,6 +979,16 @@ export const PAGE = `<!doctype html>
   }
   document.getElementById('ap-yes').onclick = function () { decide(true); };
   document.getElementById('ap-no').onclick = function () { decide(false); };
+
+  // ---- locale switch (persisted server-side; SSE state fans the new locale back) ----
+  document.getElementById('locale-chip').onclick = function () {
+    var next = this.textContent === 'zh' ? 'en' : 'zh';
+    fetch('/api/locale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale: next })
+    });
+  };
 
   // ---- composer ----
   function sendTask(text) {
