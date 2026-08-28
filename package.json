@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:e2e": "tsx packages/cli/src/main.ts \"reply with exactly: HMH-KERNEL-OK\"",
     "build": "npm run build -w @hmh/kernel && npm run build -w @hmh/evolution && npm run build -w @hmh/domain-harmony && npm run build -w @hmh/domain-ops && npm run build -w @hmh/agent && npm run build -w @hmh/web && npm run build -w @hmh/cli",
-    "test": "node --import tsx --test packages/kernel/src/__tests__/*.test.ts packages/evolution/src/__tests__/*.test.ts packages/domain-harmony/src/__tests__/*.test.ts packages/agent/src/__tests__/*.test.ts"
+    "test": "node --import tsx --test packages/kernel/src/__tests__/*.test.ts packages/evolution/src/__tests__/*.test.ts packages/domain-harmony/src/__tests__/*.test.ts packages/agent/src/__tests__/*.test.ts packages/cli/src/__tests__/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

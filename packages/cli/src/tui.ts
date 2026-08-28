@@ -13,7 +13,7 @@
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
 import { loadConfig, homeDir, resolveProvider, type ChatMessage } from '@hmh/kernel';
-import { listDrafts, listSkills } from '@hmh/evolution';
+import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
 
 const RESET = '\x1b[0m';
@@ -82,6 +82,43 @@ interface Entry {
   lines: string[];
 }
 
+/* ---------------- slash commands + mouse wheel (pure, testable) ---------------- */
+
+export const COMMANDS: Array<{ name: string; desc: string }> = [
+  { name: '/help', desc: '命令帮助 (? 同义)' },
+  { name: '/tools', desc: '已注册工具(gated 标记)' },
+  { name: '/skills', desc: '技能库(启用 + 草稿)' },
+  { name: '/ops', desc: '运维看板状态' },
+  { name: '/ops scan', desc: '扫描生态雷达并生成简报' },
+  { name: '/bench', desc: '快速基准(非 loop 用例)' },
+  { name: '/evolve', desc: '运行一轮自进化循环' },
+  { name: '/mcp', desc: '已配置 MCP 服务器' },
+  { name: '/status', desc: '刷新状态' },
+  { name: '/clear', desc: '清空转录' },
+  { name: '/web', desc: '提示启动浏览器界面' },
+  { name: '/exit', desc: '退出' },
+];
+
+/** Commands whose name starts with the input (input must start with '/'). */
+export function matchCommands(input: string): Array<{ name: string; desc: string }> {
+  if (!input.startsWith('/')) return [];
+  const q = input.toLowerCase();
+  return COMMANDS.filter((c) => c.name.startsWith(q));
+}
+
+/**
+ * SGR mouse wheel decoding: '\x1b[<64;COL;ROWM' is wheel-up (-1), 65 is
+ * wheel-down (+1), anything else (clicks, drags, plain keys) is 0.
+ */
+export function parseWheel(data: string): number {
+  const m = data.match(/^\x1b\[<(\d+);\d+;\d+[Mm]/);
+  if (!m) return 0;
+  const btn = Number(m[1]);
+  if (btn === 64) return -1;
+  if (btn === 65) return 1;
+  return 0;
+}
+
 export class TuiRuntime {
   private entries: Entry[] = [];
   private dirty = true;
@@ -106,7 +143,10 @@ export class TuiRuntime {
   private t = strings();
 
   constructor() {
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+    // 1000+1006: SGR mouse reporting - without it the terminal scrolls its
+    // own (alternate-screen) buffer on wheel, shearing the frame instead of
+    // scrolling the transcript viewport
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -126,7 +166,7 @@ export class TuiRuntime {
   destroy(): void {
     if (this.renderTimer) clearInterval(this.renderTimer);
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
-    stdout.write('\x1b[?25h\x1b[?1049l');
+    stdout.write('\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -209,7 +249,31 @@ export class TuiRuntime {
 
   /* ---------------- keyboard ---------------- */
 
+  clearScreen(): void {
+    this.entries = [];
+    this.scrollFromBottom = 0;
+    this.status = '';
+    this.dirty = true;
+  }
+
+  private totalLines(): number {
+    let n = 0;
+    for (const e of this.entries) n += e.lines.length;
+    return n;
+  }
+
   private onKey(data: string): void {
+    const wheel = parseWheel(data);
+    if (wheel !== 0) {
+      // wheel-up (-1) moves the viewport UP, i.e. further from the bottom
+      this.scrollFromBottom = Math.max(0, Math.min(this.totalLines(), this.scrollFromBottom - wheel * 3));
+      this.dirty = true;
+      return;
+    }
+    // swallow the rest of the SGR mouse reports (clicks/drag/motion) so they
+    // never leak into the input line as garbage
+    if (/^\x1b\[<\d+;\d+;\d+[Mm]/.test(data)) return;
+
     if (this.approval) {
       const grant = data === 'y' || data === 'Y' || data === '\r';
       const deny = data === 'n' || data === 'N' || data === '\x1b' || data === '\x03';
@@ -228,6 +292,15 @@ export class TuiRuntime {
       return;
     }
     if (data === '\r') { this.driver?.(); return; }
+    if (data === '\t') {
+      const hits = matchCommands(this.input);
+      if (hits.length) {
+        this.input = hits[0].name + ' ';
+        this.caret = this.input.length;
+        this.dirty = true;
+      }
+      return;
+    }
     if (data === '\x7f' || data === '\b') {
       if (this.caret > 0) {
         this.input = this.input.slice(0, this.caret - 1) + this.input.slice(this.caret);
@@ -290,8 +363,10 @@ export class TuiRuntime {
 
     const allLines: string[] = [];
     for (const e of this.entries) allLines.push(...e.lines);
+    const cmdHits = matchCommands(this.input);
+    const cmdRows = cmdHits.length ? Math.min(cmdHits.length, 6) : 0;
     const approvalRows = this.approval ? 3 : 0;
-    const viewH = Math.max(3, H - 6 - approvalRows);
+    const viewH = Math.max(3, H - 6 - approvalRows - cmdRows);
     const start = Math.max(0, allLines.length - viewH - this.scrollFromBottom);
     const view = allLines.slice(start, start + viewH);
     for (let i = 0; i < viewH; i++) frame.push(i < view.length ? truncateTo(view[i], W) : '');
@@ -301,6 +376,13 @@ export class TuiRuntime {
       frame.push(YELLOW('⚠ 审批') + ' ' + YELLOW(BOLD(this.approval.name)) + ' ' + DIM(truncateTo(argsTxt, Math.max(0, W - 24))));
       frame.push(`  [y] ${GREEN('批准')}   [n] ${RED('拒绝')}   ${DIM('enter/y 批准 · esc/n 拒绝')}`);
       frame.push(DIM('─'.repeat(W)));
+    }
+
+    // slash-command palette: shows while the input starts with '/', first
+    // match highlighted (Tab completes to it)
+    for (let i = 0; i < cmdRows; i++) {
+      const c = cmdHits[i];
+      frame.push(truncateTo('  ' + (i === 0 ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(c.desc), W - 1));
     }
 
     const iw = Math.max(10, W - 4);
@@ -362,10 +444,10 @@ export async function tui(yes: boolean): Promise<void> {
       process.exit(0);
     }
     if (line === '?' || line === '/help') {
-      rt.addText('/tools 工具 · /skills 技能 · /ops /ops scan 雷达 · /mcp 服务器 · /status 状态 · /clear 清屏 · /exit 退出 · ↑↓ 历史 · PgUp/PgDn 翻页 · Esc 清输入', 'dim');
+      rt.addText(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + c.desc).join('\n'), 'dim');
       return;
     }
-    if (line === '/clear') { rt.setStatus(''); return; }
+    if (line === '/clear') { rt.clearScreen(); return; }
     if (line === '/status') { rt.setStatus(`${(cfg.locale ?? 'zh')} · ${skills.length} skills · ${chatModel}`); return; }
     if (line === '/tools') {
       for (const tool of reg.list()) rt.addText(`${tool.name}${tool.needsApproval ? YELLOW(' [gated]') : ''} — ${tool.description.split('\n')[0].slice(0, 80)}`);
@@ -380,6 +462,78 @@ export async function tui(yes: boolean): Promise<void> {
     }
     if (line === '/mcp') {
       for (const [name, c] of Object.entries(cfg.mcpServers ?? {})) rt.addText(`${name} — ${c.type}${c.trusted ? ' · trusted' : ' · gated'}`);
+      return;
+    }
+    if (line === '/web') {
+      rt.addText('浏览器界面: 在另一个终端运行 hmh web --port=7788', 'dim');
+      return;
+    }
+    if (line === '/ops') {
+      rt.setBusy(true, '/ops');
+      try {
+        const { harmonyOpsStatus } = await import('@hmh/domain-ops');
+        const r = await harmonyOpsStatus.execute({}, { cwd: process.cwd(), home });
+        rt.addText(r.output);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
+      return;
+    }
+    if (line === '/ops scan') {
+      rt.setBusy(true, '雷达扫描中…');
+      try {
+        const { harmonyOpsRadarScan } = await import('@hmh/domain-ops');
+        const r = await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
+        rt.addText(r.output);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
+      return;
+    }
+    if (line === '/bench') {
+      rt.setBusy(true, '/bench');
+      try {
+        const { chat } = await import('@hmh/kernel');
+        const { results, passRate } = await runBench(home, async (c) => {
+          // plain model call keeps the TUI bench fast; loop cases fall back
+          // to the dedicated `hmh bench` command
+          if (c.tools) return "(skipped in tui; run 'hmh bench')";
+          const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+          return r.message.content ?? '';
+        });
+        for (const r of results) rt.addText(`${r.pass ? GREEN('PASS') : YELLOW('FAIL')} ${r.name} — ${r.detail}`);
+        rt.addText(`pass rate: ${(passRate * 100).toFixed(0)}%`);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
+      return;
+    }
+    if (line === '/evolve') {
+      rt.setBusy(true, '/evolve');
+      try {
+        const { chat } = await import('@hmh/kernel');
+        const report = await runEvolution({
+          home,
+          provider: cfg.provider,
+          runCase: async (c) => {
+            if (c.tools) return '(skipped in tui; run hmh evolve)';
+            const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+            return r.message.content ?? '';
+          },
+          log: (l) => rt.addText(l, 'dim'),
+        });
+        rt.addText(`evolve 完成: ${report.proposals.length} 提案 · 洞察 ${report.insightCount} · 记忆 ${report.noteCount}`);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
       return;
     }
 
