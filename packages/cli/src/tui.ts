@@ -149,12 +149,13 @@ export class TuiRuntime {
   private t = strings();
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** mouse capture off by default so the terminal keeps native select/copy;
-   *  `/mouse` turns it on (wheel then scrolls the transcript) */
-  private mouse = false;
+  /** wheel-only capture on by default: the wheel scrolls the transcript
+   *  while select/copy stays native (button-event mode leaves press/drag
+   *  with the terminal); `/mouse` toggles it off entirely */
+  private mouse = true;
 
   constructor() {
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1006h\x1b[?1002h\x1b[2J');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -170,9 +171,13 @@ export class TuiRuntime {
 
   toggleMouse(): boolean {
     this.mouse = !this.mouse;
-    // 1000+1006: SGR mouse reporting - wheel drives the transcript viewport
-    // while on; off restores the terminal's native selection/copy behaviour
-    stdout.write(this.mouse ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1006l\x1b[?1000l');
+    // wheel-only capture (1006+1002, NOT plain 1000): button press/drag and
+    // motion stay with the terminal, so native select/copy keeps working
+    // while the wheel drives the transcript - this is how Claude Code's TUI
+    // gets both at once
+    stdout.write(this.mouse
+      ? '\x1b[?1006h\x1b[?1002h'
+      : '\x1b[?1002l\x1b[?1006l');
     this.dirty = true;
     return this.mouse;
   }
@@ -203,7 +208,7 @@ export class TuiRuntime {
   destroy(): void {
     if (this.renderTimer) clearInterval(this.renderTimer);
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
-    stdout.write('\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l');
+    stdout.write('\x1b[?1002l\x1b[?1006l\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -300,6 +305,9 @@ export class TuiRuntime {
   }
 
   private onKey(data: string): void {
+    // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. With
+    // button-event mode (1002) everything else - click, drag, release,
+    // motion - still belongs to the terminal's native selection.
     const wheel = parseWheel(data);
     if (wheel !== 0) {
       // wheel-up (-1) moves the viewport UP, i.e. further from the bottom
@@ -307,8 +315,8 @@ export class TuiRuntime {
       this.dirty = true;
       return;
     }
-    // swallow the rest of the SGR mouse reports (clicks/drag/motion) so they
-    // never leak into the input line as garbage
+    // swallow any other SGR mouse report that slips through so it never
+    // leaks into the input line as garbage
     if (/^\x1b\[<\d+;\d+;\d+[Mm]/.test(data)) return;
 
     if (this.approval) {
@@ -603,7 +611,9 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     }
     if (line === '/mouse') {
       const on = rt.toggleMouse();
-      rt.addText(on ? '鼠标滚轮: 已开启(滚轮控制转录;多数终端可 Shift+拖动 选择复制)' : '鼠标滚轮: 已关闭(终端原生选择/复制恢复)', 'dim');
+      rt.addText(on
+        ? '滚轮接管: 已开启(滚轮翻页,左键拖选复制不受影响)'
+        : '滚轮接管: 已关闭(滚轮交还终端)', 'dim');
       return;
     }
     if (line === '/ops') {
