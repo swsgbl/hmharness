@@ -445,7 +445,21 @@ export class TuiRuntime {
     const cmdHits = this.panelItems(this.input);
     const cmdRows = cmdHits.length ? Math.min(cmdHits.length, 6) : 0;
     const approvalRows = this.approval ? 3 : 0;
-    const viewH = Math.max(3, H - 6 - approvalRows - cmdRows);
+    // the input box grows with wrapped content: rows + 2 border lines + 1
+    // status line. Cap it at half the screen so the transcript keeps room;
+    // beyond that the inner text clips (rare - one line holds ~100+ cols).
+    const inputRows = (() => {
+      const iw = Math.max(10, W - 6);
+      let n = 1;
+      let w = 0;
+      for (const ch of this.input) {
+        const cwv = cw(ch);
+        if (w + cwv > iw) { n++; w = 0; }
+        w += cwv;
+      }
+      return Math.min(n, Math.max(1, Math.floor(H / 2) - 3));
+    })();
+    const viewH = Math.max(3, H - 4 - inputRows - approvalRows - cmdRows);
     const start = Math.max(0, allLines.length - viewH - this.scrollFromBottom);
     const view = allLines.slice(start, start + viewH);
     for (let i = 0; i < viewH; i++) frame.push(i < view.length ? truncateTo(view[i], W) : '');
@@ -470,14 +484,98 @@ export class TuiRuntime {
       }
     }
 
-    const iw = Math.max(10, W - 4);
+    // input box: width-aware auto-wrap. The old render sliced the input by
+    // character count (CJK chars are 2 columns -> the line overflowed the
+    // frame and got hard-wrapped by the terminal, tearing the layout) and
+    // only ever showed the tail of long input. Now the content wraps inside
+    // a growing box, '❯' marks the first row, and the caret tracks the
+    // visible position across wraps.
+    const iw = Math.max(10, W - 6);                       // inner text width
+    const inputCap = Math.max(1, Math.floor(H / 2) - 3);  // keep transcript room
+    const sliceToCols = (text: string, maxCols: number): [string, number] => {
+      let w = 0;
+      let n = 0;
+      for (const ch of text) {
+        const chw = cw(ch);
+        if (w + chw > maxCols) break;
+        w += chw;
+        n += ch.length;
+      }
+      return [text.slice(0, n), w];
+    };
+    // caret placement in display columns (code-point aware)
+    let caretCols = 0;
+    {
+      let idx = 0;
+      for (const ch of this.input) {
+        if (idx >= this.caret) break;
+        caretCols += cw(ch);
+        idx += ch.length;
+      }
+    }
+    // wrap the input into rows of iw columns, remembering each row's first
+    // code-point index and the row/col of the caret; beyond the cap, show
+    // the tail rows around the caret (the head clips away)
+    const rows: Array<{ text: string; start: number }> = [];
+    {
+      let rowStart = 0;
+      let w = 0;
+      let idx = 0;
+      let cur = '';
+      for (const ch of this.input) {
+        const chw = cw(ch);
+        if (w + chw > iw) {
+          rows.push({ text: cur, start: rowStart });
+          rowStart = idx;
+          w = 0;
+          cur = '';
+        }
+        cur += ch;
+        w += chw;
+        idx += ch.length;
+      }
+      rows.push({ text: cur, start: rowStart });
+    }
+    if (rows.length > inputCap) {
+      let caretRow0 = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const end = rows[i].start + rows[i].text.length;
+        if (this.caret >= rows[i].start && this.caret <= end) { caretRow0 = i; break; }
+      }
+      const from = Math.max(0, Math.min(caretRow0 - (inputCap - 1), rows.length - inputCap));
+      const cut = rows[from].start;
+      const clippedRows = rows.slice(from, from + inputCap).map((r) => ({ text: r.text, start: r.start - cut }));
+      clippedRows[0].text = (from > 0 ? '…' : '') + clippedRows[0].text;
+      clippedRows[0].start += from > 0 ? 1 : 0;
+      rows.length = 0;
+      rows.push(...clippedRows);
+    }
+    let caretRow = 0;
+    let caretCol = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const end = rows[i].start + rows[i].text.length;
+      if (this.caret >= rows[i].start && this.caret <= end) { caretRow = i; break; }
+    }
+    caretCol = Math.max(0, strWidth(rows[caretRow].text.slice(0, this.caret - rows[caretRow].start)));
+    const boxRows = Math.max(1, rows.length);
     frame.push(DIM('┌' + '─'.repeat(iw + 2) + '┐'));
-    const shown = this.input.length > iw - 3 ? this.input.slice(this.input.length - iw + 3) : this.input;
-    const cIdx = Math.min(this.caret, shown.length);
-    const before = shown.slice(0, cIdx);
-    const after = shown.slice(cIdx + 1);
-    const atCaret = shown[cIdx] ?? ' ';
-    frame.push(DIM('│ ') + '❯ ' + before + (this.busy ? DIM(atCaret) : `\x1b[7m${atCaret}\x1b[27m`) + after + DIM(' │'));
+    for (let i = 0; i < boxRows; i++) {
+      const rowText = rows[i].text;
+      if (i === caretRow) {
+        const inRow = this.caret - rows[i].start;
+        const before = rowText.slice(0, inRow);
+        const atChar = rowText.slice(inRow, inRow + 1) || ' ';
+        const after = rowText.slice(inRow + atChar.length);
+        const atW = cw(atChar === ' ' ? ' ' : atChar);
+        const pad = ' '.repeat(Math.max(0, iw - strWidth(before) - atW - strWidth(after)));
+        const caretSpan = this.busy ? DIM(atChar === ' ' ? ' ' : atChar) : `\x1b[7m${atChar === ' ' ? ' ' : atChar}\x1b[27m`;
+        frame.push(DIM('│ ') + (i === 0 ? '❯ ' : '  ') + before + caretSpan + after + pad + DIM(' │'));
+      } else {
+        const [clipped] = sliceToCols(rowText, iw);
+        const pad = ' '.repeat(Math.max(0, iw - strWidth(clipped)));
+        frame.push(DIM('│ ') + (i === 0 ? '❯ ' : '  ') + clipped + pad + DIM(' │'));
+      }
+    }
     frame.push(DIM('└' + '─'.repeat(iw + 2) + '┘'));
 
     const hints = this.scrollFromBottom > 0
