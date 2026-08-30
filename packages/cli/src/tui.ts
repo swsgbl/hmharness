@@ -149,13 +149,17 @@ export class TuiRuntime {
   private t = strings();
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** wheel-only capture on by default: the wheel scrolls the transcript
-   *  while select/copy stays native (button-event mode leaves press/drag
-   *  with the terminal); `/mouse` toggles it off entirely */
-  private mouse = true;
+  /** Wheel handling without ever capturing the mouse: NO mouse-reporting
+   *  mode is enabled by default, so select/copy always works. Terminals
+   *  translate the wheel to arrow keys on the alternate screen themselves
+   *  (conhost/WT), and the transcript treats ↑/↓ as scroll when not
+   *  scrolled to the bottom. `/mouse` opts into SGR wheel reporting
+   *  (1000+1006) for terminals without that fallback - at the cost of
+   *  native selection while enabled. */
+  private mouse = false;
 
   constructor() {
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1006h\x1b[?1002h\x1b[2J');
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -171,13 +175,11 @@ export class TuiRuntime {
 
   toggleMouse(): boolean {
     this.mouse = !this.mouse;
-    // wheel-only capture (1006+1002, NOT plain 1000): button press/drag and
-    // motion stay with the terminal, so native select/copy keeps working
-    // while the wheel drives the transcript - this is how Claude Code's TUI
-    // gets both at once
+    // full mouse capture is the fallback for terminals that do not map the
+    // wheel to arrows on the alt screen; it costs native selection
     stdout.write(this.mouse
-      ? '\x1b[?1006h\x1b[?1002h'
-      : '\x1b[?1002l\x1b[?1006l');
+      ? '\x1b[?1006h\x1b[?1000h'
+      : '\x1b[?1000l\x1b[?1006l');
     this.dirty = true;
     return this.mouse;
   }
@@ -208,7 +210,7 @@ export class TuiRuntime {
   destroy(): void {
     if (this.renderTimer) clearInterval(this.renderTimer);
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
-    stdout.write('\x1b[?1002l\x1b[?1006l\x1b[?25h\x1b[?1049l');
+    stdout.write((this.mouse ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -372,7 +374,11 @@ export class TuiRuntime {
       this.dirty = true;
       return;
     }
-    // with the palette open the arrows move the selection, not the history
+    // ↑/↓: the terminal's wheel→arrow fallback (alt screen, no mouse
+    // capture) arrives here, so the arrows ARE the wheel in this mode:
+    // they scroll the transcript (clamped), never touching history. Input
+    // history stays on PgUp/PgDn-adjacent keys and re-typing; the command
+    // palette (when open) takes priority for selection.
     if (data === '\x1b[A') {
       const hits = this.panelItems(this.input);
       if (hits.length) {
@@ -380,11 +386,8 @@ export class TuiRuntime {
         this.dirty = true;
         return;
       }
-      if (this.histIdx < this.history.length - 1) {
-        this.histIdx++;
-        this.input = this.history[this.histIdx] ?? '';
-        this.caret = this.input.length;
-        this.cmdIdx = 0;
+      if (this.scrollFromBottom < this.totalLines()) {
+        this.scrollFromBottom = Math.min(this.totalLines(), this.scrollFromBottom + 3);
         this.dirty = true;
       }
       return;
@@ -396,6 +399,25 @@ export class TuiRuntime {
         this.dirty = true;
         return;
       }
+      if (this.scrollFromBottom > 0) {
+        this.scrollFromBottom = Math.max(0, this.scrollFromBottom - 3);
+        this.dirty = true;
+      }
+      return;
+    }
+    // history walk: Ctrl+P / Ctrl+N (readline-standard; arrows are the
+    // terminal's wheel in this mode)
+    if (data === '\x10') {
+      if (this.histIdx < this.history.length - 1) {
+        this.histIdx++;
+        this.input = this.history[this.histIdx] ?? '';
+        this.caret = this.input.length;
+        this.cmdIdx = 0;
+        this.dirty = true;
+      }
+      return;
+    }
+    if (data === '\x0e') {
       if (this.histIdx > 0) {
         this.histIdx--;
         this.input = this.history[this.histIdx] ?? '';
@@ -710,8 +732,8 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/mouse') {
       const on = rt.toggleMouse();
       rt.addText(on
-        ? '滚轮接管: 已开启(滚轮翻页,左键拖选复制不受影响)'
-        : '滚轮接管: 已关闭(滚轮交还终端)', 'dim');
+        ? '鼠标上报兜底: 已开启(滚轮直接控制翻页;此模式下拖选暂不可用,再按 /mouse 关闭恢复)'
+        : '鼠标上报兜底: 已关闭(终端原生拖选复制;滚轮由终端转为 ↑↓ 翻页)', 'dim');
       return;
     }
     if (line === '/ops') {
