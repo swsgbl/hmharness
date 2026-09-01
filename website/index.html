@@ -204,6 +204,69 @@ hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div
   </div>
 </div></footer>
 
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script>
+/* ---- motion layer: GSAP via CDN; full no-op fallback when unreachable or
+   when the user prefers reduced motion ---- */
+(function () {
+  if (typeof gsap === 'undefined') return;
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (reduce) return;
+
+  // hero: title, tag, sub, CTAs drift in, then the terminal pops
+  var hero = gsap.timeline({ defaults: { ease: 'power3.out' } })
+hero.from('.hero h1', { y: 34, autoAlpha: 0, duration: 0.7 });
+hero.from('.hero .tag', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.35');
+hero.from('.hero .sub', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.3');
+hero.from('.cta .btn', { y: 12, autoAlpha: 0, duration: 0.4, stagger: 0.09 }, '-=0.25');
+hero.from('.term', { y: 26, scale: 0.97, autoAlpha: 0, duration: 0.6, ease: 'back.out(1.4)', clearProps: 'transform,visibility' }, '-=0.25');
+hero.from('.term-body span', { autoAlpha: 0, duration: 0.18, stagger: 0.05, clearProps: 'opacity,visibility' }, '-=0.2');;
+  hero.from('nav .logo, nav .navlinks > *', { y: -12, autoAlpha: 0, duration: 0.35, stagger: 0.05, clearProps: 'transform,visibility' }, 0);
+
+  // sections + cards drift in as they scroll into view
+  var seen = new WeakSet();
+  function reveal(el, sel) {
+    if (seen.has(el)) return;
+    seen.add(el);
+    gsap.fromTo(el, { y: 22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: 'power2.out', clearProps: 'transform,visibility' });
+    if (sel) {
+      gsap.fromTo(el.querySelectorAll(sel), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.08, clearProps: 'transform,visibility' });
+    }
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var t = en.target;
+      if (t.dataset.anim === 'stats') {
+        if (!seen.has(t)) {
+          seen.add(t);
+          t.querySelectorAll('.stat b').forEach(function (b) {
+            var to = Number(b.textContent) || 0;
+            var o = { n: 0 };
+            gsap.to(o, { n: to, duration: 0.9, ease: 'power2.out', onUpdate: function () { b.textContent = String(Math.round(o.n)); } });
+          });
+          gsap.fromTo(t.querySelectorAll('.stat'), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, stagger: 0.07, ease: 'power2.out', clearProps: 'transform,visibility' });
+        }
+        return;
+      }
+      var host = t.closest('section') || t;
+      reveal(host, t.dataset.anim === 'cards' ? '.card' : t.dataset.anim === 'steps' ? '.step' : t.dataset.anim === 'loop' ? '.node' : null);
+    });
+  }, { threshold: 0.25 });
+  document.querySelectorAll('h2.sec, p.secdesc, .stats').forEach(function (el) { io.observe(el); });
+  document.querySelectorAll('section .grid, section .steps, section .loop').forEach(function (el) {
+    el.setAttribute('data-anim', el.classList.contains('grid') ? 'cards' : el.classList.contains('steps') ? 'steps' : 'loop');
+    io.observe(el);
+  });
+
+  // nav button + CTA micro-interactions
+  document.querySelectorAll('.btn').forEach(function (b) {
+    b.addEventListener('mouseenter', function () { gsap.to(b, { scale: 1.04, duration: 0.18, ease: 'power2.out' }); });
+    b.addEventListener('mouseleave', function () { gsap.to(b, { scale: 1, duration: 0.25, ease: 'power2.out' }); });
+  });
+})();
+</script>
 <script>
 /* ---- i18n ---- */
 const I18N = {

@@ -309,8 +309,49 @@ export const PAGE = `<!doctype html>
   button.danger { background:var(--err); color:#fff; border:0; border-radius:8px; padding:7px 14px; cursor:pointer; }
   button:disabled { opacity:.45; cursor:default; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script>
 (function () {
+  /* ---- motion layer (GSAP via CDN; everything degrades to no-animation
+     when the CDN is unreachable or the user prefers reduced motion) ---- */
+  var AN = (function () {
+    var has = typeof gsap !== 'undefined';
+    var reduce = false;
+    try { reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+    function go(fn) { if (has && !reduce) { try { fn(); } catch (e) {} } }
+    function tgt(el) { return typeof el === 'string' ? document.querySelectorAll(el) : el; }
+    return {
+      ok: has && !reduce,
+      viewIn: function (el) {
+        go(function () { gsap.fromTo(tgt(el), { y: 14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32, ease: 'power2.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
+      },
+      stagger: function (sel, root) {
+        go(function () {
+          var list = (root || document).querySelectorAll(sel);
+          gsap.fromTo(list, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.3, ease: 'power2.out', stagger: 0.04, overwrite: 'auto', clearProps: 'transform,visibility' });
+        });
+      },
+      popIn: function (el) {
+        go(function () { gsap.fromTo(tgt(el), { scale: 0.94, y: 8, autoAlpha: 0 }, { scale: 1, y: 0, autoAlpha: 1, duration: 0.36, ease: 'back.out(1.6)', overwrite: 'auto', clearProps: 'transform,visibility' }); });
+      },
+      userBubble: function (el) {
+        go(function () { gsap.fromTo(tgt(el), { x: 26, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.28, ease: 'power3.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
+      },
+      rowIn: function (el) {
+        go(function () { gsap.fromTo(tgt(el), { y: 8, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.24, ease: 'power2.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
+      },
+      tick: function (el) {
+        go(function () { gsap.fromTo(tgt(el), { scale: 1.3 }, { scale: 1, duration: 0.32, ease: 'back.out(2.2)', overwrite: 'auto', clearProps: 'transform' }); });
+      },
+      count: function (el, to, suffix) {
+        go(function () {
+          var o = { n: 0 };
+          gsap.to(o, { n: to, duration: 0.9, ease: 'power2.out', onUpdate: function () { el.textContent = Math.round(o.n) + (suffix || ''); } });
+        });
+      }
+    };
+  })();
+  window.__AN = AN;
   var log = document.getElementById('log');
   var state = null;
   var L = null;
@@ -410,6 +451,8 @@ export const PAGE = `<!doctype html>
       var elv = document.getElementById('view-' + k);
       if (elv) elv.classList.toggle('on', k === v);
     });
+    var shown = document.getElementById('view-' + v);
+    if (shown) window.__AN.viewIn(shown);
     if (L) {
       document.getElementById('viewchip').textContent =
         ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[v] || v;
@@ -437,6 +480,8 @@ export const PAGE = `<!doctype html>
     if (text !== undefined) e.textContent = text;
     log.appendChild(e);
     log.scrollTop = log.scrollHeight;
+    if (cls === 'msg-user') window.__AN.userBubble(e);
+    else window.__AN.rowIn(e);
     return e;
   }
   function clearEmpty() {
@@ -579,7 +624,12 @@ export const PAGE = `<!doctype html>
     chip.appendChild(pick);
     chip.onclick = function (ev) {
       if (ev.target.closest && ev.target.closest('.mp-row')) return;
+      var wasOff = !pick.classList.contains('on');
       pick.classList.toggle('on');
+      if (wasOff) {
+        window.__AN.popIn(pick);
+        window.__AN.stagger('.mp-row', pick);
+      }
     };
   }
   document.addEventListener('click', function (ev) {
@@ -648,7 +698,12 @@ export const PAGE = `<!doctype html>
     });
   }
   document.getElementById('wscur').onclick = function () {
-    document.getElementById('wsbox').classList.toggle('open');
+    var box = document.getElementById('wsbox');
+    box.classList.toggle('open');
+    if (box.classList.contains('open')) {
+      renderWsList();
+      window.__AN.stagger('#ws-items .wsi');
+    }
   };
   document.getElementById('ws-add').onclick = openPick;
 
@@ -659,6 +714,7 @@ export const PAGE = `<!doctype html>
     document.getElementById('wspick').classList.add('on');
     document.getElementById('wsp-name').value = '';
     loadFs('');
+    window.__AN.popIn(document.getElementById('wsp-card'));
   }
   function closePick() {
     document.getElementById('wspick').classList.remove('on');
@@ -724,6 +780,7 @@ export const PAGE = `<!doctype html>
       if (!(d.dirs || []).length && !d.parent) {
         list.innerHTML += '<div class="hint">' + L.none2 + '</div>';
       }
+      window.__AN.stagger('.wsp-item', list);
     }).catch(function (e) { list.innerHTML = '<div class="hint err">' + String(e) + '</div>'; });
   }
   function submitPick() {
@@ -776,6 +833,7 @@ export const PAGE = `<!doctype html>
         card.onclick = function () { viewSession(s.id); switchView('chat'); };
         grid.appendChild(card);
       });
+      window.__AN.stagger('.card', grid);
     }).catch(function (e) { grid.innerHTML = '<div class="err">' + String(e) + '</div>'; });
   }
   function loadDevices() {
@@ -794,6 +852,7 @@ export const PAGE = `<!doctype html>
         row.appendChild(st); row.appendChild(tg); row.appendChild(kd);
         box.appendChild(row);
       });
+      window.__AN.stagger('.devrow', box);
     }).catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
   }
   function skRow(name, desc, mark) {
@@ -837,6 +896,7 @@ export const PAGE = `<!doctype html>
       r.appendChild(ds);
       box.appendChild(r);
     });
+    window.__AN.stagger('.skrow', box);
   }
 
   function sessRow(s) {
@@ -937,6 +997,7 @@ export const PAGE = `<!doctype html>
       var pre = blk ? blk.querySelector('pre') : null;
       if (pre) copyText(pre.textContent);
       cp.textContent = '\\u2713';
+      window.__AN.tick(cp);
       setTimeout(function () { cp.textContent = L ? L.copy : 'copy'; }, 1200);
       return;
     }
@@ -1006,6 +1067,7 @@ export const PAGE = `<!doctype html>
     var box = document.getElementById('approval');
     box.style.display = 'block';
     box.classList.add('pulse');
+    window.__AN.popIn(box);
   });
   es.addEventListener('approvalDone', function (e) {
     document.getElementById('approval').style.display = 'none';
@@ -1115,6 +1177,9 @@ export const PAGE = `<!doctype html>
   fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
   loadWorkspaces();
   loadSessions();
+  // first paint: the sidebar and the welcome view drift in
+  window.__AN.stagger('#side .nav');
+  window.__AN.viewIn(document.getElementById('view-chat'));
 })();
 </script>
 </body>
