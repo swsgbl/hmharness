@@ -398,6 +398,10 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         busy = true;
         broadcast('busy', { busy: true, task: text });
         json(res, 200, { ok: true });
+        // auto/yolo tasks must not wire the remote approval prompt at all -
+        // the remote gate used to override the yes flag unconditionally,
+        // which is why "auto" still popped approvals (the audited bug)
+        const unattended = body.yes === true || cfg.approval === 'auto';
         // Runs detached; every event fans out to all SSE clients.
         void (async () => {
           try {
@@ -406,7 +410,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
               registry: reg,
               cfg,
               yes: body.yes === true,
-              approvalAsk: (name, args) =>
+              approvalAsk: unattended ? undefined : (name, args) =>
                 new Promise<boolean>((resolve) => {
                   const timer = setTimeout(() => {
                     if (pendingApproval?.resolve === resolve) pendingApproval = null;

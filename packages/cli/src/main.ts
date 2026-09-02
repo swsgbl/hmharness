@@ -15,7 +15,7 @@
  *   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
  *   hmh bench                run the evolution bench
  *   hmh skills [--promote|--rollback|--unpromote <name>]
- * Flags: --yes / -y auto-approve gated tools (else they prompt; non-TTY denies).
+ * Flags: --yes / -y / --yolo   auto-approve gated tools (Claude-Code-style alias;
  *        --locale=zh|en override the UI locale for this run.
  */
 import readline from 'node:readline/promises';
@@ -287,13 +287,15 @@ function printTool(t: Tool): void {
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
-  const yes = rawArgs.some((a) => a === '--yes' || a === '-y');
+  // --yolo is the Claude-Code-style alias of --yes (auto-approve gates;
+  // the kernel's destructive-command hard-deny always stays on)
+  const yes = rawArgs.some((a) => a === '--yes' || a === '-y' || a === '--yolo');
   // --locale=zh|en overrides the configured locale for this run (kernel's
   // loadConfig honours HMH_LOCALE), so every command - task, REPL, TUI, web -
   // picks it up without touching config.json
   const localeArg = rawArgs.find((a) => a.startsWith('--locale=') && a.length > 9);
   if (localeArg === '--locale=zh' || localeArg === '--locale=en') process.env.HMH_LOCALE = localeArg.slice(9);
-  const args = rawArgs.filter((a) => a !== '--yes' && a !== '-y' && !a.startsWith('--locale='));
+  const args = rawArgs.filter((a) => a !== '--yes' && a !== '-y' && a !== '--yolo' && !a.startsWith('--locale='));
   const [cmd, ...rest] = args;
   const arg = rest.join(' ');
 

@@ -29,6 +29,7 @@ export interface Strings {
   webTitle: string;
   idle: string;
   running: string;
+  modeYolo: string;
   send: string;
   approve: string;
   deny: string;
@@ -104,6 +105,7 @@ const zh: Strings = {
   webTitle: 'hmh web',
   idle: '空闲',
   running: '运行中…',
+  modeYolo: '🔥 YOLO(全自动)',
   send: '运行',
   approve: '批准',
   deny: '拒绝',
@@ -177,6 +179,7 @@ const en: Strings = {
   webTitle: 'hmh web',
   idle: 'idle',
   running: 'running…',
+  modeYolo: '🔥 YOLO (hands-free)',
   send: 'Run',
   approve: 'Approve',
   deny: 'Deny',

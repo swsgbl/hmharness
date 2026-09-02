@@ -194,6 +194,10 @@ export const PAGE = `<!doctype html>
 
   /* ---- composer (input card / approval takeover) ---- */
   #composer { border-top:1px solid var(--line); background:var(--panel); padding:10px 16px 12px; }
+  #runstatus { display:none; align-items:center; gap:8px; padding:2px 2px 8px; color:var(--warn); font-size:12.5px; }
+  #runstatus.on { display:flex; }
+  #rs-spin { display:inline-block; animation:rsspin 1.1s linear infinite; color:var(--warn); font-size:14px; }
+  @keyframes rsspin { to { transform:rotate(360deg); } }
   #approval { display:none; background:#2a2313; border:1px solid var(--warn); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
   #approval.pulse { animation:pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,179,65,0); } 50% { box-shadow:0 0 0 4px rgba(227,179,65,.25); } }
@@ -245,14 +249,15 @@ export const PAGE = `<!doctype html>
       <span class="chip model" id="model" style="position:relative"></span>
       <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
-      <button class="chip locale" id="locale-chip" type="button" title="切换界面语言 / switch UI language">zh</button>
-      <span id="busy">idle</span>
+      <span class="chip" id="locale-chip">zh</span>
+      <span id="topspacer" style="margin-left:auto"></span>
       <button id="clear" class="ghost sm">clear</button>
     </div>
     <div id="view-chat" class="vwrap on">
       <div id="log"><div id="empty"><div style="font-size:30px">⚙️</div><div id="empty-title" style="margin:8px 0 4px;font-size:16px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px"></div><div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div><div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div></div>
       <button id="tobot" class="ghost sm">↓</button>
       <div id="composer">
+        <div id="runstatus"><span id="rs-spin">✻</span><span id="rs-text"></span></div>
         <div id="approval">
           <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
           <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
@@ -260,10 +265,11 @@ export const PAGE = `<!doctype html>
         <div id="inputcard">
           <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
           <div id="tools-row">
-            <select id="mode" title="approval mode">
-              <option value="ask">🔒 审批询问</option>
-              <option value="auto">⚡ 自动批准</option>
-            </select>
+          <select id="mode" title="approval mode">
+            <option value="ask">🔒 审批询问</option>
+            <option value="auto">⚡ 自动批准</option>
+            <option value="yolo">🔥 YOLO</option>
+          </select>
             <span id="tokchip"></span>
             <button id="send" class="primary">运行</button>
           </div>
@@ -414,6 +420,7 @@ export const PAGE = `<!doctype html>
     document.getElementById('locale-chip').textContent = loc || 'zh';
     document.getElementById('mode').options[0].text = L.ask;
     document.getElementById('mode').options[1].text = L.auto;
+    document.getElementById('mode').options[2].text = L.modeYolo;
     document.getElementById('ws-label').textContent = L.ws;
     document.getElementById('board-title').textContent = L.viewBoard;
     document.getElementById('dev-title').textContent = L.viewDev;
@@ -437,8 +444,6 @@ export const PAGE = `<!doctype html>
     });
     document.getElementById('viewchip').textContent =
       ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[curView] || curView;
-    var badge = document.getElementById('busy');
-    badge.textContent = state && state.busy ? L.running : L.idle;
   }
 
   /* ---- view switching / sidebar collapse ---- */
@@ -549,9 +554,9 @@ export const PAGE = `<!doctype html>
     };
   }
   function setBusy(b) {
-    var badge = document.getElementById('busy');
-    badge.textContent = b ? L.running : L.idle;
-    badge.className = b ? 'on' : '';
+    var rs = document.getElementById('runstatus');
+    rs.classList.toggle('on', b);
+    if (b) document.getElementById('rs-text').textContent = L.running;
     document.title = b ? '\\u25CF ' + L.running : L.title;
     document.getElementById('send').disabled = b;
     document.getElementById('input').disabled = b;
@@ -1126,7 +1131,7 @@ export const PAGE = `<!doctype html>
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, yes: document.getElementById('mode').value === 'auto' })
+      body: JSON.stringify({ text: text, yes: document.getElementById('mode').value !== 'ask' })
     }).then(function (r) {
       if (r.status === 409) { clearEmpty(); switchView('chat'); el('div', 'err', L.alreadyRunning); }
       return r.json();
