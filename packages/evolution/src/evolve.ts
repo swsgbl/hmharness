@@ -13,7 +13,7 @@
  *    config, security settings, or code
  *  - memory is append-only (ACE: rewriting is how context gets lost)
  */
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, type ProviderConfig } from '@hmh/kernel';
 import { listCases, matchExpect, seedCases, type BenchCase } from './bench.ts';
@@ -45,6 +45,10 @@ export interface EvolveReport {
   proposals: SkillProposal[];
   outcomes: ProposalOutcome[];
   memoryDistilled: string | null;
+  /** code-level evolution: proposed patches (DGM bridge) */
+  codePatches?: Array<{ name: string; file: string; reason: string }>;
+  /** code-level outcomes: merged/reverted/error per patch */
+  patchOutcomes?: Array<{ name: string; action: string; reason: string; branch?: string }>;
 }
 
 /** Runs one bench case with the given skills block injected. */
@@ -228,7 +232,34 @@ export async function runEvolution(opts: {
     }
   }
 
-  // 6. Append-only memory distillation.
+  // 6. CODE-LEVEL evolution: propose + sandbox-bench + merge/revert patches.
+  // This is the DGM bridge - the agent can now modify its own tool code,
+  // gated by the same bench discipline as skill promotion.
+  try {
+    const { proposePatches, runPatchSandbox } = await import('./patches.ts');
+    const repoRoot = process.cwd();
+    const patches = await proposePatches(provider, signals, readFile, repoRoot, say);
+    if (patches.length > 0) {
+      report.codePatches = patches.map((p) => ({ name: p.name, file: p.file, reason: p.reason }));
+      for (const patch of patches.slice(0, 1)) { // at most 1 patch per cycle
+        const outcome = await runPatchSandbox({
+          repoRoot,
+          patch,
+          baselineRate: baseRate,
+          runCase: async (c) => runCase(c, skillsToPrompt(active)),
+          benchCases: train,
+          log: say,
+        });
+        report.patchOutcomes = report.patchOutcomes ?? [];
+        report.patchOutcomes.push(outcome);
+        say(`  code-patch ${outcome.action}: ${outcome.reason}`);
+      }
+    }
+  } catch (err) {
+    say(`  code-evolution skipped: ${String(err).slice(0, 120)}`);
+  }
+
+  // 7. Append-only memory distillation.
   if (notes.length >= 4) {
     const distilled = await distillMemory(provider, notes.map((n) => n.text).slice(-20), say);
     const distillPoison = distilled ? screenForPoison(distilled) : null;

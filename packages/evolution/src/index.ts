@@ -3,3 +3,4 @@ export * from './insights.ts';
 export * from './skills.ts';
 export * from './bench.ts';
 export * from './evolve.ts';
+export * from './patches.ts';
