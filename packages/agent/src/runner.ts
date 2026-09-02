@@ -23,7 +23,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmh/kernel';
-import { appendMemory, listSkills, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
 import { opsTools } from '@hmh/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -249,6 +249,58 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     toolUses: result.toolUses,
     toolsUsed: [...new Set(toolsUsed)],
   });
+  // daily self-evolution: every N insights, one background cycle fires
+  // (default on; autoEvolveEvery: 0 disables). Fire-and-forget - it never
+  // blocks the reply, and its own guards (bench gate, holdout, poison
+  // screen, skills/+memory/ only) apply unchanged.
+  const every = cfg.autoEvolveEvery ?? 8;
+  if (every > 0) {
+    try {
+      const count = (await readInsights(ctx.home, 10_000)).length;
+      if (count > 0 && count % every === 0) void triggerBackgroundEvolve(ctx.home);
+    } catch {
+      /* insight count is best-effort */
+    }
+  }
   events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage });
   return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)] };
+}
+
+/** One background evolution cycle (auto-triggered). Logs to the evolution
+ *  journal only; failures never surface into the user's chat. */
+async function triggerBackgroundEvolve(home: string): Promise<void> {
+  try {
+    const { runEvolution } = await import('@hmh/evolution');
+    const { defaultConfig, loadConfig, resolveProvider, chat } = await import('@hmh/kernel');
+    const cfg = await loadConfig();
+    const provider = resolveProvider(cfg, 'evolve');
+    if (!provider.apiKey) return; // no provider configured - stay quiet
+    const reg = nativeRegistry(0);
+    await runEvolution({
+      home,
+      provider,
+      runCase: async (c) => {
+        if (c.tools) {
+          const { buildSystemPrompt } = await import('./prompt.ts');
+          const res2 = await runLoop({
+            provider,
+            registry: reg,
+            messages: [
+              { role: 'system', content: buildSystemPrompt({ cwd: process.cwd(), home, memory: '', skills: '', insights: '', model: provider.model }) },
+              { role: 'user', content: c.prompt },
+            ],
+            ctx: { cwd: process.cwd(), home },
+            maxTurns: 6,
+          });
+          return res2.text;
+        }
+        const r = await chat(provider, [{ role: 'user', content: c.prompt }]);
+        return r.message.content ?? '';
+      },
+      log: () => undefined,
+    });
+    void defaultConfig; // referenced for type stability of the dynamic import
+  } catch {
+    /* background cycle failures are recorded by runEvolution itself or stay silent */
+  }
 }

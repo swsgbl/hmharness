@@ -211,6 +211,51 @@ export const webSearchTool: Tool = {
   },
 };
 
+/** Fetch a URL and return readable text (tags stripped, entities decoded,
+ *  size-bounded). Pairs with web_search: search finds, fetch reads. */
+export const webFetchTool: Tool = {
+  name: 'web_fetch',
+  description:
+    'Fetch a web page and return its readable text (HTML stripped, entities decoded, bounded to ~12k chars). Use after web_search to read a result, or for any docs page / raw file URL.',
+  parameters: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'http(s) URL' },
+      maxChars: { type: 'number', description: 'bound (default 12000, max 40000)' },
+    },
+    required: ['url'],
+  },
+  async execute(args) {
+    const url = String(args.url ?? '').trim();
+    if (!/^https?:\/\//i.test(url)) return { output: 'only http(s) URLs are supported', isError: true };
+    const max = Math.min(Math.max(Number(args.maxChars ?? 12_000), 500), 40_000);
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', Accept: 'text/html,application/json,text/plain,*/*' },
+        signal: AbortSignal.timeout(20_000),
+        redirect: 'follow',
+      });
+      if (!res.ok) return { output: 'fetch: HTTP ' + res.status, isError: true };
+      const ct = String(res.headers.get('content-type') ?? '');
+      const body = await res.text();
+      if (ct.includes('json')) return { output: body.slice(0, max) };
+      let text = body
+        .replace(/[\s\S]*?<body[^>]*>/i, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ');
+      const ents: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'", '&nbsp;': ' ' };
+      text = text.replace(/&(amp|lt|gt|quot|#x27|#39|nbsp);/g, (m) => ents[m] ?? m);
+      text = text.replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim();
+      return { output: text.slice(0, max) + (text.length > max ? '\n...[truncated at ' + max + ' chars]' : '') };
+    } catch (err) {
+      return { output: 'fetch failed: ' + String(err).slice(0, 160), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:

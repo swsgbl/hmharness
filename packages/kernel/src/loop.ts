@@ -45,8 +45,11 @@ export async function runLoop(opts: {
   maxContextChars?: number;
   approval?: LoopApproval;
   events?: LoopEvents;
+  /** Injectable model call (tests pass a fake; production uses provider.chat). */
+  chatImpl?: typeof chat;
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
+  const modelCall = opts.chatImpl ?? chat;
   const maxTurns = opts.maxTurns ?? 25;
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
@@ -54,7 +57,7 @@ export async function runLoop(opts: {
   const tools = registry.toOpenAITools();
 
   for (let turn = 1; turn <= maxTurns; turn++) {
-    const chatRes = await chat(provider, compactMessages(working, opts.maxContextChars), tools, {
+    const chatRes = await modelCall(provider, compactMessages(working, opts.maxContextChars), tools, {
       onDelta: events?.onDelta,
     });
     usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
@@ -70,6 +73,20 @@ export async function runLoop(opts: {
     }
 
     working.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
+
+    // Two-phase execution: approvals are asked ONE AT A TIME (the gate is a
+    // single dialog - ordering matters), then all approved tools run
+    // CONCURRENTLY. Independent calls (fetches, builds, searches) no longer
+    // serialize; this is the single biggest wall-clock win of the loop.
+    interface Planned {
+      call: (typeof calls)[number];
+      name: string;
+      args: Record<string, unknown>;
+      output: string;
+      isError: boolean;
+      skip: boolean; // denied or invalid - never executed
+    }
+    const planned: Planned[] = [];
     for (const call of calls) {
       const name = call.function.name;
       let args: Record<string, unknown> = {};
@@ -81,43 +98,46 @@ export async function runLoop(opts: {
       }
       events?.onToolCall?.(name, args);
       const tool = registry.get(name);
-      let output = '';
-      let isError = false;
+      const p: Planned = { call, name, args, output: '', isError: false, skip: false };
       if (!tool) {
-        output = `unknown tool: ${name}`;
-        isError = true;
+        p.output = `unknown tool: ${name}`;
+        p.isError = true;
+        p.skip = true;
       } else if (badArgs) {
-        // surface instead of silently executing with {}
-        output = `unparseable tool arguments for ${name}: ${call.function.arguments.slice(0, 200)}`;
-        isError = true;
-      } else {
-        if (tool.needsApproval?.(args)) {
-          // Safe default: with no gate wired in, risky tools are denied.
-          const granted = opts.approval ? await opts.approval.ask(name, args) : false;
-          events?.onApproval?.(name, args, granted);
-          if (!granted) {
-            output = 'User declined this action. Ask how to proceed or find a non-destructive alternative.';
-            isError = true;
-          }
-        }
-        if (!isError) {
-          try {
-            const r = await tool.execute(args, ctx);
-            output = r.output;
-            isError = r.isError === true;
-          } catch (err) {
-            output = String(err);
-            isError = true;
-          }
+        p.output = `unparseable tool arguments for ${name}: ${call.function.arguments.slice(0, 200)}`;
+        p.isError = true;
+        p.skip = true;
+      } else if (tool.needsApproval?.(args)) {
+        // Safe default: with no gate wired in, risky tools are denied.
+        const granted = opts.approval ? await opts.approval.ask(name, args) : false;
+        events?.onApproval?.(name, args, granted);
+        if (!granted) {
+          p.output = 'User declined this action. Ask how to proceed or find a non-destructive alternative.';
+          p.isError = true;
+          p.skip = true;
         }
       }
+      planned.push(p);
+    }
+    await Promise.all(planned.map(async (p) => {
+      if (p.skip) return;
+      try {
+        const r = await registry.get(p.name)!.execute(p.args, ctx);
+        p.output = r.output;
+        p.isError = r.isError === true;
+      } catch (err) {
+        p.output = String(err);
+        p.isError = true;
+      }
+    }));
+    for (const p of planned) {
       toolUses++;
-      events?.onToolResult?.(name, output, isError);
+      events?.onToolResult?.(p.name, p.output, p.isError);
       working.push({
         role: 'tool',
-        tool_call_id: call.id,
-        name,
-        content: output.length > 60_000 ? output.slice(0, 60_000) + '\n...[truncated]' : output,
+        tool_call_id: p.call.id,
+        name: p.name,
+        content: p.output.length > 60_000 ? p.output.slice(0, 60_000) + '\n...[truncated]' : p.output,
       });
     }
   }

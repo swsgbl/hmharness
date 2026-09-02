@@ -81,6 +81,10 @@ export interface HmhConfig {
   visionFallbacks?: ProviderConfig[];
   /** UI + system-prompt language. Default 'zh'. */
   locale?: 'zh' | 'en';
+  /** Run a background evolution cycle after every N recorded insights
+   *  (default 8; 0 disables). The cycle keeps its guards: bench double-gate,
+   *  holdout, poison screen, writes only under skills/ and memory/. */
+  autoEvolveEvery?: number;
   /** Named vendor endpoints for multi-provider routing. */
   providers?: Record<string, ProviderConfig>;
   /** Per-purpose provider names resolved against `providers`. */
