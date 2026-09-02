@@ -35,6 +35,15 @@ export async function chat(
     body.stream_options = { include_usage: true };
   }
 
+  // auth scheme: standard Bearer, or a custom header (some gateways such as
+  // freellmapi only accept X-Api-Key). If Bearer gets a 401 we silently
+  // renegotiate once with X-Api-Key - misconfigured gateways then just work.
+  const mkHeaders = (scheme: 'bearer' | 'xapikey' | string) =>
+    scheme === 'bearer'
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
+      : { 'Content-Type': 'application/json', [typeof scheme === 'string' ? scheme : 'X-Api-Key']: cfg.apiKey };
+  let authScheme: string = cfg.authHeader ?? 'bearer';
+
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
@@ -42,13 +51,20 @@ export async function chat(
     try {
       const res = await fetch(endpoint(cfg.baseUrl), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+        headers: mkHeaders(authScheme),
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
       if (res.status === 429 || res.status >= 500) {
         lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
         await sleep(1500 * (attempt + 1));
+        continue;
+      }
+      if (res.status === 401 && !cfg.authHeader && authScheme === 'bearer' && cfg.apiKey) {
+        // gateway rejected Bearer - try the other common scheme once
+        authScheme = 'X-Api-Key';
+        lastError = 'renegotiating auth: Bearer rejected, retrying with X-Api-Key';
+        attempt--;
         continue;
       }
       if (!res.ok) {
@@ -197,16 +213,26 @@ export async function chatVision(
     ],
   };
   let lastError = '';
+  // same auth negotiation as chat(): explicit header, Bearer, then X-Api-Key
+  let vAuth: string = cfg.authHeader ?? 'bearer';
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 120_000);
     try {
+      const vHeaders = vAuth === 'bearer'
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
+        : { 'Content-Type': 'application/json', [vAuth]: cfg.apiKey };
       const res = await fetch(endpoint(cfg.baseUrl), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+        headers: vHeaders,
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
+      if (res.status === 401 && !cfg.authHeader && vAuth === 'bearer' && cfg.apiKey) {
+        vAuth = 'X-Api-Key';
+        attempt--;
+        continue;
+      }
       if (res.status === 429 || res.status >= 500) {
         lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
         await sleep(1500 * (attempt + 1));

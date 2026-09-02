@@ -59,6 +59,10 @@ export interface ProviderConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** Custom auth header name for gateways that reject Bearer (e.g. 'X-Api-Key'
+   *  for freellmapi). Omit for standard Authorization: Bearer; on 401 the
+   *  provider renegotiates with X-Api-Key automatically. */
+  authHeader?: string;
 }
 
 /** User-level configuration (HMH_HOME/config.json). */
@@ -130,6 +134,8 @@ export interface ProviderPreset {
   baseUrl: string;
   envVar: string;
   model: string;
+  /** auth header the gateway requires (freellmapi: X-Api-Key) */
+  authHeader?: string;
 }
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -168,7 +174,8 @@ export async function detectLocalProviders(cfg: HmhConfig, readFileFn: typeof im
     if (p.envVar && process.env[p.envVar]) found.push(p);
   }
   // local OpenAI-compatible gateways: an env key plus a live /v1/models on a
-  // common loopback port (e.g. freellmapi on 3002, ollama on 11434)
+  // common loopback port (e.g. freellmapi on 3002, ollama on 11434); the
+  // probe negotiates auth (Bearer, then X-Api-Key) and remembers the scheme
   for (const [envVar, ports] of [
     ['FREELLM_API_KEY', [3002, 8080]],
     ['OPENAI_COMPAT_API_KEY', [8080, 3000]],
@@ -176,14 +183,23 @@ export async function detectLocalProviders(cfg: HmhConfig, readFileFn: typeof im
     if (!process.env[envVar] || found.some((x) => x.name === envVar.toLowerCase().replace('_api_key', ''))) continue;
     for (const port of ports) {
       try {
-        const r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
-          headers: { Authorization: `Bearer ${process.env[envVar]}` },
+        const key = process.env[envVar];
+        let r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
+          headers: { Authorization: `Bearer ${key}` },
           signal: AbortSignal.timeout(800),
         });
+        let authHeader: string | undefined;
+        if (r.status === 401) {
+          r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
+            headers: { 'X-Api-Key': key },
+            signal: AbortSignal.timeout(800),
+          });
+          if (r.ok) authHeader = 'X-Api-Key';
+        }
         if (!r.ok) continue;
         const d = (await r.json()) as { data?: Array<{ id?: string }> };
         const model = d.data?.[0]?.id ?? 'auto';
-        found.push({ name: envVar.toLowerCase().replace('_api_key', ''), baseUrl: `http://127.0.0.1:${port}/v1`, envVar: `(local gateway, key from ${envVar})`, model });
+        found.push({ name: envVar.toLowerCase().replace('_api_key', ''), baseUrl: `http://127.0.0.1:${port}/v1`, envVar: `(local gateway, key from ${envVar})`, model, ...(authHeader ? { authHeader } : {}) });
         break;
       } catch {
         /* port closed - try next */

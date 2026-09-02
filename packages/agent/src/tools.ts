@@ -93,6 +93,33 @@ export const listDirTool: Tool = {
   },
 };
 
+/** Host-shell pipe preflight: on Windows cmd, Unix-isms fail with cryptic
+ *  mojibake and the model retries for many turns. Only the FIRST word of
+ *  each host segment (split on | || && ;) is checked - Unix words inside
+ *  arguments (docker exec c ls /app) belong to the container and stay legal.
+ *  (Pure, testable.) */
+export function unixPipeOnWindows(command: string, platform: string = process.platform): string | null {
+  if (platform !== 'win32') return null;
+  const eq: Record<string, string> = {
+    head: 'more (pager) or node -e', tail: 'powershell -NoProfile -Command "Get-Content -Tail N"',
+    grep: 'findstr /i "pattern" file', awk: 'node -e', sed: 'node -e',
+    wc: 'powershell -Command "(Get-Content f).Count"', cat: 'type file',
+    ls: 'dir /b', less: 'more', which: 'where name',
+  };
+  for (const seg of command.split(/\|\||&&|[|;]/)) {
+    const first = (/^[\s"']*([\w.-]+)/.exec(seg)?.[1] ?? '').toLowerCase();
+    if (eq[first]) {
+      return `Refused before running: '${first}' does not exist in cmd.exe (the host shell). Use: ${eq[first]} . Do NOT retry the same pipeline.`;
+    }
+  }
+  return null;
+}
+
+/** Repeat-failure short-circuit: the same command that already failed twice
+ *  is refused without executing - the model repeating it 10x burned ~700k
+ *  prompt tokens in one audited session. (Module-level, session-scoped.) */
+const failedCommands = new Map<string, number>();
+
 export const runCommandTool: Tool = {
   name: 'run_command',
   description:
@@ -113,6 +140,12 @@ export const runCommandTool: Tool = {
         return { output: `Refused: ${d.why}. Ask the user to run it manually if truly intended.`, isError: true };
       }
     }
+    const unix = unixPipeOnWindows(command);
+    if (unix) return { output: unix, isError: true };
+    const fails = failedCommands.get(command) ?? 0;
+    if (fails >= 2) {
+      return { output: `Refused: this exact command already failed ${fails} times this session. Change strategy (different command, different tool, or ask the user) instead of repeating it.`, isError: true };
+    }
     const timeout = Math.min(Number(args.timeout_ms ?? 60_000), 300_000);
     try {
       const { stdout, stderr } = await execCb(command, {
@@ -122,8 +155,10 @@ export const runCommandTool: Tool = {
         maxBuffer: 8 * 1024 * 1024,
       });
       const out = (stdout || '') + (stderr ? `\n[stderr]\n${stderr}` : '');
+      failedCommands.delete(command);
       return { output: (out.trim() || '(no output)').slice(0, 60_000) };
     } catch (err: unknown) {
+      failedCommands.set(command, fails + 1);
       const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
       const parts = [e.stdout, e.stderr, e.killed ? '(timed out)' : null, e.message].filter(Boolean).join('\n');
       return { output: parts.slice(0, 60_000), isError: true };
