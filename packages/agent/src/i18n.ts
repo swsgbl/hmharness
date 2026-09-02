@@ -67,6 +67,9 @@ export interface Strings {
   cmdTools: string;
   cmdSkills: string;
   cmdModel: string;
+  cmdYolo: string;
+  yoloOn: string;
+  yoloOff: string;
   cmdMouse: string;
   cmdProviders: string;
   cmdOps: string;
@@ -143,6 +146,9 @@ const zh: Strings = {
   cmdTools: '已注册工具(gated 标记)',
   cmdSkills: '技能库(启用 + 草稿)',
   cmdModel: '列出/切换模型路由(/model <name>)',
+  cmdYolo: '切换全自动 YOLO(/yolo on|off;危险命令仍硬拒)',
+  yoloOn: '🔥 YOLO 已开启:后续任务全自动,不再弹审批(破坏性命令仍硬拒)',
+  yoloOff: '🔒 已回到审批询问模式',
   cmdMouse: '切换鼠标上报兜底(默认关:选择复制永可用,滚轮经终端转为翻页)',
   cmdProviders: '探测本地密钥并自动添加厂商(/providers scan)',
   cmdOps: '运维看板状态',
@@ -218,6 +224,9 @@ const en: Strings = {
   cmdTools: 'registered tools (gated marked)',
   cmdSkills: 'skill library (active + drafts)',
   cmdModel: 'list/switch model route (/model <name>)',
+  cmdYolo: 'toggle hands-free YOLO (/yolo on|off; destructive hard-deny stays)',
+  yoloOn: '🔥 YOLO on: tasks run unattended, no approval cards (destructive hard-deny stays)',
+  yoloOff: '🔒 back to ask-approval mode',
   cmdMouse: 'toggle mouse-report fallback (off by default: selection always works, wheel maps to scroll)',
   cmdProviders: 'detect local keys and add providers (/providers scan)',
   cmdOps: 'ops keeper status',

@@ -382,6 +382,7 @@ export const PAGE = `<!doctype html>
           noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
+          modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
@@ -398,6 +399,7 @@ export const PAGE = `<!doctype html>
           noHdc:'hdc not found - install DevEco Studio / command-line tools and add to PATH',
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
+          modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
           wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped' }

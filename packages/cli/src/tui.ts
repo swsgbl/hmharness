@@ -91,6 +91,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/tools', key: 'cmdTools' },
   { name: '/skills', key: 'cmdSkills' },
   { name: '/model', key: 'cmdModel' },
+  { name: '/yolo', key: 'cmdYolo' },
   { name: '/providers', key: 'cmdProviders' },
   { name: '/mouse', key: 'cmdMouse' },
   { name: '/ops', key: 'cmdOps' },
@@ -147,6 +148,8 @@ export class TuiRuntime {
   private cwdName = '';
   private skillCount = 0;
   private t = strings();
+  /** persistent header tag, e.g. the active approval mode (🔥 YOLO) */
+  private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
   /** Wheel handling without ever capturing the mouse: NO mouse-reporting
@@ -170,6 +173,11 @@ export class TuiRuntime {
 
   setModelChoices(list: Array<{ name: string; desc: string }>): void {
     this.modelChoices = list;
+    this.dirty = true;
+  }
+
+  setModeTag(tag: string): void {
+    this.modeTag = tag;
     this.dirty = true;
   }
 
@@ -458,7 +466,9 @@ export class TuiRuntime {
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
     const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
-    const headRight = this.busy ? YELLOW(`${spin} ${this.status || '…'}`) : GREEN(this.t.tuiIdle);
+    const headRight = this.busy
+      ? YELLOW(`${spin} ${this.status || '…'}`)
+      : GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
     frame.push(truncateTo(headLeft + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(headLeft)) - strWidth(stripAnsi(headRight)))) + headRight, W));
     frame.push(DIM('─'.repeat(W)));
 
@@ -621,6 +631,7 @@ export class TuiRuntime {
 
 export async function tui(yes: boolean, noWeb = false): Promise<void> {
   let cfg = await loadConfig();
+  let autoApprove = yes || cfg.approval === 'auto';
   if (!stdin.isTTY) {
     stdout.write(strings((cfg.locale ?? 'zh') as Locale).tuiNeedsTty + '\n');
     process.exitCode = 1;
@@ -636,6 +647,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   const chatModel = resolveProvider(cfg, 'chat').model;
   rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale);
   rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
+  if (autoApprove) rt.setModeTag('🔥');
   rt.addText(t.tuiWelcome(chatModel), 'dim');
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
 
@@ -678,6 +690,13 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       const up = await ensureWebDaemon(DEFAULT_WEB_PORT);
       rt.setBusy(false);
       rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
+      return;
+    }
+    if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
+      const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
+      autoApprove = turnOn;
+      rt.setModeTag(turnOn ? '🔥' : '');
+      rt.addText(turnOn ? t.yoloOn : t.yoloOff, turnOn ? 'plain' : 'dim');
       return;
     }
     if (line === '/model' || line.startsWith('/model ')) {
@@ -814,7 +833,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         task: line,
         registry: reg,
         cfg,
-        yes,
+        yes: autoApprove,
         resumeMessages: history,
         approvalAsk: (name, args) => rt.requestApproval(name, args),
         events: {

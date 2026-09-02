@@ -132,6 +132,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
 async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void> {
   const home = homeDir();
   let cfg = await loadConfig();
+  let autoApprove = yes;
   const t = strings((cfg.locale ?? 'zh') as Locale);
   const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
   stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
@@ -156,6 +157,12 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
       if (line === '/exit' || line === '/quit') break;
       if (line.startsWith('/')) {
         // same command set as the TUI palette, line-mode
+        if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
+          const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
+          autoApprove = turnOn;
+          stdout.write((turnOn ? YELLOW(t.yoloOn) : DIM(t.yoloOff)) + '\n');
+          continue;
+        }
         if (line === '/help' || line === '?') {
           const { COMMANDS } = await import('./tui.ts');
           stdout.write(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n') + '\n');
@@ -231,7 +238,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
         continue;
       }
       try {
-        const r = await runTask(line, { yes, sharedRl: rl, registry: reg, clients, resumeMessages: history });
+        const r = await runTask(line, { yes: autoApprove, sharedRl: rl, registry: reg, clients, resumeMessages: history });
         // working transcript = [system, ...resumeMessages, user, ...new turns];
         // only the NEW turns (past the replayed prefix) extend history.
         history = [...history, { role: 'user', content: line }, ...r.messages.slice(history.length + 2)];
