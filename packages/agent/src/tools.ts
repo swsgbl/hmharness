@@ -256,6 +256,46 @@ export const webFetchTool: Tool = {
   },
 };
 
+/** Desktop automation, step 1 (first-class): screenshot the primary display
+ *  to a PNG and hand the path back - the agent then reads it with see_image
+ *  (vision chain). Windows via PowerShell System.Drawing; other platforms
+ *  report the gap honestly instead of failing silently. */
+export const desktopScreenshotTool: Tool = {
+  name: 'desktop_screenshot',
+  description:
+    'Screenshot the primary display to a PNG file and return its path. Immediately follow with see_image on that path to actually look at it. Use for: checking a GUI app state, reading dialogs/errors, verifying what a desktop automation step did.',
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+  needsApproval: () => true,
+  async execute(_args, ctx) {
+    if (process.platform !== 'win32') {
+      return { output: 'desktop_screenshot currently supports Windows only (PowerShell + System.Drawing)', isError: true };
+    }
+    const out = join(ctx.home, 'tmp', 'shot-' + Date.now() + '.png');
+    await import('node:fs/promises').then((f) => f.mkdir(join(ctx.home, 'tmp'), { recursive: true }));
+    const ps = [
+      'Add-Type -AssemblyName System.Windows.Forms',
+      'Add-Type -AssemblyName System.Drawing',
+      '$b = New-Object System.Drawing.Bitmap([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height)',
+      '$g = [System.Drawing.Graphics]::FromImage($b)',
+      '$g.CopyFromScreen(0, 0, 0, 0, $b.Size)',
+      "$b.Save('OUTPATH', [System.Drawing.Imaging.ImageFormat]::Png)",
+      '$g.Dispose(); $b.Dispose()',
+    ].join('; ').replace(/OUTPATH/g, out.replace(/\\/g, '\\\\').replace(/'/g, "''"));
+    try {
+      const { execFile } = await import('node:child_process');
+      const { promisify: prom } = await import('node:util');
+      await prom(execFile)('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 20_000, windowsHide: true });
+      return { output: 'screenshot saved: ' + out + ' - now call see_image with this path' };
+    } catch (err) {
+      return { output: 'screenshot failed: ' + String(err).slice(0, 200), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:

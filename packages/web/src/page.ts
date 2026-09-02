@@ -168,6 +168,8 @@ export const PAGE = `<!doctype html>
   .toolrow .st.ok { color:var(--ok); }
   .toolrow .nm { color:var(--accent); font-weight:600; }
   .toolres { color:var(--dim); font-family:var(--mono); font-size:12px; white-space:pre-wrap; margin-left:22px; border-left:2px solid var(--line); padding-left:8px; }
+  .pargrp { margin-left:8px; margin-bottom:2px; border-left:2px solid var(--accent); padding-left:6px; }
+  .pargrp .plabel { color:var(--accent); font-size:10.5px; font-family:var(--mono); padding:1px 4px; }
   .toolfold { color:var(--dim); font-family:var(--mono); font-size:11.5px; margin-left:22px; cursor:pointer; padding:2px 6px; border-radius:6px; }
   .toolfold:hover { background:var(--panel2); color:var(--text); }
   .toolfold .tri { display:inline-block; transition:transform .12s; margin-right:5px; }
@@ -999,6 +1001,8 @@ export const PAGE = `<!doctype html>
   var curKind = null;
   function flushStream() {
     if (curBlock) curBlock.finalize();
+    // a new model turn resets the parallel group context
+    parCount = 0; parBox = null;
     curBlock = null;
     curKind = null;
   }
@@ -1047,6 +1051,7 @@ export const PAGE = `<!doctype html>
     curBlock.add(d.chunk);
   });
   es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', JSON.parse(e.data).text); autoscroll(); });
+  var parCount = 0; var parBox = null;
   es.addEventListener('tool', function (e) {
     flushStream();
     clearEmpty();
@@ -1062,7 +1067,20 @@ export const PAGE = `<!doctype html>
     row.appendChild(st); row.appendChild(nm); row.appendChild(ar);
     var s = seq;
     row.onclick = function () { showDetails(s); };
-    pendingToolRow = { seq: s, st: st };
+    parCount++;
+    if (parCount === 2 && !parBox) {
+      parBox = document.createElement('div');
+      parBox.className = 'pargrp';
+      var pl = document.createElement('div'); pl.className = 'plabel';
+      pl.textContent = '\u29C9 parallel tools';
+      parBox.appendChild(pl);
+      // move the first row into the group
+      var first = log.querySelector('.toolrow:last-of-type');
+      if (first) { log.appendChild(parBox); parBox.appendChild(first); }
+      else log.appendChild(parBox);
+    }
+    if (parBox) parBox.appendChild(row);
+    pendingToolRow = { seq: s, st: st, row: parBox || row };
     autoscroll();
   });
   es.addEventListener('toolResult', function (e) {
@@ -1072,6 +1090,7 @@ export const PAGE = `<!doctype html>
       pendingToolRow.st.className = 'st ' + (d.isError ? 'err' : 'ok');
       pendingToolRow.st.textContent = d.isError ? '\\u2717' : '\\u2022';
       pendingToolRow = null;
+      parCount = 0; parBox = null;
     }
     // attach output to the most recent matching entry without output
     for (var k in toolRegistry) {
