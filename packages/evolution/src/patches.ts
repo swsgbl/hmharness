@@ -22,6 +22,30 @@ import { promisify } from 'node:util';
 
 const execCb = promisify(execFile);
 
+/** git executable: PATH first, then known Windows locations (this repo's
+ *  dev machine has git only outside the test-process PATH). */
+async function git(args: string[], opts: { cwd: string; timeout: number }): Promise<{ stdout: string }> {
+  const { homedir } = await import('node:os');
+  // .cmd shims can't execFile-spawn on modern Node (EINVAL) - real .exe only
+  const candidates = [
+    'git',
+    'C:\\Program Files\\Git\\cmd\\git.exe',
+    'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+    'C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer\\Git\\cmd\\git.exe',
+  ];
+  let lastErr: unknown;
+  for (const exe of candidates) {
+    try {
+      return await execCb(exe, args, { ...opts, windowsHide: true }) as { stdout: string };
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err);
+      if (!/ENOENT|not found|EINVAL/i.test(msg)) throw err; // real failure, not missing-exe
+    }
+  }
+  throw lastErr;
+}
+
 /** A proposed code change: find-and-replace in one source file. */
 export interface CodePatch {
   name: string;
@@ -78,8 +102,23 @@ export async function applyPatch(repoRoot: string, patch: CodePatch): Promise<st
 /** Create a sandbox git branch for testing a patch. */
 export async function createSandbox(repoRoot: string, name: string): Promise<string> {
   const branch = `evolve/${name}-${Date.now().toString(36)}`;
-  await execCb('git', ['checkout', '-b', branch], { cwd: repoRoot, timeout: 10_000 });
+  // stash any stray working-tree changes first so the branch starts clean
+  await git( ['stash', '--include-untracked'], { cwd: repoRoot, timeout: 10_000 }).catch(() => undefined);
+  await git( ['checkout', '-b', branch], { cwd: repoRoot, timeout: 10_000 });
   return branch;
+}
+
+/** Commit the patch on the sandbox branch so it is fully isolated from main. */
+export async function commitOnSandbox(repoRoot: string, patchName: string): Promise<void> {
+  await git( ['add', '-A'], { cwd: repoRoot, timeout: 10_000 });
+  await git( ['commit', '-m', `evolve(code-patch): ${patchName}`, '--no-verify'], { cwd: repoRoot, timeout: 15_000 });
+}
+
+/** Merge the sandbox branch back to main (patch promoted). */
+export async function mergeSandbox(repoRoot: string, branch: string): Promise<void> {
+  await git( ['checkout', 'main'], { cwd: repoRoot, timeout: 10_000 });
+  await git( ['merge', '--no-edit', branch], { cwd: repoRoot, timeout: 15_000 });
+  await git( ['branch', '-D', branch], { cwd: repoRoot, timeout: 5000 });
 }
 
 /** Run the bench gate on the current branch. Returns pass rate (0-1) or -1 on build failure. */
@@ -111,19 +150,12 @@ export async function sandboxBench(
   return cases.length > 0 ? pass / cases.length : -1;
 }
 
-/** Merge the sandbox branch back to main (patch promoted). */
-export async function mergeSandbox(repoRoot: string, branch: string): Promise<void> {
-  await execCb('git', ['checkout', 'main'], { cwd: repoRoot, timeout: 10_000 });
-  await execCb('git', ['merge', '--no-edit', branch], { cwd: repoRoot, timeout: 15_000 });
-  await execCb('git', ['branch', '-D', branch], { cwd: repoRoot, timeout: 5000 });
-}
-
 /** Revert: go back to main, delete the sandbox branch (zero residue). */
 export async function revertSandbox(repoRoot: string, branch: string): Promise<void> {
-  await execCb('git', ['checkout', 'main'], { cwd: repoRoot, timeout: 10_000 });
+  await git( ['checkout', 'main'], { cwd: repoRoot, timeout: 10_000 });
   // discard any uncommitted changes on the sandbox branch
-  await execCb('git', ['reset', '--hard', 'HEAD'], { cwd: repoRoot, timeout: 5000 });
-  await execCb('git', ['branch', '-D', branch], { cwd: repoRoot, timeout: 5000 });
+  await git( ['reset', '--hard', 'HEAD'], { cwd: repoRoot, timeout: 5000 });
+  await git( ['branch', '-D', branch], { cwd: repoRoot, timeout: 5000 });
 }
 
 /**
@@ -149,7 +181,10 @@ export async function runPatchSandbox(opts: {
       await revertSandbox(opts.repoRoot, branch);
       return { name: patch.name, action: 'error', reason: applyResult, branch };
     }
-    say(`  code-patch "${patch.name}": applied, rebuilding + benching`);
+    // commit on the branch BEFORE benching: the patch must be fully isolated
+    // so a later checkout of main can never carry uncommitted patch changes
+    await commitOnSandbox(opts.repoRoot, patch.name);
+    say(`  code-patch "${patch.name}": applied + committed on branch, rebuilding + benching`);
     const rate = await sandboxBench(opts.repoRoot, opts.runCase, opts.benchCases);
     if (rate < 0) {
       await revertSandbox(opts.repoRoot, branch);
