@@ -20,6 +20,22 @@ test('unixPipeOnWindows refuses Unix pipelines with cmd equivalents', () => {
   assert.equal(unixPipeOnWindows('echo catalog lattice', 'win32'), null);
 });
 
+test('DENY walls: root/home recursive deletes refused, subdirectory deletes allowed', async () => {
+  const { runCommandTool } = await import('../tools.ts');
+  const ctx = { cwd: process.cwd(), home: 'C:/nonexistent-home' };
+  const refuse = async (command: string) => (await runCommandTool.execute({ command, timeout_ms: 2000 }, ctx)).output.startsWith('Refused');
+  // roots/homes are walled
+  assert.ok(await refuse('rd /s /q C:\\'));
+  assert.ok(await refuse('rmdir /s C:\\Windows /q'));
+  assert.ok(await refuse('rm -rf /'));
+  assert.ok(await refuse('rd /s ~'));
+  assert.ok(await refuse('Remove-Item -Recurse -Force C:\\Users'));
+  // relative/absolute SUBDIRECTORY deletes pass the wall (approval gate still applies)
+  assert.ok(!(await refuse('del /q obscura')));
+  assert.ok(!(await refuse('rd /s /q G:\\hmharness\\obscura')));
+  assert.ok(!(await refuse('powershell -Command "Remove-Item -Recurse -Force G:\\hmharness\\obscura-temp"')));
+});
+
 test('failed-command short-circuit: third identical failure is refused without execution', async () => {
   // use a command guaranteed to fail on this host, invoked through the tool
   const { runCommandTool } = await import('../tools.ts');

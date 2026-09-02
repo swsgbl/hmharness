@@ -13,9 +13,13 @@ import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, 
 const execCb = promisify(exec);
 
 const DENY_PATTERNS: Array<{ re: RegExp; why: string }> = [
-  // recursive deletes of root/home paths, incl. quoted and PowerShell/rd variants
-  { re: /rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\s+["']?[/~"']|rm\s+-rf?\s+[CcJj]:\\?/i, why: 'recursive delete of a root/home path' },
-  { re: /rd\s+\/s|remove-item\s+[^|;&]{0,40}-recurse\s+[^|;&]{0,12}-force\s+[a-z]:\\|format\s+[a-z]:|del\s+\/[sq]/i, why: 'recursive delete of a root/home path' },
+  // recursive deletes aimed at ROOT/HOME/SYSTEM targets only - relative
+  // subdirectories are legitimate work (the approval gate still covers them;
+  // a blanket ban made the agent unable to clean its own scratch dirs)
+  { re: /rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\s+["']?[/~"']|rm\s+-rf?\s+[CcJj]:\\?\/?(\s|$)/i, why: 'recursive delete of a root/home path' },
+  { re: /(?:rd|rmdir)\s+\/s[^|;&]{0,24}["']?(?:[a-z]:\\(?:\s|["']|$)|[a-z]:\\(?:windows|program files(?: \(x86\))?|users|programdata)(?:\\|\s|["']|$)|\/(?:\s|["']|$)|~|%userprofile%|%homedrive%)/i, why: 'recursive delete of a root/system/home path' },
+  { re: /remove-item\s+[^|;&]{0,40}-(?:recurse|force)[^|;&]{0,8}-(?:force|recurse)[^|;&]{0,12}["']?(?:[a-z]:\\(?:\s|["']|$)|[a-z]:\\(?:windows|program files(?: \(x86\))?|users|programdata)(?:\\|\s|["']|$)|~|%userprofile%|%homedrive%)/i, why: 'recursive delete of a system/home path' },
+  { re: /format\s+[a-z]:/i, why: 'drive format' },
   { re: /shutdown|restart\s+computer|taskkill\s+\/f\s+\/im\s+explorer/i, why: 'system power/shell action' },
   { re: /reg\s+(delete|add).*(Run|CurrentVersion)/i, why: 'autostart registry mutation' },
   { re: /curl[^|;&]{0,80}\|\s*(ba)?sh|iwr[^|;&]{0,80}\|\s*iex|set-executionpolicy\s+unrestricted/i, why: 'remote-script-to-shell pipe / unrestricted execution policy' },

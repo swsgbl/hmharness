@@ -15,6 +15,7 @@
  *   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
  *   hmh bench                run the evolution bench
  *   hmh skills [--promote|--rollback|--unpromote <name>]
+  hmh skills add <git-url-or-local-dir>   install skills (multi-skill packs supported)
  * Flags: --yes / -y / --yolo   auto-approve gated tools (Claude-Code-style alias;
  *        --locale=zh|en override the UI locale for this run.
  */
@@ -325,6 +326,7 @@ usage:
   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
   hmh bench                run the evolution bench
   hmh skills [--promote|--rollback|--unpromote <name>]
+  hmh skills add <git-url-or-local-dir>   install skills (multi-skill packs supported)
 
 flags:
   --yes / -y          auto-approve gated tools (else they prompt; non-TTY denies)
@@ -386,7 +388,25 @@ flags:
   if (cmd === 'skills') {
     const home = homeDir();
     const flag = rest.find((a) => a.startsWith('--'));
-    const skillName = rest.find((a) => !a.startsWith('-') && !a.startsWith('--'));
+    const skillName = rest.find((a) => !a.startsWith('-') && !a.startsWith('--') && a !== 'add');
+    if (rest[0] === 'add' || flag === '--add') {
+      // install from a git URL or local dir (multi-skill packs supported)
+      if (!skillName) {
+        stdout.write(`usage: hmh skills add <git-url-or-local-dir>\n`);
+        return;
+      }
+      const { installSkills } = await import('@hmh/evolution');
+      try {
+        const r = await installSkills(skillName, home);
+        stdout.write(r.installed.length
+          ? GREEN('✓') + ` installed ${r.installed.length} skill(s): ${r.installed.join(', ')}\n` + DIM(`verify: hmh skills\n`)
+          : DIM('no installable skills found (looked for SKILL.md at root, skills/*/, or */SKILL.md)\n'));
+        if (r.skipped.length) stdout.write(DIM(`skipped (already present): ${r.skipped.join(', ')}\n`));
+      } catch (err) {
+        stdout.write(YELLOW(`install failed: ${String(err).slice(0, 300)}\n`));
+      }
+      return;
+    }
     if (flag === '--promote' || flag === '--rollback' || flag === '--unpromote') {
       if (!skillName) {
         stdout.write(`usage: hmh skills --promote|--rollback|--unpromote <name>\n`);

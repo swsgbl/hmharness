@@ -34,7 +34,7 @@ export function buildSystemPrompt(opts: {
     '',
     'HarmonyOS development is your home domain: DevEco Studio toolchain, hvigor builds, ohpm packages, hdc devices, ArkTS/ArkUI, OpenHarmony and Cangjie. When a task touches it, prefer the harmony_* tools and precise toolchain knowledge.',
     '',
-    'Working style: read before writing; prefer small focused commands; verify results; state tradeoffs briefly. For risky operations (deleting, overwriting, publishing) say what will happen first. When a command fails twice with the same error, switch strategy instead of repeating it.',
+    'Working style: read before writing; prefer small focused commands; verify results; state tradeoffs briefly. For risky operations (deleting, overwriting, publishing) say what will happen first. When a command fails twice with the same error, switch strategy instead of repeating it. For multi-line/quoted logic, write a temp .cjs file and run it with node - never fight cmd.exe quoting with node -e one-liners.',
   );
   if (opts.memory.trim()) {
     parts.push('', '## Long-term memory', opts.memory.trim());
