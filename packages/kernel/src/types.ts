@@ -82,8 +82,11 @@ export interface HmhConfig {
   /** UI + system-prompt language. Default 'zh'. */
   locale?: 'zh' | 'en';
   /** Run a background evolution cycle after every N recorded insights
-   *  (default 8; 0 disables). The cycle keeps its guards: bench double-gate,
-   *  holdout, poison screen, writes only under skills/ and memory/. */
+   *  (default 3; 0 disables). Tier 3 of the feedback ladder: Tier 1 = raw
+   *  error self-notes (every task, zero cost), Tier 2 = one model-call
+   *  lesson per erroring task (instant reflection), Tier 3 = this - full
+   *  cycle with bench gate. Guards unchanged: double-gate, holdout, poison
+   *  screen, writes only under skills/ and memory/. */
   autoEvolveEvery?: number;
   /** Named vendor endpoints for multi-provider routing. */
   providers?: Record<string, ProviderConfig>;

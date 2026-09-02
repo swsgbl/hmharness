@@ -226,10 +226,16 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     },
   });
 
-  // distill repeated tool failures into long-term memory (dedup by tool name)
+  // ---- instant feedback: learn from THIS task's mistakes, not 8 tasks later ----
+  // Tier 1 (always, zero cost): raw error pattern → memory self-note. Lowered
+  // to 1 failure for system-level patterns (shell incompat, auth, missing
+  // binary) - those never self-correct on retry; 2 for generic errors.
   try {
+    const SYSTEM_ERR = /not (recognized|found|exist)|ENOENT|EACCES|ECONN|HTTP 4\d\d|authentication|unauthorized|command not found|is not an? (internal|external)/i;
     for (const [name, errs] of toolErrors) {
-      if (errs.length < 2) continue;
+      const systemLevel = errs.some((e) => SYSTEM_ERR.test(e));
+      const threshold = systemLevel ? 1 : 2;
+      if (errs.length < threshold) continue;
       const notes = await readNotes(ctx.home);
       const last = notes.slice(-40).map((n) => n.text).join('\n');
       if (last.includes(`[self-note] tool ${name}`)) continue;
@@ -237,6 +243,32 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     }
   } catch {
     /* memory is best-effort; never fail the task on it */
+  }
+
+  // Tier 2 (if errors occurred): one quick model call - "what went wrong,
+  // what to do differently" - written to memory immediately. This is the
+  // per-session reflection the user asked for: mistakes corrected in real
+  // time, not batched 8 sessions later.
+  if (toolErrors.size > 0) {
+    void (async () => {
+      try {
+        const { chat: chatFn } = await import('@hmh/kernel');
+        const provider = resolveProvider(cfg, 'evolve');
+        if (!provider.apiKey) return;
+        const errSummary = [...toolErrors.entries()].map(([n, e]) => `${n}: ${[...new Set(e)].slice(0, 2).join('; ')}`).join('\n').slice(0, 600);
+        const task = opts.task.slice(0, 150);
+        const r = await chatFn(provider, [
+          { role: 'system', content: 'You distill agent failure lessons. Given a task and its tool errors, output ONE actionable note (max 180 chars) starting with a verb: what to do differently next time on THIS machine/environment. If the errors are trivial/transient, output exactly NONE.' },
+          { role: 'user', content: `Task: ${task}\nTool errors:\n${errSummary}` },
+        ]);
+        const lesson = (r.message.content ?? '').trim();
+        if (lesson && lesson.toUpperCase() !== 'NONE' && lesson.length < 300) {
+          await appendMemory(ctx.home, `[lesson] ${lesson}`);
+        }
+      } catch {
+        /* reflection is best-effort */
+      }
+    })();
   }
 
   await session.final(result.text, result.turns, result.toolUses);
@@ -253,7 +285,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // (default on; autoEvolveEvery: 0 disables). Fire-and-forget - it never
   // blocks the reply, and its own guards (bench gate, holdout, poison
   // screen, skills/+memory/ only) apply unchanged.
-  const every = cfg.autoEvolveEvery ?? 8;
+  const every = cfg.autoEvolveEvery ?? 3;
   if (every > 0) {
     try {
       const count = (await readInsights(ctx.home, 10_000)).length;

@@ -296,6 +296,81 @@ export const desktopScreenshotTool: Tool = {
   },
 };
 
+/** Desktop automation steps 2-3: click and type. PowerShell + Win32 for
+ *  mouse (SetCursorPos + mouse_event), SendKeys for keyboard. Pair with
+ *  desktop_screenshot + see_image: look → act → verify. */
+export const desktopClickTool: Tool = {
+  name: 'desktop_click',
+  description:
+    'Click the mouse at screen coordinates (left click). ALWAYS desktop_screenshot + see_image FIRST to find the right coordinates, then click, then screenshot again to verify. Coordinates are pixels from top-left of the primary display.',
+  parameters: {
+    type: 'object',
+    properties: {
+      x: { type: 'number', description: 'X pixel coordinate' },
+      y: { type: 'number', description: 'Y pixel coordinate' },
+    },
+    required: ['x', 'y'],
+  },
+  needsApproval: () => true,
+  async execute(args) {
+    if (process.platform !== 'win32') return { output: 'desktop_click supports Windows only', isError: true };
+    const x = Math.round(Number(args.x));
+    const y = Math.round(Number(args.y));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { output: 'x/y must be numbers', isError: true };
+    const ps = [
+      // no here-strings (they break in -Command inline mode); use a single C# line
+      "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetCursorPos(int x, int y); [DllImport(\"user32.dll\")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, UIntPtr e);' -Name Win32M -Namespace W",
+      '[W.Win32M]::SetCursorPos(XVAL, YVAL)',
+      'Start-Sleep -Milliseconds 80',
+      '[W.Win32M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero)',
+      'Start-Sleep -Milliseconds 30',
+      '[W.Win32M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)',
+    ].join('; ').replace(/XVAL/g, String(x)).replace(/YVAL/g, String(y));
+    try {
+      const { execFile } = await import('node:child_process');
+      const { promisify: prom } = await import('node:util');
+      const r = await prom(execFile)('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 10_000, windowsHide: true });
+      return { output: 'clicked at ' + x + ',' + y + ' - now screenshot to verify' };
+    } catch (err) {
+      return { output: 'click failed: ' + String(err).slice(0, 200), isError: true };
+    }
+  },
+};
+
+export const desktopTypeTool: Tool = {
+  name: 'desktop_type',
+  description:
+    'Type text (or a key combo like ENTER, TAB, ^a, {F5}) into the focused window. Use after desktop_click to focus a field. Standard SendKeys syntax.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'text to type, or SendKeys combo (ENTER, TAB, ESC, ^a, +{TAB}, {DOWN})' },
+    },
+    required: ['text'],
+  },
+  needsApproval: () => true,
+  async execute(args) {
+    if (process.platform !== 'win32') return { output: 'desktop_type supports Windows only', isError: true };
+    const text = String(args.text ?? '');
+    if (!text) return { output: 'text required', isError: true };
+    const safe = text.replace(/'/g, "''").replace(/"/g, String.fromCharCode(34));
+    const ps = [
+      '$ws = New-Object -ComObject WScript.Shell',
+      'Start-Sleep -Milliseconds 50',
+      "$ws.SendKeys('TEXTVAL')",
+      '"typed"',
+    ].join('; ').replace(/TEXTVAL/g, safe);
+    try {
+      const { execFile } = await import('node:child_process');
+      const { promisify: prom } = await import('node:util');
+      await prom(execFile)('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 10_000, windowsHide: true });
+      return { output: 'typed: ' + text.slice(0, 40) };
+    } catch (err) {
+      return { output: 'type failed: ' + String(err).slice(0, 200), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:
