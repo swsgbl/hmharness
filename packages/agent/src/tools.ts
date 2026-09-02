@@ -170,6 +170,47 @@ export const runCommandTool: Tool = {
   },
 };
 
+/** Zero-dependency web search: DuckDuckGo HTML endpoint, no API key. */
+export const webSearchTool: Tool = {
+  name: 'web_search',
+  description:
+    'Search the web (DuckDuckGo, no key). Returns top results as: title | url | snippet. Use for current events, docs, versions - anything not knowable offline.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'search query' },
+      count: { type: 'number', description: 'max results (default 6, max 10)' },
+    },
+    required: ['query'],
+  },
+  async execute(args) {
+    const q = String(args.query ?? '').trim();
+    if (!q) return { output: 'query required', isError: true };
+    const n = Math.min(Math.max(Number(args.count ?? 6), 1), 10);
+    try {
+      const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return { output: 'search: HTTP ' + res.status, isError: true };
+      const html = await res.text();
+      const out: string[] = [];
+      const re = new RegExp('class="result__a"[^>]*href="([^"]+)"[^>]*>([\\s\\S]*?)</a>[\\s\\S]*?class="result__snippet"[^>]*>([\\s\\S]*?)</a>', 'g');
+      let m: RegExpExecArray | null;
+      const strip = (t: string) => t.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+      while ((m = re.exec(html)) && out.length < n) {
+        let url = m[1];
+        const uddg = /uddg=([^&]+)/.exec(url);
+        if (uddg) { try { url = decodeURIComponent(uddg[1]); } catch { /* keep raw */ } }
+        out.push((out.length + 1) + '. ' + strip(m[2]) + ' | ' + url + ' | ' + strip(m[3]).slice(0, 200));
+      }
+      return { output: out.length ? out.join('\n') : 'no results (try a different query)' };
+    } catch (err) {
+      return { output: 'search failed: ' + String(err).slice(0, 160), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:

@@ -48,6 +48,9 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   let busy = false;
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
+  // cross-task conversation memory (Claude-Code-style continuous thread):
+  // every task resumes the working transcript, so follow-ups have context
+  let conversation: ChatMessage[] = [];
 
   // ---- workspaces: the agent's project contexts ----
   // A workspace is a project directory; switching one chdirs the server so
@@ -389,7 +392,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           json(res, 409, { error: 'a task is already running' });
           return;
         }
-        const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean; mode?: string };
+        const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean; mode?: string; fresh?: boolean };
         const text = String(body.text ?? '').trim();
         if (!text) {
           json(res, 400, { error: 'text required' });
@@ -406,11 +409,13 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         // Runs detached; every event fans out to all SSE clients.
         void (async () => {
           try {
-            await runAgentTask({
+            const resume = body.fresh === true ? [] : conversation;
+            const result = await runAgentTask({
               task: text,
               registry: reg,
               cfg,
               yes: body.yes === true,
+              resumeMessages: resume,
               approvalAsk: unattended ? undefined : (name, args) =>
                 new Promise<boolean>((resolve) => {
                   const timer = setTimeout(() => {
@@ -428,7 +433,11 @@ export async function startServer(opts: { port: number; host?: string }): Promis
                 onToolResult: (name, output, isError) =>
                   broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
                 onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
-                onFinal: (r) => broadcast('final', r),
+                onFinal: (r) => {
+                  // extend the cross-task thread: [..prior, user, ...new turns]
+                  conversation = [...resume, { role: 'user', content: text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
+                  broadcast('final', { ...r, turnsInThread: Math.floor(conversation.length / 2) });
+                },
               },
             });
           } catch (err) {

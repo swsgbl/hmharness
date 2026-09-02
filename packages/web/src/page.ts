@@ -168,6 +168,10 @@ export const PAGE = `<!doctype html>
   .toolrow .st.ok { color:var(--ok); }
   .toolrow .nm { color:var(--accent); font-weight:600; }
   .toolres { color:var(--dim); font-family:var(--mono); font-size:12px; white-space:pre-wrap; margin-left:22px; border-left:2px solid var(--line); padding-left:8px; }
+  .toolfold { color:var(--dim); font-family:var(--mono); font-size:11.5px; margin-left:22px; cursor:pointer; padding:2px 6px; border-radius:6px; }
+  .toolfold:hover { background:var(--panel2); color:var(--text); }
+  .toolfold .tri { display:inline-block; transition:transform .12s; margin-right:5px; }
+  .toolfold.open .tri { transform:rotate(90deg); }
   .err { color:var(--err); }
   .stats { color:var(--dim); font-family:var(--mono); font-size:11.5px; border-top:1px dashed var(--line); margin-top:10px; padding-top:6px; }
   #tobot { position:absolute; right:32px; bottom:130px; display:none; }
@@ -1073,8 +1077,25 @@ export const PAGE = `<!doctype html>
     for (var k in toolRegistry) {
       if (toolRegistry[k].name === d.name && toolRegistry[k].output === '') { toolRegistry[k].output = d.full || d.preview || ''; break; }
     }
-    var prev = String(d.preview).slice(0, d.isError ? 160 : 120).split('\\n').join(' ');
-    el('div', d.isError ? 'toolres err' : 'toolres', prev);
+    // human-first: raw tool output folds to one line; click to inspect
+    var fold = document.createElement('div');
+    fold.className = 'toolfold' + (d.isError ? ' err' : '');
+    var tri = document.createElement('span'); tri.className = 'tri'; tri.textContent = '\u25B8';
+    var lab = document.createElement('span');
+    var pv = String(d.preview).replace(/\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
+    lab.textContent = pv || '(done)';
+    fold.appendChild(tri); fold.appendChild(lab);
+    var body = null;
+    fold.onclick = function () {
+      fold.classList.toggle('open');
+      if (!body) {
+        body = document.createElement('div');
+        body.className = d.isError ? 'toolres err' : 'toolres';
+        body.textContent = d.full || d.preview || '';
+        fold.after(body);
+      } else { body.style.display = body.style.display === 'none' ? '' : 'none'; }
+    };
+    log.appendChild(fold);
     autoscroll();
   });
   es.addEventListener('approvalReq', function (e) {
