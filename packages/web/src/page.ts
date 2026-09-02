@@ -559,7 +559,10 @@ export const PAGE = `<!doctype html>
     if (b) document.getElementById('rs-text').textContent = L.running;
     document.title = b ? '\\u25CF ' + L.running : L.title;
     document.getElementById('send').disabled = b;
-    document.getElementById('input').disabled = b;
+    var input = document.getElementById('input');
+    input.disabled = b;
+    // visual cue that typing is parked while the agent runs (content kept)
+    input.style.opacity = b ? '.55' : '';
   }
 
   function renderState(s) {
