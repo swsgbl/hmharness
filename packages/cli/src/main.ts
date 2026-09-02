@@ -261,6 +261,7 @@ function makeCaseRunner(): CaseRunner {
     reg.registerAll(baseTools).registerAll(harmonyTools);
     const system = buildSystemPrompt({
       cwd: process.cwd(),
+      home: homeDir(),
       memory: '',
       skills: skillsPrompt,
       insights: '',

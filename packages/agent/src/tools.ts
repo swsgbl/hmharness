@@ -5,7 +5,7 @@
  * guard on obviously destructive one-liners; approvals live in the kernel.
  */
 import { exec } from 'node:child_process';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool } from '@hmh/kernel';
@@ -58,8 +58,15 @@ export const writeFileTool: Tool = {
   async execute(args, ctx) {
     try {
       const p = safePath(String(args.path), ctx.cwd);
+      // the agent overwriting its own live config is high-blast-radius:
+      // snapshot first so a bad rewrite is one copy away from recovery
+      let backupNote = '';
+      if (p === join(ctx.home, 'config.json')) {
+        const bak = p + '.bak-' + new Date().toISOString().replace(/[:.]/g, '-');
+        await copyFile(p, bak).then(() => { backupNote = ` (backup: ${bak})`; }).catch(() => { /* first write */ });
+      }
       await writeFile(p, String(args.content ?? ''), 'utf8');
-      return { output: `wrote ${String(args.content ?? '').length} chars to ${p}` };
+      return { output: `wrote ${String(args.content ?? '').length} chars to ${p}${backupNote}` };
     } catch (err) {
       return { output: String(err), isError: true };
     }

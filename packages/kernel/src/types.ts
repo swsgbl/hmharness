@@ -167,6 +167,29 @@ export async function detectLocalProviders(cfg: HmhConfig, readFileFn: typeof im
     // presets are intentionally NOT auto-added (caller opts in by hand)
     if (p.envVar && process.env[p.envVar]) found.push(p);
   }
+  // local OpenAI-compatible gateways: an env key plus a live /v1/models on a
+  // common loopback port (e.g. freellmapi on 3002, ollama on 11434)
+  for (const [envVar, ports] of [
+    ['FREELLM_API_KEY', [3002, 8080]],
+    ['OPENAI_COMPAT_API_KEY', [8080, 3000]],
+  ] as const) {
+    if (!process.env[envVar] || found.some((x) => x.name === envVar.toLowerCase().replace('_api_key', ''))) continue;
+    for (const port of ports) {
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
+          headers: { Authorization: `Bearer ${process.env[envVar]}` },
+          signal: AbortSignal.timeout(800),
+        });
+        if (!r.ok) continue;
+        const d = (await r.json()) as { data?: Array<{ id?: string }> };
+        const model = d.data?.[0]?.id ?? 'auto';
+        found.push({ name: envVar.toLowerCase().replace('_api_key', ''), baseUrl: `http://127.0.0.1:${port}/v1`, envVar: `(local gateway, key from ${envVar})`, model });
+        break;
+      } catch {
+        /* port closed - try next */
+      }
+    }
+  }
   // opencode config carries provider ids + baseURLs + models
   try {
     const { homedir } = await import('node:os');

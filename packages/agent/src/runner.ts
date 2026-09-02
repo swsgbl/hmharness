@@ -23,7 +23,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmh/kernel';
-import { listSkills, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
+import { appendMemory, listSkills, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
 import { opsTools } from '@hmh/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -162,6 +162,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
 
   const system = buildSystemPrompt({
     cwd: ctx.cwd,
+    home: ctx.home,
     memory: pack.memory,
     skills: pack.skills,
     insights: pack.insights,
@@ -188,6 +189,10 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   ];
 
   const toolsUsed: string[] = [];
+  // self-noted failure patterns: 2+ errors from one tool become a memory
+  // note, so the NEXT session starts knowing what broke this one (the
+  // self-evolution loop's missing per-session feedback channel)
+  const toolErrors = new Map<string, string[]>();
   const result = await runLoop({
     provider: resolveProvider(cfg, 'chat'),
     registry: opts.registry,
@@ -203,6 +208,11 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         events.onToolCall?.(name, args);
       },
       onToolResult: (name, output, isError) => {
+        if (isError) {
+          const list = toolErrors.get(name) ?? [];
+          list.push(output.split('\n')[0].slice(0, 120));
+          toolErrors.set(name, list);
+        }
         void session.tool(name, output, isError);
         events.onToolResult?.(name, output, isError);
       },
@@ -215,6 +225,19 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       },
     },
   });
+
+  // distill repeated tool failures into long-term memory (dedup by tool name)
+  try {
+    for (const [name, errs] of toolErrors) {
+      if (errs.length < 2) continue;
+      const notes = await readNotes(ctx.home);
+      const last = notes.slice(-40).map((n) => n.text).join('\n');
+      if (last.includes(`[self-note] tool ${name}`)) continue;
+      await appendMemory(ctx.home, `[self-note] tool ${name} failed ${errs.length}x in one session; samples: ${[...new Set(errs)].slice(0, 2).join(' | ')}`);
+    }
+  } catch {
+    /* memory is best-effort; never fail the task on it */
+  }
 
   await session.final(result.text, result.turns, result.toolUses);
   await recordInsight(ctx.home, {
