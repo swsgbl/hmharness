@@ -371,6 +371,50 @@ export const desktopTypeTool: Tool = {
   },
 };
 
+/** Browser automation, first-class entry point: open a URL in the user's
+ *  default browser (visible window), then drive it with the desktop triad:
+ *  desktop_screenshot + see_image to LOOK, desktop_click/desktop_type to
+ *  ACT, desktop_screenshot again to VERIFY. This sees-plan-act loop works
+ *  with any browser and any page (full JS rendering, login states, CAPTCHAs
+ *  - everything a real user sees). Headless alternatives (--dump-dom etc)
+ *  are unreliable on Windows; the visible browser is the honest primitive.
+ */
+export const browserOpenTool: Tool = {
+  name: 'browser_open',
+  description:
+    'Open a URL in the user\'s default browser (visible). Then use desktop_screenshot + see_image to see the page, desktop_click/desktop_type to interact. Full workflow: browser_open → desktop_screenshot → see_image (find elements) → desktop_click (click) → desktop_screenshot (verify).',
+  parameters: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'http(s) URL to open' },
+    },
+    required: ['url'],
+  },
+  needsApproval: () => true,
+  async execute(args) {
+    const url = String(args.url ?? '').trim();
+    if (!/^https?:\/\//i.test(url)) return { output: 'only http(s) URLs', isError: true };
+    try {
+      if (process.platform === 'win32') {
+        const { execFile } = await import('node:child_process');
+        const { promisify: prom } = await import('node:util');
+        await prom(execFile)('cmd.exe', ['/c', 'start', '', url], { timeout: 8000, windowsHide: true });
+      } else if (process.platform === 'darwin') {
+        const { execFile } = await import('node:child_process');
+        const { promisify: prom } = await import('node:util');
+        await prom(execFile)('open', [url], { timeout: 8000 });
+      } else {
+        const { execFile } = await import('node:child_process');
+        const { promisify: prom } = await import('node:util');
+        await prom(execFile)('xdg-open', [url], { timeout: 8000 });
+      }
+      return { output: 'opened ' + url + ' in the default browser. Wait ~2s for load, then desktop_screenshot + see_image to see the page.' };
+    } catch (err) {
+      return { output: 'open failed: ' + String(err).slice(0, 160), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:
