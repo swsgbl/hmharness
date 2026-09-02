@@ -389,14 +389,15 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           json(res, 409, { error: 'a task is already running' });
           return;
         }
-        const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean };
+        const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean; mode?: string };
         const text = String(body.text ?? '').trim();
         if (!text) {
           json(res, 400, { error: 'text required' });
           return;
         }
+        const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
         busy = true;
-        broadcast('busy', { busy: true, task: text });
+        broadcast('busy', { busy: true, task: text, mode });
         json(res, 200, { ok: true });
         // auto/yolo tasks must not wire the remote approval prompt at all -
         // the remote gate used to override the yes flag unconditionally,

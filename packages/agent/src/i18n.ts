@@ -30,6 +30,7 @@ export interface Strings {
   idle: string;
   running: string;
   modeYolo: string;
+  modeAutoShort: string;
   send: string;
   approve: string;
   deny: string;
@@ -106,6 +107,7 @@ const zh: Strings = {
   idle: '空闲',
   running: '运行中…',
   modeYolo: '🔥 YOLO(全自动)',
+  modeAutoShort: '自动',
   send: '运行',
   approve: '批准',
   deny: '拒绝',
@@ -180,6 +182,7 @@ const en: Strings = {
   idle: 'idle',
   running: 'running…',
   modeYolo: '🔥 YOLO (hands-free)',
+  modeAutoShort: 'auto',
   send: 'Run',
   approve: 'Approve',
   deny: 'Deny',

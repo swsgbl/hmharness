@@ -197,6 +197,7 @@ export const PAGE = `<!doctype html>
   #runstatus { display:none; align-items:center; gap:8px; padding:2px 2px 8px; color:var(--warn); font-size:12.5px; }
   #runstatus.on { display:flex; }
   #rs-spin { display:inline-block; animation:rsspin 1.1s linear infinite; color:var(--warn); font-size:14px; }
+  #runstatus.yolo #rs-text { color:var(--err); font-weight:600; }
   @keyframes rsspin { to { transform:rotate(360deg); } }
   #approval { display:none; background:#2a2313; border:1px solid var(--warn); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
   #approval.pulse { animation:pulse 1.2s ease-in-out infinite; }
@@ -553,10 +554,16 @@ export const PAGE = `<!doctype html>
       finalize: function () { e.innerHTML = mdLite(txt); lastAssistantText = txt; autoscroll(); }
     };
   }
-  function setBusy(b) {
+  function setBusy(b, mode) {
     var rs = document.getElementById('runstatus');
     rs.classList.toggle('on', b);
-    if (b) document.getElementById('rs-text').textContent = L.running;
+    if (b) {
+      var tag = mode === 'yolo' ? '\\uD83D\\uDD25 YOLO' : mode === 'auto' ? '\\u26A1 ' + (L ? L.modeAutoShort : 'auto') : '';
+      document.getElementById('rs-text').textContent = L.running + (tag ? ' \\u00B7 ' + tag : '');
+      rs.classList.toggle('yolo', mode === 'yolo');
+    } else {
+      rs.classList.remove('yolo');
+    }
     document.title = b ? '\\u25CF ' + L.running : L.title;
     document.getElementById('send').disabled = b;
     var input = document.getElementById('input');
@@ -1019,7 +1026,7 @@ export const PAGE = `<!doctype html>
   es.addEventListener('state', function (e) { renderState(JSON.parse(e.data)); });
   es.addEventListener('busy', function (e) {
     var d = JSON.parse(e.data);
-    setBusy(d.busy);
+    setBusy(d.busy, d.mode);
     flushStream();
     if (d.busy) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
   });
@@ -1134,7 +1141,7 @@ export const PAGE = `<!doctype html>
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, yes: document.getElementById('mode').value !== 'ask' })
+      body: JSON.stringify({ text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value })
     }).then(function (r) {
       if (r.status === 409) { clearEmpty(); switchView('chat'); el('div', 'err', L.alreadyRunning); }
       return r.json();
