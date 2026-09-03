@@ -489,9 +489,9 @@ export class TuiRuntime {
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
     const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
-    const headRight = this.busy
-      ? YELLOW(`${spin} ${this.status || '…'}`)
-      : GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
+    // header right shows idle+mode tag; busy state moved to the input-box
+    // status line (same place as the web UI - where the user's attention is)
+    const headRight = GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
     frame.push(truncateTo(headLeft + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(headLeft)) - strWidth(stripAnsi(headRight)))) + headRight, W));
     frame.push(DIM('─'.repeat(W)));
 
@@ -514,7 +514,8 @@ export class TuiRuntime {
       }
       return Math.min(n, Math.max(1, Math.floor(H / 2) - 3));
     })();
-    const viewH = Math.max(3, H - 4 - inputRows - approvalRows - cmdRows);
+    const statusRows = this.busy ? 1 : 0;
+    const viewH = Math.max(3, H - 4 - inputRows - approvalRows - cmdRows - statusRows);
     const start = Math.max(0, allLines.length - viewH - this.scrollFromBottom);
     const view = allLines.slice(start, start + viewH);
     for (let i = 0; i < viewH; i++) frame.push(i < view.length ? truncateTo(view[i], W) : '');
@@ -524,6 +525,12 @@ export class TuiRuntime {
       frame.push(YELLOW(this.t.tuiApproval) + ' ' + YELLOW(BOLD(this.approval.name)) + ' ' + DIM(truncateTo(argsTxt, Math.max(0, W - 24))));
       frame.push(`  [y] ${GREEN(this.t.tuiApprove)}   [n] ${RED(this.t.tuiDeny)}   ${DIM(this.t.tuiApprovalHint)}`);
       frame.push(DIM('─'.repeat(W)));
+    }
+
+    // busy status line right above the input box (same position as the web
+    // UI): spinning glyph + running text, hidden when idle. Claude Code logic.
+    if (this.busy) {
+      frame.push(YELLOW(`${spin} ${this.t.tuiRunning}${this.status && this.status !== this.t.tuiRunning ? ' · ' + DIM(this.status) : ''}`));
     }
 
     // palette (slash commands or the /model picker): shows while the input
@@ -727,7 +734,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       if (!arg) {
         // bare /model: the palette opens as soon as you type the space -
         // listing here too for the transcript record
-        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM('/model <name> 切换 chat 路由'), 'plain');
+        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM(t.cmdModelHint), 'plain');
         return;
       }
       rt.setBusy(true, '/model');
@@ -737,9 +744,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         rt.addText(GREEN('✓') + ` chat → ${arg} · ${resolveProvider(cfg, 'chat').model}`);
       } catch (err) {
         const preset = PROVIDER_PRESETS.find((p) => p.name === arg);
-        rt.addText(preset
-          ? `${arg} 尚未配置 — 设置环境变量 ${preset.envVar || '(local)'} 后运行 /providers scan 添加`
-          : String(err), 'err');
+        rt.addText(preset ? t.cmdModelPreset(arg, preset.envVar || '(local)') : String(err), 'err');
       } finally {
         rt.setBusy(false);
       }
@@ -753,10 +758,10 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         if (line === '/providers') {
           rt.addText(found.length
             ? found.map((p) => `${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n' + DIM('/providers scan 将它们写入配置')
-            : DIM('未探测到新的本地厂商(环境变量/opencode 配置)'), 'plain');
+            : DIM(t.cmdProvidersListed), 'plain');
         } else {
           if (!found.length) {
-            rt.addText(DIM('未探测到新的厂商;已配置: ') + Object.keys(cfg.providers ?? {}).join(', '), 'plain');
+            rt.addText(DIM(t.cmdProvidersNone) + Object.keys(cfg.providers ?? {}).join(', '), 'plain');
           } else {
             const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
             cfg = r.cfg;
@@ -774,8 +779,8 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/mouse') {
       const on = rt.toggleMouse();
       rt.addText(on
-        ? '鼠标上报兜底: 已开启(滚轮直接控制翻页;此模式下拖选暂不可用,再按 /mouse 关闭恢复)'
-        : '鼠标上报兜底: 已关闭(终端原生拖选复制;滚轮由终端转为 ↑↓ 翻页)', 'dim');
+        ? t.cmdMouseOn
+        : t.cmdMouseOff, 'dim');
       return;
     }
     if (line === '/ops') {

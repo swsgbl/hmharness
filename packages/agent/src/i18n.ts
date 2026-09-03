@@ -59,6 +59,16 @@ export interface Strings {
   thinking: string;
   /** final label after thinking folds away (TUI) */
   thought: string;
+  /** busy spinner text, shown in the input-box status line (TUI) */
+  tuiRunning: string;
+  /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
+  cmdModelHint: string;
+  cmdModelPreset: (name: string, envVar: string) => string;
+  cmdProvidersListed: string;
+  cmdProvidersNone: string;
+  cmdProvidersAdded: (n: number, names: string) => string;
+  cmdMouseOn: string;
+  cmdMouseOff: string;
   tuiScrolled: string;
   tuiIdle: string;
   tuiWebHint: string;
@@ -140,6 +150,14 @@ const zh: Strings = {
   mouseOff: '关滚轮接管',
   thinking: '思考中',
   thought: '已完成思考',
+  tuiRunning: '运行中…',
+  cmdModelHint: '切换 chat 路由: /model <name>',
+  cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
+  cmdProvidersListed: '未探测到新的本地厂商(环境变量/opencode 配置)',
+  cmdProvidersNone: '未探测到新的厂商;已配置: ',
+  cmdProvidersAdded: (n, names) => `已添加 ${n} 个厂商: ${names} — /model <name> 启用`,
+  cmdMouseOn: '鼠标上报兜底: 已开启(滚轮直接控制翻页;此模式下拖选暂不可用,再按 /mouse 关闭恢复)',
+  cmdMouseOff: '鼠标上报兜底: 已关闭(终端原生拖选复制;滚轮由终端转为 ↑↓ 翻页)',
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiIdle: '○ 空闲',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
@@ -220,6 +238,14 @@ const en: Strings = {
   mouseOff: 'release wheel',
   thinking: 'thinking',
   thought: 'thought (done)',
+  tuiRunning: 'running…',
+  cmdModelHint: 'switch chat route: /model <name>',
+  cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,
+  cmdProvidersListed: 'no new local providers detected (env vars / opencode config)',
+  cmdProvidersNone: 'no new providers found; configured: ',
+  cmdProvidersAdded: (n, names) => `added ${n} providers: ${names} - enable via /model <name>`,
+  cmdMouseOn: 'mouse fallback: ON (wheel scrolls directly; drag-select unavailable while on; /mouse to toggle)',
+  cmdMouseOff: 'mouse fallback: OFF (native drag-select restored; wheel maps to arrows)',
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiIdle: '○ idle',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
