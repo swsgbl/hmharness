@@ -176,6 +176,26 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
+  /** Focus the /model picker (used by the bare `/model` command so the
+   *  printed list is never a dead end - the live palette opens on it). */
+  openModelPicker(): void {
+    this.input = '/model ';
+    this.caret = this.input.length;
+    this.cmdIdx = 0;
+    this.dirty = true;
+  }
+
+  /** Introspection probe for headless tests: input line, palette rows and
+   *  the highlighted row index. */
+  paletteProbe(): { input: string; rows: string[]; selected: number } {
+    const rows = this.panelItems(this.input);
+    return {
+      input: this.input,
+      rows: rows.map((r) => r.name),
+      selected: rows.length ? Math.min(this.cmdIdx, rows.length - 1) : -1,
+    };
+  }
+
   setModeTag(tag: string): void {
     this.modeTag = tag;
     this.dirty = true;
@@ -343,6 +363,15 @@ export class TuiRuntime {
     // motion - still belongs to the terminal's native selection.
     const wheel = parseWheel(data);
     if (wheel !== 0) {
+      // an open palette takes the wheel: it moves the selection (the list
+      // is what the user is driving), the transcript only scrolls when the
+      // palette is closed
+      const hits = this.panelItems(this.input);
+      if (hits.length) {
+        this.cmdIdx = Math.max(0, Math.min(hits.length - 1, this.cmdIdx + wheel));
+        this.dirty = true;
+        return;
+      }
       // wheel-up (-1) moves the viewport UP, i.e. further from the bottom
       this.scrollFromBottom = Math.max(0, Math.min(this.totalLines(), this.scrollFromBottom - wheel * 3));
       this.dirty = true;
@@ -369,7 +398,21 @@ export class TuiRuntime {
       this.dirty = true;
       return;
     }
+    if (data === '\x1b') {
+      // Esc closes an open palette / discards the draft. Exact-match only:
+      // arrow sequences arrive as one chunk ('\x1b[A') and never match.
+      if (this.input) { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; }
+      return;
+    }
     if (data === '\r') {
+      // bare '/model' + Enter OPENS the picker instead of running row 0 -
+      // Claude Code's two-stage flow: Enter shows the dialog, arrows/wheel
+      // move, a second Enter confirms the highlighted row. The old behavior
+      // silently switched to the first model on the very first Enter.
+      if (this.input === '/model') {
+        this.openModelPicker();
+        return;
+      }
       // palette is open: Enter runs the highlighted row (a command, or a
       // /model target), not the raw input
       const hits = this.panelItems(this.input);
@@ -467,7 +510,6 @@ export class TuiRuntime {
     if (data === '\x1b[6~') { this.scrollFromBottom = Math.max(0, this.scrollFromBottom - 10); this.dirty = true; return; }
     if (data === '\x1b[H') { this.scrollFromBottom = 100000; this.dirty = true; return; }
     if (data === '\x1b[F') { this.scrollFromBottom = 0; this.dirty = true; return; }
-    if (data === '\x1b') { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; return; }
     if (data === '\x0c') { this.dirty = true; return; }
     if (data.startsWith('\x1b') || data < ' ') return;
 
@@ -498,7 +540,8 @@ export class TuiRuntime {
     const allLines: string[] = [];
     for (const e of this.entries) allLines.push(...e.lines);
     const cmdHits = this.panelItems(this.input);
-    const cmdRows = cmdHits.length ? Math.min(cmdHits.length, 6) : 0;
+    // +1: the palette's dim key-hint footer row shares the layout budget
+    const cmdRows = cmdHits.length ? Math.min(cmdHits.length, 6) + 1 : 0;
     const approvalRows = this.approval ? 3 : 0;
     // the input box grows with wrapped content: rows + 2 border lines + 1
     // status line. Cap it at half the screen so the transcript keeps room;
@@ -535,15 +578,18 @@ export class TuiRuntime {
 
     // palette (slash commands or the /model picker): shows while the input
     // starts with '/'; arrows move the selection (scrolling 6-row window),
-    // Enter/Tab run/complete the highlighted row
+    // Enter/Tab run/complete the highlighted row; the last palette line is
+    // a dim key hint so the picker is discoverable without reading docs
     if (cmdRows) {
-      const from = Math.max(0, Math.min(this.cmdIdx - 5, cmdHits.length - 6));
-      for (let i = 0; i < cmdRows; i++) {
+      const dataRows = Math.min(cmdHits.length, 6);
+      const from = Math.max(0, Math.min(this.cmdIdx - 5, cmdHits.length - dataRows));
+      for (let i = 0; i < dataRows; i++) {
         const gi = from + i;
         const c = cmdHits[gi];
         const sel = gi === this.cmdIdx;
         frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(truncateTo(c.desc, 46)), W - 1));
       }
+      frame.push(DIM(truncateTo('  ' + this.t.panelHint, W - 1)));
     }
 
     // input box: width-aware auto-wrap. The old render sliced the input by
@@ -732,9 +778,11 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/model' || line.startsWith('/model ')) {
       const arg = line.slice(7).trim();
       if (!arg) {
-        // bare /model: the palette opens as soon as you type the space -
-        // listing here too for the transcript record
-        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM(t.cmdModelHint), 'plain');
+        // bare /model: keep the transcript record, then focus the LIVE
+        // picker on it - the static list alone was a dead end (nothing in
+        // it was selectable; arrows scrolled the transcript instead)
+        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM(t.panelHint), 'plain');
+        rt.openModelPicker();
         return;
       }
       rt.setBusy(true, '/model');

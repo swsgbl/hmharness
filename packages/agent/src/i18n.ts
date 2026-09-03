@@ -63,6 +63,8 @@ export interface Strings {
   tuiRunning: string;
   /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
   cmdModelHint: string;
+  /** palette footer key hint: how to drive the slash/model picker (TUI) */
+  panelHint: string;
   cmdModelPreset: (name: string, envVar: string) => string;
   cmdProvidersListed: string;
   cmdProvidersNone: string;
@@ -152,6 +154,7 @@ const zh: Strings = {
   thought: '已完成思考',
   tuiRunning: '运行中…',
   cmdModelHint: '切换 chat 路由: /model <name>',
+  panelHint: '↑↓ 或滚轮选择 · Enter 确认 · Esc 关闭',
   cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
   cmdProvidersListed: '未探测到新的本地厂商(环境变量/opencode 配置)',
   cmdProvidersNone: '未探测到新的厂商;已配置: ',
@@ -169,7 +172,7 @@ const zh: Strings = {
   cmdHelp: '命令帮助',
   cmdTools: '已注册工具(gated 标记)',
   cmdSkills: '技能库(启用 + 草稿)',
-  cmdModel: '列出/切换模型路由(/model <name>)',
+  cmdModel: '切换模型路由(输入 /model 回车打开选择面板)',
   cmdYolo: '切换全自动 YOLO(/yolo on|off;危险命令仍硬拒)',
   yoloOn: '🔥 YOLO 已开启:后续任务全自动,不再弹审批(破坏性命令仍硬拒)',
   yoloOff: '🔒 已回到审批询问模式',
@@ -240,6 +243,7 @@ const en: Strings = {
   thought: 'thought (done)',
   tuiRunning: 'running…',
   cmdModelHint: 'switch chat route: /model <name>',
+  panelHint: '↑↓ or wheel to select · Enter to confirm · Esc to close',
   cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,
   cmdProvidersListed: 'no new local providers detected (env vars / opencode config)',
   cmdProvidersNone: 'no new providers found; configured: ',
@@ -257,7 +261,7 @@ const en: Strings = {
   cmdHelp: 'command help',
   cmdTools: 'registered tools (gated marked)',
   cmdSkills: 'skill library (active + drafts)',
-  cmdModel: 'list/switch model route (/model <name>)',
+  cmdModel: 'switch model route (type /model + Enter opens the picker)',
   cmdYolo: 'toggle hands-free YOLO (/yolo on|off; destructive hard-deny stays)',
   yoloOn: '🔥 YOLO on: tasks run unattended, no approval cards (destructive hard-deny stays)',
   yoloOff: '🔒 back to ask-approval mode',

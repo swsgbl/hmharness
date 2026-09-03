@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-09-04 · TUI /model 选择器交互修复轮
+
+**动机**:用户实测反馈"tui 界面的 /model 列出来的模型列表,上下键无法选择,用鼠标
+也选中不了"。截图取证(输入框为空、模型列表是转录区普通文本)定位真相:代码逻辑
+无 bug(无头 5/5 PASS),用户走进的是**裸 `/model` 命令打印的静态列表死路**——该列表
+纯文本、无可选项;活面板只在输入含 `/model…` 时存在,命令跑完输入清空,面板就没了。
+另有暗雷:输入 `/model` 直接回车会**静默切到第一个模型**(Enter 语义过急)。
+
+**落地**(tui.ts / i18n.ts,对标 Claude Code 两段式选择器):
+- 裸 `/model`+Enter **打开交互选择器**而非打印死列表(转录留记录+聚焦活面板,
+  openModelPicker);`/model <name>` 手输路径不变
+- Enter 语义分层:输入恰为 `/model` → 开面板不执行;`/model `(已进面板)或带过滤
+  词 → 选中高亮行并执行。第一记 Enter 不再误切模型
+- **Esc 关闭面板**(清草稿;精确匹配 `\x1b`,箭头序列不受扰;顺手删除了 onKey 尾部
+  重复的旧 Esc 分支)
+- **滚轮优先驱动面板**:面板开着时 SGR 滚轮事件移动选择(此前滚轮只滚转录,面板
+  视若无睹);面板关着仍滚转录
+- 面板底部常驻 **i18n 提示行** `panelHint`(↑↓/滚轮选择·Enter 确认·Esc 关闭,
+  zh/en 双语),选择器从此无需看文档即可上手;cmdModel 描述同步改写
+- 布局账本:提示行计入 cmdRows(+1),viewH 同步,转录不被挤爆
+
+**实测**(tui.test.ts 新增 5 个 runtime 级用例,真 stdin data 接线喂键,非 mock):
+裸 /model+Enter 不触发命令且聚焦面板 ✓;↓↓+第二记 Enter 提交
+`/model nvidia-vision` ✓;SGR 滚轮上下移动选择 ✓;Esc 清空 ✓;斜杠命令面板
+`/m`+Enter 仍取 COMMANDS 序首项(实测序为 /model,顺带发现其提交即路由进选择器,
+行为自洽)✓。全仓 43/43 绿,typecheck+七包构建+dist 冒烟(skills/no-TTY 双语)过。
+
+**教训**:①"代码正确"≠"用户可达"——活面板逻辑全对,但一条静态列表死路就把用户
+挡在门外;交互入口必须收敛到单一活物;②Windows ACL 坑:某次提权进程构建出的
+dist/patches.* 带 Users:RX-only 继承 ACE,普通 shell 下 rename 可行而 delete/open-write
+EPERM——绕行(改名让路+重建),根因留 elevated 清理;③npm 在本机 shell 偶发
+"Invalid abbreviated flag"启动失败,直跑 tsc/`node --import tsx --test` 稳定。
+
+---
+
 ## 2026-09-03 · 代码级自进化轮(DGM 桥)
 
 **动机**:用户深度质问"自进化是各 agent 互相改底层代码,还是仅在提示词层面做文章?"
