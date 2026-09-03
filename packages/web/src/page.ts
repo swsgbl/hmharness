@@ -396,6 +396,7 @@ export const PAGE = `<!doctype html>
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
           modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
+          sesRename:'重命名', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
@@ -413,6 +414,7 @@ export const PAGE = `<!doctype html>
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
           modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
+          sesRename:'Rename', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
           wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped' }
@@ -956,7 +958,7 @@ export const PAGE = `<!doctype html>
       x.onclick = function (ev) { ev.stopPropagation(); fn(); };
       return x;
     }
-    acts.appendChild(mk('\\u270E', '', 'rename', function () {
+    acts.appendChild(mk('\\u270E', '', L ? L.sesRename : 'rename', function () {
       var input = document.createElement('input');
       input.className = 'ren';
       input.value = s.title || s.task || '';
@@ -973,11 +975,11 @@ export const PAGE = `<!doctype html>
         if (ev.key === 'Escape') loadSessions();
       };
     }));
-    acts.appendChild(mk('\\uD83D\\uDCE5', '', 'archive', function () {
+    acts.appendChild(mk('\\uD83D\\uDCE5', '', L ? L.sesArchive : 'archive', function () {
       fetch('/api/sessions/' + encodeURIComponent(s.id) + '/archive', { method: 'POST' }).then(function () { loadSessions(); });
     }));
-    acts.appendChild(mk('\\uD83D\\uDDD1', 'del', 'delete', function () {
-      if (!window.confirm('\\u5220\\u9664\\u8BE5\\u4F1A\\u8BDD\\uFF1F\\uFF08\\u53EF\\u4ECE sessions/trash \\u6062\\u590D\\uFF09')) return;
+    acts.appendChild(mk('\\uD83D\\uDDD1', 'del', L ? L.sesDelete : 'delete', function () {
+      if (!window.confirm(L ? L.sesConfirmDel : 'delete?')) return;
       fetch('/api/sessions/' + encodeURIComponent(s.id) + '/delete', { method: 'POST' }).then(function () { loadSessions(); });
     }));
     b.appendChild(acts);
