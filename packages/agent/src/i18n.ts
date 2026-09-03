@@ -55,6 +55,10 @@ export interface Strings {
   tuiApprovalHint: string;
   tuiHints: string;
   mouseOff: string;
+  /** live label while the model thinks (TUI) */
+  thinking: string;
+  /** final label after thinking folds away (TUI) */
+  thought: string;
   tuiScrolled: string;
   tuiIdle: string;
   tuiWebHint: string;
@@ -134,6 +138,8 @@ const zh: Strings = {
   tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
   tuiHints: 'enter 发送 · 滚轮/↑↓ 翻页 · ^P/^N 历史 · esc 清空 · 拖选复制 · ^C 退出 · /help',
   mouseOff: '关滚轮接管',
+  thinking: '思考中',
+  thought: '已完成思考',
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiIdle: '○ 空闲',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
@@ -212,6 +218,8 @@ const en: Strings = {
   tuiApprovalHint: 'enter/y approve · esc/n deny',
   tuiHints: 'enter send · wheel/arrows scroll · ^P/^N history · esc clear · drag to copy · ^C quit · /help',
   mouseOff: 'release wheel',
+  thinking: 'thinking',
+  thought: 'thought (done)',
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiIdle: '○ idle',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',

@@ -248,9 +248,18 @@ export class TuiRuntime {
     let buf = kind === 'think' ? '∴ ' : '';
     const entry: Entry = { lines };
     const repaint = () => {
-      const wrapped = wrapTo(buf, width);
-      lines.length = 0;
-      wrapped.forEach((l, i) => lines.push(kind === 'think' ? DIM(l) : l));
+      if (kind === 'say') {
+        const wrapped = wrapTo(buf, width);
+        lines.length = 0;
+        wrapped.forEach((l) => lines.push(l));
+      } else {
+        // thinking stays FOLDED while streaming: one live line (what Claude
+        // Code shows), never the raw chain-of-thought - it is model-internal
+        // planning, not user-facing output, and it swamped the transcript
+        lines.length = 0;
+        const tail = buf.replace(/\s+/g, ' ').trim();
+        lines.push(DIM('∴ ' + this.t.thinking + (tail ? ' · ' + tail.slice(-width + 18) : '…')));
+      }
       this.dirty = true;
     };
     repaint();
@@ -260,6 +269,20 @@ export class TuiRuntime {
       buf += chunk;
       repaint();
     };
+  }
+
+  /** Collapse a streamed thinking block to its final folded summary line. */
+  foldThinking(): void {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i];
+      const isThinking = e.lines.length === 1 && /^\x1b\[2m∴ /.test(e.lines[0]);
+      if (isThinking) {
+        e.lines.length = 0;
+        e.lines.push(DIM('∴ ' + this.t.thought));
+        this.dirty = true;
+        return;
+      }
+    }
   }
 
   setBusy(busy: boolean, label = ''): void {
@@ -837,12 +860,16 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         resumeMessages: history,
         approvalAsk: (name, args) => rt.requestApproval(name, args),
         events: {
-          onLine: (l) => { appender = null; kind = null; rt.addText(l, 'dim'); },
+          onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
           onDelta: (k, chunk) => {
-            if (k !== kind) { appender = rt.startStream(k === 'reasoning' ? 'think' : 'say'); kind = k; }
+            if (k !== kind) {
+              if (kind === 'reasoning') rt.foldThinking(); // collapse before the next phase
+              appender = rt.startStream(k === 'reasoning' ? 'think' : 'say'); kind = k;
+            }
             appender?.(chunk);
           },
           onToolCall: (name, args) => {
+            if (kind === 'reasoning') rt.foldThinking();
             appender = null; kind = null;
             rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(JSON.stringify(args).slice(0, 100))}`);
           },
