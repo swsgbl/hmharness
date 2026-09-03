@@ -75,6 +75,9 @@ export interface HmhConfig {
   maxContextChars?: number;
   /** MCP servers whose tools are projected into the registry at startup. */
   mcpServers?: Record<string, McpServerImport>;
+  /** SSH hosts the agent may operate (name -> {host,user,port,keyPath}).
+   *  Secrets stay in HMH_HOME; the ssh_run tool reads them from here. */
+  sshHosts?: Record<string, { host: string; user: string; port?: number; keyPath?: string }>;
   /** Vision-capable provider for see_image (any OpenAI-compatible endpoint). */
   vision?: ProviderConfig;
   /** Tried in order after `vision` fails (multi-provider resilience). */

@@ -116,6 +116,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       approvalPending: pendingApproval !== null,
       workspace: currentWs() ?? null,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
+      sshHosts: Object.entries(cfg.sshHosts ?? {}).map(([name, h]) => ({ name, host: h.host, user: h.user, port: h.port ?? 22 })),
       providerPresets: PROVIDER_PRESETS
         .filter((p) => !cfg.providers?.[p.name])
         .map((p) => ({ name: p.name, model: p.model, envVar: p.envVar, local: p.envVar === '' })),
@@ -499,6 +500,42 @@ export async function startServer(opts: { port: number; host?: string }): Promis
             broadcast('state', await stateObject());
           }
         })();
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/ssh') {
+        // proxy a remote command: the browser never sees keys or the ssh
+        // binary - the server resolves the configured host and runs ssh.
+        // Read-only probes pass; anything else needs ?approve=1 from the
+        // client-side approval flow (same gate discipline as tools).
+        const body = JSON.parse((await readBody(req)) || '{}') as { host?: string; command?: string; approve?: boolean };
+        const hosts = cfg.sshHosts ?? {};
+        const h = hosts[String(body.host ?? '')];
+        if (!h) { json(res, 404, { error: 'unknown host', configured: Object.keys(hosts) }); return; }
+        const command = String(body.command ?? '').trim();
+        if (!command) { json(res, 400, { error: 'command required' }); return; }
+        // read-only probes: allow && / ; -chained probes when every segment
+        // starts with a probe verb and none writes
+        const segments = command.split(/&&|\|\||;|(?<!\|)\|/).map((x) => x.trim()).filter(Boolean);
+        const allProbes = segments.length > 0 && segments.every((seg) => /^(ls|cat|head|tail|df|du|free|uptime|whoami|hostname|uname|systemctl (status|list-units)|ps|grep|find|wc|date|echo|id)\b/.test(seg));
+        const writes = /rm\b|mv\b|dd\b|mkfs|reboot|shutdown|kill|systemctl (start|stop|restart)|apt|yum|tee\b|>>|>(?!\s*&)/i;
+        if (!allProbes || writes.test(command)) {
+          if (body.approve !== true) { json(res, 403, { error: 'approval required', needsApproval: true }); return; }
+        }
+        try {
+          const { execFile } = await import('node:child_process');
+          const { promisify: prom } = await import('node:util');
+          const r = await prom(execFile)('ssh', [
+            '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=accept-new',
+            ...(h.keyPath ? ['-i', h.keyPath] : []),
+            '-p', String(h.port ?? 22),
+            (h.user ? h.user + '@' : '') + h.host,
+            command,
+          ], { timeout: 30_000, windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+          json(res, 200, { output: (String(r.stdout || '') + (r.stderr ? '\n[stderr]\n' + r.stderr : '')).trim().slice(0, 20_000) || '(no output)' });
+        } catch (err) {
+          const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
+          json(res, 400, { error: [e.stdout, e.stderr, e.killed ? '(timed out)' : e.message].filter(Boolean).join('\n').slice(0, 400) });
+        }
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/locale') {

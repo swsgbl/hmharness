@@ -200,6 +200,15 @@ export const PAGE = `<!doctype html>
   .devrow { display:flex; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; font-family:var(--mono); font-size:13px; }
   .devrow .st { color:var(--ok); }
   .devrow .kind { color:var(--dim); font-size:11.5px; margin-left:auto; }
+  .sshcard { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .sshcard .sshhead { display:flex; gap:10px; align-items:center; font-family:var(--mono); }
+  .sshcard .sshhead b { color:var(--accent); }
+  .sshcard .sshhead .st { color:var(--ok); font-size:12px; margin-left:auto; }
+  .sshcmd { display:flex; gap:8px; margin-top:10px; }
+  .sshcmd input { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font:13px var(--mono); outline:none; }
+  .sshcmd input:focus { border-color:var(--accent); }
+  .sshout { margin-top:10px; background:#0a0f14; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:var(--mono); font-size:12px; white-space:pre-wrap; max-height:280px; overflow-y:auto; }
+  .sshout .err { color:var(--err); }
   .skrow { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
   .skrow .nm { color:var(--accent); font-family:var(--mono); font-weight:600; }
   .skrow .ds { color:var(--dim); font-size:12.5px; margin-top:2px; }
@@ -244,6 +253,7 @@ export const PAGE = `<!doctype html>
       <button class="nav on" data-view="chat"><span class="ico">💬</span><span class="txt minhide">对话</span></button>
       <button class="nav" data-view="board"><span class="ico">🗒</span><span class="txt minhide">任务看板</span></button>
       <button class="nav" data-view="devices"><span class="ico">📟</span><span class="txt minhide">设备</span></button>
+      <button class="nav" data-view="ssh"><span class="ico">🖧</span><span class="txt minhide">SSH</span></button>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
     </nav>
     <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="添加工作区">＋</button></span></div>
@@ -297,6 +307,13 @@ export const PAGE = `<!doctype html>
     <div id="view-devices" class="view">
       <div class="vhead"><h2 id="dev-title">设备</h2><button id="dev-refresh" class="ghost sm">↻ 刷新</button></div>
       <div id="dev-body"></div>
+    <div id="view-ssh" class="view">
+          <div class="vhead"><h2 id="ssh-title">SSH</h2><button id="ssh-refresh" class="ghost sm">↻ 刷新</button></div>
+      <div id="ssh-body">
+        <div id="ssh-empty" class="hint">未配置 SSH 主机 — 在 config.json 添加 sshHosts({name,host,user,port,keyPath}) 后刷新</div>
+        <div id="ssh-panels"></div>
+      </div>
+    </div>
     </div>
     <div id="view-skills" class="view">
       <div class="vhead"><h2 id="sk-title">技能中心</h2></div>
@@ -396,6 +413,7 @@ export const PAGE = `<!doctype html>
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
           modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
+          navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'未配置 SSH 主机 — 在 config.json 添加 sshHosts 后刷新', sshRun:'运行', sshApproveFirst:'该命令需要审批 — 点击「批准并运行」', sshApprovedRun:'批准并运行', sshPh:'远程命令, 回车运行 (ls / df -h / uptime …)',
           sesRename:'重命名', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
@@ -414,6 +432,7 @@ export const PAGE = `<!doctype html>
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
           modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
+          navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'No SSH hosts configured - add sshHosts to config.json, then refresh', sshRun:'Run', sshApproveFirst:'This command needs approval - click approve-and-run', sshApprovedRun:'Approve & run', sshPh:'remote command, Enter to run (ls / df -h / uptime ...)',
           sesRename:'Rename', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
           wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
@@ -455,13 +474,13 @@ export const PAGE = `<!doctype html>
     document.getElementById('wsp-ok').textContent = L.wsOk;
     document.getElementById('ws-new').title = L.pickTitle;
     document.getElementById('wscur').title = L.wsSwitch;
-    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, skills:L.navSk };
+    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
       if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
     });
     document.getElementById('viewchip').textContent =
-      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[curView] || curView;
+      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk })[curView] || curView;
   }
 
   /* ---- view switching / sidebar collapse ---- */
@@ -470,7 +489,7 @@ export const PAGE = `<!doctype html>
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       n.classList.toggle('on', n.getAttribute('data-view') === v);
     });
-    ['chat', 'board', 'devices', 'skills'].forEach(function (k) {
+    ['chat', 'board', 'devices', 'ssh', 'skills'].forEach(function (k) {
       var elv = document.getElementById('view-' + k);
       if (elv) elv.classList.toggle('on', k === v);
     });
@@ -478,10 +497,11 @@ export const PAGE = `<!doctype html>
     if (shown) window.__AN.viewIn(shown);
     if (L) {
       document.getElementById('viewchip').textContent =
-        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, skills:L.viewSk })[v] || v;
+        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk })[v] || v;
     }
     if (v === 'board') loadBoard();
     if (v === 'devices') loadDevices();
+    if (v === 'ssh') renderSsh();
     if (v === 'skills') renderSkills();
   }
   Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
@@ -886,6 +906,58 @@ export const PAGE = `<!doctype html>
       });
       window.__AN.stagger('.devrow', box);
     }).catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+  }
+  function renderSsh() {
+    var box = document.getElementById('ssh-panels');
+    var empty = document.getElementById('ssh-empty');
+    var hosts = (state && state.sshHosts) || [];
+    empty.style.display = hosts.length ? 'none' : '';
+    if (!hosts.length) { empty.textContent = L.sshNoHosts; return; }
+    box.innerHTML = '';
+    hosts.forEach(function (h) {
+      var card = document.createElement('div'); card.className = 'sshcard';
+      var head = document.createElement('div'); head.className = 'sshhead';
+      var dot = document.createElement('span'); dot.textContent = '\u25CF'; dot.style.color = 'var(--ok)';
+      var name = document.createElement('b'); name.textContent = h.name;
+      var addr = document.createElement('span'); addr.textContent = h.user + '@' + h.host + ':' + h.port;
+      addr.style.color = 'var(--dim)';
+      var st = document.createElement('span'); st.className = 'st'; st.textContent = '';
+      head.appendChild(dot); head.appendChild(name); head.appendChild(addr); head.appendChild(st);
+      var cmd = document.createElement('div'); cmd.className = 'sshcmd';
+      var input = document.createElement('input'); input.placeholder = L.sshPh;
+      var run = document.createElement('button'); run.className = 'primary sm'; run.type = 'button'; run.textContent = L.sshRun;
+      cmd.appendChild(input); cmd.appendChild(run);
+      var out = document.createElement('div'); out.className = 'sshout'; out.style.display = 'none';
+      function send(approve) {
+        var command = input.value.trim();
+        if (!command) return;
+        run.disabled = true;
+        fetch('/api/ssh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: h.name, command: command, approve: approve === true }) })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
+          .then(function (res) {
+            run.disabled = false;
+            if (res.status === 403 && res.d.needsApproval) {
+              out.style.display = 'block';
+              out.innerHTML = '';
+              var warn = document.createElement('div'); warn.className = 'err'; warn.textContent = L.sshApproveFirst;
+              var ok = document.createElement('button'); ok.className = 'danger sm'; ok.type = 'button'; ok.textContent = L.sshApprovedRun;
+              ok.onclick = function () { send(true); };
+              out.appendChild(warn); out.appendChild(ok);
+              return;
+            }
+            out.style.display = 'block';
+            if (res.d.error) { out.innerHTML = ''; var e = document.createElement('div'); e.className = 'err'; e.textContent = res.d.error; out.appendChild(e); }
+            else { out.textContent = res.d.output || '(no output)'; }
+            window.__AN && window.__AN.tick(out);
+          })
+          .catch(function (e) { run.disabled = false; out.style.display = 'block'; out.textContent = String(e); });
+      }
+      run.onclick = function () { send(false); };
+      input.onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.isComposing) send(false); };
+      card.appendChild(head); card.appendChild(cmd); card.appendChild(out);
+      box.appendChild(card);
+    });
+    window.__AN.stagger('.sshcard', box);
   }
   function skRow(name, desc, mark) {
     var r = document.createElement('div'); r.className = 'skrow';

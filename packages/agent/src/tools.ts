@@ -415,6 +415,70 @@ export const browserOpenTool: Tool = {
   },
 };
 
+/** Remote command execution over SSH (zero-dep: OpenSSH binary).
+ *  Hosts come from config sshHosts (name/host/user/port/keyPath); secrets
+ *  never leave HMH_HOME. Read-only commands skip the approval card,
+ *  everything else is gated. */
+export interface SshHost {
+  name: string;
+  host: string;
+  user: string;
+  port?: number;
+  /** private-key path; defaults to the agent's own key resolution (~/.ssh) */
+  keyPath?: string;
+}
+
+export const sshRunTool: Tool = {
+  name: 'ssh_run',
+  description:
+    'Run a command on a remote host over SSH. Hosts must be configured under sshHosts in config.json (name/host/user/port/keyPath). Read-only probes (ls/cat/ps/grep/free/df/uptime/systemctl status) run without the approval card; anything else is approval-gated. Use for server ops, remote checks, deployments.',
+  parameters: {
+    type: 'object',
+    properties: {
+      host: { type: 'string', description: 'host name from config sshHosts' },
+      command: { type: 'string', description: 'shell command to run remotely' },
+      timeout_ms: { type: 'number', description: 'timeout in ms (default 20000, max 120000)' },
+    },
+    required: ['host', 'command'],
+  },
+  needsApproval(args) {
+    const cmd = String(args.command ?? '');
+    // read-only probe allowlist - no destructive verbs, no pipes into writes
+    const probe = /^(ls|cat|head|tail|df|du|free|uptime|whoami|hostname|uname|systemctl (status|list-units)|ps|grep|find|wc|date|echo|id|ip |ifconfig|nmap --version)/.test(cmd);
+    const writes = /rm|mv|dd|mkfs|reboot|shutdown|kill|pkill|systemctl (start|stop|restart|enable|disable)|apt|yum|docker (rm|rmi|prune)|truncate|>||/i;
+    return !(probe && !writes);
+  },
+  async execute(args) {
+    const cfg = await loadConfig();
+    const hosts = (cfg as { sshHosts?: Record<string, SshHost> }).sshHosts ?? {};
+    const h = hosts[String(args.host ?? '')];
+    if (!h) return { output: 'unknown host. configured: ' + (Object.keys(hosts).join(', ') || '(none)'), isError: true };
+    const command = String(args.command ?? '');
+    if (!command.trim()) return { output: 'command required', isError: true };
+    const timeout = Math.min(Number(args.timeout_ms ?? 20_000), 120_000);
+    const sshArgs = [
+      '-o', 'BatchMode=yes',
+      '-o', 'ConnectTimeout=8',
+      '-o', 'StrictHostKeyChecking=accept-new',
+      ...(h.keyPath ? ['-i', h.keyPath] : []),
+      '-p', String(h.port ?? 22),
+      (h.user ? h.user + '@' : '') + h.host,
+      command,
+    ];
+    try {
+      const { execFile } = await import('node:child_process');
+      const { promisify: prom } = await import('node:util');
+      const r = await prom(execFile)('ssh', sshArgs, { timeout, windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
+      const out = ((r.stdout || '') + (r.stderr ? '\n[stderr]\n' + r.stderr : '')).trim();
+      return { output: (out || '(no output)').slice(0, 30_000) };
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
+      const parts = [e.stdout, e.stderr, e.killed ? '(timed out)' : e.message];
+      return { output: parts.filter(Boolean).join('\n').slice(0, 400), isError: true };
+    }
+  },
+};
+
 export const rememberTool: Tool = {
   name: 'remember',
   description:
