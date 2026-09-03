@@ -18,6 +18,10 @@
 | **视觉** | see_image（任意视觉模型，多厂商降级链） |
 | **多前端** | CLI / REPL（斜杠命令）/ **全屏 TUI（斜杠面板、滚轮翻页）** / Web（浏览器流式、远程审批、会话回放、**工作区**） |
 | **国际化** | zh / en 双语界面与系统提示（`--locale=en`） |
+| **网络原生** | web_search（零密钥搜索）+ web_fetch（URL→可读文本）+ 浏览器自动化（browser_open+桌面视觉链） |
+| **桌面自动化** | desktop_screenshot / desktop_click / desktop_type——看→动→验闭环，全部审批门禁 |
+| **并行+即时反馈** | 多工具并发（审批保序）；三层反馈：错误即记→任务后即时反思入记忆→每 3 洞察自动进化轮；**代码级自进化**（沙箱分支+双样本门禁+git 回滚，永禁改内核循环） |
+| **会话管理** | 历史会话重命名/归档/删除（trash 可恢复），悬停操作 |
 
 ## 快速开始
 
@@ -96,7 +100,7 @@ packages/
   cli/  web/       终端与浏览器双前端（同一事件协议）
 ```
 
-详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 、[docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/PROVIDERS.md](docs/PROVIDERS.md)(常用厂商配置参考)。
+详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 、[docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/PROVIDERS.md](docs/PROVIDERS.md)(常用厂商配置参考) 与 [docs/DEVLOG.md](docs/DEVLOG.md)（开发日志）。
 
 ## 参与贡献
 

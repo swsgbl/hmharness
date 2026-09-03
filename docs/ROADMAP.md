@@ -59,6 +59,36 @@
 - [x] 聊天打磨(用户右气泡/可折叠思考/代码块语言栏+复制/重新生成);i18n 全覆盖+--locale 旗标
 - [x] 文档:README.en.md 英文版;中文 README 修复历史编码损坏并同步新功能
 
+## 智能体内核成熟轮 ✅ (2026-09-02~03,基于用户运行实录三轮审计+架构质问)
+- [x] 实战加固:系统提示词注入宿主事实(cmd.exe 身份+等价速查+探测优先+禁全盘扫
+      +失败两次换策略);工具失败模式自动入长期记忆;write_file 覆盖 config 快照
+- [x] 非标网关兼容:Bearer 401 自动重协商 X-Api-Key(freellmapi 实测);authHeader 显式字段
+- [x] 工具层硬墙:Windows Unix 管道预检(给 cmd 等价)+重复失败第 3 次短路;DENY 精度
+      (单文件 del 放行,递归删只拒盘根/系统目录/家目录);hmh skills add 安装器(三种布局)
+- [x] Web 跨任务连续对话记忆(conversation 线程,内核压缩随任务跑,新会话 fresh 重置)
+- [x] 原生 web_search(零 key,DuckDuckGo)+web_fetch(URL→可读文本)
+- [x] 输出人本化:工具流折叠一行可展开,AI 回答为可见主体
+- [x] 内核并行工具执行(审批串行保序+执行并发,计时单测;UI ⏏ parallel 分组框)
+- [x] 三层即时反馈:Tier1 系统级错即记(阈值 2→1)/Tier2 每出错任务即时模型反思入记忆
+      /Tier3 全进化轮阈值 8→3(autoEvolveEvery)——"越用越聪明"成为默认行为
+- [x] 审批修复+YOLO:远程审批钩子只挂询问模式(此前覆盖 yes 标志的根因 bug);
+      web 三档 ask/auto/yolo+CLI --yolo;状态行迁输入框上方带模式徽标
+- [x] 桌面自动化三件套:desktop_screenshot(视觉链)+click+type,看→动→验闭环
+- [x] 浏览器自动化:browser_open 可见浏览器+桌面三件套组合(Windows 无头输出全空,
+      平台限制,诚实路线);web UI/官网 GSAP 动画(CDN 降级守卫)
+- [x] 会话管理:重命名(titles 映射,审计 jsonl 不变)/归档/删除(trash 可恢复),悬停操作
+- [x] i18n 守门:页面 L.引用 vs zh/en 双字典分别校验;TUI COMMANDS vs i18n 对称检查
+
+## 代码级自进化轮 ✅ (2026-09-03,DGM 桥)
+- [x] 进化循环从提示词层升级到代码层:proposePatches(元模型看信号+热工具源码,
+      提 find/replace 补丁)/isPatchableFile 硬守卫(永禁 kernel loop/provider/
+      config/security——自举悖论防护)/沙箱 git 分支/沙箱内全链 build+双样本 bench/
+      过门合并/回归即回滚(checkout main+删分支零残留)
+- [x] 端到端验证(285439e):补丁先在分支上提交再 bench(修"未提交改动漂移 main"真 bug);
+      临时仓跑完整周期,merge 路径+revert 路径+树净全部实证
+- [x] 红线更新(CONTRIBUTING):进化写 skills/+memory/+可提代码补丁(限 src/沙箱/
+      门禁/回滚四条件同时满足)
+
 ## 待办(非阻塞)
 - [ ] 物理真机回路(等设备接入;scripts/e2e-device.mts 一键即绪)
       【blocked:外部硬件】

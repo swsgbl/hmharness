@@ -20,6 +20,10 @@
 | **Vision** | see_image (any vision model, multi-provider fallback) |
 | **Frontends** | CLI / REPL / fullscreen TUI (slash-command palette) / Web (browser streaming, remote approvals, session replay, workspaces) |
 | **i18n** | zh / en bilingual UI and system prompts (`--locale=en`) |
+| **Native web** | web_search (zero-key) + web_fetch (URL -> readable text) + browser automation (browser_open + desktop vision chain) |
+| **Desktop automation** | desktop_screenshot / desktop_click / desktop_type - the see-act-verify loop, approval-gated |
+| **Parallel + instant feedback** | concurrent tools (approvals ordered); 3-tier feedback: errors noted instantly -> per-task reflection into memory -> auto evolution every 3 insights; **code-level self-evolution** (sandbox branch + double-sample gate + git revert, kernel loop untouchable) |
+| **Session management** | rename / archive / delete (trash, recoverable) on the sidebar history |
 
 ## Quick start
 
@@ -97,7 +101,7 @@ packages/
   cli/  web/       terminal and browser frontends (same event protocol)
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/PROVIDERS.md](docs/PROVIDERS.md) (provider presets reference, in Chinese).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/PROVIDERS.md](docs/PROVIDERS.md) (provider presets reference, in Chinese) and [docs/DEVLOG.md](docs/DEVLOG.md) (development log).
 
 ## Contributing
 
