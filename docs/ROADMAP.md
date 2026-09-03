@@ -77,6 +77,9 @@
 - [x] 浏览器自动化:browser_open 可见浏览器+桌面三件套组合(Windows 无头输出全空,
       平台限制,诚实路线);web UI/官网 GSAP 动画(CDN 降级守卫)
 - [x] 会话管理:重命名(titles 映射,审计 jsonl 不变)/归档/删除(trash 可恢复),悬停操作
+- [x] SSH 一等能力:内核 ssh_run 工具(config sshHosts 密钥不出 HMH_HOME;
+      只读探针含 && 链逐段白名单免审,写/重启类审批门禁)+Web SSH 视图(第五导航项:
+      主机卡+命令输入+终端面板+批准并运行流,POST /api/ssh 代理);ndtool 服务器实测
 - [x] i18n 守门:页面 L.引用 vs zh/en 双字典分别校验;TUI COMMANDS vs i18n 对称检查
 
 ## 代码级自进化轮 ✅ (2026-09-03,DGM 桥)
