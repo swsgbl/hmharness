@@ -7,7 +7,7 @@
  * this is a local companion, never exposed.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readdir, readFile, writeFile, stat, open } from 'node:fs/promises';
+import { readdir, readFile, rename, mkdir, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
 import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmh/kernel';
@@ -335,7 +335,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
         let files: string[] = [];
         try {
-          files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')).sort().reverse().slice(0, 50);
+          files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl') && !f.startsWith('.')).sort().reverse().slice(0, 50);
         } catch {
           /* none */
         }
@@ -353,12 +353,19 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         };
         // board cards come from the insight archive (task/outcome/turns/tools)
         const bySession = new Map((await readInsights(home, 200)).map((i) => [i.session, i]));
+        // custom titles (rename) ride in workspaces.json; audit files stay immutable
+        let sessionTitles: Record<string, string> = {};
+        try {
+          const wsRaw = JSON.parse(await readFile(join(home, 'workspaces.json'), 'utf8')) as Record<string, unknown>;
+          sessionTitles = (wsRaw.sessionTitles ?? {}) as Record<string, string>;
+        } catch { /* none yet */ }
         const sessions = await Promise.all(
           files.map(async (f) => {
             const id = f.replace(/\.jsonl$/, '');
             const i = bySession.get(id);
             return {
               id,
+              title: sessionTitles[id] ?? '',
               task: i?.task ?? '',
               outcome: i?.outcome ?? '',
               turns: i?.turns ?? 0,
@@ -369,6 +376,49 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           }),
         );
         json(res, 200, { sessions, workspace: currentWs() ?? null });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname.startsWith('/api/sessions/')) {
+        // session management: rename (title), archive (move to sessions/archive/),
+        // delete (move to sessions/trash/ - recoverable, never hard-destroyed)
+        const parts = url.pathname.slice('/api/sessions/'.length).split('/');
+        const id = decodeURIComponent(parts[0]).replace(/[^a-zA-Z0-9_:.@-]/g, '');
+        const op = parts[1] ?? '';
+        const body = JSON.parse((await readBody(req)) || '{}') as { title?: string };
+        const file = join(home, 'sessions', `${id}.jsonl`);
+        const trashDir = join(home, 'sessions', 'trash');
+        const archiveDir = join(home, 'sessions', 'archive');
+        try {
+          if (op === 'delete') {
+            await mkdir(trashDir, { recursive: true });
+            await rename(file, join(trashDir, `${id}.jsonl`));
+            json(res, 200, { ok: true });
+            return;
+          }
+          if (op === 'archive') {
+            await mkdir(archiveDir, { recursive: true });
+            await rename(file, join(archiveDir, `${id}.jsonl`));
+            json(res, 200, { ok: true });
+            return;
+          }
+          if (op === 'rename') {
+            const title = String(body.title ?? '').slice(0, 120);
+            if (!title) { json(res, 400, { error: 'title required' }); return; }
+            // titles ride in workspaces.json so the audit jsonl stays immutable
+            const wsFile = join(home, 'workspaces.json');
+            let ws: Record<string, unknown> = {};
+            try { ws = JSON.parse(await readFile(wsFile, 'utf8')) as Record<string, unknown>; } catch { /* fresh */ }
+            const titles = (ws.sessionTitles ?? {}) as Record<string, string>;
+            titles[id] = title;
+            ws.sessionTitles = titles;
+            await writeFile(wsFile, JSON.stringify(ws, null, 2) + '\n', 'utf8');
+            json(res, 200, { ok: true, title });
+            return;
+          }
+          json(res, 404, { error: `unknown session op: ${op}` });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
         return;
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {

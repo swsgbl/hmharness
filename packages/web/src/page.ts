@@ -106,6 +106,13 @@ export const PAGE = `<!doctype html>
   .sess .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; }
   .sess .time { color:var(--dim); font-family:var(--mono); font-size:11px; flex:none; }
   .sess .task { color:var(--dim); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sess { position:relative; }
+  .sess .sacts { position:absolute; right:4px; top:3px; display:none; gap:2px; background:var(--panel); padding:0 2px; border-radius:6px; z-index:5; }
+  .sess:hover .sacts { display:flex; }
+  .sess .sacts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:12px; padding:1px 4px; border-radius:4px; }
+  .sess .sacts button:hover { color:var(--accent); background:var(--panel2); }
+  .sess .sacts button.del:hover { color:var(--err); }
+  .sess .ren { background:var(--bg); color:var(--text); border:1px solid var(--accent); border-radius:5px; font:12px inherit; padding:1px 4px; outline:none; width:95%; }
   #sidefoot { border-top:1px solid var(--line); padding:8px 14px; font-size:11.5px; color:var(--dim); white-space:nowrap; overflow:hidden; }
   body.sidemin .minhide { display:none !important; }
   body.sidemin #sidefoot { text-align:center; padding:8px 2px; font-size:10px; }
@@ -931,10 +938,49 @@ export const PAGE = `<!doctype html>
     var time = document.createElement('span'); time.className = 'time';
     time.textContent = sessTime(s.id);
     t1.appendChild(dot); t1.appendChild(time);
-    if (s.task) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = s.task.slice(0, 40); t1.appendChild(tk); }
+    var label = s.title || s.task || s.id;
+    if (label) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = label.slice(0, 40); t1.appendChild(tk); }
     b.appendChild(t1);
-    if (s.task) { var t2 = document.createElement('div'); t2.className = 'task'; t2.textContent = s.task; b.appendChild(t2); }
-    b.onclick = function () { viewSession(s.id); };
+    var t2 = null;
+    if (label) { t2 = document.createElement('div'); t2.className = 'task'; t2.textContent = label; b.appendChild(t2); }
+    b.onclick = function (ev) {
+      if (ev.target.closest && ev.target.closest('.sacts')) return;
+      if (ev.target.classList && ev.target.classList.contains('ren')) return;
+      viewSession(s.id);
+    };
+    // hover actions: rename (inline edit), archive, delete (trash, recoverable)
+    var acts = document.createElement('span'); acts.className = 'sacts';
+    function mk(ch, cls, tip, fn) {
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = ch; x.title = tip;
+      if (cls) x.className = cls;
+      x.onclick = function (ev) { ev.stopPropagation(); fn(); };
+      return x;
+    }
+    acts.appendChild(mk('\\u270E', '', 'rename', function () {
+      var input = document.createElement('input');
+      input.className = 'ren';
+      input.value = s.title || s.task || '';
+      if (t2) t2.replaceWith(input); else b.appendChild(input);
+      input.focus();
+      input.onkeydown = function (ev) {
+        if (ev.key === 'Enter' && !ev.isComposing) {
+          ev.preventDefault();
+          var v = input.value.trim();
+          if (!v) { loadSessions(); return; }
+          fetch('/api/sessions/' + encodeURIComponent(s.id) + '/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: v }) })
+            .then(function () { loadSessions(); });
+        }
+        if (ev.key === 'Escape') loadSessions();
+      };
+    }));
+    acts.appendChild(mk('\\uD83D\\uDCE5', '', 'archive', function () {
+      fetch('/api/sessions/' + encodeURIComponent(s.id) + '/archive', { method: 'POST' }).then(function () { loadSessions(); });
+    }));
+    acts.appendChild(mk('\\uD83D\\uDDD1', 'del', 'delete', function () {
+      if (!window.confirm('\\u5220\\u9664\\u8BE5\\u4F1A\\u8BDD\\uFF1F\\uFF08\\u53EF\\u4ECE sessions/trash \\u6062\\u590D\\uFF09')) return;
+      fetch('/api/sessions/' + encodeURIComponent(s.id) + '/delete', { method: 'POST' }).then(function () { loadSessions(); });
+    }));
+    b.appendChild(acts);
     return b;
   }
   function renderSessions(filter) {
