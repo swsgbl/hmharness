@@ -210,25 +210,26 @@ test('picker: Esc closes the palette and clears the draft', async () => {
   } finally { h.restore(); }
 });
 
-test('header is a calm identity strip: always idle+mode, run state only above the input box', async () => {
-  // settled design (0df4ba7, reaffirmed after the 18210e1 regression):
-  // the header never churns - idle+mode tag permanently; the ONLY live run
-  // indicator is the input-box status line. A mid-task header flip was
-  // shipped once and reverted: one run state, one voice, but a still header.
+test('header is a pure identity strip: no status word at all, run state only above the input box', async () => {
+  // T1-v2 (user overturned T1's leftover): when the run indicator moved
+  // to the input-box status line (0df4ba7), the old header slot kept a
+  // stale "idle" - an orphan status. Moving a thing means deleting it from
+  // where it was. Header shows identity (+mode tag); the status line is
+  // the ONLY live run indicator, hidden when idle.
   const h = await makeTui();
   try {
     let p = h.rt.paletteProbe();
-    assert.match(p.frameText, /○ 空闲/);
+    assert.doesNotMatch(p.frameText, /空闲|idle/);  // no status word in header
     h.rt.setBusy(true);
     p = h.rt.paletteProbe();
-    assert.match(p.frameText, /○ 空闲/);            // header stays calm
     assert.match(p.frameText, /运行中…/);          // status line speaks
+    assert.doesNotMatch(p.frameText, /空闲|idle/);  // header stays identity-only
     h.rt.setModeTag('🔥');
     p = h.rt.paletteProbe();
-    assert.match(p.frameText, /○ 空闲 🔥/);        // mode tag visible
+    assert.match(p.frameText, /🔥/);                // mode tag on the header
     h.rt.setBusy(false);
     p = h.rt.paletteProbe();
-    assert.match(p.frameText, /○ 空闲 🔥/);
+    assert.match(p.frameText, /🔥/);
     assert.doesNotMatch(p.frameText, /运行中…/);   // status line hidden when idle
   } finally { h.restore(); }
 });

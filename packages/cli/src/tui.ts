@@ -604,14 +604,14 @@ export class TuiRuntime {
     this.paletteClickRows.length = 0;
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
-    const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
-    // header right ALWAYS shows idle+mode tag (settled design, 0df4ba7: the
-    // header is a calm identity strip - model/cwd/skills/mode never churn).
-    // The ONLY live run indicator is the status line directly above the
-    // input box (same place as the web UI, where the user's attention is);
-    // a spinning header would re-introduce the churn this layout removed.
-    const headRight = GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
-    frame.push(truncateTo(headLeft + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(headLeft)) - strWidth(stripAnsi(headRight)))) + headRight, W));
+    // Header = pure identity strip: logo · model · cwd · skills (+ mode tag
+    // when set). NO status word up here at all (T1-v2, user-overturned: the
+    // run indicator moved to the input-box status line in 0df4ba7 but the
+    // old right slot kept showing a stale "idle" - an orphan status.
+    // Moving a thing means deleting it from where it was).
+    // The ONLY live run indicator is the status line above the input box.
+    const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}` + (this.modeTag ? ` ${this.modeTag}` : '');
+    frame.push(truncateTo(headLeft, W));
     frame.push(DIM('─'.repeat(W)));
 
     const allLines: string[] = [];

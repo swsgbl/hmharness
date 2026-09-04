@@ -73,7 +73,6 @@ export interface Strings {
   cmdProvidersNone: string;
   cmdProvidersAdded: (n: number, names: string) => string;
   tuiScrolled: string;
-  tuiIdle: string;
   tuiWebHint: string;
   tuiRadarScanning: string;
   tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
@@ -167,7 +166,6 @@ const zh: Strings = {
   cmdProvidersNone: '未探测到新的厂商;已配置: ',
   cmdProvidersAdded: (n, names) => `已添加 ${n} 个厂商: ${names} — /model <name> 启用`,
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
-  tuiIdle: '○ 空闲',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
   tuiRadarScanning: '雷达扫描中…',
   tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
@@ -258,7 +256,6 @@ const en: Strings = {
   cmdProvidersNone: 'no new providers found; configured: ',
   cmdProvidersAdded: (n, names) => `added ${n} providers: ${names} - enable via /model <name>`,
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
-  tuiIdle: '○ idle',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
   tuiRadarScanning: 'scanning radar…',
   tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
