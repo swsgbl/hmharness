@@ -64,7 +64,18 @@ EPERM——绕行(改名让路+重建),根因留 elevated 清理;③npm 在本�
 **教训**:④"无头通过"只覆盖程序一半,终端是另一半——终端模式残留(DECCKM/
 QuickEdit)能把正确的键处理整个短路;对键盘/鼠标类交互,要么真终端实测,
 要么把终端的两态(CSI/SS3、上报开/关)都纳入无头矩阵;⑤多行管道冒烟必加
-逐行延时,await 间隙里的行会被 readline 丢掉。
+逐行延时,await 间隙里的行会被 readline 丢掉,交互终端不存在。
+
+**第三轮(同日,/mouse 移除)**:用户质问"/mouse 存在的意义是什么""你想给自己
+留历史代码包袱吗"。盘点:模态上报+终端滚轮转换已覆盖 conhost/WT/VS Code 全部
+目标环境,/mouse 唯一受益者是 tmux/个别 Linux 终端用户——而本项目定位
+Windows/HarmonyOS 开发机,受益者集合为空。保留=为不存在的用户维护开关+
+i18n 键+文档心智负担。**删除**:COMMANDS 项、handleLine 分支、toggleMouse、
+mouse 字段、状态行 /mouse 提示尾巴、i18n 六键(mouseOff/cmdMouseOn/Off/
+cmdMouse,zh/en+接口)——syncMouseReporting 简化为纯模态(面板开→上报,
+面板关→还原,零用户可动开关)。**教训**:⑥兜底开关不是免费品——每个开关
+都是文档、i18n、测试和用户心智的永久负债;兜底只在"目标用户里真有人踩"
+时才值得留,否则就是历史包袱。
 
 ---
 

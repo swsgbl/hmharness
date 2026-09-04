@@ -54,7 +54,6 @@ export interface Strings {
   tuiDeny: string;
   tuiApprovalHint: string;
   tuiHints: string;
-  mouseOff: string;
   /** live label while the model thinks (TUI) */
   thinking: string;
   /** final label after thinking folds away (TUI) */
@@ -69,8 +68,6 @@ export interface Strings {
   cmdProvidersListed: string;
   cmdProvidersNone: string;
   cmdProvidersAdded: (n: number, names: string) => string;
-  cmdMouseOn: string;
-  cmdMouseOff: string;
   tuiScrolled: string;
   tuiIdle: string;
   tuiWebHint: string;
@@ -88,7 +85,6 @@ export interface Strings {
   cmdYolo: string;
   yoloOn: string;
   yoloOff: string;
-  cmdMouse: string;
   cmdProviders: string;
   cmdOps: string;
   cmdOpsScan: string;
@@ -151,7 +147,6 @@ const zh: Strings = {
   tuiDeny: '拒绝',
   tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
   tuiHints: 'enter 发送 · 滚轮/↑↓ 翻页 · ^P/^N 历史 · esc 清空 · 拖选复制 · ^C 退出 · /help',
-  mouseOff: '关滚轮接管',
   thinking: '思考中',
   thought: '已完成思考',
   tuiRunning: '运行中…',
@@ -161,8 +156,6 @@ const zh: Strings = {
   cmdProvidersListed: '未探测到新的本地厂商(环境变量/opencode 配置)',
   cmdProvidersNone: '未探测到新的厂商;已配置: ',
   cmdProvidersAdded: (n, names) => `已添加 ${n} 个厂商: ${names} — /model <name> 启用`,
-  cmdMouseOn: '鼠标上报兜底: 已开启(滚轮直接控制翻页;此模式下拖选暂不可用,再按 /mouse 关闭恢复)',
-  cmdMouseOff: '鼠标上报兜底: 已关闭(终端原生拖选复制;滚轮由终端转为 ↑↓ 翻页)',
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiIdle: '○ 空闲',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
@@ -180,7 +173,6 @@ const zh: Strings = {
   cmdYolo: '切换全自动 YOLO(/yolo on|off;危险命令仍硬拒)',
   yoloOn: '🔥 YOLO 已开启:后续任务全自动,不再弹审批(破坏性命令仍硬拒)',
   yoloOff: '🔒 已回到审批询问模式',
-  cmdMouse: '切换鼠标上报兜底(默认关:选择复制永可用,滚轮经终端转为翻页)',
   cmdProviders: '探测本地密钥并自动添加厂商(/providers scan)',
   cmdOps: '运维看板状态',
   cmdOpsScan: '扫描生态雷达并生成简报',
@@ -242,7 +234,6 @@ const en: Strings = {
   tuiDeny: 'Deny',
   tuiApprovalHint: 'enter/y approve · esc/n deny',
   tuiHints: 'enter send · wheel/arrows scroll · ^P/^N history · esc clear · drag to copy · ^C quit · /help',
-  mouseOff: 'release wheel',
   thinking: 'thinking',
   thought: 'thought (done)',
   tuiRunning: 'running…',
@@ -252,8 +243,6 @@ const en: Strings = {
   cmdProvidersListed: 'no new local providers detected (env vars / opencode config)',
   cmdProvidersNone: 'no new providers found; configured: ',
   cmdProvidersAdded: (n, names) => `added ${n} providers: ${names} - enable via /model <name>`,
-  cmdMouseOn: 'mouse fallback: ON (wheel scrolls directly; drag-select unavailable while on; /mouse to toggle)',
-  cmdMouseOff: 'mouse fallback: OFF (native drag-select restored; wheel maps to arrows)',
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiIdle: '○ idle',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
@@ -271,7 +260,6 @@ const en: Strings = {
   cmdYolo: 'toggle hands-free YOLO (/yolo on|off; destructive hard-deny stays)',
   yoloOn: '🔥 YOLO on: tasks run unattended, no approval cards (destructive hard-deny stays)',
   yoloOff: '🔒 back to ask-approval mode',
-  cmdMouse: 'toggle mouse-report fallback (off by default: selection always works, wheel maps to scroll)',
   cmdProviders: 'detect local keys and add providers (/providers scan)',
   cmdOps: 'ops keeper status',
   cmdOpsScan: 'scan the ecosystem radar and write a brief',

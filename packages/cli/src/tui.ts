@@ -94,7 +94,6 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/lang', key: 'cmdLang' },
   { name: '/yolo', key: 'cmdYolo' },
   { name: '/providers', key: 'cmdProviders' },
-  { name: '/mouse', key: 'cmdMouse' },
   { name: '/ops', key: 'cmdOps' },
   { name: '/ops scan', key: 'cmdOpsScan' },
   { name: '/bench', key: 'cmdBench' },
@@ -160,16 +159,14 @@ export class TuiRuntime {
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** Wheel handling without ever capturing the mouse: NO mouse-reporting
-   *  mode is enabled by default, so select/copy always works. Terminals
-   *  translate the wheel to arrow keys on the alternate screen themselves
-   *  (conhost/WT), and the transcript treats ↑/↓ as scroll when not
-   *  scrolled to the bottom. Reporting turns on ONLY while a palette is
-   *  open (modal: clicks choose rows, wheel moves the selection) or when
-   *  the user opts in via `/mouse` - native selection resumes the moment
-   *  the palette closes. */
-  private mouse = false;
-  /** combined reporting state actually sent to the terminal (see sync) */
+  /** Wheel/click handling: NO mouse reporting by default - select/copy
+   *  always works and terminals translate the wheel to arrow keys on the
+   *  alternate screen. Reporting turns on ONLY while a palette is open
+   *  (modal: clicks choose rows, the wheel drives the selection) and turns
+   *  off the moment it closes. (A permanent /mouse toggle existed for
+   *  terminals without alt-screen wheel mapping; removed - it cost native
+   *  selection full-time to fix a case this Windows/HarmonyOS-first tool
+   *  does not target.) */
   private mouseReported = false;
   /** screen row of each visible palette item (SGR click hit-testing); the
    *  render loop records row = frame.length (1-based) as it pushes rows */
@@ -239,18 +236,11 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  toggleMouse(): boolean {
-    this.mouse = !this.mouse;
-    this.syncMouseReporting();
-    this.dirty = true;
-    return this.mouse;
-  }
-
-  /** Reporting is on while the base /mouse toggle is on OR a palette is
-   *  open. The palette is a modal: while it shows, clicks choose its rows
-   *  and the wheel drives its selection; drag-select resumes on close. */
+  /** Reporting is on ONLY while a palette is open. The palette is a modal:
+   *  while it shows, clicks choose its rows and the wheel drives its
+   *  selection; drag-select resumes the moment it closes. */
   private syncMouseReporting(): void {
-    const want = this.mouse || this.panelItems(this.input).length > 0;
+    const want = this.panelItems(this.input).length > 0;
     if (want === this.mouseReported) return;
     this.mouseReported = want;
     stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
@@ -751,7 +741,7 @@ export class TuiRuntime {
 
     const hints = this.scrollFromBottom > 0
       ? `${DIM(this.t.tuiScrolled)}`
-      : `${DIM(this.t.tuiHints + (this.mouse ? '' : '  · /mouse ' + this.t.mouseOff))}`;
+      : `${DIM(this.t.tuiHints)}`;
     const stat = this.status && !this.busy ? DIM(this.status) : '';
     frame.push(truncateTo(hints + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(hints)) - strWidth(stat))) + stat, W - 1));
 
@@ -893,13 +883,6 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       } finally {
         rt.setBusy(false);
       }
-      return;
-    }
-    if (line === '/mouse') {
-      const on = rt.toggleMouse();
-      rt.addText(on
-        ? t.cmdMouseOn
-        : t.cmdMouseOff, 'dim');
       return;
     }
     if (line === '/ops') {
