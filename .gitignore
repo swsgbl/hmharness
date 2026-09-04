@@ -4,3 +4,5 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+# ACL-locked remnants from elevated builds (delete manually with an elevated shell)
+*.bad*
