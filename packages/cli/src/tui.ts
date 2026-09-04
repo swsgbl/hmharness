@@ -240,9 +240,18 @@ export class TuiRuntime {
       mouse: this.mouseReported,
       clickRows: this.paletteClickRows.map((p) => ({ ...p })),
       transcript: lines.join('\n'),
-      // one entry per CUP-addressed screen row (locate each \x1b[<r>;1H\x1b[2K
-      // pair; ANSI styles stripped so plain-text regexes work)
-      frameText: f.join('').split(/(\x1b\[\d+;1H\x1b\[2K)/).filter((r) => !/^\x1b/.test(r)).map((r) => stripAnsi(r).replace(/\x1b\[0J$/, '').trimEnd()).filter(Boolean).join('\n'),
+      // frame rows: split on the CUP positioning pairs, take the content
+      // halves by parity, strip ANSI. (A 'startsWith ESC' filter used to
+      // discard every styled row - i.e. exactly the interesting ones.)
+      frameText: (() => {
+        const parts = f.join('').split(/(\x1b\[\d+;1H\x1b\[2K)/);
+        const rows: string[] = [];
+        for (let i = 0; i < parts.length; i += 2) {
+          const row = stripAnsi(parts[i] ?? '').replace(/\x1b\[0J$/, '').trimEnd();
+          if (row) rows.push(row);
+        }
+        return rows.join('\n');
+      })(),
     };
   }
 
@@ -596,13 +605,12 @@ export class TuiRuntime {
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
     const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
-    // header right mirrors the true state: green idle when calm, yellow
-    // running while a task works (the input-box status line carries the
-    // live spinner+detail; a header stuck on "idle" during a run lies).
-    // The mode tag (🔥 YOLO) rides along in both states.
-    const headRight = this.busy
-      ? YELLOW(this.t.tuiRunning + (this.modeTag ? ' ' + this.modeTag : ''))
-      : GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
+    // header right ALWAYS shows idle+mode tag (settled design, 0df4ba7: the
+    // header is a calm identity strip - model/cwd/skills/mode never churn).
+    // The ONLY live run indicator is the status line directly above the
+    // input box (same place as the web UI, where the user's attention is);
+    // a spinning header would re-introduce the churn this layout removed.
+    const headRight = GREEN(this.t.tuiIdle + (this.modeTag ? ' ' + this.modeTag : ''));
     frame.push(truncateTo(headLeft + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(headLeft)) - strWidth(stripAnsi(headRight)))) + headRight, W));
     frame.push(DIM('─'.repeat(W)));
 

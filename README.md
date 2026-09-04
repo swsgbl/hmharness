@@ -100,7 +100,7 @@ packages/
   cli/  web/       终端与浏览器双前端（同一事件协议）
 ```
 
-详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 、[docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/PROVIDERS.md](docs/PROVIDERS.md)(常用厂商配置参考) 与 [docs/DEVLOG.md](docs/DEVLOG.md)（开发日志）。
+详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 、[docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/PROVIDERS.md](docs/PROVIDERS.md)(常用厂商配置参考) 与 [docs/DEVLOG.md](docs/DEVLOG.md)（开发日志）;交互设计定案见 [docs/DESIGNS.md](docs/DESIGNS.md)——改 UI 行为前先查台账。
 
 ## 参与贡献
 

@@ -101,7 +101,7 @@ packages/
   cli/  web/       terminal and browser frontends (same event protocol)
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/PROVIDERS.md](docs/PROVIDERS.md) (provider presets reference, in Chinese) and [docs/DEVLOG.md](docs/DEVLOG.md) (development log).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/PROVIDERS.md](docs/PROVIDERS.md) (provider presets reference, in Chinese) and [docs/DEVLOG.md](docs/DEVLOG.md) (development log). Settled interaction-design decisions live in [docs/DESIGNS.md](docs/DESIGNS.md) (in Chinese) — check the ledger before changing any UI behavior.
 
 ## Contributing
 

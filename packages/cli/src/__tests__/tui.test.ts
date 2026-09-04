@@ -210,23 +210,26 @@ test('picker: Esc closes the palette and clears the draft', async () => {
   } finally { h.restore(); }
 });
 
-test('header status tells the truth: idle when calm, running while busy', async () => {
-  // the header used to show "idle" permanently - even mid-task. It must
-  // mirror the real state (mode tag rides along in both states).
+test('header is a calm identity strip: always idle+mode, run state only above the input box', async () => {
+  // settled design (0df4ba7, reaffirmed after the 18210e1 regression):
+  // the header never churns - idle+mode tag permanently; the ONLY live run
+  // indicator is the input-box status line. A mid-task header flip was
+  // shipped once and reverted: one run state, one voice, but a still header.
   const h = await makeTui();
   try {
     let p = h.rt.paletteProbe();
     assert.match(p.frameText, /○ 空闲/);
     h.rt.setBusy(true);
     p = h.rt.paletteProbe();
-    assert.match(p.frameText, /运行中…/);
-    assert.doesNotMatch(p.frameText, /○ 空闲/);   // no lying "idle" while busy
+    assert.match(p.frameText, /○ 空闲/);            // header stays calm
+    assert.match(p.frameText, /运行中…/);          // status line speaks
     h.rt.setModeTag('🔥');
     p = h.rt.paletteProbe();
-    assert.match(p.frameText, /运行中… 🔥/);      // mode tag stays visible
+    assert.match(p.frameText, /○ 空闲 🔥/);        // mode tag visible
     h.rt.setBusy(false);
     p = h.rt.paletteProbe();
     assert.match(p.frameText, /○ 空闲 🔥/);
+    assert.doesNotMatch(p.frameText, /运行中…/);   // status line hidden when idle
   } finally { h.restore(); }
 });
 
