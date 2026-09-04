@@ -8,7 +8,7 @@ import { exec } from 'node:child_process';
 import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool } from '@hmh/kernel';
+import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool, type ToolContext } from '@hmh/kernel';
 
 const execCb = promisify(exec);
 
@@ -121,8 +121,44 @@ export function unixPipeOnWindows(command: string, platform: string = process.pl
 
 /** Repeat-failure short-circuit: the same command that already failed twice
  *  is refused without executing - the model repeating it 10x burned ~700k
- *  prompt tokens in one audited session. (Module-level, session-scoped.) */
+ *  prompt tokens in one audited session. (Module-level, session-scoped.)
+ *  P2 CRITIC (Reflexion's signal amplification): on the SECOND failure the
+ *  refusal isn't just "stop" - it demands a structured diagnosis first
+ *  (locate-then-fix; Self-Refine: 94% of refinement failures are bad
+ *  feedback - 33% wrong location, 61% wrong fix). The third attempt shorts
+ *  hard. */
 const failedCommands = new Map<string, number>();
+
+const CRITIC_PROMPT = [
+  'This command failed twice. Before ANY retry, write a short diagnosis in your reply:',
+  '1) LOCATE the failure - re-read the exact error text; name the failing stage (binary missing? wrong flag? path? auth? environment?).',
+  '2) HYPOTHESIZE the root cause in one sentence.',
+  '3) Only then choose a DIFFERENT command (different flags/tool/approach) - repeating the same line will be refused.',
+  'If the failure is environmental (missing tool, permission), stop and tell the user instead of retrying.',
+].join(' ');
+
+/** P2 plan verification (Self-Refine's verified lesson: 61% of refinement
+ *  failures are an appropriate-looking but WRONG fix - the verifier must
+ *  check the fix, not the effort). For expensive commands (full builds,
+ *  device flashes, package installs) a cheap pre-flight runs BEFORE the
+ *  real thing: the referenced binary must exist, the target dir must be
+ *  there, flags must parse. A failing pre-flight returns in milliseconds
+ *  what would otherwise burn a 3-minute build to discover. */
+const EXPENSIVE_HINTS = /\b(hvigorw|hvigor|hdc|ohpm|npm|pnpm|pip|gradle)\b/i;
+
+export async function commandPreflight(command: string, cwd: string): Promise<string | null> {
+  if (!EXPENSIVE_HINTS.test(command)) return null; // cheap commands skip
+  const first = command.trim().split(/\s+/)[0].replace(/["']/g, '');
+  // if it's a relative script (hvigorw.bat, ./gradlew), it must exist here
+  if (/^[.\\/]/.test(first) || /\.(bat|cmd|exe|ps1)$/i.test(first)) {
+    try {
+      await readFile(resolve(cwd, first), 'utf8');
+    } catch {
+      return `Preflight failed: "${first}" not found under ${cwd} - check the working directory or use an absolute path before running the full command.`;
+    }
+  }
+  return null;
+}
 
 export const runCommandTool: Tool = {
   name: 'run_command',
@@ -146,29 +182,41 @@ export const runCommandTool: Tool = {
     }
     const unix = unixPipeOnWindows(command);
     if (unix) return { output: unix, isError: true };
+    const pre = await commandPreflight(command, ctx.cwd);
+    if (pre) return { output: pre, isError: true };
     const fails = failedCommands.get(command) ?? 0;
     if (fails >= 2) {
       return { output: `Refused: this exact command already failed ${fails} times this session. Change strategy (different command, different tool, or ask the user) instead of repeating it.`, isError: true };
     }
-    const timeout = Math.min(Number(args.timeout_ms ?? 60_000), 300_000);
-    try {
-      const { stdout, stderr } = await execCb(command, {
-        cwd: ctx.cwd,
-        timeout,
-        windowsHide: true,
-        maxBuffer: 8 * 1024 * 1024,
-      });
-      const out = (stdout || '') + (stderr ? `\n[stderr]\n${stderr}` : '');
-      failedCommands.delete(command);
-      return { output: (out.trim() || '(no output)').slice(0, 60_000) };
-    } catch (err: unknown) {
-      failedCommands.set(command, fails + 1);
-      const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
-      const parts = [e.stdout, e.stderr, e.killed ? '(timed out)' : null, e.message].filter(Boolean).join('\n');
-      return { output: parts.slice(0, 60_000), isError: true };
+    const r = await execCommand(command, args, ctx, fails);
+    if (r.isError && fails === 1) {
+      // second failure of this line: amplify the signal (Reflexion) - the
+      // output now DEMANDS a locate-then-fix diagnosis before any act 3
+      return { output: `${r.output}\n\n${CRITIC_PROMPT}`, isError: true };
     }
+    return r;
   },
 };
+
+async function execCommand(command: string, args: Record<string, unknown>, ctx: ToolContext, fails: number) {
+  const timeout = Math.min(Number(args.timeout_ms ?? 60_000), 300_000);
+  try {
+    const { stdout, stderr } = await execCb(command, {
+      cwd: ctx.cwd,
+      timeout,
+      windowsHide: true,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    const out = (stdout || '') + (stderr ? `\n[stderr]\n${stderr}` : '');
+    failedCommands.delete(command);
+    return { output: (out.trim() || '(no output)').slice(0, 60_000) };
+  } catch (err: unknown) {
+    failedCommands.set(command, fails + 1);
+    const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
+    const parts = [e.stdout, e.stderr, e.killed ? '(timed out)' : null, e.message].filter(Boolean).join('\n');
+    return { output: parts.slice(0, 60_000), isError: true };
+  }
+}
 
 /** Zero-dependency web search: DuckDuckGo HTML endpoint, no API key. */
 export const webSearchTool: Tool = {

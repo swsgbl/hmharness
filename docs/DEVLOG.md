@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-09-04 · P2 推理时进化 + P3 拓扑最小版(蓝图收官)
+
+**动机**:用户令"继续推进计划"——P0/P1 已落地(6ea9007),按验证蓝图执行
+P2(推理时进化+静态知识刷新)与 P3(拓扑最小版),自进化升级四段全部收官。
+
+**P2 落地**:
+- **高代价命令预检**(commandPreflight,tools.ts):hvigorw/hdc/ohpm/npm 等构建
+  类命令执行前先验"相对脚本是否存在于 cwd"(hvigorw.bat 不在=毫秒级报错,
+  而非烧 3 分钟构建才发现)——Self-Refine 验证教训:验证器要校验"修法对
+  不对"而非"改没改"(61% 失败是修法错)
+- **CRITIC 结构化反思**(run_command 第 2 次失败):失败输出追加诊断要求——
+  ①LOCATE 精确定位失败阶段 ②HYPOTHESIZE 一句根因 ③才允许换策略重试;
+  第 3 次仍短路。Reflexion 信号放大:低带宽失败信号必须升格为结构化语言
+  经验才跨轮迁移(94% 反思失败源于坏反馈:33% 定位错+61% 修法错)
+- **静态知识刷新**(evolution/knowledge.ts):鸿蒙官方 release-notes 索引
+  快照→词级 diff→元模型蒸馏"知识补丁"技能草案→防投毒→writeDraft,**走
+  既有 draft→双门→canary→impact 管线,零新口子**;离线=干净 no-op
+  (best-effort 永不成为用户要处理的失败)
+
+**P3 落地(spawn_agent 角色锦标赛,诚实最小版)**:
+- spawn_agent 增 `role` 参数(explorer/reviewer/build-fixer…);每次带角色的
+  委派记录 ok 率(turn 预算内+零工具错误)到 evolution/spawn-roles.jsonl
+- 下次带角色委派时,父模型在子代理系统提示词里看到排行榜(≥3 样本才入榜)
+  "explorer 67% (3x), prefer high ok-rates"——模型自己学会不再把任务派
+  给垫底角色。无 MARL、无辩论,单 Agent 产品里的多智能体协同进化=可读的
+  角色战绩榜
+
+**红线**:全部不变(进化写域/永禁 kernel 四件/评估细节不可见);预检与 CRITIC
+都在**工具层**硬执行(教训①重申:提示词防线对模型习惯行为不够)。
+
+**实测**:p2runtime.test.ts 5 用例(预检:便宜命令直通/缺失脚本拦截/存在
+放行/PATH 命令不预检;CRITIC:一次失败裸错/二次失败带 LOCATE+HYPOTHESIZE/
+三次短路不执行;knowledge:快照持久化+diff 路径+离线 no-op;P3:角色记录/
+聚合/≥3 样本门槛+排行线);全套 **64/64**;七包构建+dist 五项字节验证
+(knowledge.js/commandPreflight/CRITIC 文案/spawn-roles/index 导出全在)。
+
+**教训**:⑲推理时进化的正确位置是工具层而非循环层——run_command 的
+失败计数器已经是事实上的"推理时状态机",把 CRITIC/预检挂在那里零新协议、
+零 kernel 改动、测试直接可断;⑳"最小诚实版"原则再验证:角色排行榜比
+MARL 适合单人 CLI 框架(可解释/零新依赖/可关闭),不追论文豪华版。
+
+---
+
 ## 2026-09-04 · 自进化生产化轮(P0 可观测+P1 种群化,论文验证驱动)
 
 **动机**:用户令用 XMUDeepLIT/Awesome-Self-Evolving-Agents 综述做差距分析+生产

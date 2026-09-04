@@ -6,3 +6,4 @@ export * from './evolve.ts';
 export * from './patches.ts';
 export * from './impact.ts';
 export * from './workflows.ts';
+export * from './knowledge.ts';
