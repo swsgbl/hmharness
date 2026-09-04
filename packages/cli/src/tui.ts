@@ -12,7 +12,7 @@
  */
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmh/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmh/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
@@ -91,6 +91,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/tools', key: 'cmdTools' },
   { name: '/skills', key: 'cmdSkills' },
   { name: '/model', key: 'cmdModel' },
+  { name: '/lang', key: 'cmdLang' },
   { name: '/yolo', key: 'cmdYolo' },
   { name: '/providers', key: 'cmdProviders' },
   { name: '/mouse', key: 'cmdMouse' },
@@ -110,6 +111,13 @@ export function matchCommands(input: string): Array<{ name: string; key: string 
   if (!input.startsWith('/')) return [];
   const q = input.toLowerCase();
   return COMMANDS.filter((c) => c.name.startsWith(q));
+}
+
+/** `/lang` target resolver: explicit zh/en wins, a bare `/lang` toggles. */
+export function nextLocale(current: string, arg: string): 'zh' | 'en' {
+  const a = arg.trim().toLowerCase();
+  if (a === 'zh' || a === 'en') return a;
+  return current === 'en' ? 'zh' : 'en';
 }
 
 /**
@@ -156,13 +164,22 @@ export class TuiRuntime {
    *  mode is enabled by default, so select/copy always works. Terminals
    *  translate the wheel to arrow keys on the alternate screen themselves
    *  (conhost/WT), and the transcript treats ↑/↓ as scroll when not
-   *  scrolled to the bottom. `/mouse` opts into SGR wheel reporting
-   *  (1000+1006) for terminals without that fallback - at the cost of
-   *  native selection while enabled. */
+   *  scrolled to the bottom. Reporting turns on ONLY while a palette is
+   *  open (modal: clicks choose rows, wheel moves the selection) or when
+   *  the user opts in via `/mouse` - native selection resumes the moment
+   *  the palette closes. */
   private mouse = false;
+  /** combined reporting state actually sent to the terminal (see sync) */
+  private mouseReported = false;
+  /** screen row of each visible palette item (SGR click hit-testing); the
+   *  render loop records row = frame.length (1-based) as it pushes rows */
+  private paletteClickRows: Array<{ row: number; idx: number }> = [];
 
   constructor() {
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+    // ?1l forces DECCKM OFF so arrow keys arrive as CSI (\x1b[A) even if a
+    // previous program left the terminal in application cursor mode - in
+    // that mode arrows arrive as SS3 (\x1bOA) and would be silently dropped
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -185,14 +202,35 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  /** Introspection probe for headless tests: input line, palette rows and
-   *  the highlighted row index. */
-  paletteProbe(): { input: string; rows: string[]; selected: number } {
+  /** Run the highlighted palette row (shared by Enter and palette clicks);
+   *  with no palette open it just submits the typed input. */
+  private pickHighlighted(): void {
+    const hits = this.panelItems(this.input);
+    const pick = hits.length ? hits[Math.min(this.cmdIdx, hits.length - 1)].name : '';
+    if (pick) {
+      this.input = this.input.startsWith('/model') ? `/model ${pick} ` : pick + ' ';
+      this.caret = this.input.length;
+      this.cmdIdx = 0;
+    }
+    this.driver?.();
+  }
+
+  /** Introspection probe for headless tests: input line, palette rows, the
+   *  highlighted row index, mouse-reporting state and clickable rows. */
+  paletteProbe(): {
+    input: string;
+    rows: string[];
+    selected: number;
+    mouse: boolean;
+    clickRows: Array<{ row: number; idx: number }>;
+  } {
     const rows = this.panelItems(this.input);
     return {
       input: this.input,
       rows: rows.map((r) => r.name),
       selected: rows.length ? Math.min(this.cmdIdx, rows.length - 1) : -1,
+      mouse: this.mouseReported,
+      clickRows: this.paletteClickRows.map((p) => ({ ...p })),
     };
   }
 
@@ -203,13 +241,19 @@ export class TuiRuntime {
 
   toggleMouse(): boolean {
     this.mouse = !this.mouse;
-    // full mouse capture is the fallback for terminals that do not map the
-    // wheel to arrows on the alt screen; it costs native selection
-    stdout.write(this.mouse
-      ? '\x1b[?1006h\x1b[?1000h'
-      : '\x1b[?1000l\x1b[?1006l');
+    this.syncMouseReporting();
     this.dirty = true;
     return this.mouse;
+  }
+
+  /** Reporting is on while the base /mouse toggle is on OR a palette is
+   *  open. The palette is a modal: while it shows, clicks choose its rows
+   *  and the wheel drives its selection; drag-select resumes on close. */
+  private syncMouseReporting(): void {
+    const want = this.mouse || this.panelItems(this.input).length > 0;
+    if (want === this.mouseReported) return;
+    this.mouseReported = want;
+    stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
   }
 
   /** The palette data source: `/model ` opens the model picker, otherwise
@@ -238,7 +282,9 @@ export class TuiRuntime {
   destroy(): void {
     if (this.renderTimer) clearInterval(this.renderTimer);
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
-    stdout.write((this.mouse ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?25h\x1b[?1049l');
+    // ?1l restores default CSI cursor keys; reporting off whatever the
+    // modal state was
+    stdout.write((this.mouseReported ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?1l\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -358,6 +404,10 @@ export class TuiRuntime {
   }
 
   private onKey(data: string): void {
+    // SS3 application-mode arrows (\x1bOA…H): terminals left in DECCKM by a
+    // previous program send these; normalize to the CSI forms this UI
+    // matches so navigation never silently dies
+    if (/^\x1bO[A-H]$/.test(data)) data = '\x1b[' + data[2];
     // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. With
     // button-event mode (1002) everything else - click, drag, release,
     // motion - still belongs to the terminal's native selection.
@@ -376,6 +426,21 @@ export class TuiRuntime {
       this.scrollFromBottom = Math.max(0, Math.min(this.totalLines(), this.scrollFromBottom - wheel * 3));
       this.dirty = true;
       return;
+    }
+    // click-to-choose on the open palette (SGR button-0 press): the
+    // terminal-reported row maps 1:1 to the screen row render() recorded
+    // for that item, so a click is a row selection + confirm
+    if (this.paletteClickRows.length) {
+      const click = data.match(/^\x1b\[<0;\d+;(\d+)M$/);
+      if (click) {
+        const row = Number(click[1]);
+        const hitRow = this.paletteClickRows.find((p) => p.row === row);
+        if (hitRow) {
+          this.cmdIdx = hitRow.idx;
+          this.pickHighlighted();
+          return;
+        }
+      }
     }
     // swallow any other SGR mouse report that slips through so it never
     // leaks into the input line as garbage
@@ -413,18 +478,9 @@ export class TuiRuntime {
         this.openModelPicker();
         return;
       }
-      // palette is open: Enter runs the highlighted row (a command, or a
-      // /model target), not the raw input
-      const hits = this.panelItems(this.input);
-      if (hits.length) {
-        const pick = hits[Math.min(this.cmdIdx, hits.length - 1)].name;
-        this.input = this.input.startsWith('/model')
-          ? `/model ${pick} `
-          : pick + ' ';
-        this.caret = this.input.length;
-        this.cmdIdx = 0;
-      }
-      this.driver?.();
+      // palette open: Enter runs the highlighted row (a command, or a
+      // /model target), not the raw input; without a palette it submits
+      this.pickHighlighted();
       return;
     }
     if (data === '\t') {
@@ -528,6 +584,10 @@ export class TuiRuntime {
     const W = stdout.columns || 100;
     const H = stdout.rows || 30;
     const frame: string[] = [];
+    // modal mouse reporting follows the palette (see syncMouseReporting);
+    // click rows are re-recorded every frame because screen positions move
+    this.syncMouseReporting();
+    this.paletteClickRows.length = 0;
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
     const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}`;
@@ -588,6 +648,9 @@ export class TuiRuntime {
         const c = cmdHits[gi];
         const sel = gi === this.cmdIdx;
         frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(truncateTo(c.desc, 46)), W - 1));
+        // row lands at screen line frame.length (render addresses rows
+        // 1-based); only rows that survive the H clip are clickable
+        if (frame.length <= H) this.paletteClickRows.push({ row: frame.length, idx: gi });
       }
       frame.push(DIM(truncateTo('  ' + this.t.panelHint, W - 1)));
     }
@@ -714,7 +777,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     return;
   }
   const home = homeDir();
-  const t = strings((cfg.locale ?? 'zh') as Locale);
+  let t = strings((cfg.locale ?? 'zh') as Locale);
   const { reg, clients } = await buildRegistry({ announce: false });
   // auto-link: bring the web UI up in the background (hmh tui --no-web skips)
   const webUp = noWeb ? false : await ensureWebDaemon(DEFAULT_WEB_PORT);
@@ -773,6 +836,14 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       autoApprove = turnOn;
       rt.setModeTag(turnOn ? '🔥' : '');
       rt.addText(turnOn ? t.yoloOn : t.yoloOff, turnOn ? 'plain' : 'dim');
+      return;
+    }
+    if (line === '/lang' || line.startsWith('/lang ')) {
+      const target = nextLocale(cfg.locale ?? 'zh', line.slice(5));
+      cfg = await setLocale(target);
+      t = strings(target);
+      rt.configure(chatModel, basename(process.cwd()), skills.length, target);
+      rt.addText(GREEN('✓') + ' ' + t.langSwitched(target));
       return;
     }
     if (line === '/model' || line.startsWith('/model ')) {

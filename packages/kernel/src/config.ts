@@ -68,6 +68,23 @@ export async function setChatRoute(name: string): Promise<HmhConfig> {
 }
 
 /**
+ * Persist the UI locale (TUI/REPL `/lang`) to config.json. Same
+ * read-mutate-write shape as setChatRoute; returns the refreshed config.
+ */
+export async function setLocale(locale: 'zh' | 'en'): Promise<HmhConfig> {
+  const file = join(homeDir(), 'config.json');
+  let raw: Record<string, unknown> = {};
+  try {
+    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    /* fresh config */
+  }
+  raw.locale = locale;
+  await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
+  return loadConfig();
+}
+
+/**
  * Merge detected providers into config.json (`hmh providers --scan`).
  * Same-name entries never overwrite what is already configured; returns the
  * refreshed config and the names actually added.

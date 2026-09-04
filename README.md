@@ -59,7 +59,7 @@ hmh init               # 建立 ~/.hmharness（配置 + 状态目录）
 ```bash
 hmh "你的任务"             # 一次性任务（完整智能体循环,流式）
 hmh                         # 交互 REPL（跨行对话记忆,/help 命令集）
-hmh tui                     # 全屏 TUI（斜杠面板 ↑↓ 选择、滚轮翻页;默认同时后台启动网页端,--no-web 关闭）
+hmh tui                     # 全屏 TUI（斜杠面板 ↑↓/滚轮/点击 选择、/model 选择器、/lang 中英切换;默认同时后台启动网页端,--no-web 关闭）
 hmh web start               # Web 前端后台静默启动(无窗口,关终端不影响;stop 停止/status 看状态)
 hmh web [--port=7788]       # Web 前端前台运行(调试用)
 hmh resume [id前缀]          # 继续历史会话

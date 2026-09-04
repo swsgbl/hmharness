@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COMMANDS, matchCommands, parseWheel } from '../tui.ts';
+import { COMMANDS, matchCommands, parseWheel, nextLocale } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
+
+test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
+  assert.equal(nextLocale('zh', ''), 'en');
+  assert.equal(nextLocale('en', ''), 'zh');
+  assert.equal(nextLocale('zh', 'en'), 'en');
+  assert.equal(nextLocale('en', 'ZH'), 'zh');   // case-insensitive explicit
+  assert.equal(nextLocale('zh', 'en '), 'en');  // trailing space from slice
+  assert.equal(nextLocale('zh', 'fr'), 'en');   // unknown arg falls back to toggle
+});
+
+test('COMMANDS exposes /lang alongside /model', () => {
+  const names = matchCommands('/lang').map((c) => c.name);
+  assert.deepEqual(names, ['/lang']);
+  assert.equal(COMMANDS.some((c) => c.name === '/lang'), true);
+});
 
 test('parseWheel decodes SGR wheel-up and wheel-down', () => {
   // wheel-up press and release forms; 64 = up, 65 = down
@@ -125,6 +140,45 @@ test('picker: wheel moves the selection while the palette is open', async () => 
     assert.equal(h.rt.paletteProbe().selected, 1);
     h.keys('\x1b[<64;10;3M');                // SGR wheel-up
     assert.equal(h.rt.paletteProbe().selected, 0);
+  } finally { h.restore(); }
+});
+
+test('picker: SS3 application-mode arrows (\x1bOA/\x1bOB) still navigate', async () => {
+  // a previous program may leave the terminal in DECCKM mode; those arrows
+  // arrive as SS3 and were silently dropped before normalization
+  const h = await makeTui();
+  try {
+    h.rt.openModelPicker();
+    h.keys('\x1bOB'); h.keys('\x1bOB');      // down, down via SS3
+    assert.equal(h.rt.paletteProbe().selected, 2);
+    h.keys('\x1bOA');                        // up via SS3
+    assert.equal(h.rt.paletteProbe().selected, 1);
+  } finally { h.restore(); }
+});
+
+test('picker: mouse reporting on while open, off after close (modal)', async () => {
+  const h = await makeTui();
+  try {
+    h.rt.openModelPicker();
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, true);   // modal capture active
+    h.keys('\x1b');                                   // Esc closes
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, false);  // native selection back
+  } finally { h.restore(); }
+});
+
+test('picker: clicking a row selects and confirms it', async () => {
+  const h = await makeTui();
+  try {
+    h.rt.openModelPicker();
+    h.rt.render();                                    // records click rows
+    const p = h.rt.paletteProbe();
+    assert.equal(p.clickRows.length > 0, true);
+    const target = p.clickRows[2];
+    assert.equal(p.rows[target.idx], 'nvidia-vision');
+    h.keys(`\x1b[<0;3;${target.row}M`);               // SGR click on that row
+    assert.deepEqual(h.submitted, ['/model nvidia-vision']);
   } finally { h.restore(); }
 });
 

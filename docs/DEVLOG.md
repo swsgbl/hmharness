@@ -37,6 +37,35 @@ dist/patches.* 带 Users:RX-only 继承 ACE,普通 shell 下 rename 可行而 de
 EPERM——绕行(改名让路+重建),根因留 elevated 清理;③npm 在本机 shell 偶发
 "Invalid abbreviated flag"启动失败,直跑 tsc/`node --import tsx --test` 稳定。
 
+**第二轮(同日,用户复测后)**:用户仍报"上下键选不了、鼠标也选不了",且点名
+**TUI 没有语言切换命令**。两个真因+一个缺口:
+- **SS3 光标键**:上个程序可能把终端留在 DECCKM(应用光标模式),方向键以
+  `\x1bOA/B` 而非 `\x1b[A/B` 到达——原代码只匹配 CSI,SS3 被末尾的
+  `data.startsWith('\x1b')` 静默吞掉,症状恰是"按了没反应"。修复:启动/退出均写
+  `\x1b[?1l` 强制 CSI;onKey 顶部 `\x1bO[A-H]`→`\x1b[A-H]` 归一化(双保险)
+- **conhost QuickEdit**:用户点列表想"选中"→终端进入文本选择模式,方向键被终端
+  吃掉移光标选文本,应用收不到。修复:**面板=模态**——面板开着时自动开
+  SGR 鼠标上报(1000+1006),**点击=选中并确认**(render 记录每行的屏幕行号,
+  SGR row 1:1 命中)、滚轮驱动选择;面板关闭(Enter/Esc/清空)立即关上报,
+  原生拖选复制即时恢复。/mouse 全局开关与模态上报合并成单一
+  syncMouseReporting 状态机
+- **缺口:/lang 命令**——此前 TUI/REPL 无界面语言入口(只有 --locale/HMH_LOCALE/
+  Web 芯片)。新增 `/lang [zh|en]`(省略则中英切换):kernel setLocale 持久化
+  (setChatRoute 同款读改写)+ TUI 运行时全量刷新(rt.configure+strings 重绑)+
+  REPL 同步获得;nextLocale 纯函数可测
+
+**实测**:TUI 测试 12/12(SS3 上下键导航/模态上报开-关/点击第 3 行提交
+`/model nvidia-vision`/nextLocale 边界);全套 48/48;dist 字节级验证(?\1l、SS3
+归一化、点击正则、syncMouseReporting、/lang 全在);setLocale 经 dist kernel
+隔离 HMH_HOME 往返持久化实证;REPL /lang 交互节奏冒烟(spawn+延时写入模拟真人)
+——切换行+切换后 /help 以英文渲染(证明运行时刷新而非仅落盘)。管道整块喂入的
+"多行丢失"是 readline 行交付竞态(历史坑),交互终端不存在。
+
+**教训**:④"无头通过"只覆盖程序一半,终端是另一半——终端模式残留(DECCKM/
+QuickEdit)能把正确的键处理整个短路;对键盘/鼠标类交互,要么真终端实测,
+要么把终端的两态(CSI/SS3、上报开/关)都纳入无头矩阵;⑤多行管道冒烟必加
+逐行延时,await 间隙里的行会被 readline 丢掉。
+
 ---
 
 ## 2026-09-03 · 代码级自进化轮(DGM 桥)

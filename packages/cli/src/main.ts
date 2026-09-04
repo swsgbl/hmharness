@@ -36,6 +36,7 @@ import {
   Registry,
   runLoop,
   setChatRoute,
+  setLocale,
   type ChatMessage,
   type McpClient,
   type McpServerImport,
@@ -134,7 +135,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
   const home = homeDir();
   let cfg = await loadConfig();
   let autoApprove = yes;
-  const t = strings((cfg.locale ?? 'zh') as Locale);
+  let t = strings((cfg.locale ?? 'zh') as Locale);
   const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
   stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
   const { reg, clients } = await buildRegistry();
@@ -162,6 +163,14 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
           autoApprove = turnOn;
           stdout.write((turnOn ? YELLOW(t.yoloOn) : DIM(t.yoloOff)) + '\n');
+          continue;
+        }
+        if (line === '/lang' || line.startsWith('/lang ')) {
+          const { nextLocale } = await import('./tui.ts');
+          const target = nextLocale(cfg.locale ?? 'zh', line.slice(5));
+          cfg = await setLocale(target);
+          t = strings(target);
+          stdout.write(GREEN('✓') + ' ' + t.langSwitched(target) + '\n');
           continue;
         }
         if (line === '/help' || line === '?') {
