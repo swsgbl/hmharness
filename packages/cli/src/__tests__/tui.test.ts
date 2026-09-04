@@ -210,6 +210,26 @@ test('picker: Esc closes the palette and clears the draft', async () => {
   } finally { h.restore(); }
 });
 
+test('header status tells the truth: idle when calm, running while busy', async () => {
+  // the header used to show "idle" permanently - even mid-task. It must
+  // mirror the real state (mode tag rides along in both states).
+  const h = await makeTui();
+  try {
+    let p = h.rt.paletteProbe();
+    assert.match(p.frameText, /○ 空闲/);
+    h.rt.setBusy(true);
+    p = h.rt.paletteProbe();
+    assert.match(p.frameText, /运行中…/);
+    assert.doesNotMatch(p.frameText, /○ 空闲/);   // no lying "idle" while busy
+    h.rt.setModeTag('🔥');
+    p = h.rt.paletteProbe();
+    assert.match(p.frameText, /运行中… 🔥/);      // mode tag stays visible
+    h.rt.setBusy(false);
+    p = h.rt.paletteProbe();
+    assert.match(p.frameText, /○ 空闲 🔥/);
+  } finally { h.restore(); }
+});
+
 test('slash palette unchanged: /m + Enter runs the highlighted command', async () => {
   const h = await makeTui();
   try {
