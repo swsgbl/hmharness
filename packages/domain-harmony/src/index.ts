@@ -18,6 +18,8 @@ import { emulatorTools } from './emulator.ts';
 import { harmonySchemaCheck } from './schema.ts';
 import { harmonyBuildDoctor } from './builddoctor.ts';
 import { harmonyProjectProfile } from './profile.ts';
+import { harmonySign } from './signing.ts';
+import { harmonyDeviceTest } from './ondevice.ts';
 
 const exec = promisify(execFile);
 
@@ -423,6 +425,8 @@ export const harmonyTools: Tool[] = [
   harmonySchemaCheck,
   harmonyBuildDoctor,
   harmonyProjectProfile,
+  harmonySign,
+  harmonyDeviceTest,
   ...emulatorTools,
 ];
 
@@ -432,3 +436,5 @@ export { harmonySchemaCheck, checkProjectSchemas, parseJson5 as parseJson5Strict
 export { parseSdkVersion, compareSdk, capabilitiesFor, CAPABILITY_MATRIX, type SdkVersion, type CapabilityRule } from './apimatrix.ts';
 export { harmonyBuildDoctor, diagnoseBuildFailure, firstErrorBlock } from './builddoctor.ts';
 export { harmonyProjectProfile, profileProject } from './profile.ts';
+export { harmonySign, resolveSigningIdentity, ensureDebugProfile, signHap, hapsignToolPaths, type SigningIdentity } from './signing.ts';
+export { harmonyDeviceTest, runDeviceTest, type DeviceTestStep } from './ondevice.ts';

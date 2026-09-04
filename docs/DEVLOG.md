@@ -4,6 +4,52 @@
 
 ---
 
+## 2026-09-05 · 签名封装+设备测试:hapsigntool 全链破案(设备实证)
+
+**动机**:继续推进 ROADMAP 域缺口最后两项:hapsigntool 签名封装+onDeviceTest。
+模拟器在线,一切可实证。
+
+**破案过程(五关,全部设备实证)**:
+1. **mode 词汇**:hapsigntool 的 -mode 要 `localSign`(不是 debug/release)
+2. **过期模板**:SDK 的 UnsgnedDebugProfileTemplate.json 自带 2021-2023
+   validity——**今天已过期**(verify-profile 实锤 not-after=1705127532)。
+   解:克隆模板刷新为 now..+30y(换 uuid)→ ensureDebugProfile 自动生成
+3. **别名谜题**:p12 有 8 个别名(keytool -storetype PKCS12 列出);经组合
+   穷举实证:**sign-app 的 keyAlias 是 `openharmony application profile
+   debug`**(不是直觉的 application release——那张是自签证书,链验不过)
+4. **证书链**:appCertFile 用 OpenHarmonyProfileDebug.pem(内含 3 张证书
+   的三级链,OpenHarmony.p12/Profile pem 本就是 profile 链不是 app 链)
+5. **hdc 路径坑**:hdc install 只吃反斜杠 Windows 路径,正斜杠被当相对拼接
+
+**设备实证**:签名后的 hap(54404b)在模拟器 install→launch→hilog 回读
+`EntryAbility onCreate`——**自己签的应用真的跑起来了**。
+
+**落地**:
+- **signing.ts**(重写):hapsignToolPaths(jar/p12/pem/template/java 五件
+  定位)/resolveSigningIdentity(explicit 覆盖>SDK 身份,诚实注明
+  ~/.ohos/config 是句柄非文件,不走假路径)/ensureDebugProfile(自动刷新
+  过期模板+sign-profile)/signHap(实证组合)/harmony_sign 工具(默认
+  全自动:找最新 unsigned hap→生成 profile→签出 -signed.hap)
+- **ondevice.ts**:runDeviceTest 四步判定回路(install→launch→hilog
+  轮询断言生命周期标记≤6s→cleanup uninstall,install 失败短路;
+  **runImpl 注入缝**=测试确定性,顺修 .cmd shim EINVAL 老坑的绕行)/
+  harmony_device_test 工具(自动寻最新 signed hap+bundle 从 AppScope 读)
+
+**最终验收(全自动化,清空 tmp 从零跑)**:harmony_build OK→harmony_sign
+(profile 自动生成+签名 OK)→harmony_device_test 四步全 PASS
+("the app really installed, launched and logged on device")。
+
+**实测**:signing.test.ts 5 用例(身份解析优先级+SDK 回退+四步判定+
+install 失败短路+marker 缺失诚实 FAIL);全套 **85/85**;七包构建。
+
+**教训**:㉕文档之外的唯一裁判是工具自己的报错——hapsigntool 每一步
+(mode/别名/链/过期)都是被它的错误消息逐级教育出来的,-h 帮助+错误
+码是第一手资料,二手教程全都过时;㉖过期证书类"玄学失败"先 verify-profile
+拿 not-before/after 数字再说话;㉗组合穷举是破签名矩阵的正路(2×3 组合
+就出了唯一解),别在单一组合上反复撞墙。
+
+---
+
 ## 2026-09-05 · 设备回路打通(模拟器)+ 编译-修复闭环 + 项目画像
 
 **动机**:用户问"真机回路 blocked 是指链接手机吗?模拟器可以吗?模拟器已开,

@@ -119,6 +119,11 @@
       harmony_build_doctor(失败日志七类签名分类+每类具体修复+首错块提取,
       未知签名不隐藏)、harmony_project_profile(模块/页面/依赖/资源/配置
       健康一次调用出全像);api_kg/channel/cybernetics 维持排期
+- [x] **hapsigntool 签名封装+onDeviceTest(2026-09-05,设备实证)**:
+      harmony_sign(全自动 SDK 调试签名:自动刷新过期模板生成 profile+
+      实证别名/证书链组合;破案五关见 DEVLOG 当日轮)与 harmony_device_test
+      (install→launch→hilog 生命周期标记断言→cleanup 四步判定)——签名
+      后的 hap 在模拟器真实安装/启动/打出日志,最终验收全自动化四步全 PASS
 - [ ] npm 公开发布 bin(README 用法以 npm link 为准,发布后更新)
       【排期:发版前需 README/CI npm provenance 检查】
 - [x] **进化循环接入雷达信号源(2026-09-04)**:evolution/radar.ts 只读消费
