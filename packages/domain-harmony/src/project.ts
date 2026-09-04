@@ -12,6 +12,7 @@ import { deflateSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import type { Tool } from '@hmh/kernel';
+import { parseSdkVersion } from './apimatrix.ts';
 
 /* ------------------------------------------------------------------ */
 /* Minimal PNG encoder (solid RGBA color, power-of-two sizes)          */
@@ -70,7 +71,15 @@ export function solidPng(size: number, rgba: [number, number, number, number]): 
 /* ------------------------------------------------------------------ */
 
 export function sdkVersion(): string {
-  return process.env.HM_SDK_VERSION ?? '6.1.1(24)';
+  const raw = process.env.HM_SDK_VERSION ?? '6.1.1(24)';
+  try {
+    // reject junk early with a pointed message instead of letting hvigor
+    // fail cryptically later (the apimatrix knows both version shapes)
+    parseSdkVersion(raw);
+  } catch (err) {
+    throw new Error(`HM_SDK_VERSION="${raw}" is not a valid SDK version (${String(err).slice(0, 90)}). Expected "6.1.1(24)" or "26.0.0" style.`);
+  }
+  return raw;
 }
 
 function sanitizeIdent(s: string): string {

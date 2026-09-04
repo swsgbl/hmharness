@@ -119,9 +119,13 @@
       喂提议提示词("顾及近期发布,别给过时工具链建议")——只读不触发,
       预算边界不破(视觉用于 UI 回归基准仍待做)
 - [ ] 新设备类型镜像的自动下载(依赖厂商开放公开通道)【blocked:厂商】
-- [ ] 域缺口补齐:hapsigntool 签名封装、onDeviceTest 设备测试、
-      API-level 能力矩阵(26.0.0 起版本号改 SemVer,体检/脚手架需按矩阵适配)、
-      module.json5/build-profile.json5 schema 校验
+- [x] **域缺口:API 能力矩阵+schema 校验(2026-09-05)**:apimatrix.ts 双形态
+      版本解析("6.1.1(24)" 遗留 vs 26+ 纯 SemVer,major=API level,改版适配
+      单点收敛)+compareSdk+能力矩阵;scaffold 入口预检 HM_SDK_VERSION(坏值
+      即报期望格式);schema.ts 宽松 JSON5+module.json5/build-profile 结构校验
+      +harmony_schema_check 工具(构建前毫秒级精确字段报告;e2e 冒烟钉死:
+      真 scaffold→过→损坏→精确捕获)。仍缺:hapsigntool 签名封装、
+      onDeviceTest 设备测试
 - [x] **门禁方法学(2026-09-04)**:bench 断言升级四模式(expect-exact 精确
       等值/expect-regex 正则/expect-none 禁词否决/expect-any 多选一,旧
       expect 子串语义向后兼容)+成本双指标门(候选输出成本超基线×cap 拒绝,

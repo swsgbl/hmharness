@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-09-05 · 域缺口补齐:项目 schema 校验 + API 能力矩阵
+
+**动机**:用户令"继续"。ROADMAP 域缺口里最可落地的两项:schema 校验
+(module.json5/build-profile.json5 结构验证——工具链失败前的第一道网)与
+API-level SemVer 矩阵(26.0.0 起版本改版适配)。
+
+**落地(domain-harmony)**:
+- **schema.ts**:宽松 JSON5 解析(行/块注释+尾逗号+单引号,字符串感知——
+  闭环号单引号曾漏转义,测试当场抓住)+module.json5 结构校验(name/type
+  枚举 entry/feature/har/shared/entry 的 mainElement+deviceTypes 必填)
+  +build-profile 校验(root: app.products[].compatibleSdkVersion+modules;
+  module: apiType=stageMode+targets);**新工具 harmony_schema_check**
+  (只读,构建前跑,把 3 分钟的 hvigor 深层失败换成毫秒级"精确字段名"报告);
+  模块目录判定=有 src/main/module.json5 或 build-profile 才查,AppScope
+  等非模块目录静默跳过(e2e 冒烟抓到的真 bug:缺失文件被当解析错误误报)
+- **apimatrix.ts**:双形态版本解析("6.1.1(24)" 遗留式 vs "26.0.0"+ 纯
+  SemVer——26 起 major 即 API level,改版适配只在此一处)+compareSdk+
+  能力矩阵(shared-module/2in1/semver-numbering 等条目,可扩展)+
+  **scaffold 接入**:坏 HM_SDK_VERSION 在脚手架入口即报错(带期望格式),
+  不再留给 hvigor 报天书
+
+**实测**:schema.test.ts 6 用例(JSON5 容错+坏 JSON 报错/entry 必填三态/
+root+module 校验/整项目扫描:合法过+损坏精确捕获/双形态版本+垃圾抛错/
+排序+矩阵跨 26 开关门控);**e2e dist 冒烟 4/4**(真 scaffold→schema_check
+通过→故意损坏 module.type→输出精确点名→apimatrix 导出往返);全套 77/77;
+七包构建+dist 三项验证。
+
+**教训**:㉔脚本改关键文件必须回读验证——本轮 src/index.ts 的接线脚本
+"成功"输出但写入被 ACL 静默吞掉,靠 dist 字节验证才暴露(与 index.ts.bad2
+同源);**写完就 console 回读**应成为脚本改文件的固定动作;㉑复训:e2e 冒烟
+再次证明其价值——单元测试 6/6 全绿的情况下,真脚手架扫描仍抓出
+"缺失文件≠解析错误"的分类 bug。
+
+---
+
 ## 2026-09-04 · 门禁方法学升级 + 雷达信号接入(ROADMAP 收官批)
 
 **动机**:用户令"继续推进计划"。自进化蓝图 P0-P3 落地后,ROADMAP 上最顺承
