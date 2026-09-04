@@ -213,21 +213,26 @@ export class TuiRuntime {
   }
 
   /** Introspection probe for headless tests: input line, palette rows, the
-   *  highlighted row index, mouse-reporting state and clickable rows. */
+   *  highlighted row index, mouse-reporting state, clickable rows and the
+   *  transcript text (for asserting what a command printed). */
   paletteProbe(): {
     input: string;
     rows: string[];
     selected: number;
     mouse: boolean;
     clickRows: Array<{ row: number; idx: number }>;
+    transcript: string;
   } {
     const rows = this.panelItems(this.input);
+    const lines: string[] = [];
+    for (const e of this.entries) lines.push(...e.lines);
     return {
       input: this.input,
       rows: rows.map((r) => r.name),
       selected: rows.length ? Math.min(this.cmdIdx, rows.length - 1) : -1,
       mouse: this.mouseReported,
       clickRows: this.paletteClickRows.map((p) => ({ ...p })),
+      transcript: lines.join('\n'),
     };
   }
 
@@ -839,10 +844,9 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/model' || line.startsWith('/model ')) {
       const arg = line.slice(7).trim();
       if (!arg) {
-        // bare /model: keep the transcript record, then focus the LIVE
-        // picker on it - the static list alone was a dead end (nothing in
-        // it was selectable; arrows scrolled the transcript instead)
-        rt.addText(listProviders(cfg).map((v) => `${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`).join('\n') + '\n' + DIM(t.panelHint), 'plain');
+        // bare /model: the LIVE picker is the single menu. Printing a
+        // static provider list here too showed TWO model menus at once
+        // (one selectable, one not) - transcript stays minimal
         rt.openModelPicker();
         return;
       }
@@ -866,7 +870,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         const found = await detectLocalProviders(cfg, readFile);
         if (line === '/providers') {
           rt.addText(found.length
-            ? found.map((p) => `${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n' + DIM('/providers scan 将它们写入配置')
+            ? found.map((p) => `${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n' + DIM(t.cmdProvidersScanHint)
             : DIM(t.cmdProvidersListed), 'plain');
         } else {
           if (!found.length) {
@@ -875,7 +879,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
             const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
             cfg = r.cfg;
             rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
-            rt.addText(GREEN('✓') + ` 已添加 ${r.added.length} 个厂商: ${r.added.join(', ')} — /model <name> 启用`);
+            rt.addText(GREEN('✓') + ' ' + t.cmdProvidersAdded(r.added.length, r.added.join(', ')));
           }
         }
       } catch (err) {

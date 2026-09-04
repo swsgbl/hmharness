@@ -84,12 +84,13 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
   void clients;
 
   // Live output state: reasoning arrives dimmed and prefixed, final text plain.
+  const zt = strings((cfg.locale ?? 'zh') as Locale);
   let displayMode: 'none' | 'reasoning' | 'text' = 'none';
   let streamedText = false;
   const openMode = (m: 'reasoning' | 'text') => {
     if (displayMode !== m) {
       if (displayMode === 'reasoning') stdout.write('\n');
-      if (m === 'reasoning') stdout.write(DIM('\n[thinking] '));
+      if (m === 'reasoning') stdout.write(DIM('\n' + zt.thinkingLabel));
       displayMode = m;
     }
   };
@@ -181,8 +182,10 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
         if (line === '/model' || line.startsWith('/model ')) {
           const mArg = line.slice(7).trim();
           if (!mArg) {
+            // line-mode REPL has no live palette: the list IS the menu,
+            // the hint tells how to act on it (i18n, was hardcoded zh)
             const rows = listProviders(cfg).map((v) => `  ${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}`);
-            stdout.write(rows.join('\n') + '\n' + DIM('  /model <name> 切换 chat 路由') + '\n');
+            stdout.write(rows.join('\n') + '\n' + DIM(t.cmdModelHint) + '\n');
             continue;
           }
           try {
@@ -210,6 +213,33 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           for (const [name, c] of Object.entries(cfg.mcpServers ?? {})) {
             stdout.write(`  ${name} — ${c.type}${c.trusted ? ' · trusted' : ' · gated'}\n`);
           }
+          continue;
+        }
+        if (line === '/providers' || line === '/providers scan') {
+          // same capability as the TUI: probe local keys, optionally write
+          // them in (was REPL-missing -> 'unknown command' while /help
+          // advertised it, a scan-D gap)
+          const { readFile } = await import('node:fs/promises');
+          const { detectLocalProviders, addProviders } = await import('@hmh/kernel');
+          const found = await detectLocalProviders(cfg, readFile);
+          if (line === '/providers') {
+            stdout.write(found.length
+              ? found.map((p) => `  ${YELLOW('+')} ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n' + DIM(t.cmdProvidersScanHint) + '\n'
+              : DIM(t.cmdProvidersListed) + '\n');
+          } else if (!found.length) {
+            stdout.write(DIM(t.cmdProvidersNone) + Object.keys(cfg.providers ?? {}).join(', ') + '\n');
+          } else {
+            const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
+            cfg = r.cfg;
+            stdout.write(GREEN('✓') + ' ' + t.cmdProvidersAdded(r.added.length, r.added.join(', ')) + '\n');
+          }
+          continue;
+        }
+        if (line === '/clear') {
+          // line-mode twin of the TUI /clear: clear the conversation so the
+          // next task starts fresh (REPL counterpart was missing)
+          history = [];
+          stdout.write(DIM(t.cmdClearDone) + '\n');
           continue;
         }
         if (line === '/status') {
@@ -244,7 +274,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           stdout.write(t.tuiEvolveDone(report.proposals.length, report.insightCount, report.noteCount) + '\n');
           continue;
         }
-        stdout.write(YELLOW(`unknown command: ${line} (/help)\n`));
+        stdout.write(YELLOW(t.unknownCommand(line) + '\n'));
         continue;
       }
       try {

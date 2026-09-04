@@ -77,6 +77,24 @@ cmdMouse,zh/en+接口)——syncMouseReporting 简化为纯模态(面板开→�
 都是文档、i18n、测试和用户心智的永久负债;兜底只在"目标用户里真有人踩"
 时才值得留,否则就是历史包袱。
 
+**第四轮(同日,双菜单根除+全量扫描)**:用户截图抓到裸 /model 输出**两个模型
+菜单**——一个可选中(活面板)一个不能(静态列表)。根因:上一轮修 /model 时
+只改了键盘路径(输入框直敲回车),**没改驱动路径**(/斜杠面板选中 /model 命令
+进入同一 handleLine,却仍打印静态列表+开活面板)——"修症状不修路径"的复发。
+用户令"全量扫描整个工具确保无同类问题",建立三道脚本化扫描:A 硬编码
+UI 文案(addText/stdout.write 含中文且无 t.) B COMMANDS×REPL/TUI 处理器
+矩阵 C dist 双菜单残留。**修复**:①裸 /model 不再打印静态列表,活面板是
+唯一菜单(transcript 断言钉死:无 `z-ai — ` 静态行;键盘/面板两入口同一
+openModelPicker);②扫描抓出三处漏网硬编码(/providers scan 成功文案、
+/providers 列表尾巴、REPL [thinking] 标签)全接 i18n(复用 cmdProvidersAdded,
+新增 cmdProvidersScanHint/thinkingLabel);③REPL 两缺口补齐(/providers [scan]
+TUI 有而 REPL 报 unknown command、/clear 同缺)——COMMANDS×处理器矩阵全绿。
+**实测**:TUI 13/13(新增面板路由单一菜单断言);全套 49/49;REPL spawn+延时
+实证 /clear//providers 生效+无 unknown command;三道扫描 ALL CLEAN。
+**教训**:⑦同一动作的多条入口路径必须收敛到同一出口——修交互 bug 时要枚举
+"用户到达这里的所有路径",只修自己想到的那条=给用户留另一条坏路;⑧扫描
+要脚本化且可重跑(人眼审一遍会漏,正则矩阵不会)。
+
 ---
 
 ## 2026-09-03 · 代码级自进化轮(DGM 桥)

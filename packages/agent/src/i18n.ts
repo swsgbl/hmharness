@@ -66,6 +66,10 @@ export interface Strings {
   panelHint: string;
   cmdModelPreset: (name: string, envVar: string) => string;
   cmdProvidersListed: string;
+  /** tail hint after a bare /providers listing (TUI) */
+  cmdProvidersScanHint: string;
+  /** streaming label in front of reasoning output (REPL one-shot) */
+  thinkingLabel: string;
   cmdProvidersNone: string;
   cmdProvidersAdded: (n: number, names: string) => string;
   tuiScrolled: string;
@@ -77,6 +81,10 @@ export interface Strings {
   tuiStatus: (locale: string, skills: number, model: string) => string;
   tuiSkills: string;
   cmdHelp: string;
+  /** REPL feedback for a slash command that does not exist */
+  unknownCommand: (line: string) => string;
+  /** REPL /clear confirmation */
+  cmdClearDone: string;
   cmdTools: string;
   cmdSkills: string;
   cmdModel: string;
@@ -154,6 +162,8 @@ const zh: Strings = {
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
   cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
   cmdProvidersListed: '未探测到新的本地厂商(环境变量/opencode 配置)',
+  cmdProvidersScanHint: '/providers scan 将它们写入配置',
+  thinkingLabel: '[思考中] ',
   cmdProvidersNone: '未探测到新的厂商;已配置: ',
   cmdProvidersAdded: (n, names) => `已添加 ${n} 个厂商: ${names} — /model <name> 启用`,
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
@@ -165,6 +175,8 @@ const zh: Strings = {
   tuiStatus: (locale, skills, model) => `${locale} · ${skills} 技能 · ${model}`,
   tuiSkills: '技能',
   cmdHelp: '命令帮助',
+  unknownCommand: (l) => `未知命令: ${l} (/help 查看全部)`,
+  cmdClearDone: '✓ 对话已清空,下一条任务从全新上下文开始',
   cmdTools: '已注册工具(gated 标记)',
   cmdSkills: '技能库(启用 + 草稿)',
   cmdModel: '切换模型路由(输入 /model 回车打开选择面板)',
@@ -241,6 +253,8 @@ const en: Strings = {
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',
   cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,
   cmdProvidersListed: 'no new local providers detected (env vars / opencode config)',
+  cmdProvidersScanHint: '/providers scan writes them into the config',
+  thinkingLabel: '[thinking] ',
   cmdProvidersNone: 'no new providers found; configured: ',
   cmdProvidersAdded: (n, names) => `added ${n} providers: ${names} - enable via /model <name>`,
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
@@ -252,6 +266,8 @@ const en: Strings = {
   tuiStatus: (locale, skills, model) => `${locale} · ${skills} skills · ${model}`,
   tuiSkills: 'skills',
   cmdHelp: 'command help',
+  unknownCommand: (l) => `unknown command: ${l} (/help lists all)`,
+  cmdClearDone: '✓ conversation cleared; the next task starts a fresh context',
   cmdTools: 'registered tools (gated marked)',
   cmdSkills: 'skill library (active + drafts)',
   cmdModel: 'switch model route (type /model + Enter opens the picker)',

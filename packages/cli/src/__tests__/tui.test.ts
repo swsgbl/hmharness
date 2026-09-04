@@ -115,6 +115,23 @@ test('bare /model + Enter OPENS the picker (no command runs, no silent first-mod
     assert.equal(h.submitted.length, 0);    // driver NOT invoked
     assert.equal(p.rows.length >= 3, true); // live rows, selectable
     assert.equal(p.selected, 0);
+    // single-menu guarantee: the transcript must NOT also print a static
+    // provider listing (the two-menus regression the user caught)
+    assert.equal(/z-ai — /.test(p.transcript), false);
+  } finally { h.restore(); }
+});
+
+test('slash-palette route: selecting the /model command opens ONLY the live picker', async () => {
+  // entering via the slash palette (type '/', pick the /model row, Enter)
+  // must behave exactly like typing /model + Enter: picker open, no static
+  // list printed into the transcript - one menu, whichever way you came in
+  const h = await makeTui();
+  try {
+    h.rt.openModelPicker();
+    const p = h.rt.paletteProbe();
+    assert.equal(p.input, '/model ');
+    assert.equal(p.rows.length >= 3, true);
+    assert.equal(/— .* \(/.test(p.transcript), false); // no static listing rows
   } finally { h.restore(); }
 });
 
