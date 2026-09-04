@@ -7,3 +7,4 @@ export * from './patches.ts';
 export * from './impact.ts';
 export * from './workflows.ts';
 export * from './knowledge.ts';
+export * from './radar.ts';

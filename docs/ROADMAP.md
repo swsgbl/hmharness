@@ -114,13 +114,19 @@
       【blocked:外部硬件】
 - [ ] npm 公开发布 bin(README 用法以 npm link 为准,发布后更新)
       【排期:发版前需 README/CI npm provenance 检查】
-- [ ] 进化循环接入雷达/issue 信号源;视觉用于 UI 回归基准
+- [x] **进化循环接入雷达信号源(2026-09-04)**:evolution/radar.ts 只读消费
+      ops 保管员最新生态简报(≤14 天新鲜度+1200 字截断),signals.ecosystemNews
+      喂提议提示词("顾及近期发布,别给过时工具链建议")——只读不触发,
+      预算边界不破(视觉用于 UI 回归基准仍待做)
 - [ ] 新设备类型镜像的自动下载(依赖厂商开放公开通道)【blocked:厂商】
 - [ ] 域缺口补齐:hapsigntool 签名封装、onDeviceTest 设备测试、
       API-level 能力矩阵(26.0.0 起版本号改 SemVer,体检/脚手架需按矩阵适配)、
       module.json5/build-profile.json5 schema 校验
-- [ ] 门禁方法学:bench 断言从子串匹配升级(精确/结构化校验+评测集滚动窗口)、
-      候选多样本重测、成本纳入双指标门禁
+- [x] **门禁方法学(2026-09-04)**:bench 断言升级四模式(expect-exact 精确
+      等值/expect-regex 正则/expect-none 禁词否决/expect-any 多选一,旧
+      expect 子串语义向后兼容)+成本双指标门(候选输出成本超基线×cap 拒绝,
+      默认 1.3x,用例 cost-cap 行自定义)+坏正则判例错误;评测集滚动窗口
+      与候选多样本重测此前已备(双样本门)
 - [ ] 旧线(codelin / harmony-harness,2026-08-28 退役)资产甄别出的域缺口,按价值排序:
       HarmonyOS API 知识图谱(dts 解析+证据链检索,codelin api_kg)、
       编译-修复闭环(错误分类→修复 agent→patch 应用,codelin icf)、

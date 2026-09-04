@@ -16,7 +16,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, type ProviderConfig } from '@hmh/kernel';
-import { listCases, matchExpect, seedCases, type BenchCase } from './bench.ts';
+import { listCases, matchCase, seedCases, type BenchCase } from './bench.ts';
 import { deleteDraft, listCanary, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';
 import { readInsights } from './insights.ts';
@@ -70,6 +70,21 @@ export interface EvolveReport {
 
 /** Runs one bench case with the given skills block injected. */
 export type CaseRunner = (c: BenchCase, skillsPrompt: string) => Promise<string>;
+
+/** One bench run through the structured assertion (upgraded gate: exact/
+ *  regex/none/any modes, not just substrings). Also returns the raw output
+ *  so callers can cost-cap (verbose-but-passing candidates). */
+async function runAndAssert(runCase: CaseRunner, c: BenchCase, injection: string): Promise<{ pass: boolean; output: string }> {
+  const output = await runCase(c, injection);
+  return { pass: matchCase(output, c).pass, output };
+}
+
+/** Rough token estimate: chars/4 - good enough to catch a 3x bloat, never
+ *  used as the only rejection reason (the pass-rate gate decides; cost-cap
+ *  only vetoes candidates that pass by rambling). */
+function estTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
 
 export async function runEvolution(opts: {
   home: string;
@@ -125,6 +140,14 @@ export async function runEvolution(opts: {
   const insightIds = insights.map((i) => `${i.time.slice(0, 16)}:${i.session.slice(-6)}`);
   const toolCounts: Record<string, number> = {};
   for (const i of insights) for (const t of i.toolsUsed) toolCounts[t] = (toolCounts[t] ?? 0) + 1;
+  // Radar feed (ops keeper): the newest ecosystem brief as context for
+  // proposals - toolchain advice must know what shipped recently.
+  // Read-only, best-effort; no brief = no signal.
+  let radarBrief: string | null = null;
+  try {
+    const { latestRadarBrief } = await import('./radar.ts');
+    radarBrief = await latestRadarBrief(home);
+  } catch { /* radar feed absent = no ecosystem signal this cycle */ }
   const signals = {
     sessions: insights.length,
     failures: insights.filter((i) => i.outcome !== 'ok').map((i) => ({ task: i.task, outcome: i.outcome })),
@@ -133,14 +156,21 @@ export async function runEvolution(opts: {
     canarySkills: canary.map((s: { name: string }) => s.name),
     existingDrafts: drafts.map((s) => s.name),
     recentNotes: notes.slice(-10).map((n) => n.text),
+    ecosystemNews: radarBrief ?? '(no recent ecosystem brief - run hmh ops scan)',
   };
 
   // 3. Baseline bench (train gates promotion; holdout re-verifies after).
+  // Per-case cost captured too - the dual-metric gate (P0 methodology):
+  // a candidate that passes only by RAMBLING (cost > baseline x cost-cap)
+  // gets vetoed even at a green pass rate.
   say(`baseline bench: ${train.length} train + ${holdout.length} holdout cases`);
   const baseResults: Array<{ name: string; pass: boolean }> = [];
+  const baseCost: Record<string, number> = {};
   for (const c of train) {
     try {
-      baseResults.push({ name: c.name, pass: matchExpect(await runCase(c, skillsToPrompt(active)), c.expect) });
+      const r = await runAndAssert(runCase, c, skillsToPrompt(active));
+      baseResults.push({ name: c.name, pass: r.pass });
+      baseCost[c.name] = estTokens(r.output);
     } catch (err) {
       baseResults.push({ name: c.name, pass: false });
       say(`  case ${c.name} threw: ${String(err).slice(0, 100)}`);
@@ -150,7 +180,7 @@ export async function runEvolution(opts: {
   const holdoutBase: Array<{ name: string; pass: boolean }> = [];
   for (const c of holdout) {
     try {
-      holdoutBase.push({ name: c.name, pass: matchExpect(await runCase(c, skillsToPrompt(active)), c.expect) });
+      holdoutBase.push({ name: c.name, pass: (await runAndAssert(runCase, c, skillsToPrompt(active))).pass });
     } catch {
       holdoutBase.push({ name: c.name, pass: false });
     }
@@ -200,19 +230,30 @@ export async function runEvolution(opts: {
       const draftBlock = `## Draft skill under evaluation: ${p.name}\n\n${p.skill_md.slice(0, 4000)}`;
       const candidateInjection = `${skillsToPrompt(active)}\n${draftBlock}`;
       const candResults: Array<{ name: string; pass: boolean }> = [];
+      const candCost: Record<string, number> = {};
       for (const c of train) {
         try {
           // two independent samples: a candidate passes only if it passes
           // BOTH runs - a single lucky output must not clear the gate
-          const a = matchExpect(await runCase(c, candidateInjection), c.expect);
-          const b = a ? matchExpect(await runCase(c, candidateInjection), c.expect) : false;
-          candResults.push({ name: c.name, pass: a && b });
+          const a = await runAndAssert(runCase, c, candidateInjection);
+          const b = a.pass ? await runAndAssert(runCase, c, candidateInjection) : { pass: false, output: '' };
+          candResults.push({ name: c.name, pass: a.pass && b.pass });
+          candCost[c.name] = Math.max(estTokens(a.output), estTokens(b.output));
         } catch {
           candResults.push({ name: c.name, pass: false });
         }
       }
       const candRate = candResults.filter((r) => r.pass).length / candResults.length;
       const regression = baseResults.some((b) => b.pass && !candResults.find((c) => c.name === b.name)?.pass);
+      // dual-metric veto: a passing case that costs > cost-cap x its
+      // baseline counts as a cost regression (the candidate passed by
+      // rambling) - only enforced where the case declares a cost-cap
+      const costRegressions = train.filter((c) => {
+        const cap = c.costCap ?? 1.3; // default 1.3x for all cases
+        const base = baseCost[c.name] ?? 0;
+        const cand = candCost[c.name] ?? 0;
+        return base > 0 && cand > base * cap;
+      }).map((c) => c.name);
       const summary = (rs: Array<{ name: string; pass: boolean }>) => rs.map((r) => `${r.name}:${r.pass ? 'pass' : 'FAIL'}`).join(' ');
       if (regression || candRate < baseRate) {
         await deleteDraft(home, p.name);
@@ -226,6 +267,20 @@ export async function runEvolution(opts: {
           lineage: { parentInsights: insightIds, scores: { train: candRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
         });
         say(`  rejected (${regression ? 'regression' : 'lower pass rate'})`);
+        continue;
+      }
+      if (costRegressions.length > 0) {
+        await deleteDraft(home, p.name);
+        await recordParetoEntry(home, { name: p.name, parentInsights: insightIds, rejectedReason: `cost regression on ${costRegressions.join(', ')}`, scores: { train: candRate }, metaModel: provider.model, at: new Date().toISOString() });
+        report.outcomes.push({
+          name: p.name,
+          action: 'rejected',
+          reason: `passed the bench but by rambling: output cost exceeded the baseline cap on ${costRegressions.join(', ')}`,
+          baseline: { passRate: baseRate, cases: summary(baseResults) },
+          candidate: { passRate: candRate, cases: summary(candResults) },
+          lineage: { parentInsights: insightIds, scores: { train: candRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
+        });
+        say(`  rejected (cost regression on ${costRegressions.join(', ')})`);
         continue;
       }
       // P0 canary promotion: passing the train+holdout gates earns a
@@ -244,9 +299,9 @@ export async function runEvolution(opts: {
         for (const c of holdout) {
           try {
             // same double-sample rule as the training gate
-            const a = matchExpect(await runCase(c, candidateInjection), c.expect);
-            const b = a ? matchExpect(await runCase(c, candidateInjection), c.expect) : false;
-            holdoutCand.push({ name: c.name, pass: a && b });
+            const a = await runAndAssert(runCase, c, candidateInjection);
+            const b = a.pass ? await runAndAssert(runCase, c, candidateInjection) : { pass: false, output: '' };
+            holdoutCand.push({ name: c.name, pass: a.pass && b.pass });
           } catch {
             holdoutCand.push({ name: c.name, pass: false });
           }
@@ -385,7 +440,7 @@ async function proposeSkills(
       lineage += `\nA second rejected candidate with a DIFFERENT failure mode - consider merging their complementary angles:\nname: ${mergeWith.name}\nrejected because: ${mergeWith.rejectedReason ?? 'unknown'}\n${mergeWith.skillMd ? `content (first 1000 chars):\n${mergeWith.skillMd.slice(0, 1000)}\n` : ''}`;
     }
   }
-  const user = `Session signals:\n${JSON.stringify(signals, null, 2)}${lineage}\n\nPropose at most 2 skills (or []).`;
+  const user = `Session signals:\n${JSON.stringify(signals, null, 2)}${lineage}\n\nIf signals.ecosystemNews mentions recent OpenHarmony releases, prefer proposals that account for them over stale toolchain advice.\n\nPropose at most 2 skills (or []).`;
   const r = await chat(provider, [
     { role: 'system', content: system },
     { role: 'user', content: user },
