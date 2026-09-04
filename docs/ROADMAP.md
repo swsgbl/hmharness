@@ -96,6 +96,16 @@
       门禁/回滚四条件同时满足)
 
 ## 待办(非阻塞)
+- [x] **自进化生产化 P0+P1(2026-09-04,论文验证驱动)**:血缘账本(lineage+
+      skillsInjected)/金丝雀晋升(canary 态+20% 采样+水印+`bench --impact`
+      对照组判定)/进化预算闸门/技能算子 pin/decay(dormant 不删)/GEPA
+      Pareto 池+单祖先变异+Merge 交叉(忠实原文机制)/AWM 工作流归纳(走
+      既有门禁管线);12 篇论文原文验证修正三处转述失真,详见
+      docs/research/self-evolution-upgrade.md 与 DEVLOG 当日轮
+- [ ] P2 推理时进化:高代价操作前计划验证(n=3+规则验证器,Seld-Refine 教训
+      "校验修法而非改动")/Tier1 第 2 次失败插 CRITIC 结构化反思/静态知识
+      刷新(鸿蒙官方文档快照 diff→知识补丁技能草案→过门)
+- [ ] P3 拓扑进化最小版:spawn_agent 角色成功率记录+锦标赛淘汰(诚实最小实现)
 - [ ] 物理真机回路(等设备接入;scripts/e2e-device.mts 一键即绪)
       【blocked:外部硬件】
 - [ ] npm 公开发布 bin(README 用法以 npm link 为准,发布后更新)

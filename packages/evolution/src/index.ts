@@ -4,3 +4,5 @@ export * from './skills.ts';
 export * from './bench.ts';
 export * from './evolve.ts';
 export * from './patches.ts';
+export * from './impact.ts';
+export * from './workflows.ts';

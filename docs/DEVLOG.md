@@ -4,6 +4,68 @@
 
 ---
 
+## 2026-09-04 · 自进化生产化轮(P0 可观测+P1 种群化,论文验证驱动)
+
+**动机**:用户令用 XMUDeepLIT/Awesome-Self-Evolving-Agents 综述做差距分析+生产
+级升级蓝图,"搜索全网验证补全,最后根据结果来执行全面升级"。
+
+**调研(12 篇论文原文逐篇验证,两个并行 agent)**:综述六维分类法逐条核对
+(Model-Centric Inference/Training;Environment-Centric Static/Dynamic/Modular/
+Topology;Co-Evolution)。**验证推翻了初版蓝图三处转述失真**:①GEPA 不是
+"k 候选并行采样选优"——原文是 Pareto 前沿**单祖先单变异稳态遗传循环**;
+②DGM 死因不是"漂移"(v1/v3 全文 drift 0 命中)——是 **objective hacking**
+(node 114 绕过评估函数,类比 reward hacking+Goodhart);③ACE 无"bench 门控
+版本化"——真实机制是 embedding 去重+上下文长度触发修剪。**Voyager 教训反转**:
+"技能库膨胀"论文当卖点(ever-growing 缓解遗忘),全文无任何生命周期管理——
+膨胀是真实但被论文忽视的缺口,做 merge/decay 是补课不是复现。**新成立教训**:
+Self-Refine 94% 失败源于反馈质量(33% 定位错+61% 修法错);Misevolve 实证
+memory 进化→safety alignment decay+部署期 reward hacking,缓解="references
+not rules";AWM 工作流归纳+选择性注入完全属实;Agent KB 分层检索(workflow 级
+规划+execution 级纠错)+分歧门控。验证后蓝图:**docs/research/self-evolution-upgrade.md**。
+
+**P0 落地(可观测性——一切算法的前提)**:
+- **血缘账本**:ProposalOutcome.lineage{parentInsights,scores,metaModel,
+  decidedAt}三落点;Insight.skillsInjected 注入键;evidence/report 不可审计→可审计
+- **金丝雀晋升**:promote 默认目标=**canary 态**(过双门只赚实验位,不直接
+  全量);~20% 会话确定性采样注入(session hash 稳定归因)+Misevolve 水印
+  "references not rules";`hmh bench --impact`:暴露组 vs 对照组 ≥8 会话且
+  成功率差 ≥10% 才 promote/retire,数据薄=诚实 insufficient-data——**objective
+  hacking 的结构性防线:不信进化系统自己能看到的指标,信对照组**
+- **进化预算闸门**:config.evolutionBudget{maxCyclesPerDay,maxTokensPerCycle},
+  当日超限 skip 并记 budget 行(AZR"safety alarms"教训:无界自进化失稳)
+- **技能算子**:pin(用户钉住永不被进化动)/promoteCanary/retireCanary(退回
+  draft 不删,只增不删红线)/decay(30 天零注入→dormant 出注入集,Voyager
+  补课)
+
+**P1 落地(GEPA 化,忠实原文机制)**:
+- **Pareto 候选池**:被拒候选持久化 evolution/pareto/entries.jsonl(带拒因+
+  skillMd 快照)——GEPA/DGM 共同支柱:多样性存档防局部最优
+- **单祖先变异**:每轮从池中随机采 ONE 祖先喂 proposeSkills("learn from why
+  it failed, propose a VARIATION"),互补拒因 30% 概率 Merge 交叉——原文
+  Algorithm 1 机制,非 k-候选锦标赛
+- **AWM 工作流归纳**(workflows.ts):洞察按任务原型聚类(归一化前缀),同型
+  ≥3 次→元模型归纳 {{参数化}} 工作流模板(带触发条件)→走**既有** draft→
+  防投毒→双门管线(不开新口子);常规 propose 空转时才触发(预算友好)
+
+**红线全部保留**:进化写域仍限 skills/+memory/+已批补丁;kernel
+loop/provider/config/security 永不可触;评估细节(bench 用例)永不进进化元
+模型提示词(objective hacking 防线)。
+
+**实测**:新 impact.test.ts 9 用例(canary 采样确定性+~20% 分布/预算读数/
+Pareto 存取+祖先+Merge/draft→canary→promote→active 全链/retire 不删/promote
+判定 ≥10% 边界/insufficient-data 下限/pin 豁免 decay+30 天安静/AWM 聚类);
+skills.test.ts 更新为 canary 协议(顺带修真 bug:re-promote 占用 canary 目录
+EPERM→canary 前任也入 archive);全套 **59/59**;七包构建+dist 六项字节验证
+(impact.js/workflows.js/lineage/canary/skillsInjected/--impact 全在);空 home
+`bench --impact` 冒烟"no canary skills under evaluation"诚实输出。
+
+**教训**:⑯引用论文教训前必须回原文核对——本批 5 处主张 2 失真 1 反转,
+未核对的"文献驱动开发"等于传闻驱动;⑰P0 可观测先于一切算法:没有归因
+闭环,GEPA/金丝雀的效果与运气不可分;⑱机制升级要顺着既有门禁管线开
+(AWM 走 draft→gate 而非另开口子),新能力=新风险面。
+
+---
+
 ## 2026-09-04 · TUI /model 选择器交互修复轮
 
 **动机**:用户实测反馈"tui 界面的 /model 列出来的模型列表,上下键无法选择,用鼠标

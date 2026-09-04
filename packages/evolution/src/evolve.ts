@@ -17,9 +17,10 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, type ProviderConfig } from '@hmh/kernel';
 import { listCases, matchExpect, seedCases, type BenchCase } from './bench.ts';
-import { deleteDraft, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
+import { deleteDraft, listCanary, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';
 import { readInsights } from './insights.ts';
+import { readBudget, recordParetoEntry, readParetoEntries, sampleAncestor, impactReport, decayUnusedSkills } from './impact.ts';
 
 export interface SkillProposal {
   name: string;
@@ -34,6 +35,16 @@ export interface ProposalOutcome {
   baseline?: { passRate: number; cases: string };
   candidate?: { passRate: number; cases: string };
   holdout?: { baselineRate: number; candidateRate: number };
+  /** P0 lineage ledger: what fed this decision (provenance for impact
+   *  attribution - which insights produced which skill, with which scores).
+   *  Evolution-artifact genealogy is the GEPA/DGM archive lesson: decisions
+   *  without ancestry cannot be audited for objective hacking. */
+  lineage?: {
+    parentInsights: string[];
+    scores: { train: number; holdout?: number };
+    metaModel: string;
+    decidedAt: string;
+  };
 }
 
 export interface EvolveReport {
@@ -49,6 +60,12 @@ export interface EvolveReport {
   codePatches?: Array<{ name: string; file: string; reason: string }>;
   /** code-level outcomes: merged/reverted/error per patch */
   patchOutcomes?: Array<{ name: string; action: string; reason: string; branch?: string }>;
+  /** P0 impact attribution: canary A/B comparison applied this cycle */
+  impact?: { rows: Array<{ skill: string; exposed: string; control: string; verdict: string }>; applied: string[] };
+  /** P1 lifecycle: skills moved to dormant this cycle */
+  decayed?: string[];
+  /** budget state at cycle start (observability) */
+  budget?: { cyclesToday: number; maxCyclesPerDay?: number };
 }
 
 /** Runs one bench case with the given skills block injected. */
@@ -77,6 +94,16 @@ export async function runEvolution(opts: {
     memoryDistilled: null,
   };
 
+  // P0 evolution budget gate (AZR "safety alarms" + cost control): a day's
+  // cycle count and a per-cycle token ceiling live in config; overspending
+  // skips the cycle instead of burning money unattended.
+  const budget = await readBudget(home);
+  const today = new Date().toISOString().slice(0, 10);
+  if (budget.maxCyclesPerDay && budget.cyclesToday >= budget.maxCyclesPerDay) {
+    report.outcomes.push({ name: '(budget)', action: 'error', reason: `daily cycle limit reached (${budget.cyclesToday}/${budget.maxCyclesPerDay} today) - skipped` });
+    return report;
+  }
+
   // 1. Seed bench cases on a fresh home so the gate always has a signal.
   report.seededCases = await seedCases(home);
   const cases = await listCases(home);
@@ -92,8 +119,10 @@ export async function runEvolution(opts: {
   const notes = await readNotes(home);
   const active = await listSkills(home);
   const drafts = await listDrafts(home);
+  const canary = await listCanary(home);
   report.insightCount = insights.length;
   report.noteCount = notes.length;
+  const insightIds = insights.map((i) => `${i.time.slice(0, 16)}:${i.session.slice(-6)}`);
   const toolCounts: Record<string, number> = {};
   for (const i of insights) for (const t of i.toolsUsed) toolCounts[t] = (toolCounts[t] ?? 0) + 1;
   const signals = {
@@ -101,6 +130,7 @@ export async function runEvolution(opts: {
     failures: insights.filter((i) => i.outcome !== 'ok').map((i) => ({ task: i.task, outcome: i.outcome })),
     toolUsage: toolCounts,
     activeSkills: active.map((s) => s.name),
+    canarySkills: canary.map((s: { name: string }) => s.name),
     existingDrafts: drafts.map((s) => s.name),
     recentNotes: notes.slice(-10).map((n) => n.text),
   };
@@ -128,8 +158,28 @@ export async function runEvolution(opts: {
   const holdoutBaseRate = holdoutBase.length === 0 ? 1 : holdoutBase.filter((r) => r.pass).length / holdoutBase.length;
   say(`baseline: train ${(baseRate * 100).toFixed(0)}%, holdout ${(holdoutBaseRate * 100).toFixed(0)}%`);
 
-  // 4. Proposals: preset (tests/UI) or meta-model call.
-  const proposals = opts.presetProposals ?? (await proposeSkills(provider, signals, say));
+  // 4. Proposals: preset (tests/UI) or meta-model call. The GEPA population
+  // loop: ONE random ancestor from the rejected-candidate pool (Pareto
+  // front) feeds the prompt so evolution varies around the archive, not
+  // around the single best; a complementary reject gets merged in (cross).
+  // AWM adds workflow-level induction from repeated task archetypes - a
+  // higher abstraction than per-mistake reflection (paper-verified).
+  const pool = await readParetoEntries(home, 60);
+  const { ancestor, mergeWith } = sampleAncestor(pool);
+  let proposals: SkillProposal[];
+  if (opts.presetProposals) {
+    proposals = opts.presetProposals;
+  } else {
+    proposals = await proposeSkills(provider, signals, say, ancestor ?? undefined, mergeWith ?? undefined);
+    if (proposals.length === 0) {
+      try {
+        const { workflowProposals } = await import('./workflows.ts');
+        proposals = await workflowProposals(provider, home, say);
+      } catch (err) {
+        say(`  awm skipped: ${String(err).slice(0, 80)}`);
+      }
+    }
+  }
   report.proposals = proposals;
 
   // 5. A/B gate each proposal on the train set.
@@ -166,17 +216,25 @@ export async function runEvolution(opts: {
       const summary = (rs: Array<{ name: string; pass: boolean }>) => rs.map((r) => `${r.name}:${r.pass ? 'pass' : 'FAIL'}`).join(' ');
       if (regression || candRate < baseRate) {
         await deleteDraft(home, p.name);
+        await recordParetoEntry(home, { name: p.name, parentInsights: insightIds, rejectedReason: regression ? 'bench regression' : `pass rate ${candRate.toFixed(2)} < baseline ${baseRate.toFixed(2)}`, scores: { train: candRate }, metaModel: provider.model, at: new Date().toISOString() });
         report.outcomes.push({
           name: p.name,
           action: 'rejected',
           reason: regression ? 'bench regression on a previously passing case' : `pass rate ${candRate} < baseline ${baseRate}`,
           baseline: { passRate: baseRate, cases: summary(baseResults) },
           candidate: { passRate: candRate, cases: summary(candResults) },
+          lineage: { parentInsights: insightIds, scores: { train: candRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
         });
         say(`  rejected (${regression ? 'regression' : 'lower pass rate'})`);
         continue;
       }
-      const { archivedPrevious } = await promoteSkill(home, p.name);
+      // P0 canary promotion: passing the train+holdout gates earns a
+      // CANARY slot (injected into ~20% of sessions, watermarked as
+      // experimental), not immediate full-active. The impact loop
+      // (bench --impact) compares canary vs control sessions and promotes
+      // to active only on evidence - the objective-hacking defense:
+      // never trust only the metric the evolution system can see.
+      const { archivedPrevious } = await promoteSkill(home, p.name, { canary: true });
       // Holdout re-verification (GDPevo anti-memorization): the gate saw the
       // train cases; holdout cases check the skill generalizes. Regression
       // here rolls the promotion back.
@@ -202,6 +260,7 @@ export async function runEvolution(opts: {
             await unpromoteSkill(home, p.name);
             await deleteDraft(home, p.name);
           }
+          await recordParetoEntry(home, { name: p.name, parentInsights: insightIds, rejectedReason: `holdout regression (${holdoutRate.toFixed(2)} < ${holdoutBaseRate.toFixed(2)})`, scores: { train: candRate, holdout: holdoutRate }, metaModel: provider.model, at: new Date().toISOString() });
           report.outcomes.push({
             name: p.name,
             action: 'rejected',
@@ -209,6 +268,7 @@ export async function runEvolution(opts: {
             baseline: { passRate: baseRate, cases: summary(baseResults) },
             candidate: { passRate: candRate, cases: summary(candResults) },
             holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate },
+            lineage: { parentInsights: insightIds, scores: { train: candRate, holdout: holdoutRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
           });
           say(`  rolled back (holdout regression: ${(holdoutRate * 100).toFixed(0)}% < ${(holdoutBaseRate * 100).toFixed(0)}%)`);
           continue;
@@ -220,12 +280,13 @@ export async function runEvolution(opts: {
       report.outcomes.push({
         name: p.name,
         action: 'promoted',
-        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''})${archivedPrevious ? '; previous version archived' : ''}${weakGate ? ' [WEAK GATE: no holdout cases defined]' : ''}`,
+        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''}) - promoted to CANARY (20% sessions, impact-gated full promotion)${archivedPrevious ? '; previous version archived' : ''}${weakGate ? ' [WEAK GATE: no holdout cases defined]' : ''}`,
         baseline: { passRate: baseRate, cases: summary(baseResults) },
         candidate: { passRate: candRate, cases: summary(candResults) },
         ...(holdout.length ? { holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate } } : {}),
+        lineage: { parentInsights: insightIds, scores: { train: candRate, holdout: holdout.length ? holdoutRate : undefined }, metaModel: provider.model, decidedAt: new Date().toISOString() },
       });
-      say(`  promoted${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ' [weak gate: no holdout]'}`);
+      say(`  promoted to canary${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ' [weak gate: no holdout]'}`);
     } catch (err) {
       report.outcomes.push({ name: p.name, action: 'error', reason: String(err).slice(0, 200) });
       say(`  error: ${String(err).slice(0, 120)}`);
@@ -271,6 +332,28 @@ export async function runEvolution(opts: {
     }
   }
 
+  // 7.5. P0 impact loop: graduate/retire canaries on evidence; P1 decay:
+  //  quiet skills leave the injection set (never deleted). Both are
+  //  best-effort - measurement must never fail the cycle.
+  try {
+    report.budget = { cyclesToday: budget.cyclesToday, maxCyclesPerDay: budget.maxCyclesPerDay };
+    const impact = await impactReport(home);
+    if (impact.rows.length > 0) {
+      report.impact = {
+        rows: impact.rows.map((r) => ({ skill: r.skill, exposed: `${r.exposed.sessions}s/${(r.exposed.okRate * 100).toFixed(0)}%`, control: `${r.control.sessions}s/${(r.control.okRate * 100).toFixed(0)}%`, verdict: r.verdict })),
+        applied: impact.applied,
+      };
+      for (const a of impact.applied) say(`  impact: ${a}`);
+    }
+    const decayed = await decayUnusedSkills(home);
+    if (decayed.length) {
+      report.decayed = decayed;
+      say(`  decayed to dormant: ${decayed.join(', ')}`);
+    }
+  } catch (err) {
+    say(`  impact/decay skipped: ${String(err).slice(0, 100)}`);
+  }
+
   // 7. Durable evolution log.
   const logDir = join(home, 'evolution');
   await mkdir(logDir, { recursive: true });
@@ -282,6 +365,8 @@ async function proposeSkills(
   provider: ProviderConfig,
   signals: Record<string, unknown>,
   say: (l: string) => void,
+  ancestor?: { name: string; rejectedReason?: string; skillMd?: string; scores: { train: number; holdout?: number } },
+  mergeWith?: { name: string; rejectedReason?: string; skillMd?: string } | null,
 ): Promise<SkillProposal[]> {
   const system = [
     'You are the evolution module of hmharness, a self-evolving agent framework for HarmonyOS development.',
@@ -290,7 +375,17 @@ async function proposeSkills(
     'Rules: name is kebab-case; description is one line; skill_md is at most 60 lines with concrete steps and example commands; do NOT propose skills about security config, approval policy, or anything outside the topics; if nothing is genuinely reusable, return an empty array.',
     'Respond with ONLY a JSON array: [{"name":"...","description":"...","skill_md":"..."}] - no prose, no code fences.',
   ].join('\n');
-  const user = `Session signals:\n${JSON.stringify(signals, null, 2)}\n\nPropose at most 2 skills (or []).`;
+  // GEPA ancestor context: vary around a past rejection (its reason is the
+  // lesson), optionally crossing with a complementary one - steady-state
+  // genetic sampling instead of always restarting from scratch.
+  let lineage = '';
+  if (ancestor) {
+    lineage = `\nPast rejected candidate (sampled from the archive - learn from why it failed, propose a VARIATION that fixes it):\nname: ${ancestor.name}\nrejected because: ${ancestor.rejectedReason ?? 'unknown'}\n${ancestor.skillMd ? `its content (first 1500 chars):\n${ancestor.skillMd.slice(0, 1500)}\n` : ''}`;
+    if (mergeWith) {
+      lineage += `\nA second rejected candidate with a DIFFERENT failure mode - consider merging their complementary angles:\nname: ${mergeWith.name}\nrejected because: ${mergeWith.rejectedReason ?? 'unknown'}\n${mergeWith.skillMd ? `content (first 1000 chars):\n${mergeWith.skillMd.slice(0, 1000)}\n` : ''}`;
+    }
+  }
+  const user = `Session signals:\n${JSON.stringify(signals, null, 2)}${lineage}\n\nPropose at most 2 skills (or []).`;
   const r = await chat(provider, [
     { role: 'system', content: system },
     { role: 'user', content: user },
@@ -304,7 +399,7 @@ async function proposeSkills(
       out.push({ name: o.name, description: typeof o.description === 'string' ? o.description : '', skill_md: o.skill_md });
     }
   }
-  say(`proposals: ${out.length ? out.map((p) => p.name).join(', ') : '(none)'}`);
+  say(`proposals: ${out.length ? out.map((p) => p.name).join(', ') : '(none)'}${ancestor ? ` (ancestor: ${ancestor.name})` : ''}`);
   return out;
 }
 

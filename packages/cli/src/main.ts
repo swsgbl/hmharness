@@ -471,6 +471,24 @@ flags:
   }
   if (cmd === 'bench') {
     await initHome();
+    // `hmh bench --impact`: the canary A/B report - which experimental
+    // skills earned full activation on evidence, which retired, which
+    // need more data. The observability half of self-evolution (P0).
+    if (rest.includes('--impact')) {
+      const { impactReport } = await import('@hmh/evolution');
+      const { rows, applied } = await impactReport(homeDir());
+      if (rows.length === 0) {
+        stdout.write(DIM('no canary skills under evaluation\n'));
+        return;
+      }
+      for (const r of rows) {
+        const badge = r.verdict === 'promote' ? GREEN('PROMOTE') : r.verdict === 'retire' ? YELLOW('RETIRE') : r.verdict === 'keep' ? GREEN('KEEP') : DIM('needs data');
+        stdout.write(`${badge.padEnd(10)} ${r.skill} — exposed ${r.exposed.sessions}s/${(r.exposed.okRate * 100).toFixed(0)}% vs control ${r.control.sessions}s/${(r.control.okRate * 100).toFixed(0)}%\n`);
+      }
+      if (applied.length) stdout.write('\n' + applied.map((a) => CYAN('✓ ') + a).join('\n') + '\n');
+      else stdout.write(DIM('\n(no verdicts strong enough to act on - honesty over noise)\n'));
+      return;
+    }
     const runner = makeCaseRunner();
     const { results, passRate } = await runBench(homeDir(), (c) => runner(c, ''));
     for (const r of results) stdout.write(`${r.pass ? GREEN('PASS') : YELLOW('FAIL')} ${r.name} — ${r.detail}\n`);

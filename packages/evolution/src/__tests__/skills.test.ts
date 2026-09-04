@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { deleteDraft, listDrafts, listSkills, promoteSkill, rollbackSkill, unpromoteSkill, writeDraft } from '../skills.ts';
+import { deleteDraft, listCanary, listDrafts, listSkills, promoteCanary, promoteSkill, rollbackSkill, unpromoteSkill, writeDraft } from '../skills.ts';
 
 let home: string;
 before(async () => {
@@ -13,10 +13,12 @@ after(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-test('skill lifecycle: draft -> promote -> re-promote archives -> rollback restores', async () => {
+test('skill lifecycle: draft -> canary promote -> re-promote archives -> rollback restores', async () => {
   await writeDraft(home, 'ut-skill', '---\nname: ut-skill\ndescription: v1\n---\n# v1\n');
+  // default promotion targets canary (P0): the bench gate earns a canary
+  // slot, full activation comes from the impact loop's evidence
   await promoteSkill(home, 'ut-skill');
-  assert.ok((await listSkills(home)).some((s) => s.name === 'ut-skill'));
+  assert.ok((await listCanary(home)).some((s) => s.name === 'ut-skill'));
   assert.equal((await listDrafts(home)).length, 0);
 
   await writeDraft(home, 'ut-skill', '---\nname: ut-skill\ndescription: v2\n---\n# v2\n');
@@ -25,11 +27,14 @@ test('skill lifecycle: draft -> promote -> re-promote archives -> rollback resto
 
   const ok = await rollbackSkill(home, 'ut-skill');
   assert.equal(ok, true);
-  const active = (await listSkills(home)).find((s) => s.name === 'ut-skill');
-  assert.match(active?.description ?? '', /v1/);
+  const restored = (await listSkills(home)).find((s) => s.name === 'ut-skill')
+    ?? (await listCanary(home)).find((s) => s.name === 'ut-skill');
+  assert.match(restored?.description ?? '', /v1/);
 });
 
 test('unpromote moves active back to drafts; deleteDraft removes', async () => {
+  // after test 1's rollback, v1 sits in skills/active - a normal active skill
+  assert.ok((await listSkills(home)).some((s) => s.name === 'ut-skill'));
   assert.equal(await unpromoteSkill(home, 'ut-skill'), true);
   assert.ok((await listDrafts(home)).some((s) => s.name === 'ut-skill'));
   assert.equal(await deleteDraft(home, 'ut-skill'), true);

@@ -17,13 +17,49 @@ import { promisify } from 'node:util';
 
 const execCb = promisify(execFile);
 
-export type SkillState = 'draft' | 'active' | 'archived';
+export type SkillState = 'draft' | 'canary' | 'active' | 'archived';
 
 export interface SkillEntry {
   name: string;
   description: string;
   file: string;
   state: SkillState;
+}
+
+/** Skills the user pinned: evolution never moves, merges or decays them.
+ *  Marked by a .pin file next to SKILL.md (cheap, visible, git-friendly). */
+export async function pinSkill(home: string, name: string): Promise<boolean> {
+  for (const dir of [join(home, 'skills', 'active', sanitize(name)), join(home, 'skills', sanitize(name)), join(home, 'skills', 'canary', sanitize(name))]) {
+    try {
+      await writeFile(join(dir, '.pin'), String(new Date().toISOString()), 'utf8');
+      return true;
+    } catch { /* try next location */ }
+  }
+  return false;
+}
+
+export async function unpinSkill(home: string, name: string): Promise<boolean> {
+  for (const dir of [join(home, 'skills', 'active', sanitize(name)), join(home, 'skills', sanitize(name)), join(home, 'skills', 'canary', sanitize(name))]) {
+    try {
+      await rm(join(dir, '.pin'), { force: true });
+      return true;
+    } catch { /* try next */ }
+  }
+  return false;
+}
+
+export async function isPinned(file: string): Promise<boolean> {
+  try {
+    await readFile(join(dirname(file), '.pin'), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dirname(p: string): string {
+  const m = /^(.*)[\\/][^\\/]+$/.exec(p);
+  return m?.[1] ?? p;
 }
 
 /**
@@ -97,13 +133,19 @@ function basename(p: string): string {
 export async function listSkills(home: string): Promise<SkillEntry[]> {
   const root = join(home, 'skills');
   // Phase 0 layout: skills/<name>/SKILL.md directly under root (excluding lifecycle dirs)
-  const legacy = await scan(join(root), ['draft', 'active', 'archive'], 'active');
+  const legacy = await scan(join(root), ['draft', 'active', 'canary', 'archive'], 'active');
   const active = await scan(join(root, 'active'), [], 'active');
   return [...legacy, ...active].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function listDrafts(home: string): Promise<SkillEntry[]> {
   return scan(join(home, 'skills', 'draft'), [], 'draft');
+}
+
+/** Canary-state skills: promoted through the bench gates but still under
+ *  impact evaluation - injected into a sample of sessions, watermarked. */
+export async function listCanary(home: string): Promise<SkillEntry[]> {
+  return scan(join(home, 'skills', 'canary'), [], 'canary');
 }
 
 async function scan(dir: string, exclude: string[], state: SkillState): Promise<SkillEntry[]> {
@@ -140,20 +182,28 @@ export async function writeDraft(home: string, name: string, skillMd: string): P
 }
 
 /**
- * Promote a draft to active. If an active skill with the same name exists
- * it is archived first (timestamped snapshot) so promoteSkill is always
- * reversible via rollbackSkill.
+ * Promote a draft. Default target is `canary` (P0: bench-passing skills
+ * earn a canary slot first; full activation happens through the impact
+ * loop, not on the gate alone). `{canary: false}` promotes straight to
+ * active (used by the impact loop once evidence clears, and by `hmh skills
+ * promote`). If a same-name skill exists at the destination it is archived
+ * first (timestamped snapshot) so promotion is always reversible.
  */
-export async function promoteSkill(home: string, name: string): Promise<{ file: string; archivedPrevious: boolean }> {
+export async function promoteSkill(home: string, name: string, opts: { canary?: boolean } = {}): Promise<{ file: string; archivedPrevious: boolean }> {
   const safe = sanitize(name);
   const draftDir = join(home, 'skills', 'draft', safe);
   const activeDir = join(home, 'skills', 'active', safe);
+  const canaryDir = join(home, 'skills', 'canary', safe);
   const legacyDir = join(home, 'skills', safe);
   await mkdir(join(home, 'skills', 'active'), { recursive: true });
   await mkdir(join(home, 'skills', 'archive'), { recursive: true });
+  if (opts.canary !== false) await mkdir(join(home, 'skills', 'canary'), { recursive: true });
 
   let archivedPrevious = false;
-  for (const existing of [activeDir, legacyDir]) {
+  // archive incumbents at both destinations: active/legacy AND an existing
+  // canary slot (re-promoting a canary skill must not rename onto an
+  // occupied directory - that is EPERM on Windows)
+  for (const existing of [activeDir, legacyDir, join(home, 'skills', 'canary', safe)]) {
     try {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       await rename(existing, join(home, 'skills', 'archive', `${stamp}_${safe}`));
@@ -162,8 +212,35 @@ export async function promoteSkill(home: string, name: string): Promise<{ file: 
       /* nothing at this path */
     }
   }
-  await rename(draftDir, activeDir);
-  return { file: join(activeDir, 'SKILL.md'), archivedPrevious };
+  await rename(draftDir, opts.canary === false ? activeDir : canaryDir);
+  return { file: join(opts.canary === false ? activeDir : canaryDir, 'SKILL.md'), archivedPrevious };
+}
+
+/** Graduate a canary skill to full active (the impact loop's decision). */
+export async function promoteCanary(home: string, name: string): Promise<boolean> {
+  const safe = sanitize(name);
+  await mkdir(join(home, 'skills', 'active'), { recursive: true });
+  try {
+    await rename(join(home, 'skills', 'canary', safe), join(home, 'skills', 'active', safe));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Retire a canary skill back to draft (impact loop's rejection path) -
+ *  nothing is ever deleted (append-only red line). */
+export async function retireCanary(home: string, name: string): Promise<boolean> {
+  const safe = sanitize(name);
+  await mkdir(join(home, 'skills', 'draft'), { recursive: true });
+  try {
+    const dest = join(home, 'skills', 'draft', safe);
+    try { await rm(dest, { recursive: true, force: true }); } catch { /* not there */ }
+    await rename(join(home, 'skills', 'canary', safe), dest);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Restore the most recent archived snapshot of a skill back to active. */

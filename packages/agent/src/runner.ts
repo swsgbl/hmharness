@@ -23,7 +23,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmh/kernel';
-import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt } from '@hmh/evolution';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary } from '@hmh/evolution';
 import { harmonyTools } from '@hmh/domain-harmony';
 import { opsTools } from '@hmh/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -94,15 +94,27 @@ export async function buildRegistry(opts: { mcp?: boolean; announce?: boolean } 
   return { reg, clients };
 }
 
-/** Retrieval-based context pack: task-relevant memories, not the whole file. */
-export async function contextPack(task: string) {
+/** Retrieval-based context pack: task-relevant memories, not the whole file.
+ *  P0 canary: ~20% of sessions (deterministic by session id) also receive
+ *  the canary skill block, watermarked as experimental references - the
+ *  impact loop compares these sessions against the rest. */
+export async function contextPack(task: string, sessionId?: string) {
   const home = homeDir();
   const [memory, skills, insights] = await Promise.all([
     retrieveMemory(home, task),
     listSkills(home),
     recentInsights(home),
   ]);
-  return { memory, skills: skillsToPrompt(skills), insights };
+  let canaryBlock = '';
+  let canaryNames: string[] = [];
+  if (sessionId && sessionGetsCanary(sessionId)) {
+    const canary = await listCanary(home);
+    if (canary.length > 0) {
+      canaryNames = canary.map((s) => s.name);
+      canaryBlock = canaryWatermark(canaryNames) + '\n' + skillsToPrompt(canary);
+    }
+  }
+  return { memory, skills: skillsToPrompt(skills) + (canaryBlock ? '\n' + canaryBlock : ''), insights, skillsInjected: [...skills.map((s) => s.name), ...canaryNames] };
 }
 
 /**
@@ -158,7 +170,10 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   const cfg = opts.cfg ?? (await loadConfig());
   const ctx = opts.ctx ?? { cwd: process.cwd(), home: homeDir() };
   const events = opts.events ?? {};
-  const pack = await contextPack(opts.task);
+  const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);
+  // contextPack needs the session id: canary injection is deterministic
+  // per-session (stable attribution), decided before the prompt is built
+  const pack = await contextPack(opts.task, session.id);
 
   const system = buildSystemPrompt({
     cwd: ctx.cwd,
@@ -170,7 +185,6 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     locale: cfg.locale,
   });
 
-  const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);
   await session.user(opts.task);
 
   const approval: LoopApproval = opts.approvalAsk ? { ask: opts.approvalAsk } : makeApproval(cfg, opts.yes === true);
@@ -280,6 +294,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     turns: result.turns,
     toolUses: result.toolUses,
     toolsUsed: [...new Set(toolsUsed)],
+    skillsInjected: pack.skillsInjected,
   });
   // daily self-evolution: every N insights, one background cycle fires
   // (default on; autoEvolveEvery: 0 disables). Fire-and-forget - it never

@@ -16,6 +16,9 @@ export interface Insight {
   turns: number;
   toolUses: number;
   toolsUsed: string[];
+  /** P0 impact attribution: skills (incl. canaries) injected into this
+   *  session's system prompt - the join key for canary A/B comparison. */
+  skillsInjected?: string[];
 }
 
 export async function recordInsight(home: string, insight: Insight): Promise<void> {
