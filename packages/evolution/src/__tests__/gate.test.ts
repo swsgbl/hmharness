@@ -8,7 +8,7 @@ import { latestRadarBrief } from '../radar.ts';
 
 /* -------- structured assertions (gate methodology upgrade) -------- */
 
-const base = { expect: [] } as const;
+const base = { expect: [] as string[] };
 
 test('expect-exact: trimmed equality, no extra prose tolerated', () => {
   const c = { ...base, expectExact: 'HMH-OK' };
