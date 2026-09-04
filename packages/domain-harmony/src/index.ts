@@ -16,6 +16,8 @@ import { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';
 import { harmonyLint } from './lint.ts';
 import { emulatorTools } from './emulator.ts';
 import { harmonySchemaCheck } from './schema.ts';
+import { harmonyBuildDoctor } from './builddoctor.ts';
+import { harmonyProjectProfile } from './profile.ts';
 
 const exec = promisify(execFile);
 
@@ -419,6 +421,8 @@ export const harmonyTools: Tool[] = [
   harmonyCjpmTest,
   harmonyLint,
   harmonySchemaCheck,
+  harmonyBuildDoctor,
+  harmonyProjectProfile,
   ...emulatorTools,
 ];
 
@@ -426,3 +430,5 @@ export { harmonyProjectCreate, scaffoldProject, solidPng, sdkVersion } from './p
 export { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';
 export { harmonySchemaCheck, checkProjectSchemas, parseJson5 as parseJson5Strict, validateModuleJson5, validateBuildProfile } from './schema.ts';
 export { parseSdkVersion, compareSdk, capabilitiesFor, CAPABILITY_MATRIX, type SdkVersion, type CapabilityRule } from './apimatrix.ts';
+export { harmonyBuildDoctor, diagnoseBuildFailure, firstErrorBlock } from './builddoctor.ts';
+export { harmonyProjectProfile, profileProject } from './profile.ts';

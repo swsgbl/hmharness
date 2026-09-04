@@ -110,8 +110,15 @@
 - [x] **P3 拓扑最小版(2026-09-04)**:spawn_agent 角色参数+ok 率记录
       (spawn-roles.jsonl)+≥3 样本排行榜注入下次委派——模型自学会
       不派任务给垫底角色(诚实最小实现,无 MARL)
-- [ ] 物理真机回路(等设备接入;scripts/e2e-device.mts 一键即绪)
-      【blocked:外部硬件】
+- [x] **设备回路打通(2026-09-05,模拟器)**:用户指出模拟器即够——hdc 通道
+      不区分模拟器/真机;e2e-device.mts 全链一次过:scaffold→schema_check→
+      build→install→launch→**logs 回读 EntryAbility onCreate**(应用真在
+      模拟器上运行)→uninstall,零人工介入;脚本归档可重复跑
+      (真机到位时同脚本直用)
+- [x] **编译-修复闭环+项目画像(2026-09-05,旧线 icf+quality 基座)**:
+      harmony_build_doctor(失败日志七类签名分类+每类具体修复+首错块提取,
+      未知签名不隐藏)、harmony_project_profile(模块/页面/依赖/资源/配置
+      健康一次调用出全像);api_kg/channel/cybernetics 维持排期
 - [ ] npm 公开发布 bin(README 用法以 npm link 为准,发布后更新)
       【排期:发版前需 README/CI npm provenance 检查】
 - [x] **进化循环接入雷达信号源(2026-09-04)**:evolution/radar.ts 只读消费

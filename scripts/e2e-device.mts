@@ -1,8 +1,10 @@
 /**
- * Device-lifecycle E2E: scaffold -> build -> install -> launch -> logs
- * against a connected device/emulator. Run: npx tsx scripts/e2e-device.mts [target]
+ * Device-lifecycle E2E: scaffold -> schema_check -> build -> install ->
+ * launch -> logs -> uninstall against a connected device/emulator.
+ * Run: npx tsx scripts/e2e-device.mts [target]
+ * The emulator counts - hdc treats 127.0.0.1:5555 like any target.
  */
-import { harmonyBuild, harmonyInstall, harmonyLaunch, harmonyLogs, scaffoldProject } from '../packages/domain-harmony/src/index.ts';
+import { harmonyBuild, harmonyInstall, harmonyLaunch, harmonyLogs, harmonyUninstall, harmonySchemaCheck, scaffoldProject } from '../packages/domain-harmony/src/index.ts';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +21,11 @@ const die = (step: string, out: string): never => {
 banner('scaffold');
 const sc = await scaffoldProject(root, { name: 'DevE2E', bundleId: 'com.example.deve2e' });
 console.log(`created ${sc.root} bundle=${sc.bundleId} files=${sc.files}`);
+
+banner('schema check (pre-build gate)');
+const s = await harmonySchemaCheck.execute({}, ctx);
+console.log(s.output.slice(0, 400));
+if (s.isError) die('schema', s.output);
 
 banner('build');
 const b = await harmonyBuild.execute({}, ctx);
@@ -39,5 +46,9 @@ banner('logs (grep hmh tag)');
 await new Promise((r) => setTimeout(r, 3000));
 const g = await harmonyLogs.execute({ target, grep: 'hmh', lines: 20 }, ctx);
 console.log(g.output.slice(0, 1500) || '(no matching lines)');
+
+banner('uninstall (cleanup)');
+const u = await harmonyUninstall.execute({ target, bundle: 'com.example.deve2e' }, ctx);
+console.log(u.output.slice(0, 300));
 
 console.log('\n=== DEVICE E2E COMPLETE ===');

@@ -4,6 +4,47 @@
 
 ---
 
+## 2026-09-05 · 设备回路打通(模拟器)+ 编译-修复闭环 + 项目画像
+
+**动机**:用户问"真机回路 blocked 是指链接手机吗?模拟器可以吗?模拟器已开,
+其他项继续"——正确!e2e 走 hdc 通道,模拟器(127.0.0.1:5555)对 hdc 就是普通
+设备,block 当年只是"无任何设备在线"。模拟器已开=blocked 解除。
+
+**设备回路全链实证(一次过)**:升级 scripts/e2e-device.mts(补 schema_check
+前置门+uninstall 清理步),对模拟器跑完整生命周期:
+scaffold(19 文件)→schema_check(3 配置全过)→harmony_build(BUILD
+SUCCESSFUL)→install(bundle installed)→launch(start ability
+successfully)→**logs 真实回读到应用自己的 `EntryAbility onCreate`**(应用
+确实在模拟器上活了)→uninstall(clean)。**全链零人工介入**。
+
+**编译-修复闭环(builddoctor.ts,旧线 icf 缺口)**:
+- **harmony_build_doctor**:hvigor 失败日志→七类已知签名分类(sdk-home/
+  signing/ohpm-deps/hvigor-env/arkts-source/config/network)→每类给**具体
+  修复动作**(不是"去搜报错");未知签名**不隐藏**——原样透传尾部+首错块,
+  反复出现的模式该进签名表;首 ERROR 块单独提取(file:line:pos)
+- 测试 3 用例:七类全命中+未知返回 null+首错块提取;profile 画像准确性
+
+**项目画像(profile.ts,旧线质量三件套基座)**:
+- **harmony_project_profile** 一次调用回答"这是个什么项目":模块清单
+  (type/pages/abilities/deviceTypes)、entry 的 har 依赖边、资源与源码
+  计数、bundle/SDK、配置健康(对接 schema_check 的 issue 计数)——
+  改动规划与工作量估计的起手式
+- 旧线五缺口处置:icf(编译修复)✅ 本轮;quality(画像)✅ 基座本轮
+  (回归+评分待视觉/真机配合);api_kg(知识图谱)/channel(消息通道)/
+  cybernetics(控制论)维持排期
+
+**坑(教训㉔三次重演,升级为铁律)**:脚本(node fs.writeFile)改
+src/index.ts 又被 ACL **静默吞写**(输出"成功"但文件未变+残留半截拼接行)——
+**此类文件一律改用编辑器工具直写**,shell 脚本改文件在本机此文件上已三次
+失败,不再尝试。
+
+**实测**:doctor.test.ts 3/3(含 profile 对真实 scaffold 的模块/页面/依赖
+断言;顺修 countFiles 深度 3→6 的目录遍历 bug);全套 **80/80**;七包构建
++dist 四项验证;dist 冒烟:profile 输出完整画像(2 模块/2 页面/4 源码/
+deps 边/健康 OK),doctor 对合成失败日志输出 kind+evidence+fix。
+
+---
+
 ## 2026-09-05 · 域缺口补齐:项目 schema 校验 + API 能力矩阵
 
 **动机**:用户令"继续"。ROADMAP 域缺口里最可落地的两项:schema 校验
