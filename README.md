@@ -3,6 +3,7 @@
 **为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架。** 零依赖内核 + 自进化一等公民 + MCP 生态借力——不继承任何上游运行时能力，全部自持或经标准协议外借。
 
 [English](README.en.md) · [![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@hmharness/cli?color=cb3837&label=npm%20%40hmharness%2Fcli)](https://www.npmjs.com/package/@hmharness/cli)
 ![node](https://img.shields.io/badge/node-%3E%3D22-339933)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-000000)
 
@@ -27,7 +28,7 @@
 
 ## 快速开始
 
-**方式一:npm 安装**(发布后推荐,零构建):
+**方式一:npm 安装**(已发布 `@hmharness/*`,推荐,零构建):
 
 ```bash
 npm install -g @hmharness/cli     # Node >= 22

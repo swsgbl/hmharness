@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-09-06 · 发布后文档跟进:CHANGELOG 诞生 + 官网口径切换 + 官网守门转正
+
+**动机**:npm 发布完成后全面清点文档面,用户令"做好各项技术变更记录和开发日志
+等文档跟进"。自查发现四处陈旧/缺失。
+
+**四处修复**:
+1. **官网四步上手第一步**还停留在发布前的"克隆+构建+npm link"开发流程——
+   改为 `npm install -g @hmharness/cli`(HTML 默认中文+zh/en 双字典三处同步,
+   键 ins1)。
+2. **CHANGELOG.md 诞生**:0.1.0(七包首发+发布时点能力快照,逐包一段)/
+   0.1.1(cli bin 修复,只有 cli 变更如实注明"其余六包保持 0.1.0")。
+3. **CONTRIBUTING.md 补"Releasing to npm"章节**:版本号→CHANGELOG→lockfile
+   →build→预检→NODE_AUTH_TOKEN 发布→传播延迟注意项(六步,含"npm view 短暂
+   404 别重发"的实战教训)。
+4. **README/README.en**:双语文档补 npm 版本徽章(shields.io/npm/v);
+   "发布后推荐"措辞改为既成事实"已发布"。
+
+**官网守门转正(scripts/check-website.cjs,挂 CI)**:四道——内联 script 块
+语法(new Function)/data-i18n 引用必须在 zh+en 双字典都存在/双字典键集对称/
+快速开始必须是发布安装命令(npm link 回归即失败)。**解析教训**:字典一行多键
+(`nav_a: '…', nav_b: '…'`),行首正则每行只抓一个键(29 个假阴性);字符串值
+内含冒号,宽松正则又抓出 8 个假阳性——**最终解:平衡花括号截取对象字面量+
+eval 求值,格式免疫**。这正是此前 web 应用守门(LABELS 键 diff)的官网版补课。
+
+**验证**:check-website 2 脚本块语法 OK/57 引用/zh 60=en 60 对称/安装命令在位;
+CI 顺序追加守门步骤;全仓 @hmh/ 残留 0。
+
+---
+
 ## 2026-09-05 · npm 正式发布:七包上线 @hmharness scope(桌面自动化破局)
 
 **动机**:预检全绿后正式发布。此前 5 个 token 连续失败(E403→EOTP→E404),

@@ -21,3 +21,5 @@ jobs:
         run: node packages/cli/dist/main.js skills
       - name: npm publish preflight (ordered-set check, never publishes)
         run: node scripts/publish-preflight.cjs
+      - name: website guard (inline JS syntax + zh/en i18n symmetry + install cmd)
+        run: node scripts/check-website.cjs

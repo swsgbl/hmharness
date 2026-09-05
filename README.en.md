@@ -3,6 +3,7 @@
 **A self-evolving agent harness for HarmonyOS/OpenHarmony development.** Zero-dependency kernel + first-class self-evolution + MCP ecosystem borrow — every runtime capability is home-grown or absorbed via standard protocols, never inherited from a parent runtime.
 
 [![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@hmharness/cli?color=cb3837&label=npm%20%40hmharness%2Fcli)](https://www.npmjs.com/package/@hmharness/cli)
 ![node](https://img.shields.io/badge/node-%3E%3D22-339933)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-000000)
 
@@ -29,7 +30,7 @@
 
 ## Quick start
 
-**Option 1: install from npm** (recommended once published, zero build):
+**Option 1: install from npm** (recommended — published as `@hmharness/*`, zero build):
 
 ```bash
 npm install -g @hmharness/cli     # Node >= 22

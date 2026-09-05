@@ -142,9 +142,7 @@ footer li{list-style:none;margin:6px 0}
   <h2 class="sec" data-i18n="ins_title">四步上手</h2>
   <p class="secdesc" data-i18n="ins_desc">Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。</p>
   <div class="steps">
-    <div class="step"><div class="n">1</div><div style="flex:1"><div class="cap" data-i18n="ins1">克隆并构建</div><pre>git clone https://github.com/swsgbl/hmharness.git
-cd hmharness && npm install && npm run build
-npm link -w @hmharness/cli</pre></div></div>
+    <div class="step"><div class="n">1</div><div style="flex:1"><div class="cap" data-i18n="ins1">npm 安装(已发布,零构建)</div><pre>npm install -g @hmharness/cli   # Node >= 22</pre></div></div>
     <div class="step"><div class="n">2</div><div style="flex:1"><div class="cap" data-i18n="ins2">初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)</div><pre>hmh init
 notepad %USERPROFILE%\.hmharness\config.json
   { "provider": { "baseUrl": "…", "apiKey": "…", "model": "…" } }</pre></div></div>
@@ -294,7 +292,7 @@ const I18N = {
     s1: '单仓七包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '门禁(训练+保留)',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
-    ins1: '克隆并构建',
+    ins1: 'npm 安装(已发布,零构建)',
     ins2: '初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)',
     ins3: '一条命令起飞:全屏 TUI,网页端自动就绪',
     ins4: '让它自己变强',
@@ -332,7 +330,7 @@ const I18N = {
     s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'gates (training + holdout)',
     ins_title: 'Quick Start in Four Steps',
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
-    ins1: 'Clone and build',
+    ins1: 'Install via npm (published, zero build)',
     ins2: 'Init and configure a provider (any OpenAI-compatible endpoint; multi-provider routing optional)',
     ins3: 'One command to fly: fullscreen TUI, web UI auto-linked',
     ins4: 'Let it evolve',
