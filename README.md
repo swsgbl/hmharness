@@ -27,6 +27,15 @@
 
 ## 快速开始
 
+**方式一:npm 安装**(发布后推荐,零构建):
+
+```bash
+npm install -g @hmh/cli     # Node >= 22
+hmh init                    # 建立 ~/.hmharness（配置 + 状态目录）
+```
+
+**方式二:源码运行**(开发/尝鲜):
+
 ```bash
 git clone https://github.com/swsgbl/hmharness.git
 cd hmharness

@@ -29,6 +29,15 @@
 
 ## Quick start
 
+**Option 1: install from npm** (recommended once published, zero build):
+
+```bash
+npm install -g @hmh/cli     # Node >= 22
+hmh init                    # creates ~/.hmharness (config + state dirs)
+```
+
+**Option 2: from source** (development / trying it out):
+
 ```bash
 git clone https://github.com/swsgbl/hmharness.git
 cd hmharness

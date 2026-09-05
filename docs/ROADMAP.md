@@ -124,11 +124,11 @@
       实证别名/证书链组合;破案五关见 DEVLOG 当日轮)与 harmony_device_test
       (install→launch→hilog 生命周期标记断言→cleanup 四步判定)——签名
       后的 hap 在模拟器真实安装/启动/打出日志,最终验收全自动化四步全 PASS
-- [x] **npm 发布预检就绪(2026-09-05)**:scripts/publish-preflight.cjs 五道
-      (dist 新鲜/shebang/@hmh 依赖声明/npm pack dry-run/密钥扫描)——当场
-      抓出 11 处真问题(2 stale+9 缺声明+cli 漏 web)全部补齐,PREFLIGHT OK;
-      已挂 CI(只检不发)。**执行发布**:按预检输出顺序 npm publish 七包,
-      npm login 后一条条跑(发布=外部动作,留待用户点头执行)
+- [x] **npm 发布预检+执行器就绪(2026-09-05)**:scripts/publish-preflight.cjs
+      五道(当场抓 11 处真问题全修复)+scripts/publish.cjs(preflight→whoami
+      fail-fast→七包有序发布,--dry-run 验证);七包名 npm 全部可用;README
+      双语快速开始已改 npm 安装优先。**执行门槛:npm login(浏览器授权,
+      无法代登)→node scripts/publish.cjs**
 - [x] **视觉 UI 回归(2026-09-05,quality 其二)**:harmony_ui_regression
       (launch→snapshot_display 截屏→vision 描述→关键词断言,判定引用
       模型原话可审计;语义存在性非像素 diff)。真机验收:vision 在 79KB
