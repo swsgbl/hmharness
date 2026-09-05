@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeApproval } from '../runner.ts';
-import { defaultConfig } from '@hmh/kernel';
+import { defaultConfig } from '@hmharness/kernel';
 
 test('approval gate: yes / config-auto pass without a TTY; ask denies headless', async () => {
   // --yes / --yolo: every gate passes, nothing may block the loop

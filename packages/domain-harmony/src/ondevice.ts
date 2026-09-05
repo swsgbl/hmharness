@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - ondevicetest (minimal honest version)
+ * @hmharness/domain-harmony - ondevicetest (minimal honest version)
  * The ROADMAP gap "onDeviceTest 设备测试": a scripted assertion loop over
  * the REAL device instead of a hypothetical unit-test framework. What we
  * can actually verify on-device today, deterministically:
@@ -15,7 +15,7 @@ import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const execCb = promisify(execFile);
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @hmh/cli - main (terminal frontend)
+ * @hmharness/cli - main (terminal frontend)
  * Usage:
  *   hmh init                 create HMH_HOME skeleton + config
  *   hmh "do something"       one-shot task (full agent loop, streaming)
@@ -42,7 +42,7 @@ import {
   type McpServerImport,
   type McpServerConfig,
   type Tool,
-} from '@hmh/kernel';
+} from '@hmharness/kernel';
 import {
   listSkills,
   listDrafts,
@@ -54,9 +54,9 @@ import {
   unpromoteSkill,
   type BenchCase,
   type CaseRunner,
-} from '@hmh/evolution';
-import { harmonyTools } from '@hmh/domain-harmony';
-import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask, strings, type Locale } from '@hmh/agent';
+} from '@hmharness/evolution';
+import { harmonyTools } from '@hmharness/domain-harmony';
+import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask, strings, type Locale } from '@hmharness/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
@@ -220,7 +220,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           // them in (was REPL-missing -> 'unknown command' while /help
           // advertised it, a scan-D gap)
           const { readFile } = await import('node:fs/promises');
-          const { detectLocalProviders, addProviders } = await import('@hmh/kernel');
+          const { detectLocalProviders, addProviders } = await import('@hmharness/kernel');
           const found = await detectLocalProviders(cfg, readFile);
           if (line === '/providers') {
             stdout.write(found.length
@@ -251,7 +251,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           continue;
         }
         if (line === '/ops' || line === '/ops scan') {
-          const { harmonyOpsStatus, harmonyOpsRadarScan } = await import('@hmh/domain-ops');
+          const { harmonyOpsStatus, harmonyOpsRadarScan } = await import('@hmharness/domain-ops');
           const r = line === '/ops'
             ? await harmonyOpsStatus.execute({}, { cwd: process.cwd(), home })
             : await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
@@ -434,7 +434,7 @@ flags:
         stdout.write(`usage: hmh skills add <git-url-or-local-dir>\n`);
         return;
       }
-      const { installSkills } = await import('@hmh/evolution');
+      const { installSkills } = await import('@hmharness/evolution');
       try {
         const r = await installSkills(skillName, home);
         stdout.write(r.installed.length
@@ -475,7 +475,7 @@ flags:
     // skills earned full activation on evidence, which retired, which
     // need more data. The observability half of self-evolution (P0).
     if (rest.includes('--impact')) {
-      const { impactReport } = await import('@hmh/evolution');
+      const { impactReport } = await import('@hmharness/evolution');
       const { rows, applied } = await impactReport(homeDir());
       if (rows.length === 0) {
         stdout.write(DIM('no canary skills under evaluation\n'));
@@ -543,7 +543,7 @@ flags:
     await initHome();
     const cfg = await loadConfig();
     const { readFile } = await import('node:fs/promises');
-    const { detectLocalProviders, listProviders, PROVIDER_PRESETS, addProviders } = await import('@hmh/kernel');
+    const { detectLocalProviders, listProviders, PROVIDER_PRESETS, addProviders } = await import('@hmharness/kernel');
     stdout.write(CYAN(`configured (${listProviders(cfg).length})\n`));
     for (const v of listProviders(cfg)) {
       stdout.write(`  ${v.purposes.includes('chat') ? GREEN('●') : DIM('○')} ${v.name} — ${v.model}${v.purposes.length ? DIM(` (${v.purposes.join('/')})`) : ''}\n`);
@@ -566,7 +566,7 @@ flags:
   }
   if (cmd === 'ops') {
     await initHome();
-    const { harmonyOpsRadarScan, harmonyOpsRadarBrief, harmonyOpsStatus } = await import('@hmh/domain-ops');
+    const { harmonyOpsRadarScan, harmonyOpsRadarBrief, harmonyOpsStatus } = await import('@hmharness/domain-ops');
     const sub = rest[0] ?? 'status';
     const ctx = { cwd: process.cwd(), home: homeDir() };
     if (sub === 'scan') {
@@ -612,7 +612,7 @@ flags:
       return;
     }
     // default: foreground server (handy for debugging)
-    const { startServer } = await import('@hmh/web');
+    const { startServer } = await import('@hmharness/web');
     await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
     return; // startServer keeps the process alive
   }

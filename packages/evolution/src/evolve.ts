@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - evolve
+ * @hmharness/evolution - evolve
  * The evolution loop, one cycle per invocation (schedule it however you
  * like). Pipeline: mine insights -> propose skill drafts via a meta-model
  * call -> bench A/B (baseline vs candidate injection) -> promote or reject
@@ -15,7 +15,7 @@
  */
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chat, type ProviderConfig } from '@hmh/kernel';
+import { chat, type ProviderConfig } from '@hmharness/kernel';
 import { listCases, matchCase, seedCases, type BenchCase } from './bench.ts';
 import { deleteDraft, listCanary, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';

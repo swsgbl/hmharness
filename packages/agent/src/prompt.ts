@@ -1,10 +1,10 @@
 /**
- * @hmh/agent - system prompt
+ * @hmharness/agent - system prompt
  * Identity + evolution context. The agent is "hmh": a HarmonyOS-first
  * coding agent on the hmharness framework. Memory and the skill catalog
  * are injected every run - the self-evolution loop's read side.
  */
-import type { HmhConfig } from '@hmh/kernel';
+import type { HmhConfig } from '@hmharness/kernel';
 import { homedir } from 'node:os';
 
 export function buildSystemPrompt(opts: {

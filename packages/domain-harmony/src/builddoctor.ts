@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - builddoctor (compile-fix loop, the codelin icf gap)
+ * @hmharness/domain-harmony - builddoctor (compile-fix loop, the codelin icf gap)
  * When hvigor fails, its log is a wall of stack traces. This tool parses
  * the failure into ONE OF A SMALL SET OF KNOWN CAUSE CLASSES and returns
  * the concrete fix for that class - so the agent (or user) repairs the
@@ -10,7 +10,7 @@
  * known remedy. Unknown signatures pass through with the raw tail so
  * nothing is hidden.
  */
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 export interface DiagnosedError {
   kind: string;

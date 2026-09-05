@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony
+ * @hmharness/domain-harmony
  * HarmonyOS domain tools. Device + toolchain probes are zero-risk;
  * build/install/launch/logs cover the code-to-device lifecycle and landed
  * in Phase 1. Device-mutating tools (install/launch/uninstall) carry
@@ -10,7 +10,7 @@ import { accessSync } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 import { harmonyProjectCreate } from './project.ts';
 import { harmonyCjpmBuild, harmonyCjpmTest, findCjpm } from './cangjie.ts';
 import { harmonyLint } from './lint.ts';

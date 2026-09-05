@@ -12,22 +12,22 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@hmh/kernel": [
+      "@hmharness/kernel": [
         "packages/kernel/src/index.ts"
       ],
-      "@hmh/evolution": [
+      "@hmharness/evolution": [
         "packages/evolution/src/index.ts"
       ],
-      "@hmh/domain-harmony": [
+      "@hmharness/domain-harmony": [
         "packages/domain-harmony/src/index.ts"
       ],
-      "@hmh/web": [
+      "@hmharness/web": [
         "packages/web/src/index.ts"
       ],
-      "@hmh/agent": [
+      "@hmharness/agent": [
         "packages/agent/src/index.ts"
       ],
-      "@hmh/domain-ops": [
+      "@hmharness/domain-ops": [
         "packages/domain-ops/src/index.ts"
       ]
     }

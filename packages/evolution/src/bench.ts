@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - bench
+ * @hmharness/evolution - bench
  * The fitness signal for self-evolution. bench/cases/*.task files are:
  *   line 1        the prompt
  *   expect: a && b   substrings that must ALL appear in the final output

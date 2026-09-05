@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - apimatrix (API-level capability matrix)
+ * @hmharness/domain-harmony - apimatrix (API-level capability matrix)
  * SDK version strings come in TWO shapes and toolchain behavior differs
  * across them:
  *   legacy:  "6.1.1(24)"            - <version>(<api-level>) up to API 25

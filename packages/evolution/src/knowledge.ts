@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - knowledge (Static Knowledge Evolution)
+ * @hmharness/evolution - knowledge (Static Knowledge Evolution)
  * The environment's knowledge decays: HarmonyOS API versions, toolchain
  * requirements, SDK release notes change out from under the agent. The
  * surveyed gap (Environment-Centric / Static Knowledge Evolution): the
@@ -18,7 +18,7 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chat, type ProviderConfig } from '@hmh/kernel';
+import { chat, type ProviderConfig } from '@hmharness/kernel';
 import { screenForPoison, type SkillProposal } from './evolve.ts';
 import { writeDraft } from './skills.ts';
 

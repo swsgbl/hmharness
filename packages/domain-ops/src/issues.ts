@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-ops - issues (keeper v2)
+ * @hmharness/domain-ops - issues (keeper v2)
  * The issue half of the old hm-keeper, on the gh CLI instead of hand-rolled
  * API clients. Behavior spec preserved from the old line (see
  * docs/MIGRATION-ASSESSMENT.md):
@@ -11,7 +11,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const exec = promisify(execFile);
 

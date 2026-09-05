@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - cangjie (cjpm) tools
+ * @hmharness/domain-harmony - cangjie (cjpm) tools
  * Cangjie package-manager build/test for HarmonyOS native modules.
  * Resolution: HM_CJPM env override > PATH > known DevEco-adjacent install
  * roots. CANGJIE_HOME is derived from the cjpm.exe layout and injected -
@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const exec = promisify(execFile);
 

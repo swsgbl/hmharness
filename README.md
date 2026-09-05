@@ -30,7 +30,7 @@
 **方式一:npm 安装**(发布后推荐,零构建):
 
 ```bash
-npm install -g @hmh/cli     # Node >= 22
+npm install -g @hmharness/cli     # Node >= 22
 hmh init                    # 建立 ~/.hmharness（配置 + 状态目录）
 ```
 
@@ -41,7 +41,7 @@ git clone https://github.com/swsgbl/hmharness.git
 cd hmharness
 npm install
 npm run build
-npm link -w @hmh/cli   # 之后任意目录直接 hmh ...
+npm link -w @hmharness/cli   # 之后任意目录直接 hmh ...
 hmh init               # 建立 ~/.hmharness（配置 + 状态目录）
 ```
 

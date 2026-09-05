@@ -1,5 +1,5 @@
 /**
- * @hmh/cli - spawn
+ * @hmharness/cli - spawn
  * The sub-agent tool: run a nested agent loop with a FRESH context on a
  * self-contained subtask and return its final answer. Children share the
  * tool registry (minus MCP - children stay fast and deterministic) and the
@@ -15,13 +15,13 @@
  */
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { runLoop, type Session, type LoopApproval, type Registry, type Tool } from '@hmh/kernel';
+import { runLoop, type Session, type LoopApproval, type Registry, type Tool } from '@hmharness/kernel';
 
 export const MAX_SPAWN_DEPTH = 2;
 
 export interface SpawnBase {
-  provider: import('@hmh/kernel').ProviderConfig;
-  ctx: import('@hmh/kernel').ToolContext;
+  provider: import('@hmharness/kernel').ProviderConfig;
+  ctx: import('@hmharness/kernel').ToolContext;
   approval?: LoopApproval;
   session?: Session;
   /** Bubbled tool traffic for display: `[sub1] list_dir {...}`. */

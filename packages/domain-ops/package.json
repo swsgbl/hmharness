@@ -1,5 +1,5 @@
 {
-  "name": "@hmh/domain-ops",
+  "name": "@hmharness/domain-ops",
   "version": "0.1.0",
   "description": "hmharness ops keeper: ecosystem radar (OpenHarmony release tracking, snapshot diff, model brief with template fallback). Rewrite of the old line's hm-keeper per its captured behavior spec.",
   "type": "module",
@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmh/kernel": "0.1.0"
+    "@hmharness/kernel": "0.1.0"
   },
   "files": [
     "dist"

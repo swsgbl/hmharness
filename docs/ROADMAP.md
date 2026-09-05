@@ -124,9 +124,15 @@
       实证别名/证书链组合;破案五关见 DEVLOG 当日轮)与 harmony_device_test
       (install→launch→hilog 生命周期标记断言→cleanup 四步判定)——签名
       后的 hap 在模拟器真实安装/启动/打出日志,最终验收全自动化四步全 PASS
+- [x] **npm 正式发布完成(2026-09-05)**:七包 0.1.0(cli 0.1.1 修 bin)全部
+      上线 **@hmharness** scope——@hmh 被他人占用,创建 @hmharness org
+      (Free,无限公开包)后仓库 66 文件整体重命名,88/88 测试绿后有序发布。
+      破案链(E401 死 token→E404 scope 不存在→bin ./ 前缀→新包审查管道延迟)
+      与桌面自动化(AX 树填表读 token)见 DEVLOG 当日轮。后续版本发布:
+      改版本号→npm run build→NODE_AUTH_TOKEN=<granular token> node scripts/publish.cjs
 - [x] **npm 发布预检+执行器就绪(2026-09-05)**:scripts/publish-preflight.cjs
       五道(当场抓 11 处真问题全修复)+scripts/publish.cjs(preflight→whoami
-      fail-fast→七包有序发布,--dry-run 验证);七包名 npm 全部可用;README
+      fail-fast→七包有序发布,--dry-run 验证);README
       双语快速开始已改 npm 安装优先。**执行门槛:npm login(浏览器授权,
       无法代登)→node scripts/publish.cjs**
 - [x] **视觉 UI 回归(2026-09-05,quality 其二)**:harmony_ui_regression

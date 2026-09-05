@@ -1,5 +1,5 @@
 /**
- * @hmh/agent - base tools
+ * @hmharness/agent - base tools
  * The general coding-agent toolset: read, write, list, a guarded shell
  * runner, long-term memory, and image viewing (vision model). Deny-first
  * guard on obviously destructive one-liners; approvals live in the kernel.
@@ -8,7 +8,7 @@ import { exec } from 'node:child_process';
 import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool, type ToolContext } from '@hmh/kernel';
+import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 
 const execCb = promisify(exec);
 
@@ -538,7 +538,7 @@ export const rememberTool: Tool = {
   },
   async execute(args) {
     try {
-      const { appendMemory } = await import('@hmh/evolution');
+      const { appendMemory } = await import('@hmharness/evolution');
       await appendMemory(homeDir(), String(args.note ?? ''));
       return { output: 'remembered.' };
     } catch (err) {

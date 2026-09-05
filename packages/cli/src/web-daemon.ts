@@ -1,5 +1,5 @@
 /**
- * @hmh/cli - web daemon helpers
+ * @hmharness/cli - web daemon helpers
  * Shared by `hmh web start|stop|status` and the TUI auto-link (hmh tui
  * brings the web UI up unless --no-web). One pid file + one log file under
  * HMH_HOME; the daemon runs detached with no window and survives terminals.
@@ -7,7 +7,7 @@
 import { spawn } from 'node:child_process';
 import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homeDir } from '@hmh/kernel';
+import { homeDir } from '@hmharness/kernel';
 
 export const DEFAULT_WEB_PORT = 7788;
 

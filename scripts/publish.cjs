@@ -30,11 +30,15 @@ try {
 }
 
 // 1. whoami check (fail fast with a pointed message instead of per-package 403s)
+// Token path: NODE_AUTH_TOKEN env (granular token with bypass-2fa) passes
+// straight through to npm; the token is never written to disk or logs.
+const TOKEN = process.env.NODE_AUTH_TOKEN;
+const ENV = { ...process.env, ...(TOKEN ? { NODE_AUTH_TOKEN: TOKEN } : {}) };
 try {
-  const who = execSync('npm whoami --registry ' + REG, { encoding: 'utf8', timeout: 30000, shell: 'cmd.exe', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-  console.log('publishing as:', who);
+  const who = execSync('npm whoami --registry ' + REG, { encoding: 'utf8', timeout: 30000, shell: 'cmd.exe', stdio: ['pipe', 'pipe', 'pipe'], env: ENV }).trim();
+  console.log('publishing as:', who, '(auth: ' + (TOKEN ? 'NODE_AUTH_TOKEN' : 'npm login session') + ')');
 } catch {
-  console.error('NOT LOGGED IN to ' + REG + '. Run: npm login --registry ' + REG);
+  console.error('NOT LOGGED IN to ' + REG + '. Run: npm login --registry ' + REG + '  (or set NODE_AUTH_TOKEN to a granular token with bypass-2fa)');
   process.exit(1);
 }
 
@@ -44,13 +48,13 @@ for (const name of ORDER) {
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   const args = ['publish', '--access', 'public', '--registry', REG];
   if (DRY) args.push('--dry-run');
-  console.log('\n--- publishing @hmh/' + name + ' ' + pkg.version + (DRY ? ' (dry-run)' : '') + ' ---');
+  console.log('\n--- publishing @hmharness/' + name + ' ' + pkg.version + (DRY ? ' (dry-run)' : '') + ' ---');
   try {
-    execSync('npm ' + args.join(' '), { cwd: dir, encoding: 'utf8', stdio: 'inherit', timeout: 600000 });
-    console.log('OK @hmh/' + name);
+    execSync('npm ' + args.join(' '), { cwd: dir, encoding: 'utf8', stdio: 'inherit', timeout: 600000, env: ENV });
+    console.log('OK @hmharness/' + name);
   } catch (err) {
-    console.error('FAILED @hmh/' + name + ' - stopping the ordered set here.');
+    console.error('FAILED @hmharness/' + name + ' - stopping the ordered set here.');
     process.exit(1);
   }
 }
-console.log('\nALL SEVEN PUBLISHED' + (DRY ? ' (dry-run)' : '') + ' - verify: npm view @hmh/cli version');
+console.log('\nALL SEVEN PUBLISHED' + (DRY ? ' (dry-run)' : '') + ' - verify: npm view @hmharness/cli version');

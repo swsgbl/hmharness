@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - signing (hapsigntool wrapper, device-proven)
+ * @hmharness/domain-harmony - signing (hapsigntool wrapper, device-proven)
  * Signs a built .hap with the local debug identity so it installs on
  * emulator/developer-mode devices. Production (release/AGC) signing stays
  * in DevEco/AppGallery - this wraps the DEBUG flow.
@@ -27,7 +27,7 @@ import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, win32 } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const execCb = promisify(execFile);
 

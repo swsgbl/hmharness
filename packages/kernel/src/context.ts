@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - context
+ * @hmharness/kernel - context
  * Char-budget context compaction. Long agent runs are dominated by stale
  * tool output; when the transcript exceeds its budget we replace the oldest
  * tool results (never the system prompt, never the task itself, never the

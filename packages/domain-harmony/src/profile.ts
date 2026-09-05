@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - profile (project picture, quality-trio minimal)
+ * @hmharness/domain-harmony - profile (project picture, quality-trio minimal)
  * A one-call inventory of a HarmonyOS project: modules, pages, abilities,
  * har/hap dependency edges, resource counts, and config health (schema
  * issues inline). Answer "what is this project" without reading 20 files -
@@ -8,7 +8,7 @@
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 import { parseJson5, checkProjectSchemas } from './schema.ts';
 
 export interface ProjectProfile {

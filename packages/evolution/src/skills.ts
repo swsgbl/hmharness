@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - skills
+ * @hmharness/evolution - skills
  * The skill library with a three-state lifecycle:
  *   skills/draft/<name>/    drafted by the evolution loop, never injected
  *   skills/active/<name>/   promoted skills, injected into the system prompt

@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - lint (codelinter wrapper, probe-based)
+ * @hmharness/domain-harmony - lint (codelinter wrapper, probe-based)
  * The official codelinter CLI wrapped as a tool. Probe-first: if the CLI
  * isn't installed locally the tool explains exactly what to install rather
  * than failing opaquely. Flag surface kept to the minimum verified subset.
@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const exec = promisify(execFile);
 

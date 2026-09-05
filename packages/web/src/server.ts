@@ -1,5 +1,5 @@
 /**
- * @hmh/web - server
+ * @hmharness/web - server
  * Local web frontend for hmharness: node:http only, zero runtime deps.
  * One task runs at a time; its events stream to every connected browser
  * via SSE; the approval gate is bridged to the page (request -> human
@@ -10,9 +10,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readdir, readFile, rename, mkdir, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmh/kernel';
-import { listDrafts, listSkills, readInsights } from '@hmh/evolution';
-import { buildRegistry, runAgentTask } from '@hmh/agent';
+import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
+import { listDrafts, listSkills, readInsights } from '@hmharness/evolution';
+import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;

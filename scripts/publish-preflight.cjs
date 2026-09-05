@@ -7,7 +7,7 @@
  *   1. every package builds (dist/ newer than every src file)
  *   2. dist main entry exists, bin shebang present where declared
  *   3. workspace deps referenced by shipped packages are declared in
- *      package.json (npm cannot resolve undeclared @hmh/* on install)
+ *      package.json (npm cannot resolve undeclared @hmharness/* on install)
  *   4. npm pack --dry-run succeeds per package (tarball contents sane)
  *   5. no secrets under any dist/ (the repo-publication red line)
  * Exit code 0 = safe to run the real `npm publish -w <pkg>` sequence.
@@ -22,7 +22,7 @@ let failures = 0;
 const fail = (msg) => { console.error('  FAIL ' + msg); failures++; };
 
 for (const name of ORDER) {
-  console.log('== @hmh/' + name);
+  console.log('== @hmharness/' + name);
   const dir = path.join(ROOT, 'packages', name);
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   const dist = path.join(dir, 'dist');
@@ -54,7 +54,7 @@ for (const name of ORDER) {
   const deps = { ...pkg.dependencies };
   const shippedDeps = fs.readdirSync(dist)
     .filter((f) => f.endsWith('.js'))
-    .flatMap((f) => [...fs.readFileSync(path.join(dist, f), 'utf8').matchAll(/['"](@hmh\/[a-z-]+)['"]/g)].map((m) => m[1]));
+    .flatMap((f) => [...fs.readFileSync(path.join(dist, f), 'utf8').matchAll(/['"](@hmharness\/[a-z-]+)['"]/g)].map((m) => m[1]));
   for (const d of new Set(shippedDeps)) {
     if (!deps[d]) fail(name + ': dist imports ' + d + ' but package.json does not declare it');
   }
@@ -80,5 +80,5 @@ for (const name of ORDER) {
   if (leaked) fail(name + ': secret-looking string in dist');
 }
 
-console.log(failures === 0 ? '\nPREFLIGHT OK - safe to publish in order: ' + ORDER.map((o) => '@hmh/' + o).join(' -> ') : '\nPREFLIGHT FAILED: ' + failures + ' issue(s)');
+console.log(failures === 0 ? '\nPREFLIGHT OK - safe to publish in order: ' + ORDER.map((o) => '@hmharness/' + o).join(' -> ') : '\nPREFLIGHT FAILED: ' + failures + ' issue(s)');
 process.exit(failures ? 1 : 0);

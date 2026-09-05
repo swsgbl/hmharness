@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - radar (ops-signal feed)
+ * @hmharness/evolution - radar (ops-signal feed)
  * The ops keeper's ecosystem radar scans OpenHarmony release sources and
  * writes dated briefs (home/ops/briefs/YYYY-MM-DD.md). This module hands
  * the NEWEST brief text to the evolution loop as context: toolchain flags

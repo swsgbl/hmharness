@@ -1,5 +1,5 @@
 /**
- * @hmh/web - page (three-column layout, deepseek-harness inspired)
+ * @hmharness/web - page (three-column layout, deepseek-harness inspired)
  * Sidebar (brand / new session / nav: chat·board·devices·skills / workspace
  * search / session tree, collapsible to an icon rail) | main (topbar, view
  * switcher, chat flow with user bubbles + collapsible thinking + code blocks

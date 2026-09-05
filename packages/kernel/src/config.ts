@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - config
+ * @hmharness/kernel - config
  * HMH_HOME isolation: all hmharness state lives under one root
  * (env HMH_HOME wins, default ~/.hmharness). Nothing is ever shared with
  * any other harness on the machine - the lesson that motivated this

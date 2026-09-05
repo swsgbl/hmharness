@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - insights
+ * @hmharness/evolution - insights
  * Automatic insight capture: every finished session appends a compact
  * record (task / outcome / tool usage) to insights/insights.jsonl. This is
  * the raw feed the future evolution loop mines for skill and prompt

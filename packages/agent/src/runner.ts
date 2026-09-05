@@ -1,5 +1,5 @@
 /**
- * @hmh/agent - runner
+ * @hmharness/agent - runner
  * The shared agent-task execution layer. CLI maps its events to terminal
  * output; the web frontend maps them to SSE - one behavior, two frontends.
  * Also owns the native registry factory (spawn_agent recursion) and the
@@ -22,10 +22,10 @@ import {
   type McpServerConfig,
   type McpServerImport,
   type ToolContext,
-} from '@hmh/kernel';
-import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary } from '@hmh/evolution';
-import { harmonyTools } from '@hmh/domain-harmony';
-import { opsTools } from '@hmh/domain-ops';
+} from '@hmharness/kernel';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary } from '@hmharness/evolution';
+import { harmonyTools } from '@hmharness/domain-harmony';
+import { opsTools } from '@hmharness/domain-ops';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -266,7 +266,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   if (toolErrors.size > 0) {
     void (async () => {
       try {
-        const { chat: chatFn } = await import('@hmh/kernel');
+        const { chat: chatFn } = await import('@hmharness/kernel');
         const provider = resolveProvider(cfg, 'evolve');
         if (!provider.apiKey) return;
         const errSummary = [...toolErrors.entries()].map(([n, e]) => `${n}: ${[...new Set(e)].slice(0, 2).join('; ')}`).join('\n').slice(0, 600);
@@ -317,8 +317,8 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
  *  journal only; failures never surface into the user's chat. */
 async function triggerBackgroundEvolve(home: string): Promise<void> {
   try {
-    const { runEvolution } = await import('@hmh/evolution');
-    const { defaultConfig, loadConfig, resolveProvider, chat } = await import('@hmh/kernel');
+    const { runEvolution } = await import('@hmharness/evolution');
+    const { defaultConfig, loadConfig, resolveProvider, chat } = await import('@hmharness/kernel');
     const cfg = await loadConfig();
     const provider = resolveProvider(cfg, 'evolve');
     if (!provider.apiKey) return; // no provider configured - stay quiet

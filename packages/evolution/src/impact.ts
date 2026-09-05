@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - impact
+ * @hmharness/evolution - impact
  * The P0 observability layer for self-evolution: canary sessions, impact
  * attribution, the evolution budget gate, and the GEPA-style candidate
  * pool. Everything here is *measurement* - none of it changes what the

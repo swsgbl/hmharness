@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseDeclaration, buildApiIndex, lookupSymbol } from '../apikg.ts';
-import { sendNotification } from '@hmh/domain-ops';
+import { sendNotification } from '@hmharness/domain-ops';
 
 /* ---------------- d.ts parser shapes ---------------- */
 

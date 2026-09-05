@@ -1,5 +1,5 @@
 {
-  "name": "@hmh/kernel",
+  "name": "@hmharness/kernel",
   "version": "0.1.0",
   "description": "hmharness kernel: tool registry, provider adapters, the agent loop, session log, config. Zero runtime dependencies (Node >=22 native fetch).",
   "type": "module",
@@ -11,6 +11,17 @@
     }
   },
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
   }

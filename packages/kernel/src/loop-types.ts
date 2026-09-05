@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - loop-types
+ * @hmharness/kernel - loop-types
  * Structural typing for the registry the loop needs (avoids a hard import
  * cycle and lets tests pass a stub registry).
  */

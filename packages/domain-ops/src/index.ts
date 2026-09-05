@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-ops
+ * @hmharness/domain-ops
  * The ops keeper (hm-keeper successor, rewritten per the behavior spec
  * captured in docs/MIGRATION-ASSESSMENT.md):
  *  - ecosystem radar: pull OpenHarmony release sources -> diff against the
@@ -14,7 +14,7 @@
  */
 import { mkdir, readFile, readdir, writeFile, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chat, type ProviderConfig, type Tool } from '@hmh/kernel';
+import { chat, type ProviderConfig, type Tool } from '@hmharness/kernel';
 import { issueTools } from './issues.ts';
 import { channelTools } from './channel.ts';
 
@@ -229,7 +229,7 @@ export async function opsStatus(home: string): Promise<{ scans: number; lastScan
 /* ------------------------------------------------------------------ */
 
 async function resolveProvider(): Promise<ProviderConfig> {
-  const { loadConfig } = await import('@hmh/kernel');
+  const { loadConfig } = await import('@hmharness/kernel');
   return (await loadConfig()).provider;
 }
 

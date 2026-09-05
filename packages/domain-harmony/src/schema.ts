@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - schema (config validation)
+ * @hmharness/domain-harmony - schema (config validation)
  * Structural validation for the three project config files hvigor reads:
  *   <module>/src/main/module.json5   - the module manifest (name/type/abilities...)
  *   <module>/build-profile.json5    - module build config (apiType/targets...)
@@ -18,7 +18,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 /* ---------------- lenient JSON5 parse ---------------- */
 

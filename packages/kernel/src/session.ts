@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - session
+ * @hmharness/kernel - session
  * Append-only JSONL session log under HMH_HOME/sessions/. Every loop event
  * is durably recorded - the audit trail the 2026 consensus calls
  * non-negotiable, and the raw material the evolution subsystem learns from.

@@ -32,7 +32,7 @@
 **Option 1: install from npm** (recommended once published, zero build):
 
 ```bash
-npm install -g @hmh/cli     # Node >= 22
+npm install -g @hmharness/cli     # Node >= 22
 hmh init                    # creates ~/.hmharness (config + state dirs)
 ```
 
@@ -43,7 +43,7 @@ git clone https://github.com/swsgbl/hmharness.git
 cd hmharness
 npm install
 npm run build
-npm link -w @hmh/cli   # then `hmh ...` works from any directory
+npm link -w @hmharness/cli   # then `hmh ...` works from any directory
 hmh init               # creates ~/.hmharness (config + state dirs)
 ```
 

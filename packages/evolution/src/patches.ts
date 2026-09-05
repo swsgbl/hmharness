@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - patches
+ * @hmharness/evolution - patches
  * CODE-LEVEL self-evolution: the evolution loop can now propose source-code
  * patches (not just prompt-level skills), test them on an isolated git
  * branch, and merge or revert based on the benchmark gate.
@@ -252,7 +252,7 @@ export async function proposePatches(
   const user = `Session signals:\n${JSON.stringify(signals, null, 2)}\n\nHot tool source files:\n${JSON.stringify(fileContents, null, 2)}\n\nPropose at most 1 patch (or []).`;
   say('  code-evolution: asking meta-model for patch proposals');
   try {
-    const { chat } = await import('@hmh/kernel');
+    const { chat } = await import('@hmharness/kernel');
     const r = await chat(provider, [
       { role: 'system', content: system },
       { role: 'user', content: user },

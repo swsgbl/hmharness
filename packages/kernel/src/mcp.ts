@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - mcp
+ * @hmharness/kernel - mcp
  * A zero-dependency MCP (Model Context Protocol) client: JSON-RPC 2.0 over
  * stdio (spawned server process) or Streamable HTTP (POST + SSE response).
  * Remote tools are projected onto the same Tool shape as native ones, so the

@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - emulator management (no DevEco GUI)
+ * @hmharness/domain-harmony - emulator management (no DevEco GUI)
  * DevEco's Emulator.exe is itself a headless CLI:
  *   Emulator.exe -hvd <name> -path <deployedDir> -imageRoot <imageRoot>
  * A deployed device is just: lists.json entry + instance dir with two
@@ -15,7 +15,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { accessSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 const exec = promisify(execFile);
 

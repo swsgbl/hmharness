@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - registry
+ * @hmharness/kernel - registry
  * The capability registry. One Map, duplicate-name rejection, OpenAI shape
  * projection. Boring on purpose: 2026 consensus is that the loop+registry
  * core should stay simple while capability volume grows around it.

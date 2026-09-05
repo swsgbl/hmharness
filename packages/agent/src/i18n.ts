@@ -1,5 +1,5 @@
 /**
- * @hmh/agent - i18n
+ * @hmharness/agent - i18n
  * UI-chrome strings for both frontends (cli, web), keyed and bilingual.
  * Locale comes from HmhConfig.locale (default zh). Tool descriptions and
  * model output stay as-is: models answer in the user's language already.

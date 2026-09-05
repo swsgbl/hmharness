@@ -1,5 +1,5 @@
 /**
- * @hmh/cli - tui (fullscreen, Claude-Code / dsh-TUI style)
+ * @hmharness/cli - tui (fullscreen, Claude-Code / dsh-TUI style)
  *
  *   ┌ header: logo · model · cwd · skills · spinner/status
  *   ├ transcript viewport (scrollable, auto-follow)
@@ -12,9 +12,9 @@
  */
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmh/kernel';
-import { listDrafts, listSkills, runBench, runEvolution } from '@hmh/evolution';
-import { buildRegistry, runAgentTask, strings, type Locale } from '@hmh/agent';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmharness/kernel';
+import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
+import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
 
 const RESET = '\x1b[0m';
@@ -914,7 +914,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/ops') {
       rt.setBusy(true, '/ops');
       try {
-        const { harmonyOpsStatus } = await import('@hmh/domain-ops');
+        const { harmonyOpsStatus } = await import('@hmharness/domain-ops');
         const r = await harmonyOpsStatus.execute({}, { cwd: process.cwd(), home });
         rt.addText(r.output);
       } catch (err) {
@@ -927,7 +927,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/ops scan') {
       rt.setBusy(true, t.tuiRadarScanning);
       try {
-        const { harmonyOpsRadarScan } = await import('@hmh/domain-ops');
+        const { harmonyOpsRadarScan } = await import('@hmharness/domain-ops');
         const r = await harmonyOpsRadarScan.execute({}, { cwd: process.cwd(), home });
         rt.addText(r.output);
       } catch (err) {
@@ -940,7 +940,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/bench') {
       rt.setBusy(true, '/bench');
       try {
-        const { chat } = await import('@hmh/kernel');
+        const { chat } = await import('@hmharness/kernel');
         const { results, passRate } = await runBench(home, async (c) => {
           // plain model call keeps the TUI bench fast; loop cases fall back
           // to the dedicated `hmh bench` command
@@ -960,7 +960,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/evolve') {
       rt.setBusy(true, '/evolve');
       try {
-        const { chat } = await import('@hmh/kernel');
+        const { chat } = await import('@hmharness/kernel');
         const report = await runEvolution({
           home,
           provider: cfg.provider,
@@ -983,7 +983,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     rt.addText(`❯ ${line}`);
     rt.setBusy(true, t.running);
     let appender: ((c: string) => void) | null = null;
-    let kind: import('@hmh/kernel').DeltaKind | null = null;
+    let kind: import('@hmharness/kernel').DeltaKind | null = null;
     try {
       const result = await runAgentTask({
         task: line,

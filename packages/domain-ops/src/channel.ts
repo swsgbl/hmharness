@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-ops - channel (message notifications, the codelin channel gap)
+ * @hmharness/domain-ops - channel (message notifications, the codelin channel gap)
  * Minimal honest version: a webhook notifier. Feishu (飞书) and DingTalk
  * (钉钉) custom-bot webhooks plus any generic JSON POST URL. The agent can
  * report task completion / build failures / device-test results to a chat
@@ -11,7 +11,7 @@
 import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadConfig, type Tool } from '@hmh/kernel';
+import { loadConfig, type Tool } from '@hmharness/kernel';
 
 interface ChannelConfig {
   type: 'feishu' | 'dingtalk' | 'json';
@@ -101,7 +101,7 @@ export const opsNotify: Tool = {
     const name = String(args.channel ?? '').trim();
     const text = String(args.text ?? '').trim();
     if (!name || !text) return { output: 'channel and text required', isError: true };
-    const { homeDir } = await import('@hmh/kernel');
+    const { homeDir } = await import('@hmharness/kernel');
     const r = await sendNotification(homeDir(), name, text);
     return {
       output: r.ok ? `notified ${name}: ${text.slice(0, 80)}` : `notify ${name} failed: ${r.detail}`,

@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - project scaffold
+ * @hmharness/domain-harmony - project scaffold
  * Creates a minimal buildable HarmonyOS stage-model project (ArkTS entry +
  * single page + resources) tuned to the installed SDK via HM_SDK_VERSION
  * (default "6.1.1(24)"). Icons are generated PNGs (zlib + hand-rolled CRC -
@@ -11,7 +11,7 @@
 import { deflateSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 import { parseSdkVersion } from './apimatrix.ts';
 
 /* ------------------------------------------------------------------ */

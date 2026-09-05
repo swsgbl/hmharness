@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - types
+ * @hmharness/kernel - types
  * The kernel contract surface. Deliberately small: a Tool, a chat message,
  * a provider config. Everything else in hmharness composes from these.
  */

@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - apikg (API knowledge graph, the codelin api_kg gap)
+ * @hmharness/domain-harmony - apikg (API knowledge graph, the codelin api_kg gap)
  * The agent guesses HarmonyOS APIs because it cannot SEE the SDK. The
  * declarations are right there on disk (ets/api/*.d.ts, 927 files) - this
  * module indexes them ONCE into HMH_HOME/apikg and answers lookups with
@@ -13,7 +13,7 @@
  */
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Tool } from '@hmh/kernel';
+import type { Tool } from '@hmharness/kernel';
 
 export interface ApiSymbolEntry {
   module: string;      // @ohos.xxx

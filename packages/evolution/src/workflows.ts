@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - workflows (AWM: Agent Workflow Memory, arxiv 2409.07429)
+ * @hmharness/evolution - workflows (AWM: Agent Workflow Memory, arxiv 2409.07429)
  * Verified lesson from the paper: inducing commonly REUSED routines from
  * past task trajectories and injecting them on demand beats stacking raw
  * trajectories or per-mistake notes. Here the "repeated trajectory" signal
@@ -9,7 +9,7 @@
  * draft -> poison-screen -> bench-gate pipeline. No new gate is opened -
  * a workflow is just a skill with a shape.
  */
-import { chat, type ProviderConfig } from '@hmh/kernel';
+import { chat, type ProviderConfig } from '@hmharness/kernel';
 import { readInsights } from './insights.ts';
 import { screenForPoison, type SkillProposal } from './evolve.ts';
 

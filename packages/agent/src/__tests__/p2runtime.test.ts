@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { commandPreflight } from '../tools.ts';
 import { recordRole, roleStats, roleStatsLine, type RoleStat } from '../spawn.ts';
-import { refreshKnowledge } from '@hmh/evolution';
+import { refreshKnowledge } from '@hmharness/evolution';
 
 async function freshHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), 'hmh-p2-'));

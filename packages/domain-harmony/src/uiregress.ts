@@ -1,5 +1,5 @@
 /**
- * @hmh/domain-harmony - uiregress (visual UI regression, quality trio #2)
+ * @hmharness/domain-harmony - uiregress (visual UI regression, quality trio #2)
  * Minimal honest version of the old line's visual-regression gap, built
  * from parts that already exist and are device-proven:
  *   hdc shell snapshot_display / uitest UIRecord screenshots + see_image
@@ -20,7 +20,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, type ProviderConfig, type Tool } from '@hmh/kernel';
+import { chatVision, type ProviderConfig, type Tool } from '@hmharness/kernel';
 
 const execCb = promisify(execFile);
 
@@ -127,7 +127,7 @@ export const harmonyUiRegression: Tool = {
     const expect = Array.isArray(args.expect) ? (args.expect as string[]).map(String).filter(Boolean) : [];
     if (!bundle || expect.length === 0) return { output: 'bundle and non-empty expect[] required', isError: true };
     // vision provider from config (kernel routing)
-    const { loadConfig, resolveProvider } = await import('@hmh/kernel');
+    const { loadConfig, resolveProvider } = await import('@hmharness/kernel');
     const cfg = await loadConfig();
     let vision: ProviderConfig;
     try {

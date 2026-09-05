@@ -1,5 +1,5 @@
 /**
- * @hmh/kernel - loop
+ * @hmharness/kernel - loop
  * The agent loop: call the model, run the tools it asks for, feed results
  * back, repeat until it answers without tool calls or the turn budget is
  * spent. This is the "loop engineering" core - kept deliberately dull.

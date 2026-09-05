@@ -1,5 +1,5 @@
 /**
- * @hmh/evolution - memory
+ * @hmharness/evolution - memory
  * Cross-session persistent memory. Notes are append-only lines in
  * memory/memory.md (ACE lesson: append beats rewrite - rewriting is where
  * hard-won context gets lost). Injection is retrieval-based: notes are
