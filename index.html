@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hmharness — 自进化的鸿蒙开发智能体框架</title>
+<meta name="description" content="零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
+<style>
+:root{
+  --navy:#0B1E3A; --navy2:#123B6E; --cyan:#4FD8EB; --ice:#EAF4FA;
+  --text:#DCE8F2; --dim:#8FA8C0; --card:rgba(13,32,58,.72); --line:rgba(79,216,235,.22);
+  --radius:18px; --maxw:1120px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;overflow-x:hidden;line-height:1.65}
+#rain{position:fixed;inset:0;z-index:0;opacity:.55}
+.vignette{position:fixed;inset:0;z-index:1;background:radial-gradient(ellipse at 50% 0%,transparent 30%,rgba(7,17,33,.88) 100%);pointer-events:none}
+.wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px}
+a{color:var(--cyan);text-decoration:none}
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(9,22,42,.72);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:#fff}
+.logo .star{color:var(--cyan);font-size:20px}
+.navlinks{display:flex;gap:26px;align-items:center;font-size:14.5px}
+.navlinks a{color:var(--dim);transition:color .2s}
+.navlinks a:hover{color:#fff}
+.lang{cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ice);font-size:13px;background:transparent;transition:border-color .2s}
+.lang:hover{border-color:var(--cyan)}
+.btn{display:inline-block;padding:10px 22px;border-radius:999px;font-weight:600;font-size:14.5px;border:1px solid transparent;cursor:pointer;transition:transform .15s,box-shadow .2s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;box-shadow:0 6px 26px rgba(79,216,235,.35)}
+.btn-primary:hover{box-shadow:0 8px 34px rgba(79,216,235,.55)}
+.btn-ghost{border-color:var(--line);color:var(--ice)}
+.btn-ghost:hover{border-color:var(--cyan)}
+.hero{text-align:center;padding:110px 0 80px}
+.hero h1{font-size:clamp(42px,7vw,76px);font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(120deg,#FFFFFF 20%,var(--cyan) 70%,#2FA8D8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero .tag{margin:18px 0 10px;font-size:clamp(18px,2.6vw,24px);color:var(--cyan);letter-spacing:.35em}
+.hero p.sub{max-width:720px;margin:0 auto 34px;color:var(--dim);font-size:17px}
+.cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.term{max-width:640px;margin:56px auto 0;background:rgba(5,14,28,.9);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden;text-align:left}
+.term-bar{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.term-bar i{width:11px;height:11px;border-radius:50%;background:#31507A}
+.term-bar i:first-child{background:#E5484D}.term-bar i:nth-child(2){background:#F5A623}
+.term-body{padding:22px 24px;font-family:"Cascadia Code",Consolas,"JetBrains Mono",monospace;font-size:13.5px;line-height:1.75;color:var(--dim);white-space:pre;overflow-x:auto}
+.term-body .w{color:#fff;font-weight:700}.term-body .c{color:var(--cyan)}.term-body .g{color:#7DDF9A}
+section{padding:86px 0}
+h2.sec{font-size:clamp(28px,4vw,40px);font-weight:800;text-align:center;letter-spacing:-.01em;margin-bottom:14px}
+p.secdesc{text-align:center;color:var(--dim);max-width:680px;margin:0 auto 46px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;transition:transform .2s,border-color .2s,box-shadow .25s;backdrop-filter:blur(8px)}
+.card:hover{transform:translateY(-4px);border-color:rgba(79,216,235,.55);box-shadow:0 16px 46px rgba(0,0,0,.35)}
+.card .ic{font-size:26px;margin-bottom:12px}
+.card h3{font-size:17.5px;margin-bottom:8px;color:#fff}
+.card p{font-size:14.5px;color:var(--dim)}
+.card code{font-family:Consolas,monospace;font-size:12.5px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px;text-align:center}
+.stat{padding:26px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
+.stat b{display:block;font-size:40px;font-weight:800;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat span{color:var(--dim);font-size:14px}
+.steps{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.step{display:flex;gap:18px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px}
+.step .n{flex:none;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+.step pre{flex:1;font-family:Consolas,monospace;font-size:13px;color:#9FE8F5;background:rgba(5,14,28,.75);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+.step .cap{color:var(--dim);font-size:13px;margin-bottom:8px}
+.loop{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:8px}
+.node{padding:12px 22px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:14.5px}
+.node b{color:var(--cyan)}
+.arrow{color:var(--dim);font-size:18px}
+footer{border-top:1px solid var(--line);padding:44px 0 54px;color:var(--dim);font-size:13px}
+footer .cols{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;margin-bottom:26px}
+footer h4{color:#fff;font-size:14px;margin-bottom:10px}
+footer li{list-style:none;margin:6px 0}
+.legal{max-width:880px;border-top:1px dashed var(--line);padding-top:20px;line-height:1.8}
+@media(max-width:640px){.navlinks a:not(.btn){display:none}.term-body{font-size:11.5px}}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas><div class="vignette"></div>
+
+<nav><div class="wrap">
+  <div class="logo"><span class="star">✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px;margin-left:6px">hmharness</span></div>
+  <div class="navlinks">
+    <a href="#features" data-i18n="nav_features">特性</a>
+    <a href="#install" data-i18n="nav_install">快速开始</a>
+    <a href="#evo" data-i18n="nav_evo">自进化</a>
+    <a href="#models" data-i18n="nav_models">模型路由</a>
+    <button class="lang" id="langBtn" onclick="toggleLang()">EN</button>
+    <a class="btn btn-primary" href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <h1>hmharness</h1>
+  <div class="tag" data-i18n="hero_tag">自 进 化 · 零 依 赖</div>
+  <p class="sub" data-i18n="hero_sub">为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架 —— 零依赖内核 + 自进化一等公民 + MCP 生态借力。一句话创建工程、构建、装机、跑模拟器;每一步进化都有基准门禁与回滚。</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener" data-i18n="cta_github">⭐ GitHub 开源</a>
+    <a class="btn btn-ghost" href="#install" data-i18n="cta_start">四步上手</a>
+  </div>
+  <div class="term"><div class="term-bar"><i></i><i></i><i></i></div>
+<div class="term-body"><span class="c">$ hmh tui</span>
+<span class="w">⚙ hmharness</span> · <span class="c">your-model</span> · my-app · <span class="g">○ idle</span>
+<span class="w" data-i18n="term_tagline">网页端已就绪 → http://127.0.0.1:7788</span>
+
+❯ <span class="w" data-i18n="term_prompt">创建鸿蒙工程 my-app:登录页+首页,构建装进模拟器跑起来</span>
+<span class="g">●</span> harmony_project_create → pages+modules · <span class="g">OK</span>
+<span class="g">●</span> harmony_build        → hvigorw · <span class="g">BUILD SUCCESSFUL</span>
+<span class="g">●</span> harmony_emulator_start → <span class="g">running</span>
+<span class="g">●</span> harmony_install → harmony_launch → <span class="g">✓ ability started</span></div></div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <h2 class="sec" data-i18n="feat_title">不继承任何上游,全部自持</h2>
+  <p class="secdesc" data-i18n="feat_desc">七包单仓:零依赖内核 + 自进化 + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。</p>
+  <div class="grid">
+    <div class="card"><div class="ic">🏗️</div><h3 data-i18n="c1_h">参数化工程脚手架</h3><p data-i18n="c1_p"><code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。</p></div>
+    <div class="card"><div class="ic">🖥️</div><h3 data-i18n="c2_h">模拟器全生命周期(零 IDE)</h3><p data-i18n="c2_p"><code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。</p></div>
+    <div class="card"><div class="ic">📲</div><h3 data-i18n="c3_h">构建 · 装机 · 运行</h3><p data-i18n="c3_p">hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 <code>cjpm</code> 构建、官方 <code>codelinter</code> 门禁 —— 设备写操作全部走审批。</p></div>
+    <div class="card"><div class="ic">🧠</div><h3 data-i18n="c4_h">自进化双门禁</h3><p data-i18n="c4_p">洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升快照 → 保留门防背题复验 → 回归即回滚;进化只写 skills/ 与 memory/。</p></div>
+    <div class="card"><div class="ic">🔌</div><h3 data-i18n="c5_h">MCP 生态借力</h3><p data-i18n="c5_p">手写零依赖 MCP 客户端(stdio + Streamable HTTP),5800+ 社区服务器即插即用;远端工具默认受审批门禁。</p></div>
+    <div class="card"><div class="ic">🛰️</div><h3 data-i18n="c6_h">运维看家(生态雷达)</h3><p data-i18n="c6_p">8 源开源鸿蒙雷达每日 diff 脚手架与门禁假设,模型写简报、模板降级;issue 流 AI 只起草、人批准才发布,draft PR + 身份署名。</p></div>
+    <div class="card"><div class="ic">🎛️</div><h3 data-i18n="c7_h">双前端</h3><p data-i18n="c7_p">全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、SGR 鼠标)+ Web(浏览器审批、会话回放、<b>工作区</b>切换、目录选择器);<code>hmh tui</code> 一条命令自动带起网页端。</p></div>
+    <div class="card"><div class="ic">🛡️</div><h3 data-i18n="c8_h">安全内建</h3><p data-i18n="c8_p">deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计。</p></div>
+    <div class="card"><div class="ic">🌍</div><h3 data-i18n="c9_h">国际化 & 多厂商</h3><p data-i18n="c9_p">zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。</p></div>
+  </div>
+</div></section>
+
+<section style="padding-top:20px"><div class="wrap">
+  <div class="stats">
+    <div class="stat"><b>7</b><span data-i18n="s1">单仓七包</span></div>
+    <div class="stat"><b>0</b><span data-i18n="s2">运行时依赖(内核)</span></div>
+    <div class="stat"><b>25</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
+    <div class="stat"><b>2</b><span data-i18n="s4">门禁(训练+保留)</span></div>
+  </div>
+</div></section>
+
+<section id="install" style="padding-top:30px"><div class="wrap">
+  <h2 class="sec" data-i18n="ins_title">四步上手</h2>
+  <p class="secdesc" data-i18n="ins_desc">Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div style="flex:1"><div class="cap" data-i18n="ins1">克隆并构建</div><pre>git clone https://github.com/swsgbl/hmharness.git
+cd hmharness && npm install && npm run build
+npm link -w @hmh/cli</pre></div></div>
+    <div class="step"><div class="n">2</div><div style="flex:1"><div class="cap" data-i18n="ins2">初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)</div><pre>hmh init
+notepad %USERPROFILE%\.hmharness\config.json
+  { "provider": { "baseUrl": "…", "apiKey": "…", "model": "…" } }</pre></div></div>
+    <div class="step"><div class="n">3</div><div style="flex:1"><div class="cap" data-i18n="ins3">一条命令起飞:全屏 TUI,网页端自动就绪</div><pre>hmh tui          # 全屏 TUI + 自动后台启动网页端
+hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div></div>
+    <div class="step"><div class="n">4</div><div style="flex:1"><div class="cap" data-i18n="ins4">让它自己变强</div><pre>hmh evolve --every=30   # 常驻自进化(双门禁,回归即回滚)</pre></div></div>
+  </div>
+</div></section>
+
+<section id="evo" style="padding-top:20px"><div class="wrap">
+  <h2 class="sec" data-i18n="evo_title">严格提升,否则回退</h2>
+  <p class="secdesc" data-i18n="evo_desc">借鉴 Darwin Gödel Machine 与 GDPevo 的机制教训:每轮优化有度量、有快照、防背题、可回滚;进化循环无法触碰配置与安全设置。</p>
+  <div class="loop">
+    <div class="node"><b data-i18n="n1">洞察</b> insights</div><span class="arrow">→</span>
+    <div class="node"><b data-i18n="n2">提案</b> drafts</div><span class="arrow">→</span>
+    <div class="node"><b data-i18n="n3">训练门</b> bench A/B ×2</div><span class="arrow">→</span>
+    <div class="node"><b data-i18n="n4">晋升</b> snapshot</div><span class="arrow">→</span>
+    <div class="node"><b data-i18n="n5">保留门</b> holdout</div><span class="arrow">↺</span>
+  </div>
+  <p class="secdesc" style="margin-top:34px" data-i18n="evo_outro">上一次会话踩过的坑,下一次开局就知道(检索式长期记忆自动注入,蒸馏层只增不删);每一轮进化都落在 evolution/log.jsonl,全程可审计。</p>
+</div></section>
+
+<section id="models" style="padding-top:10px"><div class="wrap">
+  <h2 class="sec" data-i18n="mod_title">模型无关 · 按用途路由</h2>
+  <p class="secdesc" data-i18n="mod_desc">任意 OpenAI 兼容厂商:GLM / DeepSeek / 通义 / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio……chat、vision、evolve、bench 各走各的,密钥只存在本机 HMH_HOME。</p>
+  <div class="steps">
+    <div class="step"><div class="n">✦</div><div style="flex:1"><pre>{
+  "providers": { "a": { "baseUrl": "…", "model": "strong" },
+                 "v": { "baseUrl": "…", "model": "vision" } },
+  "routing": { "chat": "a", "vision": "v", "evolve": "a", "bench": "a" }
+}</pre></div></div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="cols">
+    <div><h4>✦ hmharness</h4><ul>
+      <li><a href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener" data-i18n="f_repo">GitHub 仓库</a></li>
+      <li><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" data-i18n="f_arch">架构设计</a></li>
+      <li><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md" target="_blank" rel="noopener" data-i18n="f_road">路线图</a></li>
+    </ul></div>
+    <div><h4 data-i18n="f_eco">生态</h4><ul>
+      <li><a href="https://developer.huawei.com/consumer/cn/deveco-studio/" target="_blank" rel="noopener">DevEco Studio</a></li>
+      <li><a href="https://www.openharmony.cn" target="_blank" rel="noopener">OpenHarmony</a></li>
+      <li><a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a></li>
+    </ul></div>
+    <div><h4 data-i18n="f_docs">文档</h4><ul>
+      <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.md" target="_blank" rel="noopener">README(中文)</a></li>
+      <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.en.md" target="_blank" rel="noopener">README(English)</a></li>
+      <li><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="f_contrib">参与贡献</a></li>
+    </ul></div>
+  </div>
+  <div class="legal" data-i18n="legal">
+    <b>非官方声明:</b>hmharness 是独立社区开源项目(MIT),与华为(Huawei)、开放原子开源基金会均无隶属、合作或背书关系。
+    "HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有,此处仅为描述性合理使用。
+    本项目为净室(clean-room)重写,不继承任何上游运行时能力;自进化机制参考 Darwin Gödel Machine、GDPevo、Penguin Harness 等公开研究思想(无代码复制)。
+    <br>© 2026 hmharness contributors · MIT License
+  </div>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script>
+/* ---- motion layer: GSAP via CDN; full no-op fallback when unreachable or
+   when the user prefers reduced motion ---- */
+(function () {
+  if (typeof gsap === 'undefined') return;
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (reduce) return;
+
+  // hero: title, tag, sub, CTAs drift in, then the terminal pops
+  var hero = gsap.timeline({ defaults: { ease: 'power3.out' } })
+hero.from('.hero h1', { y: 34, autoAlpha: 0, duration: 0.7 });
+hero.from('.hero .tag', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.35');
+hero.from('.hero .sub', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.3');
+hero.from('.cta .btn', { y: 12, autoAlpha: 0, duration: 0.4, stagger: 0.09 }, '-=0.25');
+hero.from('.term', { y: 26, scale: 0.97, autoAlpha: 0, duration: 0.6, ease: 'back.out(1.4)', clearProps: 'transform,visibility' }, '-=0.25');
+hero.from('.term-body span', { autoAlpha: 0, duration: 0.18, stagger: 0.05, clearProps: 'opacity,visibility' }, '-=0.2');;
+  hero.from('nav .logo, nav .navlinks > *', { y: -12, autoAlpha: 0, duration: 0.35, stagger: 0.05, clearProps: 'transform,visibility' }, 0);
+
+  // sections + cards drift in as they scroll into view
+  var seen = new WeakSet();
+  function reveal(el, sel) {
+    if (seen.has(el)) return;
+    seen.add(el);
+    gsap.fromTo(el, { y: 22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: 'power2.out', clearProps: 'transform,visibility' });
+    if (sel) {
+      gsap.fromTo(el.querySelectorAll(sel), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.08, clearProps: 'transform,visibility' });
+    }
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var t = en.target;
+      if (t.dataset.anim === 'stats') {
+        if (!seen.has(t)) {
+          seen.add(t);
+          t.querySelectorAll('.stat b').forEach(function (b) {
+            var to = Number(b.textContent) || 0;
+            var o = { n: 0 };
+            gsap.to(o, { n: to, duration: 0.9, ease: 'power2.out', onUpdate: function () { b.textContent = String(Math.round(o.n)); } });
+          });
+          gsap.fromTo(t.querySelectorAll('.stat'), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, stagger: 0.07, ease: 'power2.out', clearProps: 'transform,visibility' });
+        }
+        return;
+      }
+      var host = t.closest('section') || t;
+      reveal(host, t.dataset.anim === 'cards' ? '.card' : t.dataset.anim === 'steps' ? '.step' : t.dataset.anim === 'loop' ? '.node' : null);
+    });
+  }, { threshold: 0.25 });
+  document.querySelectorAll('h2.sec, p.secdesc, .stats').forEach(function (el) { io.observe(el); });
+  document.querySelectorAll('section .grid, section .steps, section .loop').forEach(function (el) {
+    el.setAttribute('data-anim', el.classList.contains('grid') ? 'cards' : el.classList.contains('steps') ? 'steps' : 'loop');
+    io.observe(el);
+  });
+
+  // nav button + CTA micro-interactions
+  document.querySelectorAll('.btn').forEach(function (b) {
+    b.addEventListener('mouseenter', function () { gsap.to(b, { scale: 1.04, duration: 0.18, ease: 'power2.out' }); });
+    b.addEventListener('mouseleave', function () { gsap.to(b, { scale: 1, duration: 0.25, ease: 'power2.out' }); });
+  });
+})();
+</script>
+<script>
+/* ---- i18n ---- */
+const I18N = {
+  zh: {
+    _title: 'hmharness — 自进化的鸿蒙开发智能体框架',
+    _desc: '零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。',
+    nav_features: '特性', nav_install: '快速开始', nav_evo: '自进化', nav_models: '模型路由',
+    hero_tag: '自 进 化 · 零 依 赖',
+    hero_sub: '为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架 —— 零依赖内核 + 自进化一等公民 + MCP 生态借力。一句话创建工程、构建、装机、跑模拟器;每一步进化都有基准门禁与回滚。',
+    cta_github: '⭐ GitHub 开源', cta_start: '四步上手',
+    term_tagline: '网页端已就绪 → http://127.0.0.1:7788',
+    term_prompt: '创建鸿蒙工程 my-app:登录页+首页,构建装进模拟器跑起来',
+    feat_title: '不继承任何上游,全部自持',
+    feat_desc: '七包单仓:零依赖内核 + 自进化 + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。',
+    c1_h: '参数化工程脚手架', c1_p: '<code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。',
+    c2_h: '模拟器全生命周期(零 IDE)', c2_p: '<code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。',
+    c3_h: '构建 · 装机 · 运行', c3_p: 'hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 <code>cjpm</code> 构建、官方 <code>codelinter</code> 门禁 —— 设备写操作全部走审批。',
+    c4_h: '自进化双门禁', c4_p: '洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升快照 → 保留门防背题复验 → 回归即回滚;进化只写 skills/ 与 memory/。',
+    c5_h: 'MCP 生态借力', c5_p: '手写零依赖 MCP 客户端(stdio + Streamable HTTP),5800+ 社区服务器即插即用;远端工具默认受审批门禁。',
+    c6_h: '运维看家(生态雷达)', c6_p: '8 源开源鸿蒙雷达每日 diff 脚手架与门禁假设,模型写简报、模板降级;issue 流 AI 只起草、人批准才发布,draft PR + 身份署名。',
+    c7_h: '双前端', c7_p: '全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、SGR 鼠标)+ Web(浏览器审批、会话回放、<b>工作区</b>切换、目录选择器);<code>hmh tui</code> 一条命令自动带起网页端。',
+    c8_h: '安全内建', c8_p: 'deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计。',
+    c9_h: '国际化 & 多厂商', c9_p: 'zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。',
+    s1: '单仓七包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '门禁(训练+保留)',
+    ins_title: '四步上手',
+    ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
+    ins1: '克隆并构建',
+    ins2: '初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)',
+    ins3: '一条命令起飞:全屏 TUI,网页端自动就绪',
+    ins4: '让它自己变强',
+    evo_title: '严格提升,否则回退',
+    evo_desc: '借鉴 Darwin Gödel Machine 与 GDPevo 的机制教训:每轮优化有度量、有快照、防背题、可回滚;进化循环无法触碰配置与安全设置。',
+    n1: '洞察', n2: '提案', n3: '训练门', n4: '晋升', n5: '保留门',
+    evo_outro: '上一次会话踩过的坑,下一次开局就知道(检索式长期记忆自动注入,蒸馏层只增不删);每一轮进化都落在 evolution/log.jsonl,全程可审计。',
+    mod_title: '模型无关 · 按用途路由',
+    mod_desc: '任意 OpenAI 兼容厂商:GLM / DeepSeek / 通义 / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio……chat、vision、evolve、bench 各走各的,密钥只存在本机 HMH_HOME。',
+    f_repo: 'GitHub 仓库', f_arch: '架构设计', f_road: '路线图',
+    f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献',
+    legal: '<b>非官方声明:</b>hmharness 是独立社区开源项目(MIT),与华为(Huawei)、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有,此处仅为描述性合理使用。本项目为净室(clean-room)重写,不继承任何上游运行时能力;自进化机制参考 Darwin Gödel Machine、GDPevo、Penguin Harness 等公开研究思想(无代码复制)。<br>© 2026 hmharness contributors · MIT License',
+    _langBtn: 'EN'
+  },
+  en: {
+    _title: 'hmharness — self-evolving agent framework for HarmonyOS development',
+    _desc: 'Zero-dependency kernel + first-class self-evolution + MCP ecosystem. Scaffold, build, install and run HarmonyOS apps in one sentence; every evolution step is gated and reversible.',
+    nav_features: 'Features', nav_install: 'Quick Start', nav_evo: 'Self-Evolving', nav_models: 'Model Routing',
+    hero_tag: 'S E L F - E V O L V I N G · Z E R O - D E P',
+    hero_sub: 'A self-evolving agent framework for the full HarmonyOS development lifecycle — a zero-dependency kernel, evolution as a first-class citizen, and the MCP ecosystem on tap. Scaffold, build, install and run in one sentence; every evolution step is benchmark-gated and reversible.',
+    cta_github: '⭐ Star on GitHub', cta_start: 'Quick Start',
+    term_tagline: 'web UI ready -> http://127.0.0.1:7788',
+    term_prompt: 'Create HarmonyOS project my-app (login + home pages), build it and run it on the emulator',
+    feat_title: 'Nothing inherited. Everything home-grown.',
+    feat_desc: 'Seven packages in one repo: a zero-dependency kernel, self-evolution, the HarmonyOS native domain, the ops keeper, the execution layer, and two frontends. The loop kernel, context compression, approval gates and session audit are all first-party; MCP plugs the wider ecosystem in.',
+    c1_h: 'Parameterized Scaffolding', c1_p: '<code>harmony_project_create</code> generates any structure of multi-page + feature HAP + HAR libraries in one call; verified against real hvigor builds.',
+    c2_h: 'Full Emulator Lifecycle, No IDE', c2_p: '<code>harmony_emulator_*</code> drives the official headless CLI directly: discover / catalog / create / start / stop / delete — every device model and variant on demand, without opening DevEco Studio.',
+    c3_h: 'Build · Install · Run', c3_p: 'hvigor builds, hdc install/launch/logs/uninstall, Cangjie <code>cjpm</code> builds, and the official <code>codelinter</code> gate — every device write goes through approval.',
+    c4_h: 'Self-Evolution, Double-Gated', c4_p: 'Insight mining → skill proposals → training gate A/B bench (double-sampled — luck cannot pass) → promotion snapshot → holdout anti-memorization re-verification → instant rollback on regression. The loop writes only skills/ and memory/.',
+    c5_h: 'MCP Ecosystem on Tap', c5_p: 'A hand-written zero-dependency MCP client (stdio + Streamable HTTP); 5,800+ community servers plug and play. Remote tools are approval-gated by default.',
+    c6_h: 'Ops Keeper (Ecosystem Radar)', c6_p: 'An 8-source OpenHarmony radar diffs our scaffold & gate assumptions daily; model-written briefs with template fallback. The issue flow drafts replies and ships only human-approved draft PRs with AI attribution.',
+    c7_h: 'Two Frontends', c7_p: 'A fullscreen TUI (slash palette with arrow keys, mouse-wheel transcript) and a web UI (browser approvals, session replay, <b>workspaces</b>, folder picker). <code>hmh tui</code> brings the web UI up automatically.',
+    c8_h: 'Safety Baked In', c8_p: 'A deny-first approval gate lives in the loop kernel itself; destructive command patterns are hard-denied; evolution proposals pass a poisoning screen; sessions are append-only audited.',
+    c9_h: 'i18n & Multi-Provider', c9_p: 'Bilingual zh/en UI and system prompts (<code>--locale=en</code>); any OpenAI-compatible provider, routed per purpose (chat / vision / evolve / bench).',
+    s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'gates (training + holdout)',
+    ins_title: 'Quick Start in Four Steps',
+    ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
+    ins1: 'Clone and build',
+    ins2: 'Init and configure a provider (any OpenAI-compatible endpoint; multi-provider routing optional)',
+    ins3: 'One command to fly: fullscreen TUI, web UI auto-linked',
+    ins4: 'Let it evolve',
+    evo_title: 'Strictly Improve, Or Roll Back',
+    evo_desc: 'Mechanism lessons from Darwin Gödel Machine and GDPevo: every optimization round is measured, snapshotted, anti-memorized and reversible; the evolution loop can never touch config or safety settings.',
+    n1: 'Insights', n2: 'Proposals', n3: 'Training gate', n4: 'Promotion', n5: 'Holdout gate',
+    evo_outro: 'Lessons from your last session are already known at the start of the next one (retrieval-based long-term memory, append-only distillation on top); every round lands in evolution/log.jsonl — fully auditable.',
+    mod_title: 'Model-Agnostic, Routed by Purpose',
+    mod_desc: 'Any OpenAI-compatible provider: GLM / DeepSeek / Qwen / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio… chat, vision, evolve and bench each take their own route; keys never leave HMH_HOME on your machine.',
+    f_repo: 'GitHub Repository', f_arch: 'Architecture', f_road: 'Roadmap',
+    f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing',
+    legal: '<b>Non-affiliation notice:</b> hmharness is an independent community open-source project (MIT). It is not affiliated with, endorsed by, or cooperating with Huawei or the OpenAtom Foundation. "HarmonyOS", "OpenHarmony", "DevEco Studio" and related names and marks belong to their respective owners; used here descriptively under fair use. This project is a clean-room rewrite that inherits no upstream runtime capability; self-evolution mechanisms reference public research ideas from Darwin Gödel Machine, GDPevo and Penguin Harness (no code copied).<br>© 2026 hmharness contributors · MIT License',
+    _langBtn: '中文'
+  }
+};
+
+function applyLang(lang) {
+  const dict = I18N[lang] || I18N.zh;
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.title = dict._title;
+  document.querySelector('meta[name="description"]').content = dict._desc;
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    const v = dict[el.dataset.i18n];
+    if (v !== undefined) el.innerHTML = v;
+  }
+  document.getElementById('langBtn').textContent = dict._langBtn;
+  try { localStorage.setItem('hmh-lang', lang); } catch (e) {}
+}
+function toggleLang() {
+  const cur = document.documentElement.lang.startsWith('zh') ? 'zh' : 'en';
+  applyLang(cur === 'zh' ? 'en' : 'zh');
+}
+(function () {
+  let lang = null;
+  try { lang = localStorage.getItem('hmh-lang'); } catch (e) {}
+  if (!lang) {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (q === 'en' || q === 'zh') lang = q;
+  }
+  if (!lang) lang = (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  applyLang(lang);
+})();
+
+/* ---- Matrix-style rain, brand-tuned ---- */
+(function(){
+  const cv = document.getElementById('rain'), cx = cv.getContext('2d');
+  const GLYPHS = '01✦HM自进化-{}<>/;$#'.split('');
+  let W, H, cols, drops, speeds;
+  function fit(){
+    W = cv.width = innerWidth; H = cv.height = innerHeight;
+    cols = Math.floor(W / 16);
+    drops = Array.from({length: cols}, () => Math.random() * -H / 16);
+    speeds = Array.from({length: cols}, () => 0.45 + Math.random() * 0.75);
+  }
+  fit(); addEventListener('resize', fit);
+  function frame(){
+    cx.fillStyle = 'rgba(11,30,58,0.14)';
+    cx.fillRect(0, 0, W, H);
+    cx.font = '14px Consolas, monospace';
+    for (let i = 0; i < cols; i++){
+      const y = drops[i] * 16;
+      const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+      cx.fillStyle = Math.random() < 0.06 ? 'rgba(234,244,250,0.92)' : 'rgba(79,216,235,0.72)';
+      cx.fillText(ch, i * 16, y);
+      if (y > H && Math.random() > 0.985) drops[i] = 0;
+      drops[i] += speeds[i];
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>
