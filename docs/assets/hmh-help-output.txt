@@ -1,0 +1,24 @@
+hmh - self-evolving agent harness for HarmonyOS development
+
+usage:
+  hmh "do something"       one-shot task (full agent loop, streaming)
+  hmh                      interactive REPL (conversation memory kept, /help for commands)
+  hmh resume [id-prefix]   continue a past session by id prefix (or latest)
+  hmh web start|stop|status   web UI as a silent background daemon (no window,
+                             survives closing everything; log ~/.hmharness/web.log)
+  hmh web [--port=7788]       web UI in the foreground (debugging)
+  hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
+                           also starts the web UI in the background (--no-web skips)
+  hmh ops [scan|brief|status]  ops keeper: ecosystem radar
+  hmh devices|check        direct tool run, no model
+  hmh tools                list all registered tools (native + MCP)
+  hmh mcp                  show configured MCP servers and their tools
+  hmh evolve [--every=N]   self-evolution cycle (or resident loop)
+  hmh bench                run the evolution bench
+  hmh skills [--promote|--rollback|--unpromote <name>]
+  hmh skills add <git-url-or-local-dir>   install skills (multi-skill packs supported)
+
+flags:
+  --yes / -y          auto-approve gated tools (else they prompt; non-TTY denies)
+  --locale=zh|en      override the UI locale for this run
+  --help | -h         this help

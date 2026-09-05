@@ -6,6 +6,8 @@
 ![node](https://img.shields.io/badge/node-%3E%3D22-339933)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-000000)
 
+![hmh CLI demo](docs/assets/hmh-demo.gif)
+
 [中文文档](README.md)
 
 ## Feature highlights
