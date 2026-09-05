@@ -20,6 +20,7 @@ import { harmonyBuildDoctor } from './builddoctor.ts';
 import { harmonyProjectProfile } from './profile.ts';
 import { harmonySign } from './signing.ts';
 import { harmonyDeviceTest } from './ondevice.ts';
+import { harmonyApiLookup } from './apikg.ts';
 
 const exec = promisify(execFile);
 
@@ -427,6 +428,7 @@ export const harmonyTools: Tool[] = [
   harmonyProjectProfile,
   harmonySign,
   harmonyDeviceTest,
+  harmonyApiLookup,
   ...emulatorTools,
 ];
 
@@ -438,3 +440,4 @@ export { harmonyBuildDoctor, diagnoseBuildFailure, firstErrorBlock } from './bui
 export { harmonyProjectProfile, profileProject } from './profile.ts';
 export { harmonySign, resolveSigningIdentity, ensureDebugProfile, signHap, hapsignToolPaths, type SigningIdentity } from './signing.ts';
 export { harmonyDeviceTest, runDeviceTest, type DeviceTestStep } from './ondevice.ts';
+export { harmonyApiLookup, buildApiIndex, loadApiIndex, lookupSymbol, parseDeclaration, sdkApiDir, type ApiIndex, type ApiSymbolEntry } from './apikg.ts';

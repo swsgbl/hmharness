@@ -143,12 +143,14 @@
       expect 子串语义向后兼容)+成本双指标门(候选输出成本超基线×cap 拒绝,
       默认 1.3x,用例 cost-cap 行自定义)+坏正则判例错误;评测集滚动窗口
       与候选多样本重测此前已备(双样本门)
-- [ ] 旧线(codelin / harmony-harness,2026-08-28 退役)资产甄别出的域缺口,按价值排序:
-      HarmonyOS API 知识图谱(dts 解析+证据链检索,codelin api_kg)、
-      编译-修复闭环(错误分类→修复 agent→patch 应用,codelin icf)、
-      工程质量三件套(项目画像/视觉回归/质量评分,harmony-harness quality 包)、
-      消息通道接入(小艺/DevEco/飞书/钉钉,codelin channel)、
-      控制论事件域(感知→世界模型→反馈,harmony-harness cybernetics,实验性评估)
+- [x] **旧线域缺口收官(2026-09-05~09-04)**:
+      api_kg✅ apikg.ts(927 个 d.ts 索引为 20,241 符号/0.2s,声明片段+
+      file:line 证据+kit 归属;harmony_api_lookup 拦截 API 幻觉,假符号
+      诚实拒)、icf✅ harmony_build_doctor(七类失败签名分类+修复建议)、
+      quality 基座✅ harmony_project_profile(模块/页面/依赖/资源/配置
+      健康全像)、channel✅ ops_notify(飞书 HMAC 签名/钉钉签名 URL/通用
+      JSON webhook,配置驻 HMH_HOME,审批门);cybernetics 维持实验排期;
+      视觉回归(quality 其二)待视觉模型配合
       可搬数据资产已归档:38 厂商路由模板/营销物料/实战记忆(insights 已并入
       HMH_HOME 长期记忆)存 ~/.hmharness/local-docs/harmony-harness-archive/
 

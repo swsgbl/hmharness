@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-09-05 · API 知识图谱 + 消息通道(旧线最后两项落地)
+
+**动机**:用户令"继续推进"。旧线五缺口剩余 api_kg 与 channel 可落地项
+(cybernetics 维持实验排期)。
+
+**API 知识图谱(apikg.ts,旧线 api_kg 缺口)**:
+- **动机的根**:agent 猜鸿蒙 API 因为它**看不见 SDK**——而 927 个 d.ts
+  声明文件就在磁盘上。索引一次,查证每个符号:声明片段+file:line 证据+
+  kit 归属;"查不到"=本 SDK 无此符号,**幻觉被索引拦截**
+- **索引器**:行式宽松解析 d.ts(export default class/declare namespace/
+  interface/enum/成员方法属性含 `?` 可选/const/静态),提取 @kit 标签;
+  **实证 20,241 符号/0.2s**,缓存于 HMH_HOME/apikg(SDK mtime 变化才重建,
+  重载 44ms)
+- **harmony_api_lookup 工具**:符号直查(支持 hilog.info 层级形式),返回
+  精确命中+相似候选;**假符号诚实拒**("not in this SDK - do not guess")
+- 解析器四轮测试驱动修正:`Want`(export default 形态)/`hilog`(namespace
+  形态)初始全漏——d.ts 声明形态比想的多样;正则的 `\(?:` 转义错误逐字符
+  debug(execute 层字符类错吃整组)
+
+**消息通道(channel.ts,旧线 channel 缺口,诚实最小版)**:
+- **ops_notify** 工具:飞书(HMAC-SHA256 timestamp 签名)/钉钉(签名 URL
+  query)/通用 JSON webhook 三型;配置在 HMH_HOME config.json 的
+  channels{}——**webhook URL 是准密钥,不进仓库**;未配置=友好提示带
+  配置样例;出站消息挂审批门
+- 用途:任务完成/构建结果/设备测试判定推送到群——"模拟器装完了告诉我"
+
+**红线保持**:索引只读 SDK、缓存只写 HMH_HOME;webhook 走审批门。
+
+**实测**:apikg.test.ts 3 用例(解析器全形态/lookup 精确+模糊+假符号/
+channel 未配置提示+本地 stub 服务器真实 POST 往返);真 SDK 烟测
+(UIAbility/Want/hilog/HashMap 命中带 kit 与行号,NonExistentFake 拒);
+全套 **88/88**;七包构建+dist 四项验证。
+
+**教训**:㉘"看不见的知识"先建索引再谈提示词——agent 猜 API 不是模型
+笨,是证据链缺失;索引+file:line 证据让错误在写码前暴露;㉙正则 debug
+用最小复现行逐字符过,别盯着整段代码猜;㉘复训:e2e(真 SDK 20k 符号)
+再次抓出单测(合成样本)漏掉的声明形态多样性。
+
+---
+
 ## 2026-09-05 · 签名封装+设备测试:hapsigntool 全链破案(设备实证)
 
 **动机**:继续推进 ROADMAP 域缺口最后两项:hapsigntool 签名封装+onDeviceTest。
