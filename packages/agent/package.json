@@ -13,5 +13,22 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@hmh/kernel": "0.1.0",
+    "@hmh/evolution": "0.1.0",
+    "@hmh/domain-harmony": "0.1.0",
+    "@hmh/domain-ops": "0.1.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

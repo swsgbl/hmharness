@@ -124,13 +124,24 @@
       实证别名/证书链组合;破案五关见 DEVLOG 当日轮)与 harmony_device_test
       (install→launch→hilog 生命周期标记断言→cleanup 四步判定)——签名
       后的 hap 在模拟器真实安装/启动/打出日志,最终验收全自动化四步全 PASS
-- [ ] npm 公开发布 bin(README 用法以 npm link 为准,发布后更新)
-      【排期:发版前需 README/CI npm provenance 检查】
+- [x] **npm 发布预检就绪(2026-09-05)**:scripts/publish-preflight.cjs 五道
+      (dist 新鲜/shebang/@hmh 依赖声明/npm pack dry-run/密钥扫描)——当场
+      抓出 11 处真问题(2 stale+9 缺声明+cli 漏 web)全部补齐,PREFLIGHT OK;
+      已挂 CI(只检不发)。**执行发布**:按预检输出顺序 npm publish 七包,
+      npm login 后一条条跑(发布=外部动作,留待用户点头执行)
+- [x] **视觉 UI 回归(2026-09-05,quality 其二)**:harmony_ui_regression
+      (launch→snapshot_display 截屏→vision 描述→关键词断言,判定引用
+      模型原话可审计;语义存在性非像素 diff)。真机验收:vision 在 79KB
+      截屏上读出"Hello HarmonyOS";429 瞬态重试即过
+- [x] **镜像下载诚实检查(2026-09-05)**:harmony_image_check——不假装
+      能下载(华为无公开通道);报告已装镜像/类型+未装类型的唯一人工步骤
+      指路。自动下载本身维持 blocked(厂商通道)
 - [x] **进化循环接入雷达信号源(2026-09-04)**:evolution/radar.ts 只读消费
       ops 保管员最新生态简报(≤14 天新鲜度+1200 字截断),signals.ecosystemNews
       喂提议提示词("顾及近期发布,别给过时工具链建议")——只读不触发,
       预算边界不破(视觉用于 UI 回归基准仍待做)
-- [ ] 新设备类型镜像的自动下载(依赖厂商开放公开通道)【blocked:厂商】
+- [ ] 新设备类型镜像的**自动下载本体**维持 blocked(厂商无公开通道;
+      探测/诚实报告已由 harmony_image_check 覆盖,见上)
 - [x] **域缺口:API 能力矩阵+schema 校验(2026-09-05)**:apimatrix.ts 双形态
       版本解析("6.1.1(24)" 遗留 vs 26+ 纯 SemVer,major=API level,改版适配
       单点收敛)+compareSdk+能力矩阵;scaffold 入口预检 HM_SDK_VERSION(坏值

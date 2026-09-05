@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-09-05 · GitHub 中文门面 + npm 预检 + 视觉回归 + 镜像诚实检查(收尾批)
+
+**动机**:用户令"继续全部,逐个推进"+附 GitHub 主页截图指出缺中文介绍。
+ROADMAP 剩余四项一次推进。
+
+**GitHub 中文门面**:仓库 description 改为**中文优先双语**(中文定位+
+英文关键词共存,两语搜索都命中);topics 上限 20——移除弱泛化(testing/
+devtools/cli/nodejs)换精准中文生态词(ohos/arkui/cangjie/self-evolving-
+agent)。README 本已是中文,无需动。
+
+**npm 发布预检(scripts/publish-preflight.cjs)**:发布是七包**有序集**
+(kernel→evolution→domain-harmony→domain-ops→agent→web→cli),预检五道:
+dist 新于 src/shebang/dist 中 @hmh/* 导入必须在 package.json 声明/
+npm pack --dry-run/dist 密钥扫描。**当场抓出 11 处真问题**:两个包 dist
+stale(提交后忘重建)+九处 @hmh/* 导入未声明(发布后用户 install 必炸的
+坑)+cli 漏声明 @hmh/web——全部补齐后 PREFLIGHT OK;已挂 CI(只检不发)。
+首发指令固化在脚本输出里。
+
+**视觉 UI 回归(uiregress.ts,quality 三件套其二)**:launch→hdc
+snapshot_display 截屏→vision 描述→**关键词断言**;每个判定**引用模型原话**
+(可审计,永不"看起来不错"盲过);语义存在性检查而非像素 diff(像素 diff
+被模拟器 GPU 字体渲染差异打穿)。**真机验收**:截屏 79KB 真 JPEG,vision
+在截屏上读出 **"Hello HarmonyOS"**(脚手架 Index 页面真渲染);首跑遇
+HTTP 429 为本地网关瞬态限流,重试即过(教训:外部服务状态先重试再定性)。
+
+**镜像下载诚实检查(harmony_image_check)**:华为只经 DevEco 账号绑定
+组件管理器发镜像,无公开 URL 通道——不写死代码假装能下载;探测工具
+报告**已装镜像(API 6.1.1-B1/phone_all_x86)+已装类型实例全自动+未装
+类型的唯一人工步骤指路**。真机验收:正确列出 installed 与"phone"未装
+的诚实报告。
+
+**实测**:全套 88/88;preflight OK;dist 六项验证;GitHub API 双操作
+(description/topics)即时生效。
+
+**教训**:㉚发布多包必须预检"有序集"——单包看不去的缺声明,`npm pack
+--dry-run` 不查依赖可解析性,预检脚本是唯一防线;㉙瞬态外部故障(429)
+先重试再定性,验收输出里保留完整错误串方便分辨"代码 bug"与"服务状态"。
+
+---
+
 ## 2026-09-05 · API 知识图谱 + 消息通道(旧线最后两项落地)
 
 **动机**:用户令"继续推进"。旧线五缺口剩余 api_kg 与 channel 可落地项

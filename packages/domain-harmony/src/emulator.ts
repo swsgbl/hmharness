@@ -333,6 +333,45 @@ export const harmonyEmulatorDelete: Tool = {
   },
 };
 
+export const harmonyImageDownloadCheck: Tool = {
+  name: 'harmony_image_check',
+  description:
+    'Check emulator system-image availability: which API version and device types are installed locally (deployable headlessly right now), and for anything else the exact DevEco manual step (Huawei provides no public image-download channel - account-bound component manager only). Honest probe, never a fake download.',
+  parameters: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', description: 'optional device type to check, e.g. "phone"' },
+    },
+    required: [],
+  },
+  needsApproval: () => false,
+  async execute(args) {
+    const want = typeof args.type === 'string' ? args.type.toLowerCase() : '';
+    const lines: string[] = [];
+    let ver = '';
+    let types: string[] = [];
+    try {
+      const vers = await readdir(join(imageRoot(), 'system-image'));
+      ver = vers[0] ?? '';
+      types = ver ? await readdir(join(imageRoot(), 'system-image', ver)) : [];
+    } catch {
+      return {
+        output: `No emulator images installed at ${imageRoot()}.\nImages ship only through DevEco Studio > Settings > SDK component manager (account-bound; no public download channel exists).\nAfter installing one image there, instances of that type are fully self-serve here (harmony_emulator_create).`,
+        isError: true,
+      };
+    }
+    lines.push(`installed image: API ${ver}`);
+    lines.push(`device types deployable now: ${types.join(', ') || '(none)'}`);
+    if (want) {
+      lines.push(types.includes(want)
+        ? `"${want}" IS installed - create instances with harmony_emulator_create.`
+        : `"${want}" NOT installed - DevEco Studio > Settings > SDK component manager is the only channel (no public URL exists); this is a manual, account-bound step by vendor design.`);
+    }
+    lines.push('note: new INSTANCES of installed types are fully automatable; new IMAGE acquisition is manual by vendor design.');
+    return { output: lines.join('\n'), isError: want ? !types.includes(want) : false };
+  },
+};
+
 export const emulatorTools: Tool[] = [
   harmonyEmulatorList,
   harmonyEmulatorCatalog,
@@ -340,4 +379,5 @@ export const emulatorTools: Tool[] = [
   harmonyEmulatorStop,
   harmonyEmulatorCreate,
   harmonyEmulatorDelete,
+  harmonyImageDownloadCheck,
 ];

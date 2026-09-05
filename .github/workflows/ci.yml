@@ -19,3 +19,5 @@ jobs:
       - run: npm run build
       - name: built CLI smoke (no model needed)
         run: node packages/cli/dist/main.js skills
+      - name: npm publish preflight (ordered-set check, never publishes)
+        run: node scripts/publish-preflight.cjs

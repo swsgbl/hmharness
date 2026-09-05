@@ -1,7 +1,7 @@
 {
   "name": "@hmh/cli",
   "version": "0.1.0",
-  "description": "hmharness command line: one-shot tasks, an interactive REPL, direct tool invocation, and the bench runner.",
+  "description": "hmharness command line: one-shot tasks, an interactive REPL, a fullscreen TUI, the web frontend, and direct tool invocation.",
   "type": "module",
   "main": "dist/main.js",
   "exports": {
@@ -11,10 +11,43 @@
     }
   },
   "types": "dist/main.d.ts",
+  "bin": {
+    "hmh": "./dist/main.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "harmonyos",
+    "openharmony",
+    "ohos",
+    "agent",
+    "ai",
+    "cli",
+    "coding-agent",
+    "arkts",
+    "self-evolving",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
+  "homepage": "https://swsgbl.github.io/hmharness/",
+  "bugs": "https://github.com/swsgbl/hmharness/issues",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
   },
-  "bin": {
-    "hmh": "./dist/main.js"
+  "dependencies": {
+    "@hmh/kernel": "0.1.0",
+    "@hmh/evolution": "0.1.0",
+    "@hmh/domain-harmony": "0.1.0",
+    "@hmh/domain-ops": "0.1.0",
+    "@hmh/agent": "0.1.0",
+    "@hmh/web": "0.1.0"
   }
 }

@@ -21,6 +21,7 @@ import { harmonyProjectProfile } from './profile.ts';
 import { harmonySign } from './signing.ts';
 import { harmonyDeviceTest } from './ondevice.ts';
 import { harmonyApiLookup } from './apikg.ts';
+import { harmonyUiRegression, runUiRegression, captureDeviceScreen, type UiRegressionCase, type UiRegressionResult } from './uiregress.ts';
 
 const exec = promisify(execFile);
 
@@ -429,6 +430,7 @@ export const harmonyTools: Tool[] = [
   harmonySign,
   harmonyDeviceTest,
   harmonyApiLookup,
+  harmonyUiRegression,
   ...emulatorTools,
 ];
 
@@ -441,3 +443,5 @@ export { harmonyProjectProfile, profileProject } from './profile.ts';
 export { harmonySign, resolveSigningIdentity, ensureDebugProfile, signHap, hapsignToolPaths, type SigningIdentity } from './signing.ts';
 export { harmonyDeviceTest, runDeviceTest, type DeviceTestStep } from './ondevice.ts';
 export { harmonyApiLookup, buildApiIndex, loadApiIndex, lookupSymbol, parseDeclaration, sdkApiDir, type ApiIndex, type ApiSymbolEntry } from './apikg.ts';
+export { harmonyUiRegression, runUiRegression, captureDeviceScreen, type UiRegressionCase, type UiRegressionResult } from './uiregress.ts';
+export { harmonyImageDownloadCheck } from './emulator.ts';
