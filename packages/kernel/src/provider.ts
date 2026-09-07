@@ -47,7 +47,7 @@ export async function chat(
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 120_000);
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
     try {
       const res = await fetch(endpoint(cfg.baseUrl), {
         method: 'POST',
@@ -217,7 +217,7 @@ export async function chatVision(
   let vAuth: string = cfg.authHeader ?? 'bearer';
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 120_000);
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
     try {
       const vHeaders = vAuth === 'bearer'
         ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }

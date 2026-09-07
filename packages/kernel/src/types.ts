@@ -63,6 +63,10 @@ export interface ProviderConfig {
    *  for freellmapi). Omit for standard Authorization: Bearer; on 401 the
    *  provider renegotiates with X-Api-Key automatically. */
   authHeader?: string;
+  /** Per-request timeout override (ms). Slow reasoning models (free-tier
+   *  tokenrouter took 84s on an evolve-sized prompt vs the 120s default)
+   *  set e.g. 240000 on the evolve/bench routes. */
+  timeoutMs?: number;
 }
 
 /** User-level configuration (HMH_HOME/config.json). */
