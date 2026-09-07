@@ -360,8 +360,8 @@ usage:
                            also starts the web UI in the background (--no-web skips)
   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
   hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
-                        Claude Code / Codex / any MCP host (host config:
-                        {"command":"npx","args":["-y","@hmharness/cli","mcp-serve"]})
+                        Claude Code / Codex / any MCP host
+                        (host config: npx -y @hmharness/cli mcp-serve)
   hmh devices|check        direct tool run, no model
   hmh tools                list all registered tools (native + MCP)
   hmh mcp                  show configured MCP servers and their tools
