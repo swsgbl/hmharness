@@ -90,6 +90,22 @@ hmh --help                  # 完整用法
 
 所有命令支持 `--locale=zh|en`。危险操作默认走审批门禁（TTY 问 y/N；非交互默认拒绝；`--yes` 或 `"approval":"auto"` 放行；破坏性命令模式硬拒绝）。
 
+## 在 Claude Code / Codex 里用（MCP 服务器模式）
+
+hmharness 可以把鸿蒙工具链以 **MCP 原生工具**的形式供给任何 MCP 宿主（Claude Code、Codex、Cursor……）——外层智能体直接调用 `harmony_build`、`harmony_api_lookup` 等工具，无嵌套智能体循环，工具调用按宿主自身的权限系统逐个确认：
+
+```jsonc
+// Claude Code: claude mcp add hmharness -- npx -y @hmharness/cli mcp-serve
+// 或 .mcp.json / Codex 配置:
+{ "mcpServers": { "hmharness": { "command": "npx", "args": ["-y", "@hmharness/cli", "mcp-serve"] } } }
+```
+
+- 默认只暴露 `harmony_*` 域工具（构建/装机/日志/签名/API 检索/雷达）；`run_command`、`write_file` 等通用工具不暴露（宿主有自己的）。可用环境变量 `HMH_MCP_TOOLS="harmony_build,harmony_ops"` 收窄；
+- 审批分工：宿主权限系统负责"问用户"，工具内部的破坏性硬墙（deny 红线）永驻 server 侧；
+- 外部智能体的每次调用记入 `insights/mcp-calls.jsonl`（只做观测，不进技能门禁——自进化专属原生会话）。
+
+> 说明:MCP 模式是"鸿蒙工具箱出口";hmh 的自进化(记忆/技能/门禁)只在原生 `hmh` 会话中运行——两种用法互补,见 `docs/SELFFEED.md`。
+
 ## 鸿蒙全流程（零 IDE）
 
 ```text

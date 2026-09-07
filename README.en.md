@@ -91,6 +91,22 @@ hmh ops scan|brief|status    # ecosystem radar
 
 Any command accepts `--locale=zh|en`. Dangerous operations go through the approval gate by default (y/N on a TTY, denied headless; `--yes` or `"approval":"auto"` to allow; destructive command patterns are hard-denied).
 
+## Use inside Claude Code / Codex (MCP server mode)
+
+hmharness can serve its HarmonyOS toolchain to any MCP host (Claude Code, Codex, Cursor, ...) as **native MCP tools** - the outer agent calls `harmony_build`, `harmony_api_lookup`, ... directly: no nested agent loop, and every call is permission-gated by the host itself:
+
+```jsonc
+// Claude Code: claude mcp add hmharness -- npx -y @hmharness/cli mcp-serve
+// or .mcp.json / Codex config:
+{ "mcpServers": { "hmharness": { "command": "npx", "args": ["-y", "@hmharness/cli", "mcp-serve"] } } }
+```
+
+- Only `harmony_*` domain tools are exposed by default (build / install / logs / signing / API lookup / radar); generic tools (`run_command`, `write_file`, ...) stay private - the host has its own. Narrow further with `HMH_MCP_TOOLS="harmony_build,harmony_ops"`;
+- Approval split: the host's permission system asks the user; the destructive-command hard walls inside each tool stay server-side, always on;
+- Every external call is appended to `insights/mcp-calls.jsonl` (observation only - the skill gate stays exclusive to native hmh sessions).
+
+> Note: MCP mode is the "HarmonyOS toolbox" outlet; hmh's self-evolution (memory/skills/gates) runs in native `hmh` sessions - the two usages complement each other, see `docs/SELFFEED.md`.
+
 ## HarmonyOS flow without an IDE
 
 ```text

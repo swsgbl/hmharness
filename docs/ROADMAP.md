@@ -17,6 +17,11 @@
 - [ ] 投稿 XMUDeepLIT/Awesome-Self-Evolving-Agents Applications 节(草稿已备,等作者点头提交)
 
 **60 天(纵深)**:
+- [x] **MCP server 模式(提前完成,2026-09-07)**:`hmh mcp-serve` 把 harmony_* 工具面以
+      stdio MCP 供给 Claude Code/Codex/任意宿主(默认只暴露域工具,run_command 等不暴露;
+      HMH_MCP_TOOLS 可收窄;宿主权限系统当审批门,deny 硬墙永驻 server 侧;外部调用落
+      insights/mcp-calls.jsonl 只观测不进门禁)——**回环测试:自家 McpClient 连自家
+      server,协议双端一进程对验证**;README 双语接入章节+宿主配置样例
 - [ ] promptlineage:系统提示词纳入 patches.ts 沙箱+双门+git tag 快照管线,
       hmh prompt rollback(蓝图 P2 漏项)
 - [ ] best-of-n + 验证器:高代价操作(hvigor 全量/批量写)前计划采样选优

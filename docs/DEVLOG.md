@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-09-07 · MCP server 模式落地:hmharness 成为 Claude Code/Codex 的原生鸿蒙工具箱
+
+**动机**:外部评估(用户转述)指出"最干净的集成方式还没被官方提供"——hmh 只有
+MCP 客户端,没有 server 模式;并问"有没有更优方案"。评估结论:有必要做且无更优
+解(CLI JSON 模式 schema 不进宿主上下文;skill 文件是免费互补非替代;HTTP MCP
+现阶段过度设计)。该分析低估了可行性:**仓库里早有一个能跑的 MCP 服务器**
+(scripts/test-mcp-server.mjs,65 行全握手),协议自家双端验证过,生产化只剩接线。
+
+**实现(packages/cli/src/mcp-server.ts,~160 行)**:
+- `hmh mcp-serve`:行式 JSON-RPC 2.0 over stdio(initialize/ping/tools/list/
+  tools/call);**console.log 劫持到 stderr**(stdio 协议通道绝不容杂物);
+- **暴露面白名单默认 `/^harmony_/`**(域工具统一前缀先行核实;run_command/
+  write_file/desktop_* 等通用工具不暴露——宿主有自己的);`HMH_MCP_TOOLS`
+  环境变量按名/前缀收窄;
+- **审批分工(对评估的修正)**:宿主权限系统负责逐工具问用户(优于我们 headless
+  下的非交互即拒);工具内部破坏性硬墙永驻 server 侧;tool 级 needsApproval
+  在 server 模式有意不咨询;
+- **观测不进门禁**:每次 tools/call 落 `insights/mcp-calls.jsonl`(工具/成败/
+  毫秒)——外部智能体的鸿蒙工具使用进入雷达观测面;技能门禁仍专属原生会话
+  (自进化挂在自己的循环上,MCP 模式=工具出口,双模式互补)。
+
+**验证**:回环测试 3 用例**一次全过**——自家 McpClient spawn 自家 mcp-serve
+(HMH_HOME 隔离到 tmp),握手→tools/list(≥10 个全 harmony_ 前缀,危险工具
+不在列)→tools/call(无 hdc 诚实输出+未知工具 isError)→调用日志落盘→
+HMH_MCP_TOOLS 收窄生效。全套 96/96;七包构建。
+
+**文档**:README 双语"在 Claude Code/Codex 里用"章节(宿主配置样例+安全分工
+说明);ROADMAP 60 天档该项提前勾销。
+
+---
+
 ## 2026-09-07 · SELFFEED 第 1 天:首次真实自喂养循环跑通 + 慢推理超时破案
 
 **循环实录**(全部真实数据,已进 evidence 页:11 轮/2 canary/15 判例):

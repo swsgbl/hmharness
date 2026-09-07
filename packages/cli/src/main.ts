@@ -359,6 +359,9 @@ usage:
   hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
                            also starts the web UI in the background (--no-web skips)
   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
+  hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
+                        Claude Code / Codex / any MCP host (host config:
+                        {"command":"npx","args":["-y","@hmharness/cli","mcp-serve"]})
   hmh devices|check        direct tool run, no model
   hmh tools                list all registered tools (native + MCP)
   hmh mcp                  show configured MCP servers and their tools
@@ -427,6 +430,14 @@ flags:
       }
     }
     return;
+  }
+  if (cmd === 'mcp-serve') {
+    // SERVER mode: expose the harmony_* tool surface over stdio MCP so
+    // Claude Code / Codex / any MCP host calls them natively. stdout is the
+    // protocol - run this exactly as the host's server command.
+    const { serveMcp } = await import('./mcp-server.ts');
+    await serveMcp();
+    return; // serveMcp exits when stdin closes
   }
   if (cmd === 'skills') {
     const home = homeDir();
