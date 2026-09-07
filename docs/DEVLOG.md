@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-09-07 · SELFFEED 第 1 天:首次真实自喂养循环跑通 + 慢推理超时破案
+
+**循环实录**(全部真实数据,已进 evidence 页:11 轮/2 canary/15 判例):
+任务池 #1(脚手架 SelfFeed1 双页面+schema 校验,真实工具 3 轮 2 用)→ evolve
+完整跑通(提案 mcp-http-endpoint-config→双样本门禁全过→**晋升 canary**;
+记忆蒸馏出 findstr 无匹配返回非零的真实教训)→ export-evidence→推送→
+state backup(8 项)。
+
+**破案:provider 超时对慢推理模型不足**。evolve 稳定 AbortError,同请求
+带 120s 探针 3.9s 成功→**真实尺寸请求(带血缘/Pareto 注入的长提示词)
+实测 84.5s**才返回(免费档慢推理,reasoning_content 先想一大段)。
+修复:ProviderConfig 增加 `timeoutMs` 配置(per-provider,z-ai 已设 240000),
+provider.ts 两处 `opts.timeoutMs ?? cfg.timeoutMs ?? 120_000`。93/93 复验。
+
+**环境事实(当日)**:freellmapi 网关 3002 端口活着但 FreeRide 后台无可
+用 key(HTTP 503 "Add provider API keys");tokenrouter 免费档 8 req/min
+限流+出海需代理+sing-box 当日两次自死(重启即活)。evolve/bench/vision
+路由临时切 omnifusion(chat 同款本地路由,当日唯一稳定),原配置备份在
+config.json.bak-selffeed。**git push 遇代理死:重启 vpn-manager 再推即过。**
+
+**Awesome-Self-Evolving-Agents 投稿(PR #21)**:fork→Autonomous Software
+Engineering 表尾插入 hmharness 行(8 列格式对齐)→gh pr create 在本机
+cmd 环境下 git 调用损坏('merge' 不是命令),**绕道 REST API
+`gh api -X POST .../pulls --input` 成功**:
+https://github.com/XMUDeepLIT/Awesome-Self-Evolving-Agents/pull/21
+
+---
+
 ## 2026-09-06 · 外部评审采纳:证据工程落地(30 天档)+ 纵深提前项
 
 **动机**:外部评审(逐条核对 DEVLOG 后)结论:蓝图执行完毕且质量超预期,但
