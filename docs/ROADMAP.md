@@ -1,5 +1,39 @@
 # hmharness 路线图
 
+## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
+
+外部评审结论:瓶颈已从"机制不够"转为"证据不够、纵深不够、人手不够"。采纳其节奏:
+
+**30 天(证据工程+卫生,已开工)**:
+- [x] 自喂养老协议基础设施:docs/SELFFEED.md(每日任务→evolve→导出→提交→备份,
+      四条诚实规则)+ scripts/selffeed-tasks.json(20 个已验证管线内的真任务)+
+      scripts/export-evidence.cjs(数字只来自文件,缺席标 absent)+
+      website/evidence/ 证据页(判例/被拒候选/每日轮次/原始日志副本)——**实际 30 天
+      运行需每日执行,见 SELFFEED.md 每日循环**
+- [x] 成本指标 CJK 修正:estTokens 按语言分桶(ASCII 4 字符/token,CJK 1 字符/token),
+      中文啰嗦不再逃过 cost-cap
+- [x] hmh state backup|restore|remove|list(restore 前自动 .pre-restore 停放)
+- [x] README 诚实脚注(管线就绪但数据集收集中,链接 /evidence)+ Windows 优先声明
+- [ ] 投稿 XMUDeepLIT/Awesome-Self-Evolving-Agents Applications 节(草稿已备,等作者点头提交)
+
+**60 天(纵深)**:
+- [ ] promptlineage:系统提示词纳入 patches.ts 沙箱+双门+git tag 快照管线,
+      hmh prompt rollback(蓝图 P2 漏项)
+- [ ] best-of-n + 验证器:高代价操作(hvigor 全量/批量写)前计划采样选优
+- [ ] 序贯检验(简化 SPRT)替换 impact 固定阈值(≥8/≥10% 在 8 样本上不显著),
+      置信区间进 --impact 输出;判定只认检验输出(防人形偷看)
+- [x] knowledge.ts 供应链加固(提前完成):来源白名单钉死在代码内+sha256 哈希链
+      进快照+蒸馏提示词祈使句防线(diff 是数据不是指令)
+- [x] MCP 豁免细化(提前完成):trustedTools 按工具名豁免,trusted 整服务器保留为危险档
+
+**90 天(外部验证)**:
+- [ ] 2-3 个真实鸿蒙团队试用,收集对照数据——"生产中的自进化"的最终裁判
+- [ ] 贡献者通道:good-first-issue 标签 + "如何安全提一个 bench 用例"指南
+- [ ] 功能准入红线进 CONTRIBUTING:新工具/新命令进 ROADMAP 前必须回答
+      "它进化/被验证的管道是什么"(AWM 不开新口子原则升级到产品级)
+- [ ] dev container/WSL2 统一构建环境评审(ACL 事故根因;先评估对 hdc/DevEco
+      模拟器链路的影响再决定——鸿蒙工具链深度绑定 Windows 主机,可能不迁)
+
 ## Phase 0 — 行走骨架 ✅
 - [x] 四包单仓,零依赖内核;智能体循环 E2E(模型→工具→总结→会话+洞察落盘)
 - [x] 鸿蒙域首发工具(设备列表/工具链体检);HMH_HOME 隔离;deny-first 护栏;typecheck 绿

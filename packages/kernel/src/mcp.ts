@@ -10,8 +10,8 @@ import { spawn } from 'node:child_process';
 import type { Tool } from './types.ts';
 
 export type McpServerConfig =
-  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; trusted?: boolean }
-  | { type: 'http'; url: string; headers?: Record<string, string>; trusted?: boolean };
+  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; trusted?: boolean; trustedTools?: string[] }
+  | { type: 'http'; url: string; headers?: Record<string, string>; trusted?: boolean; trustedTools?: string[] };
 
 const PROTOCOL_VERSION = '2025-06-18';
 const CLIENT_INFO = { name: 'hmharness', version: '0.1.0' };
@@ -268,14 +268,20 @@ export async function mcpServerTools(
   await client.connect();
   const remote = await client.listTools();
   const trusted = 'trusted' in config && config.trusted === true;
+  // Exemption granularity: `trusted: true` exempts the WHOLE server (dangerous,
+  // meant for servers you own). `trustedTools: ['search', ...]` exempts only
+  // the named REMOTE tool names - read-only lookups stay frictionless while
+  // every mutating tool on the same server still hits the approval gate.
+  const trustedTools = 'trustedTools' in config && Array.isArray(config.trustedTools) ? config.trustedTools : [];
   const tools: Tool[] = remote.map((t) => {
     const localName = `mcp_${sanitizeToolName(serverName)}_${sanitizeToolName(t.name)}`.slice(0, 60);
     const remoteName = t.name;
+    const exempt = trusted || trustedTools.includes(remoteName);
     return {
       name: localName,
       description: `[mcp:${serverName}] ${t.description ?? t.name}`.slice(0, 400),
       parameters: normalizeSchema(t.inputSchema),
-      needsApproval: trusted ? undefined : () => true,
+      needsApproval: exempt ? undefined : () => true,
       async execute(args) {
         return client.callTool(remoteName, args);
       },

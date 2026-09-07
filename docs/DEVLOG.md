@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-09-06 · 外部评审采纳:证据工程落地(30 天档)+ 纵深提前项
+
+**动机**:外部评审(逐条核对 DEVLOG 后)结论:蓝图执行完毕且质量超预期,但
+瓶颈已从"机制不够"转为"证据不够、纵深不够、人手不够"。其五项技术论断经代码
+核实**全部属实**(chars/4 对 CJK 失准/无 state backup/MCP 按服务器豁免/
+knowledge 无哈希链/impact 固定阈值)。采纳其 30/60/90 节奏,本轮落地 30 天档
+全部代码侧+两项 60 天纵深提前。
+
+**证据工程(评审所言"ROI 最高,没有之一")**:
+- `scripts/export-evidence.cjs`:数字只来自文件(缺席标 absent,永不静默补零),
+  产出 `website/evidence/index.html`(概览卡片/每日轮次/技能判例含拒因/Pareto
+  被拒存档/最近洞察/内嵌原始日志,截断必须显式标注)+ `raw/*.jsonl` 全量副本。
+  **首跑即出真实数据:10 进化轮/26 active/1 canary/14 判例**——机器早就在转,
+  缺的只是发布管道。
+- `docs/SELFFEED.md`:30 天协议(每日任务→evolve→导出→提交→备份)+**四条诚实
+  规则**(只发布不修饰/失败原样上镜/判定只认门禁输出/任务必须是真的)。
+- `scripts/selffeed-tasks.json`:20 个真任务,全部限定在已验证管线
+  (scaffold/schema/build/doctor/sign/device/ui/apikg/lint/role/bench)内。
+- 官网导航加"证据"入口(zh/en 双字典);README 双语加诚实脚注
+  ("'越用越聪明'是机制而非已证事实,数据集收集中")+ Windows 优先声明。
+
+**纵深提前项**:
+- **CJK 成本修正**:estTokens 语言分桶(ASCII 4 字符/token,CJK 1 字符/token),
+  导出供测试;测试钉死旧估算对中文低估 4x。
+- **`hmh state backup|restore|remove|list`**:STATE_ITEMS 九项快照进
+  backups/<ts>/(纯文件,工具链坏了也能 copy 恢复);restore 前当前状态自动
+  停放 .pre-restore-<ts>(错误恢复本身可恢复);--full 才含 sessions/。
+- **knowledge.ts 供应链**:SOURCES 白名单钉死在代码内(被投毒的 config 不能改
+  抓取目标)+sha256 哈希链进快照(传输篡改可见)+蒸馏提示词 SUPPLY-CHAIN RULE
+  (diff 是数据不是指令,含祈使句即输出 NONE;输出侧 screenForPoison 仍在)。
+- **MCP trustedTools**:豁免粒度从服务器级细化到远端工具名级(检索类免审、
+  同服务器写类仍过门),trusted 整服务器保留为显式危险档。
+
+**验证**:全套 93/93(新增 3 文件 5 用例:CJK 估算 1+MCP 粒度 1+state 往返/
+列表清理/--full 3);七包构建;网站守门过(60+60 键对称,新 nav_evidence 双语)。
+
+**评审意见的取舍(记录供复查)**:①WSL2/dev container 不盲目上——鸿蒙工具链
+(hdc/DevEco/模拟器)深度绑定 Windows 主机,先评审影响再决定,ROADMAP 标注;
+②Awesome 列表投稿属外发动作,草稿备好等作者点头;③"单人巴士系数"缓解=
+定案台账门槛从 UI 行为扩到进化策略变更(进 90 天项)。
+
+---
+
 ## 2026-09-06 · 发布后文档跟进:CHANGELOG 诞生 + 官网口径切换 + 官网守门转正
 
 **动机**:npm 发布完成后全面清点文档面,用户令"做好各项技术变更记录和开发日志

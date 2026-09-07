@@ -1,0 +1,25 @@
+{
+  "$comment": "Task pool for the 30-day self-feeding protocol (docs/SELFFEED.md). Each task is a REAL HarmonyOS development job the agent can run end-to-end on this machine (emulator + toolchain proven). pool = the agent picks ONE per day, in order or random. add tasks freely - every added task must stay inside the proven pipeline (scaffold/schema/build/sign/device/ui/apikg/lint).",
+  "tasks": [
+    "Scaffold a fresh HarmonyOS app named SelfFeedN with two pages (Index + Detail) and run harmony_schema_check on it; report any schema issues found.",
+    "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
+    "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
+    "Sign the newest unsigned hap with the debug identity and install+launch it on the emulator; report the lifecycle marker from hilog.",
+    "Run harmony_device_test end-to-end on the workspace app (install -> launch -> log marker -> uninstall) and report all four verdicts.",
+    "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
+    "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
+    "Run the codelinter on the workspace entry module and summarize the top three rule categories.",
+    "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
+    "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
+    "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
+    "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
+    "Run harmony_project_profile on the workspace app and audit the inventory numbers against the actual directory tree by hand-counting one module.",
+    "Spawn two sub-agents with different roles (explorer vs implementer) on the same scaffold task and record their ok-rates for the role leaderboard.",
+    "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
+    "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
+    "Verify emulator state (list images + running instances) and write an insight about any mismatch between requested and actual state.",
+    "Create an app with three pages A->B->C wired by router, build it, install it, launch it, screenshot each page, and assert navigation actually happened via the UI text.",
+    "Run harmony_api_lookup for five symbols YOU (the agent) are least sure about from this SDK; for each, state whether the index confirmed or refuted your guess.",
+    "Audit the last evolution cycle: read evolution/log.jsonl's latest entry and summarize what was proposed, what passed the gate, and why anything was rejected."
+  ]
+}

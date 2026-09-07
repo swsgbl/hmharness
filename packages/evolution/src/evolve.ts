@@ -79,11 +79,14 @@ async function runAndAssert(runCase: CaseRunner, c: BenchCase, injection: string
   return { pass: matchCase(output, c).pass, output };
 }
 
-/** Rough token estimate: chars/4 - good enough to catch a 3x bloat, never
- *  used as the only rejection reason (the pass-rate gate decides; cost-cap
- *  only vetoes candidates that pass by rambling). */
-function estTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+/** Rough token estimate, language-aware: ASCII runs ~4 chars/token, CJK
+ * ~1 char/token. A flat chars/4 undercounted Chinese 2-4x, letting verbose
+ * zh candidates dodge the cost cap. Used on BOTH sides of every comparison
+ * (baseline and candidate), never as the only rejection reason (the
+ * pass-rate gate decides; cost-cap only vetoes pass-by-rambling). */
+export function estTokens(text: string): number {
+  const cjk = (text.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/g) ?? []).length;
+  return Math.ceil((text.length - cjk) / 4 + cjk);
 }
 
 export async function runEvolution(opts: {

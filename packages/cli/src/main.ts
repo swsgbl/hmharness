@@ -363,9 +363,13 @@ usage:
   hmh tools                list all registered tools (native + MCP)
   hmh mcp                  show configured MCP servers and their tools
   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
-  hmh bench                run the evolution bench
+  hmh bench [--impact]     run the evolution bench / canary A/B report
   hmh skills [--promote|--rollback|--unpromote <name>]
   hmh skills add <git-url-or-local-dir>   install skills (multi-skill packs supported)
+  hmh state backup [--full] | restore [id] | remove <id|--all> | list
+                           snapshot / recover the evolution state (skills,
+                           memory, insights, logs); restore parks current
+                           state in a .pre-restore copy first
 
 flags:
   --yes / -y          auto-approve gated tools (else they prompt; non-TTY denies)
@@ -579,6 +583,41 @@ flags:
       const r = await harmonyOpsStatus.execute({}, ctx);
       stdout.write(r.output + '\n');
     }
+    return;
+  }
+  if (cmd === 'state') {
+    // The evolution state (skills+memory+insights+logs) is a single-point
+    // asset; backup/restore/list keeps one bad JSONL from erasing the
+    // agent's whole learning history. Restore always parks the current
+    // state in a .pre-restore copy first (undoable by construction).
+    await initHome();
+    const { backupState, listBackups, restoreState, removeBackup } = await import('./state.ts');
+    const sub = rest[0] ?? 'list';
+    if (sub === 'backup') {
+      const full = rest.includes('--full');
+      const r = await backupState(homeDir(), { full });
+      stdout.write(GREEN('✓') + ` backup ${r.id} (${r.items.length} items${full ? ', incl. sessions' : ''}) -> ${r.dir}\n`
+        + DIM('restore with: hmh state restore ' + r.id + '\n'));
+      return;
+    }
+    if (sub === 'restore') {
+      const id = rest.find((a) => !a.startsWith('-') && a !== 'restore');
+      const r = await restoreState(homeDir(), id);
+      stdout.write(GREEN('✓') + ` restored ${r.id} (${r.restored.length} items)\n`
+        + DIM(`current state parked at ${r.parked} (delete it if unwanted)\n`));
+      return;
+    }
+    if (sub === 'remove') {
+      const id = rest.find((a) => !a.startsWith('-') && a !== 'remove');
+      if (!id && !rest.includes('--all')) { stdout.write('usage: hmh state remove <id | --all>\n'); return; }
+      const removed = await removeBackup(homeDir(), id ?? '', { all: rest.includes('--all') });
+      stdout.write(`removed ${removed.length} backup(s)\n`);
+      return;
+    }
+    const list = await listBackups(homeDir());
+    stdout.write(list.length
+      ? list.map((b) => `  ${b.id}  ${b.items.length} items${b.full ? ' (full)' : ''}  ${b.time}`).join('\n') + '\n'
+      : DIM('  no backups yet - run "hmh state backup"\n'));
     return;
   }
   if (cmd === 'tui') {

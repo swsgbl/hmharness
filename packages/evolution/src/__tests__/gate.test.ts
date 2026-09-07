@@ -5,6 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { matchCase, listCases } from '../bench.ts';
 import { latestRadarBrief } from '../radar.ts';
+import { estTokens } from '../evolve.ts';
+
+/* -------- cost metric: language-aware token estimate -------- */
+
+test('estTokens: CJK counts ~1 token/char, ASCII ~1/4 - the cost cap cannot be dodged by writing Chinese', () => {
+  const en = 'a'.repeat(400);                       // 400 ascii chars -> ~100
+  const zh = '好'.repeat(400);                      // 400 cjk chars  -> ~400
+  assert.equal(estTokens(en), 100);
+  assert.equal(estTokens(zh), 400);
+  assert.ok(estTokens(zh) >= 3 * estTokens(en), 'the old chars/4 estimator undercounted zh 4x');
+  // mixed text: both families bucketed independently
+  const mixed = 'a'.repeat(200) + '鸿蒙开发'.repeat(50);   // 200 ascii + 200 cjk
+  assert.equal(estTokens(mixed), 50 + 200);
+});
 
 /* -------- structured assertions (gate methodology upgrade) -------- */
 

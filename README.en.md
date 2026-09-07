@@ -27,6 +27,11 @@
 | **Desktop automation** | desktop_screenshot / desktop_click / desktop_type - the see-act-verify loop, approval-gated |
 | **Parallel + instant feedback** | concurrent tools (approvals ordered); 3-tier feedback: errors noted instantly -> per-task reflection into memory -> auto evolution every 3 insights; **code-level self-evolution** (sandbox branch + double-sample gate + git revert, kernel loop untouchable) |
 | **Session management** | rename / archive / delete (trash, recoverable) on the sidebar history |
+| **State safety** | `hmh state backup\|restore` - snapshot and recover the evolution state (skills / memory / logs); restore parks the current state first |
+
+> **Honest footnote on "self-evolving"**: the canary->impact statistics pipeline is in place (exposed vs control, promote only on >=8 sessions and >=10% delta), but the first 30-day production dataset is still being collected - verdicts, rejected candidates and raw logs are published verbatim on the [evidence page](https://swsgbl.github.io/hmharness/evidence/), protocol in [docs/SELFFEED.md](docs/SELFFEED.md). Until that dataset ships, "gets smarter with use" is a mechanism, not a proven fact.
+>
+> **Platform status**: Windows-first (HarmonyOS toolchain, emulator, desktop automation and TUI terminal handling are all verified here); macOS/Linux is community-supported (the kernel and evolution loop are pure Node; domain tools degrade gracefully by availability).
 
 ## Quick start
 

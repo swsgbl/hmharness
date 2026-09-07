@@ -32,3 +32,19 @@ test('McpClient reports a clear error when the server cannot start', async () =>
   await assert.rejects(() => c.connect(5000));
   void spawn; // keep import symmetric
 });
+
+test('trustedTools exempts named tools only; trusted exempts the whole server', async () => {
+  const server = join(process.cwd(), 'scripts', 'test-mcp-server.mjs');
+  const { client, tools } = await mcpServerTools('ut', {
+    type: 'stdio', command: process.execPath, args: [server],
+    trustedTools: ['echo'],
+  });
+  try {
+    const echo = tools.find((t) => t.name === 'mcp_ut_echo')!;
+    const ping = tools.find((t) => t.name === 'mcp_ut_hmh_ping')!;
+    assert.equal(echo.needsApproval, undefined, 'listed remote tool name is exempt');
+    assert.equal(typeof ping.needsApproval, 'function', 'every other tool on the same server stays gated');
+  } finally {
+    client.close();
+  }
+});
