@@ -806,6 +806,14 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   if (autoApprove) rt.setModeTag('🔥');
   rt.addText(t.tuiWelcome(chatModel), 'dim');
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
+  // update reminder: cached (1/day) registry check, resolved async into the
+  // transcript via addText (frame-safe); offline stays silent
+  {
+    const { notifyUpdate } = await import('./update-check.ts');
+    const { createRequire } = await import('node:module');
+    const current = createRequire(import.meta.url)('../package.json').version as string;
+    void notifyUpdate(home, current, (latest) => rt.addText(`↑ ${t.updateHint(latest)}`, 'dim'));
+  }
 
   let history: ChatMessage[] = [];
   rt.onSubmit(() => {

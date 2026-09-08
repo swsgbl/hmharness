@@ -8,7 +8,7 @@
  *   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
  *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
  *   hmh tui                  lite terminal UI (status header + slash commands)
- *   hmh ops [scan|brief|status]  ops keeper: ecosystem radar
+ *   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
  *   hmh mcp                  show configured MCP servers and their tools
@@ -139,6 +139,14 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
   let t = strings((cfg.locale ?? 'zh') as Locale);
   const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
   stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
+  // npm is pull-based; the update reminder is a cached (1/day) registry
+  // check printed when resolved - never blocks, never nags offline
+  const { notifyUpdate } = await import('./update-check.ts');
+  const { createRequire } = await import('node:module');
+  const CURRENT_VERSION = createRequire(import.meta.url)('../package.json').version as string;
+  void notifyUpdate(home, CURRENT_VERSION, (latest) => {
+    stdout.write(DIM(`↑ ${t.updateHint(latest)}\n\n`));
+  });
   const { reg, clients } = await buildRegistry();
   const rl = readline.createInterface({ input: stdin, output: stdout });
   // stdin EOF (piped input, closed terminal) must exit the loop - a bare
@@ -358,7 +366,7 @@ usage:
   hmh web [--port=7788]       web UI in the foreground (debugging)
   hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
                            also starts the web UI in the background (--no-web skips)
-  hmh ops [scan|brief|status]  ops keeper: ecosystem radar
+  hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
   hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
                         Claude Code / Codex / any MCP host
                         (host config: npx -y @hmharness/cli mcp-serve)
@@ -590,6 +598,14 @@ flags:
     } else if (sub === 'brief') {
       const r = await harmonyOpsRadarBrief.execute({}, ctx);
       stdout.write(r.output + '\n');
+    } else if (sub === 'stats') {
+      // npm download counts for the seven packages (public API, no auth).
+      const { fetchNpmStats, renderStats } = await import('./npm-stats.ts');
+      try {
+        stdout.write(renderStats(await fetchNpmStats()) + '\n');
+      } catch {
+        stdout.write('npm downloads API unreachable right now - try again later\n');
+      }
     } else {
       const r = await harmonyOpsStatus.execute({}, ctx);
       stdout.write(r.output + '\n');

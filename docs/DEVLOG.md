@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-09-08 · 分发反馈闭环:更新提醒 + `hmh ops stats`(用户问"怎么知道下载量/怎么通知更新")
+
+**动机**:用户问两问——多少人下载使用?更新如何触达用户?核实机制:npm 是拉取式
+无推送;下载数有公开 API(api.npmjs.org/downloads);"更新提醒"的正解是客户端
+启动时对比 registry latest。当场拉了真实数据(cli 周 208)讲清口径(下载≠用户,
+镜像/扫描器计入,npmmirror 用户不计),然后实现缺的两块。
+
+**实现**:
+- **update-check.ts**:REPL/TUI 启动时异步查 dist-tags(3s 超时,结果缓存
+  24h 于 HMH_HOME/update-check.json,离线静默);旧版本打一行提示(zh/en 双语,
+  i18n 键 updateHint;TUI 经 rt.addText 帧安全);cmpSemver 逐分量 parseInt
+  ('1-beta'→1,Number() 会 NaN 归零——单测当场抓住)。
+- **npm-stats.ts + `hmh ops stats`**:七包日/周/月下载量表(公开 API 并行拉取,
+  失败列 '-'),表下常驻口径脚注"downloads, not users..."(诚实优先:不让人
+  误读数字)。
+
+**验证**:新增 3 用例(cmpSemver 排序含 0.2<0.10 数值序/缓存命中零网络/
+离线不崩/渲染对齐);全套 **99/99**;真机:0.1.0 触发提示→latest 0.2.0、
+0.2.0 正确不提示、ops stats 实时表。**npm 更新触达三层**:手动 npm update/
+MCP 模式 npx -y 每次解析 latest(自动最新)/CLI 内置提醒(本轮补齐)。
+
+---
+
 ## 2026-09-07 · MCP server 模式落地:hmharness 成为 Claude Code/Codex 的原生鸿蒙工具箱
 
 **动机**:外部评估(用户转述)指出"最干净的集成方式还没被官方提供"——hmh 只有

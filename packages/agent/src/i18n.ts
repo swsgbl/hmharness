@@ -74,6 +74,7 @@ export interface Strings {
   cmdProvidersAdded: (n: number, names: string) => string;
   tuiScrolled: string;
   tuiWebHint: string;
+  updateHint: (latest: string) => string;
   tuiRadarScanning: string;
   tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
   tuiPassRate: (pct: string) => string;
@@ -167,6 +168,7 @@ const zh: Strings = {
   cmdProvidersAdded: (n, names) => `已添加 ${n} 个厂商: ${names} — /model <name> 启用`,
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
+  updateHint: (latest) => `新版本 ${latest} 可用: npm i -g @hmharness/cli 更新`,
   tuiRadarScanning: '雷达扫描中…',
   tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,
@@ -257,6 +259,7 @@ const en: Strings = {
   cmdProvidersAdded: (n, names) => `added ${n} providers: ${names} - enable via /model <name>`,
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
+  updateHint: (latest) => `version ${latest} available - update with: npm i -g @hmharness/cli`,
   tuiRadarScanning: 'scanning radar…',
   tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,
