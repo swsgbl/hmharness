@@ -234,6 +234,17 @@ test('header is a pure identity strip: no status word at all, run state only abo
   } finally { h.restore(); }
 });
 
+test('header shows the installed version from the first frame (user-facing build identity)', async () => {
+  const h = await makeTui();
+  try {
+    const p = h.rt.paletteProbe();
+    assert.match(p.frameText, /v\d+\.\d+\.\d+/, 'header carries vMAJOR.MINOR.PATCH');
+    // and configure can replace it (version flows via configure, never hardcoded in the frame)
+    h.rt.configure('m', 'd', 0, 'zh', '9.9.9');
+    assert.match(h.rt.paletteProbe().frameText, /v9\.9\.9/);
+  } finally { h.restore(); }
+});
+
 test('slash palette unchanged: /m + Enter runs the highlighted command', async () => {
   const h = await makeTui();
   try {

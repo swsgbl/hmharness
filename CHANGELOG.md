@@ -4,6 +4,11 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.4.1] - 2026-09-09
+
+- **TUI 头部显示版本号**(用户点名):每次启动第一帧即带 `⚙ hmh v0.4.x`,
+  用户永远知道自己跑的是哪个构建;`/lang` 切换语言后保持。
+
 ## [0.4.0] - 2026-09-08
 
 - **模型感知上下文工程(kernel/agent)**:上下文预算不再一刀切——context

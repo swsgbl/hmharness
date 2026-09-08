@@ -12,10 +12,17 @@
  */
 import { stdin, stdout } from 'node:process';
 import { basename } from 'node:path';
+import { createRequire } from 'node:module';
 import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
+
+/** installed version, shown in the TUI header (v0.4.0) so users always
+ *  know which build they are talking to - resolves in both src/ and dist/ */
+const HMH_VERSION = (() => {
+  try { return createRequire(import.meta.url)('../package.json').version as string; } catch { return ''; }
+})();
 
 const RESET = '\x1b[0m';
 const DIM = (s: string) => `\x1b[2m${s}${RESET}`;
@@ -155,6 +162,9 @@ export class TuiRuntime {
   private cwdName = '';
   private skillCount = 0;
   private t = strings();
+  /** installed hmharness version, shown in the header (v0.4.0 style);
+   *  defaults to the running build so even a bare runtime identifies itself */
+  private version = HMH_VERSION;
   /** persistent header tag, e.g. the active approval mode (🔥 YOLO) */
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
@@ -285,11 +295,12 @@ export class TuiRuntime {
     return matchCommands(input).map((c) => ({ name: c.name, desc: String(this.t[c.key as keyof typeof this.t]) }));
   }
 
-  configure(model: string, cwdName: string, skillCount: number, locale: Locale): void {
+  configure(model: string, cwdName: string, skillCount: number, locale: Locale, version?: string): void {
     this.model = model;
     this.cwdName = cwdName;
     this.skillCount = skillCount;
     this.t = strings(locale);
+    this.version = version ?? HMH_VERSION;
     this.dirty = true;
   }
 
@@ -610,7 +621,7 @@ export class TuiRuntime {
     // old right slot kept showing a stale "idle" - an orphan status.
     // Moving a thing means deleting it from where it was).
     // The ONLY live run indicator is the status line above the input box.
-    const headLeft = ` ${BOLD('⚙ hmh')} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}` + (this.modeTag ? ` ${this.modeTag}` : '');
+    const headLeft = ` ${BOLD('⚙ hmh')}${this.version ? ` ${DIM('v' + this.version)}` : ''} ${DIM('·')} ${CYAN(this.model)} ${DIM('·')} ${this.cwdName} ${DIM('·')} ${this.skillCount} ${this.t.tuiSkills}` + (this.modeTag ? ` ${this.modeTag}` : '');
     frame.push(truncateTo(headLeft, W));
     frame.push(DIM('─'.repeat(W)));
 
@@ -801,7 +812,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   const rt = new TuiRuntime();
   const skills = await listSkills(home);
   const chatModel = resolveProvider(cfg, 'chat').model;
-  rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale);
+  rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale, HMH_VERSION);
   rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
   if (autoApprove) rt.setModeTag('🔥');
   rt.addText(t.tuiWelcome(chatModel), 'dim');
@@ -867,7 +878,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       const target = nextLocale(cfg.locale ?? 'zh', line.slice(5));
       cfg = await setLocale(target);
       t = strings(target);
-      rt.configure(chatModel, basename(process.cwd()), skills.length, target);
+      rt.configure(chatModel, basename(process.cwd()), skills.length, target, HMH_VERSION);
       rt.addText(GREEN('✓') + ' ' + t.langSwitched(target));
       return;
     }
