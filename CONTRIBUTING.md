@@ -31,3 +31,13 @@ kernel -> evolution -> domain-harmony -> domain-ops -> agent -> web -> cli.
 6. Brand-new packages/versions may take a few minutes to appear in `npm view`
    (registry propagation pipeline). The org's package list on npmjs.com is the
    immediate source of truth - do not re-publish on a transient 404.
+
+## Remotes: GitHub (origin) + AtomGit mirror
+
+`origin` is GitHub (swsgbl/hmharness); `atomgit` is the AtomGit mirror
+(hongfu/hmharness, SSH key `~/.ssh/atomgit_key`). After pushes that matter
+(releases, evidence updates), sync both:
+
+```
+git push origin main && git push atomgit main
+```
