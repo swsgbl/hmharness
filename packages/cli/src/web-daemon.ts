@@ -5,6 +5,7 @@
  * HMH_HOME; the daemon runs detached with no window and survives terminals.
  */
 import { spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
@@ -29,30 +30,56 @@ function alive(pid: number): boolean {
   }
 }
 
-/** cheap probe: does OUR server answer on the port (not just any listener)? */
+/** cheap probe: does OUR server answer on the port (not just any listener)?
+ *  Accepts ANY hmh /api/state shape - a daemon from an older build still
+ *  serves the UI, and rejecting it made the TUI auto-link spawn a fresh
+ *  daemon that died on EADDRINUSE every startup (the "lost setting" bug). */
 export async function hmhWebUp(port: number): Promise<boolean> {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/api/state`, { signal: AbortSignal.timeout(1500) });
     if (!r.ok) return false;
-    const d = (await r.json()) as { model?: string };
-    return typeof d.model === 'string';
+    const d = await r.json();
+    return !!d && typeof d === 'object';
   } catch {
     return false;
   }
 }
 
+/** Windows-first: find the PID LISTENING on 127.0.0.1:<port> via netstat.
+ *  Used to reclaim a port held by an orphaned/old daemon whose pid file is
+ *  stale - `hmh web stop` must be able to evict it, or restarts never heal. */
+function portOwnerPid(port: number): number {
+  if (process.platform !== 'win32') return 0;
+  try {
+    const out = execSync(`netstat -ano -p tcp`, { encoding: 'utf8', timeout: 5000 });
+    for (const line of out.split('\n')) {
+      const m = line.trim().match(new RegExp(`^(TCP)\\s+\\S*?:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)$`));
+      if (m) return Number(m[2]);
+    }
+  } catch { /* netstat unavailable - give up quietly */ }
+  return 0;
+}
+
 export function stopWebDaemon(): boolean {
   const pid = readWebPid();
-  if (!pid || !alive(pid)) {
-    try { unlinkSync(join(homeDir(), 'web.pid')); } catch { /* absent */ }
-    return false;
-  }
-  if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-  else {
-    try { process.kill(pid); } catch { /* gone */ }
+  let killed = false;
+  if (pid && alive(pid)) {
+    if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+    else {
+      try { process.kill(pid); } catch { /* gone */ }
+    }
+    killed = true;
   }
   try { unlinkSync(join(homeDir(), 'web.pid')); } catch { /* absent */ }
-  return true;
+  // stale pid file but the port is still held (orphaned/old daemon): evict
+  const owner = portOwnerPid(DEFAULT_WEB_PORT);
+  if (owner && owner !== pid) {
+    try {
+      spawn('taskkill', ['/PID', String(owner), '/T', '/F'], { windowsHide: true });
+      killed = true;
+    } catch { /* best effort */ }
+  }
+  return killed;
 }
 
 /** Spawn the daemon (no window, detached). Returns the pid. */

@@ -245,6 +245,23 @@ test('header shows the installed version from the first frame (user-facing build
   } finally { h.restore(); }
 });
 
+test('addUser: chat-style - blank line gap above/below, right-aligned against the width', async () => {
+  const h = await makeTui();
+  try {
+    h.rt.addText('model output line');
+    h.rt.addUser('你好 hmh');
+    // paletteProbe.frameText FILTERS empty rows (see its impl) - the raw
+    // transcript field is where blank separation is assertable
+    const p = h.rt.paletteProbe();
+    const plain = p.transcript.split('\n').map((l) => l.replace(/\u001b\[[0-9;]*m/g, ''));
+    const idx = plain.findIndex((l) => l.trim() === '你好 hmh');
+    assert.ok(idx >= 0, 'user text renders');
+    assert.ok(plain[idx].length - plain[idx].trimStart().length >= 20, 'visibly right-aligned (leading pad)');
+    assert.equal(plain[idx - 1].trim(), '', 'blank line above');
+    assert.equal(plain[idx + 1].trim(), '', 'blank line below');
+  } finally { h.restore(); }
+});
+
 test('slash palette unchanged: /m + Enter runs the highlighted command', async () => {
   const h = await makeTui();
   try {

@@ -11,7 +11,7 @@
  * Not a TTY? Prints a pointer to the plain REPL instead.
  */
 import { stdin, stdout } from 'node:process';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
@@ -106,6 +106,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/bench', key: 'cmdBench' },
   { name: '/evolve', key: 'cmdEvolve' },
   { name: '/mcp', key: 'cmdMcp' },
+  { name: '/resume', key: 'cmdResume' },
   { name: '/status', key: 'cmdStatus' },
   { name: '/clear', key: 'cmdClear' },
   { name: '/web', key: 'cmdWeb' },
@@ -329,6 +330,22 @@ export class TuiRuntime {
     const paint = style === 'dim' ? DIM : style === 'err' ? RED : (s: string) => s;
     const width = Math.max(20, (stdout.columns || 100) - 2);
     this.entries.push({ lines: wrapTo(text, width).map((l) => paint(l)) });
+    this.scrollFromBottom = 0;
+    this.dirty = true;
+  }
+
+  /** The user's own input, chat-style: separated by a blank line above and
+   *  below, right-aligned to the terminal width so it reads as "the human
+   *  side" against left-aligned model output. */
+  addUser(text: string): void {
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    const lines: string[] = [''];
+    for (const l of wrapTo(text.replace(/\n+/g, ' '), width)) {
+      const pad = Math.max(1, width - strWidth(l));
+      lines.push(' '.repeat(pad) + BOLD(l));
+    }
+    lines.push('');
+    this.entries.push({ lines });
     this.scrollFromBottom = 0;
     this.dirty = true;
   }
@@ -867,6 +884,37 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
       return;
     }
+    if (line === '/resume' || line.startsWith('/resume ')) {
+      const arg = line.slice(8).trim();
+      const { latestSession, loadTranscript } = await import('@hmharness/kernel');
+      if (!arg) {
+        // list the 8 newest sessions: id prefix (enough to disambiguate) + first user line
+        const { readdir } = await import('node:fs/promises');
+        let files: string[] = [];
+        try { files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')); } catch { /* none */ }
+        files.sort();
+        const recent = files.slice(-8).reverse();
+        if (recent.length === 0) { rt.addText(t.cmdResumeNone, 'dim'); return; }
+        for (const f of recent) {
+          try {
+            const tr = await loadTranscript(join(home, 'sessions', f));
+            const firstUser = tr?.messages.find((m) => m.role === 'user')?.content ?? '';
+            rt.addText(`${CYAN(f.slice(0, 18))}  ${(firstUser || '(no user line)').replace(/\n/g, ' ').slice(0, 60)}`, 'dim');
+          } catch { /* skip unreadable */ }
+        }
+        rt.addText(t.cmdResumeHint, 'dim');
+        return;
+      }
+      const file = await latestSession(home, arg);
+      const tr = file ? await loadTranscript(file) : null;
+      if (!tr || tr.messages.length === 0) { rt.addText(t.cmdResumeNotFound(arg), 'err'); return; }
+      history = tr.messages;
+      const firstUser = tr.messages.find((m) => m.role === 'user')?.content ?? '';
+      rt.clearScreen();
+      rt.addUser(firstUser.replace(/\n/g, ' ').slice(0, 120));
+      rt.addText(t.cmdResumeLoaded(tr.messages.length), 'dim');
+      return;
+    }
     if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
       const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
       autoApprove = turnOn;
@@ -999,7 +1047,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       return;
     }
 
-    rt.addText(`❯ ${line}`);
+    rt.addUser(line);
     rt.setBusy(true, t.running);
     let appender: ((c: string) => void) | null = null;
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
@@ -1023,11 +1071,17 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
           onToolCall: (name, args) => {
             if (kind === 'reasoning') rt.foldThinking();
             appender = null; kind = null;
-            rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(JSON.stringify(args).slice(0, 100))}`);
+            // fold the args to their essence: for run_command the command
+            // string itself, otherwise a short JSON tail
+            const brief = name === 'run_command' && typeof args.command === 'string'
+              ? args.command
+              : JSON.stringify(args);
+            rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(brief.replace(/\s+/g, ' ').slice(0, 90))}`);
           },
           onToolResult: (name, output, isError) => {
             const dot = isError ? RED('✗') : GREEN('•');
-            rt.addText(`  ${dot} ${DIM('⎿ ' + output.split('\n').slice(0, 2).join(' ').slice(0, 110))}`);
+            const first = output.split('\n').find((l) => l.trim()) ?? '';
+            rt.addText(`  ${dot} ${DIM('⎿ ' + first.trim().slice(0, 100))}`);
           },
         },
       });
