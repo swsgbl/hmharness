@@ -29,10 +29,16 @@
       - [x] rolling summary 分层摘要:compactWithDigest——被逐工具输出先蒸馏成
             持久 digest 系统注(置于受保护头部),下轮与旧 digest 合并;
             摘要器故障静默降级为原墓碑剪枝;runner 用 chat 路由模型做蒸馏;
-      - [ ] (远期)embedding 检索可选后端(现为纯词法,零依赖优先——需先定
-            后端形态:本地 miniLM 或 API);
-      - [ ] 工作区级记忆隔离(现记忆全局共享,多项目互相污染——涉及
-            memory.md 数据迁移,单独一轮)。
+      - [x] embedding 检索可选后端(2026-09-08 落地):OpenAI 兼容 /embeddings
+            API(零新依赖),向量缓存 memory/embeddings.json(内容哈希键,
+            只在笔记新增时嵌入一次),混合打分=50% 词法+50% 余弦;**routing
+            里显式配置 embedding 路由才启用**(继承 chat 会白打 /embeddings
+            404);任何失败回退纯词法;
+      - [x] 工作区记忆隔离(2026-09-08 落地,标签制零迁移):workspaces.json
+            最长路径前缀解析当前工作区;新笔记带 [ws:名] 后缀;检索时本区
+            ×2.5 提升/他区 ×0.3 抑制/全局不动——隔离而不割裂;旧记忆全为
+            全局注,行为零变化。顺修真 bug:retrieveMemory newest:0 时
+            slice(-0)=slice(0) 会注入全部笔记。
 - [ ] **配置变更后自动实证(agent 纪律工程化)**:改 provider/config 类配置后
       强制一次最小回环验证再报成功(2026-09-08 用户会话实录教训:agent 改完
       配置即报成功表,实际 404——"改完必须实证"要从 DEVLOG 铁律变成工具层

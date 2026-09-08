@@ -536,11 +536,13 @@ export const rememberTool: Tool = {
     properties: { note: { type: 'string', description: 'the fact/lesson to remember, one line preferred' } },
     required: ['note'],
   },
-  async execute(args) {
+  async execute(args, ctx) {
     try {
-      const { appendMemory } = await import('@hmharness/evolution');
-      await appendMemory(homeDir(), String(args.note ?? ''));
-      return { output: 'remembered.' };
+      const { appendMemory, workspaceForCwd } = await import('@hmharness/evolution');
+      const home = ctx?.home ?? homeDir();
+      const ws = await workspaceForCwd(home, ctx?.cwd ?? process.cwd());
+      await appendMemory(home, String(args.note ?? ''), ws ?? undefined);
+      return { output: ws ? `remembered (workspace: ${ws}).` : 'remembered.' };
     } catch (err) {
       return { output: String(err), isError: true };
     }

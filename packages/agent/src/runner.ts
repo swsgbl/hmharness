@@ -23,7 +23,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmharness/kernel';
-import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary } from '@hmharness/evolution';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -98,10 +98,10 @@ export async function buildRegistry(opts: { mcp?: boolean; announce?: boolean } 
  *  P0 canary: ~20% of sessions (deterministic by session id) also receive
  *  the canary skill block, watermarked as experimental references - the
  *  impact loop compares these sessions against the rest. */
-export async function contextPack(task: string, sessionId?: string) {
+export async function contextPack(task: string, sessionId?: string, opts: { workspace?: string | null; embedding?: EmbeddingProvider } = {}) {
   const home = homeDir();
   const [memory, skills, insights] = await Promise.all([
-    retrieveMemory(home, task),
+    retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
     listSkills(home),
     recentInsights(home),
   ]);
@@ -171,9 +171,17 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   const ctx = opts.ctx ?? { cwd: process.cwd(), home: homeDir() };
   const events = opts.events ?? {};
   const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);
+  // workspace scoping + optional embedding hybrid for memory retrieval.
+  // Embeddings only when routing.embedding is EXPLICITLY set - an inherited
+  // chat route would 404 on /embeddings once per task for nothing.
+  const workspace = await workspaceForCwd(ctx.home, ctx.cwd);
+  const embeddingRoute = (cfg as { routing?: Record<string, string> }).routing?.['embedding'];
+  const embedding = embeddingRoute && cfg.providers?.[embeddingRoute]
+    ? cfg.providers[embeddingRoute] as EmbeddingProvider
+    : undefined;
   // contextPack needs the session id: canary injection is deterministic
   // per-session (stable attribution), decided before the prompt is built
-  const pack = await contextPack(opts.task, session.id);
+  const pack = await contextPack(opts.task, session.id, { workspace, embedding });
 
   const system = buildSystemPrompt({
     cwd: ctx.cwd,
@@ -266,7 +274,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       const notes = await readNotes(ctx.home);
       const last = notes.slice(-40).map((n) => n.text).join('\n');
       if (last.includes(`[self-note] tool ${name}`)) continue;
-      await appendMemory(ctx.home, `[self-note] tool ${name} failed ${errs.length}x in one session; samples: ${[...new Set(errs)].slice(0, 2).join(' | ')}`);
+      await appendMemory(ctx.home, `[self-note] tool ${name} failed ${errs.length}x in one session; samples: ${[...new Set(errs)].slice(0, 2).join(' | ')}`, workspace ?? undefined);
     }
   } catch {
     /* memory is best-effort; never fail the task on it */
@@ -290,7 +298,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         ]);
         const lesson = (r.message.content ?? '').trim();
         if (lesson && lesson.toUpperCase() !== 'NONE' && lesson.length < 300) {
-          await appendMemory(ctx.home, `[lesson] ${lesson}`);
+          await appendMemory(ctx.home, `[lesson] ${lesson}`, workspace ?? undefined);
         }
       } catch {
         /* reflection is best-effort */
