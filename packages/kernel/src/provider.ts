@@ -182,10 +182,11 @@ async function consumeStream(
   };
 }
 
-/** Accept bases both with and without the /v1 suffix. */
-function endpoint(baseUrl: string): string {
+/** Accept bases with any /vN suffix (v1 OpenAI convention, v4 zhipu coding
+ *  plan: open.bigmodel.cn/api/coding/paas/v4) or none at all. */
+export function endpoint(baseUrl: string): string {
   const b = baseUrl.replace(/\/+$/, '');
-  return b.endsWith('/v1') ? `${b}/chat/completions` : `${b}/v1/chat/completions`;
+  return /\/v\d+$/.test(b) ? `${b}/chat/completions` : `${b}/v1/chat/completions`;
 }
 
 /**

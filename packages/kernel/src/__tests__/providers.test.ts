@@ -4,7 +4,18 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { listProviders, resolveProvider } from '../types.ts';
+import { endpoint } from '../provider.ts';
 import { homeDir, loadConfig, setChatRoute, defaultConfig } from '../config.ts';
+
+test('endpoint: any /vN suffix is complete; bare bases get /v1 appended', () => {
+  assert.equal(endpoint('https://api.x.com/v1'), 'https://api.x.com/v1/chat/completions');
+  // zhipu coding plan ends in /v4 - the old endsWith('/v1') check appended
+  // /v1/chat/completions onto it (HTTP 404 in the wild)
+  assert.equal(endpoint('https://open.bigmodel.cn/api/coding/paas/v4'), 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions');
+  assert.equal(endpoint('https://ark.cn-beijing.volces.com/api/v3'), 'https://ark.cn-beijing.volces.com/api/v3/chat/completions');
+  assert.equal(endpoint('https://api.x.com'), 'https://api.x.com/v1/chat/completions');
+  assert.equal(endpoint('https://api.x.com/v1/'), 'https://api.x.com/v1/chat/completions', 'trailing slash trimmed');
+});
 
 test('listProviders marks purposes and falls back to a single default row', () => {
   const cfg = {

@@ -17,6 +17,20 @@
 - [ ] 投稿 XMUDeepLIT/Awesome-Self-Evolving-Agents Applications 节(草稿已备,等作者点头提交)
 
 **60 天(纵深)**:
+- [ ] **模型感知上下文工程(2026-09-08 用户拷问驱动,排期)**——现状诚实盘点:
+      已有=检索式记忆(词法 bigram top-k 注入)+字符预算压缩(保护头尾)+会话
+      恢复+记忆蒸馏;**缺口=全部"一刀切",不感知模型**:
+      - contextWindow 登记表(per provider/model),压缩目标从固定字符数改为
+        窗口百分比(小窗模型不溢出,大窗模型不浪费);
+      - 记忆/技能注入预算随窗口自适应;
+      - 超长会话分层摘要:旧轮次压缩成 rolling summary(现在只剪工具输出,
+        对话本体永不缩——"超长上下文记忆工程"的真正缺口);
+      - (远期)embedding 检索可选后端(现为纯词法,零依赖优先);
+      - 工作区级记忆隔离(现记忆全局共享,多项目互相污染)。
+- [ ] **配置变更后自动实证(agent 纪律工程化)**:改 provider/config 类配置后
+      强制一次最小回环验证再报成功(2026-09-08 用户会话实录教训:agent 改完
+      配置即报成功表,实际 404——"改完必须实证"要从 DEVLOG 铁律变成工具层
+      硬执行,如同 commandPreflight 之于昂贵命令)。
 - [x] **MCP server 模式(提前完成,2026-09-07)**:`hmh mcp-serve` 把 harmony_* 工具面以
       stdio MCP 供给 Claude Code/Codex/任意宿主(默认只暴露域工具,run_command 等不暴露;
       HMH_MCP_TOOLS 可收窄;宿主权限系统当审批门,deny 硬墙永驻 server 侧;外部调用落

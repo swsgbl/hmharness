@@ -4,6 +4,18 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.3.0] - 2026-09-08
+
+- **修复 endpoint 对 /v4 后缀基地址的拼接 bug(kernel)**:此前只认 `/v1` 后缀,
+  以 `/v4` 结尾的基地址(智谱 GLM Coding Plan `open.bigmodel.cn/api/coding/paas/v4`、
+  火山方舟 `/api/v3`)会被再拼上 `/v1/chat/completions` 导致 404。现在任何
+  `/vN` 后缀都直接追加 `/chat/completions`(单测覆盖 v1/v3/v4/裸/尾斜杠五形态)。
+  glm 预设同步更新为 Coding Plan 地址 + glm-5.3。
+- **更新提醒(cli)**:REPL/TUI 启动时异步检查 npm registry 最新版(3 秒超时、
+  结果缓存 24 小时、离线静默),旧版本显示一行升级提示(中英双语)。
+- **`hmh ops stats`(cli)**:七包日/周/月下载量表(npm 公开 API),表下常驻
+  "downloads, not users" 口径脚注。
+
 ## [0.2.0] - 2026-09-07
 
 实质变更集中在 kernel / evolution / cli 三包(其余四包为版本对齐重发,内容与

@@ -155,7 +155,7 @@ export interface ProviderPreset {
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   { name: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', envVar: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
   { name: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', envVar: 'MOONSHOT_API_KEY', model: 'kimi-latest' },
-  { name: 'glm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', envVar: 'ZHIPU_API_KEY', model: 'glm-4.7' },
+  { name: 'glm', baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4', envVar: 'ZHIPU_API_KEY', model: 'glm-5.3' },
   { name: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', envVar: 'DASHSCOPE_API_KEY', model: 'qwen3-max' },
   { name: 'openai', baseUrl: 'https://api.openai.com/v1', envVar: 'OPENAI_API_KEY', model: 'gpt-5' },
   { name: 'siliconflow', baseUrl: 'https://api.siliconflow.cn/v1', envVar: 'SILICONFLOW_API_KEY', model: 'deepseek-ai/DeepSeek-V3.2-Exp' },
