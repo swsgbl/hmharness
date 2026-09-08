@@ -67,6 +67,10 @@ export interface ProviderConfig {
    *  tokenrouter took 84s on an evolve-sized prompt vs the 120s default)
    *  set e.g. 240000 on the evolve/bench routes. */
   timeoutMs?: number;
+  /** Explicit context window (tokens) for this model. Overrides the
+   *  built-in registry; the transcript budget then scales to the window
+   *  (see window.ts) instead of the fixed legacy default. */
+  contextWindow?: number;
 }
 
 /** User-level configuration (HMH_HOME/config.json). */

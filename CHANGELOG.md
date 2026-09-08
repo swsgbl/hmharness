@@ -4,6 +4,14 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [Unreleased]
+
+- **模型感知上下文工程(kernel/agent)**:上下文预算不再一刀切——context
+  window 登记表(claude/glm/deepseek/gemini/gpt 等,`ProviderConfig.contextWindow`
+  可显式覆盖),转录预算随窗口自适应(128K 窗口=旧默认,未知模型零变化);
+  压缩新增 rolling digest:被逐内容先蒸馏成持久摘要注(随轮合并),摘要器
+  故障静默降级为原剪枝行为。
+
 ## [0.3.0] - 2026-09-08
 
 - **修复 endpoint 对 /v4 后缀基地址的拼接 bug(kernel)**:此前只认 `/v1` 后缀,

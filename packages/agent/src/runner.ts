@@ -207,13 +207,26 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // note, so the NEXT session starts knowing what broke this one (the
   // self-evolution loop's missing per-session feedback channel)
   const toolErrors = new Map<string, string[]>();
+  // rolling digest hook: compaction-evicted tool output is distilled into a
+  // persistent summary note by the chat model instead of being dropped
+  // (failures degrade silently to the deterministic prune inside the kernel)
+  const chatProvider = resolveProvider(cfg, 'chat');
+  const { chat: chatFn } = await import('@hmharness/kernel');
+  const summarizeContext = async (input: { previousDigest: string | null; evicted: string[] }) => {
+    const r = await chatFn(chatProvider, [
+      { role: 'system', content: 'You compress evicted agent transcript content into a dense factual digest. Keep: what was done, key results, paths, versions, decisions, errors and their fixes. Drop: raw listings, repetition, fluff. Max 120 words. Plain text bullets, no preamble.' },
+      { role: 'user', content: (input.previousDigest ? `PREVIOUS DIGEST (merge, keep still-relevant facts):\n${input.previousDigest}\n\n` : '') + `NEWLY EVICTED CONTENT:\n${input.evicted.join('\n---\n').slice(0, 24_000)}` },
+    ]);
+    return r.message.content ?? '';
+  };
   const result = await runLoop({
-    provider: resolveProvider(cfg, 'chat'),
+    provider: chatProvider,
     registry: opts.registry,
     messages,
     ctx,
     maxTurns: cfg.maxTurns,
     maxContextChars: cfg.maxContextChars,
+    summarizeContext,
     approval: spawnBase.current.approval,
     events: {
       onDelta: (kind, chunk) => events.onDelta?.(kind, chunk),

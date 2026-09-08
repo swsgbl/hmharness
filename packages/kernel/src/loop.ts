@@ -7,7 +7,8 @@
  * no gate configured means deny (safe default). Between turns the
  * transcript is compacted against the context budget.
  */
-import { compactMessages } from './context.ts';
+import { compactMessages, compactWithDigest } from './context.ts';
+import { adaptiveContextChars } from './window.ts';
 import type { ChatMessage, RegistryLike } from './loop-types.ts';
 import { chat, type DeltaKind } from './provider.ts';
 import type { ProviderConfig, ToolContext } from './types.ts';
@@ -42,22 +43,32 @@ export async function runLoop(opts: {
   messages: ChatMessage[];
   ctx: ToolContext;
   maxTurns?: number;
+  /** Explicit transcript budget override (chars). Default: scales with the
+   *  model's context window (window.ts registry / provider.contextWindow). */
   maxContextChars?: number;
   approval?: LoopApproval;
   events?: LoopEvents;
   /** Injectable model call (tests pass a fake; production uses provider.chat). */
   chatImpl?: typeof chat;
+  /** Rolling digest hook (model-aware context engineering): when compaction
+   *  evicts content, it is distilled into a persistent digest note instead
+   *  of being dropped. Absent -> deterministic prune only. */
+  summarizeContext?: (input: { previousDigest: string | null; evicted: string[] }) => Promise<string>;
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
   const modelCall = opts.chatImpl ?? chat;
   const maxTurns = opts.maxTurns ?? 25;
+  const budget = opts.maxContextChars ?? adaptiveContextChars(provider);
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
   const usage = { promptTokens: 0, completionTokens: 0 };
   const tools = registry.toOpenAITools();
 
   for (let turn = 1; turn <= maxTurns; turn++) {
-    const chatRes = await modelCall(provider, compactMessages(working, opts.maxContextChars), tools, {
+    const compacted = opts.summarizeContext
+      ? await compactWithDigest(working, budget, opts.summarizeContext)
+      : compactMessages(working, budget);
+    const chatRes = await modelCall(provider, compacted, tools, {
       onDelta: events?.onDelta,
     });
     usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
