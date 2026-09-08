@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/kernel",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "hmharness kernel: tool registry, provider adapters, the agent loop, session log, config. Zero runtime dependencies (Node >=22 native fetch).",
   "type": "module",
   "main": "dist/index.js",

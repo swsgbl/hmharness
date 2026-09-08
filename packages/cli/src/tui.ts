@@ -13,6 +13,7 @@
 import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
+import { open as fopen } from 'node:fs/promises';
 import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
@@ -844,6 +845,28 @@ export class TuiRuntime {
 
 /* ---------------- driver ---------------- */
 
+/** First user line of a session file WITHOUT a full parse: peek the first
+ *  64KB, scan lines for the first user event. With hundreds of sessions a
+ *  full loadTranscript per row would stall the picker for seconds; the user
+ *  event is always near the head, so the peek is O(64KB) per session. */
+export async function firstUserLinePeek(file: string): Promise<string> {
+  try {
+    const fh = await fopen(file, 'r');
+    try {
+      const buf = Buffer.alloc(65_536);
+      const { bytesRead } = await fh.read(buf, 0, 65_536, 0);
+      for (const line of buf.toString('utf8', 0, bytesRead).split('\n')) {
+        if (!line.includes('"user"')) continue;
+        try {
+          const ev = JSON.parse(line) as { t?: string; text?: string };
+          if (ev.t === 'user' && typeof ev.text === 'string') return ev.text;
+        } catch { /* partial line at the buffer edge - no preview */ }
+      }
+    } finally { await fh.close(); }
+  } catch { /* unreadable file - no preview */ }
+  return '';
+}
+
 export async function tui(yes: boolean, noWeb = false): Promise<void> {
   let cfg = await loadConfig();
   let autoApprove = yes || cfg.approval === 'auto';
@@ -919,18 +942,18 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       const arg = line.slice(8).trim();
       const { latestSession, loadTranscript } = await import('@hmharness/kernel');
       const { readdir } = await import('node:fs/promises');
-      // refresh the picker rows: id prefix + first user line as the preview
+      // ALL sessions, newest first - no arbitrary "recent 8" cap (user
+      // challenge: "不应该是所有历史会话吗"). Previews use the 64KB peek,
+      // never a full parse, so hundreds of rows still open instantly; the
+      // palette scrolls and head-prefix filtering narrows fast.
       let files: string[] = [];
       try { files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')); } catch { /* none */ }
       files.sort();
-      const recent = files.slice(-8).reverse();
+      const recent = files.reverse();
       const rows: Array<{ name: string; desc: string }> = [];
       for (const f of recent) {
-        try {
-          const tr = await loadTranscript(join(home, 'sessions', f));
-          const firstUser = tr?.messages.find((m) => m.role === 'user')?.content ?? '';
-          rows.push({ name: f.slice(0, 18), desc: (firstUser || '(no user line)').replace(/\n/g, ' ').slice(0, 56) });
-        } catch { /* skip unreadable */ }
+        const firstUser = await firstUserLinePeek(join(home, 'sessions', f));
+        rows.push({ name: f.slice(0, 18), desc: (firstUser || '(无预览)').replace(/\n/g, ' ').slice(0, 56) });
       }
       rt.setSessionChoices(rows);
       if (!arg) {

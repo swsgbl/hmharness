@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { COMMANDS, matchCommands, parseWheel, nextLocale } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
@@ -290,6 +292,28 @@ test('session picker: bare /resume + Enter OPENS the live list; arrows move; sec
     p = h.rt.paletteProbe();
     assert.deepEqual(p.rows, ['2026-09-08T21-36-13']);
   } finally { h.restore(); }
+});
+
+test('firstUserLinePeek: 64KB head scan finds the first user event without a full parse', async () => {
+  const { firstUserLinePeek } = await import('../tui.ts');
+  const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-peek-'));
+  try {
+    const f = join(dir, 's.jsonl');
+    // session/start line + a first user line - the normal head shape
+    await writeFile(f, JSON.stringify({ t: 'session/start', id: 'x', model: 'm', cwd: 'c' }) + '\n'
+      + JSON.stringify({ t: 'user', text: '第一条输入' }) + '\n'
+      + JSON.stringify({ t: 'assistant', text: 'x'.repeat(200_000) }) + '\n', 'utf8');
+    assert.equal(await firstUserLinePeek(f), '第一条输入');
+    // no user event in the head -> empty preview, no throw
+    const f2 = join(dir, 'none.jsonl');
+    await writeFile(f2, JSON.stringify({ t: 'session/start' }) + '\n', 'utf8');
+    assert.equal(await firstUserLinePeek(f2), '');
+    // missing file -> empty preview, no throw
+    assert.equal(await firstUserLinePeek(join(dir, 'nope.jsonl')), '');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('slash palette unchanged: /m + Enter runs the highlighted command', async () => {

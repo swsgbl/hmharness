@@ -77,7 +77,6 @@ export interface Strings {
   updateHint: (latest: string) => string;
   cmdResume: string;
   cmdResumeNone: string;
-  cmdResumeHint: string;
   cmdResumeNotFound: (p: string) => string;
   cmdResumeLoaded: (n: number) => string;
   tuiRadarScanning: string;
@@ -174,9 +173,8 @@ const zh: Strings = {
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
   updateHint: (latest) => `新版本 ${latest} 可用: npm i -g @hmharness/cli 更新`,
-  cmdResume: '恢复历史会话(/resume 列出最近,/resume <前缀> 载入)',
+  cmdResume: '恢复历史会话(/resume 打开选择器,↑↓ 选择,Enter 载入;输入 id 前缀过滤)',
   cmdResumeNone: '还没有历史会话',
-  cmdResumeHint: '输入 /resume <上面的 id 前缀> 载入该会话继续对话',
   cmdResumeNotFound: (p) => `没有匹配 "${p}" 的会话`,
   cmdResumeLoaded: (n) => `已恢复会话(${n} 条消息),直接输入内容继续对话`,
   tuiRadarScanning: '雷达扫描中…',
@@ -270,9 +268,8 @@ const en: Strings = {
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
   updateHint: (latest) => `version ${latest} available - update with: npm i -g @hmharness/cli`,
-  cmdResume: 'resume a past session (/resume lists recent, /resume <prefix> loads)',
+  cmdResume: 'resume a past session (/resume opens the picker; arrows + Enter, type an id prefix to filter)',
   cmdResumeNone: 'no past sessions yet',
-  cmdResumeHint: 'type /resume <an id prefix above> to load that session',
   cmdResumeNotFound: (p) => `no session matches "${p}"`,
   cmdResumeLoaded: (n) => `session resumed (${n} messages) - just type to continue`,
   tuiRadarScanning: 'scanning radar…',
