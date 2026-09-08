@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/web",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "hmharness web frontend: local node:http server with SSE streaming, remote approval gate, and an embedded zero-build single page app.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,9 +15,9 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.4.2",
-    "@hmharness/evolution": "0.4.2",
-    "@hmharness/agent": "0.4.2"
+    "@hmharness/kernel": "0.4.3",
+    "@hmharness/evolution": "0.4.3",
+    "@hmharness/agent": "0.4.3"
   },
   "files": [
     "dist"

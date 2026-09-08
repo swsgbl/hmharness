@@ -170,6 +170,8 @@ export class TuiRuntime {
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
+  /** rows for the `/resume ` session picker (id prefix + first user line) */
+  private sessionChoices: Array<{ name: string; desc: string }> = [];
   /** Wheel/click handling: NO mouse reporting by default - select/copy
    *  always works and terminals translate the wheel to arrow keys on the
    *  alternate screen. Reporting turns on ONLY while a palette is open
@@ -201,10 +203,24 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
+  setSessionChoices(list: Array<{ name: string; desc: string }>): void {
+    this.sessionChoices = list;
+    this.dirty = true;
+  }
+
   /** Focus the /model picker (used by the bare `/model` command so the
    *  printed list is never a dead end - the live palette opens on it). */
   openModelPicker(): void {
     this.input = '/model ';
+    this.caret = this.input.length;
+    this.cmdIdx = 0;
+    this.dirty = true;
+  }
+
+  /** Focus the /resume session picker - same live palette as /model:
+   *  arrows/wheel navigate, Enter loads the highlighted session. */
+  openSessionPicker(): void {
+    this.input = '/resume ';
     this.caret = this.input.length;
     this.cmdIdx = 0;
     this.dirty = true;
@@ -216,7 +232,9 @@ export class TuiRuntime {
     const hits = this.panelItems(this.input);
     const pick = hits.length ? hits[Math.min(this.cmdIdx, hits.length - 1)].name : '';
     if (pick) {
-      this.input = this.input.startsWith('/model') ? `/model ${pick} ` : pick + ' ';
+      if (this.input.startsWith('/model')) this.input = `/model ${pick} `;
+      else if (this.input.startsWith('/resume')) this.input = `/resume ${pick}`;
+      else this.input = pick + ' ';
       this.caret = this.input.length;
       this.cmdIdx = 0;
     }
@@ -281,8 +299,9 @@ export class TuiRuntime {
     stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
   }
 
-  /** The palette data source: `/model ` opens the model picker, otherwise
-   *  slash commands. Rows are {name, desc} so both share one renderer. */
+  /** The palette data source: `/model ` opens the model picker, `/resume `
+   *  the session picker, otherwise slash commands. Rows are {name, desc} so
+   *  all three share one renderer, keyboard and click machinery. */
   private panelItems(input: string): Array<{ name: string; desc: string }> {
     if (input === '/model' || input.startsWith('/model ')) {
       const q = input.slice(6).trim().toLowerCase();
@@ -292,6 +311,10 @@ export class TuiRuntime {
         .map((p) => ({ name: p.name, desc: `${p.model}${p.envVar ? ' · set ' + p.envVar : ' · local'}` }));
       const all = [...configured, ...rest];
       return q ? all.filter((i) => i.name.toLowerCase().startsWith(q)) : all;
+    }
+    if (input === '/resume' || input.startsWith('/resume ')) {
+      const q = input.slice(7).trim().toLowerCase();
+      return q ? this.sessionChoices.filter((i) => i.name.toLowerCase().startsWith(q)) : this.sessionChoices;
     }
     return matchCommands(input).map((c) => ({ name: c.name, desc: String(this.t[c.key as keyof typeof this.t]) }));
   }
@@ -520,6 +543,12 @@ export class TuiRuntime {
         this.openModelPicker();
         return;
       }
+      // same two-stage rule for /resume: bare command + Enter opens the
+      // session picker (focus moves to the list), never loads row 0 blindly
+      if (this.input === '/resume') {
+        this.openSessionPicker();
+        return;
+      }
       // palette open: Enter runs the highlighted row (a command, or a
       // /model target), not the raw input; without a palette it submits
       this.pickHighlighted();
@@ -530,7 +559,9 @@ export class TuiRuntime {
       if (hits.length) {
         this.input = this.input.startsWith('/model')
           ? `/model ${hits[Math.min(this.cmdIdx, hits.length - 1)].name} `
-          : hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
+          : this.input.startsWith('/resume')
+            ? `/resume ${hits[Math.min(this.cmdIdx, hits.length - 1)].name}`
+            : hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
         this.caret = this.input.length;
         this.cmdIdx = 0;
         this.dirty = true;
@@ -887,22 +918,27 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     if (line === '/resume' || line.startsWith('/resume ')) {
       const arg = line.slice(8).trim();
       const { latestSession, loadTranscript } = await import('@hmharness/kernel');
+      const { readdir } = await import('node:fs/promises');
+      // refresh the picker rows: id prefix + first user line as the preview
+      let files: string[] = [];
+      try { files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')); } catch { /* none */ }
+      files.sort();
+      const recent = files.slice(-8).reverse();
+      const rows: Array<{ name: string; desc: string }> = [];
+      for (const f of recent) {
+        try {
+          const tr = await loadTranscript(join(home, 'sessions', f));
+          const firstUser = tr?.messages.find((m) => m.role === 'user')?.content ?? '';
+          rows.push({ name: f.slice(0, 18), desc: (firstUser || '(no user line)').replace(/\n/g, ' ').slice(0, 56) });
+        } catch { /* skip unreadable */ }
+      }
+      rt.setSessionChoices(rows);
       if (!arg) {
-        // list the 8 newest sessions: id prefix (enough to disambiguate) + first user line
-        const { readdir } = await import('node:fs/promises');
-        let files: string[] = [];
-        try { files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')); } catch { /* none */ }
-        files.sort();
-        const recent = files.slice(-8).reverse();
-        if (recent.length === 0) { rt.addText(t.cmdResumeNone, 'dim'); return; }
-        for (const f of recent) {
-          try {
-            const tr = await loadTranscript(join(home, 'sessions', f));
-            const firstUser = tr?.messages.find((m) => m.role === 'user')?.content ?? '';
-            rt.addText(`${CYAN(f.slice(0, 18))}  ${(firstUser || '(no user line)').replace(/\n/g, ' ').slice(0, 60)}`, 'dim');
-          } catch { /* skip unreadable */ }
-        }
-        rt.addText(t.cmdResumeHint, 'dim');
+        // bare /resume opens the LIVE picker - same arrows/wheel/Enter/click
+        // machinery as /model; a printed text list is a dead end (user-
+        // reported: "上下键无法选择")
+        if (rows.length === 0) { rt.addText(t.cmdResumeNone, 'dim'); return; }
+        rt.openSessionPicker();
         return;
       }
       const file = await latestSession(home, arg);

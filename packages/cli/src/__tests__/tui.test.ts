@@ -262,6 +262,36 @@ test('addUser: chat-style - blank line gap above/below, right-aligned against th
   } finally { h.restore(); }
 });
 
+test('session picker: bare /resume + Enter OPENS the live list; arrows move; second Enter selects it', async () => {
+  // the interaction the user demanded: the list must be NAVIGABLE, not a
+  // printed dead end. Mirrors the /model two-stage picker tests.
+  const h = await makeTui();
+  try {
+    h.rt.setSessionChoices([
+      { name: '2026-09-08T21-36-13', desc: 'hello session' },
+      { name: '2026-09-08T20-54-41', desc: 'codexhost stall debug' },
+      { name: '2026-09-08T18-25-31', desc: 'selffeed task' },
+    ]);
+    for (const ch of '/resume') h.keys(ch);
+    h.keys('\r');                                  // bare /resume + Enter: OPEN, do not load row 0
+    let p = h.rt.paletteProbe();
+    assert.equal(p.input, '/resume ', 'picker focused with the session list');
+    assert.deepEqual(p.rows.slice(0, 3), ['2026-09-08T21-36-13', '2026-09-08T20-54-41', '2026-09-08T18-25-31']);
+    assert.equal(p.selected, 0);
+    h.keys('\x1b[B');                              // ↓ to the second session
+    p = h.rt.paletteProbe();
+    assert.equal(p.selected, 1);
+    h.keys('\r');                                  // second Enter runs the highlighted row
+    assert.deepEqual(h.submitted, ['/resume 2026-09-08T20-54-41'], 'Enter loads exactly the highlighted session');
+    // filtering: typing an id HEAD prefix narrows rows (same semantics as
+    // latestSession's startsWith match - mid-string prefixes don't filter)
+    h.rt.consumeInput();
+    for (const ch of '/resume 2026-09-08T21') h.keys(ch);
+    p = h.rt.paletteProbe();
+    assert.deepEqual(p.rows, ['2026-09-08T21-36-13']);
+  } finally { h.restore(); }
+});
+
 test('slash palette unchanged: /m + Enter runs the highlighted command', async () => {
   const h = await makeTui();
   try {
