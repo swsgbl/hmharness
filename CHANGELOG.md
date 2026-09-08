@@ -4,7 +4,7 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
-## [Unreleased]
+## [0.4.0] - 2026-09-08
 
 - **模型感知上下文工程(kernel/agent)**:上下文预算不再一刀切——context
   window 登记表(claude/glm/deepseek/gemini/gpt 等,`ProviderConfig.contextWindow`
