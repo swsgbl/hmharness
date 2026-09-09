@@ -4,16 +4,15 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
-## [Unreleased - Codex/DeepSeek 智能体工程升级]
+## [0.5.0] - 2026-09-09
 
-- **系统提示词重写(agent/prompt.ts)**:新增 9 段工程指令——持久执行(Codex:
-  "Persist until handled end-to-end")、显式规划协议(2-4步 outline→逐步确认)、
-  并行工具调用提示、Git 工作区纪律、代码审查模式、分段执行(DeepSeek:先搜→
-  规划→执行)、合理质疑、编辑纪律、AGENTS.md 发现。
-- **edit_file 工具(agent/tools.ts)**:搜索替换替代 write_file 全量覆盖(采纳
-  Codex apply_patch 哲学);唯一性校验拒绝非唯一匹配;不需审批。
+- **系统提示词重写(agent/prompt.ts)**:新增 9 段工程指令(来源:Codex 开源 + DeepSeek
+  Harness + hmh 自研)——持久执行、显式规划协议、并行工具调用提示、Git 工作区纪律、
+  代码审查模式、分段执行、合理质疑、编辑纪律、AGENTS.md 发现。
+- **edit_file 工具(agent/tools.ts)**:搜索替换替代 write_file 全量覆盖;唯一性校验
+  拒绝非唯一匹配;不需审批(爆破范围限于声明的子串)。
 - **AGENTS.md 被动发现(agent/runner.ts)**:从 cwd 向上扫描 AGENTS.md/CLAUDE.md/
-  .cursorrules,命中自动注入 system prompt(不注册为工具)。
+  .cursorrules,命中自动注入 system prompt。
 - **上下文预算收口信号(kernel/loop.ts)**:上下文使用量超 80% 时注入 "wrap up"
   system 消息(Codex token_budget_context + DeepSeek 80% pressure)。
 - **审批持久化(agent/runner.ts)**:批准过的命令模式写入 HMH_HOME/approved-rules.json,
