@@ -23,6 +23,9 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmharness/kernel';
+import { readFile } from 'node:fs/promises';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
@@ -94,6 +97,23 @@ export async function buildRegistry(opts: { mcp?: boolean; announce?: boolean } 
   return { reg, clients };
 }
 
+/** Discover AGENTS.md / CLAUDE.md / .cursorrules by walking up from cwd to
+ *  the workspace root. Deeper files take precedence (Codex convention). Only
+ *  the first hit is returned; null when nothing found. */
+async function discoverAgentsMd(cwd: string): Promise<string | null> {
+  const NAMES = ['AGENTS.md', 'CLAUDE.md', '.cursorrules'];
+  let dir = cwd;
+  while (true) {
+    for (const name of NAMES) {
+      try { return await readFile(join(dir, name), 'utf8'); } catch { /* not here */ }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break; // filesystem root
+    dir = parent;
+  }
+  return null;
+}
+
 /** Retrieval-based context pack: task-relevant memories, not the whole file.
  *  P0 canary: ~20% of sessions (deterministic by session id) also receive
  *  the canary skill block, watermarked as experimental references - the
@@ -121,12 +141,34 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
  * Terminal approval gate: auto mode passes everything; a TTY gets a y/N
  * prompt (reusing a caller-provided readline); a pipe gets a safe deny.
  * The kernel loop denies by default when no gate is wired at all.
+ *
+ * Persistent approval (Codex's .rules pattern): once a user approves a
+ * command pattern (e.g. "hdc shell"), it is saved to
+ * HMH_HOME/approved-rules.json and auto-approved next time. Rules are
+ * matched by the tool name + args prefix. The hard-deny patterns in
+ * tools.ts always override rules - dangerous commands are never auto-approved.
  */
+export interface ApprovedRule { tool: string; argPrefix: string; time: string }
+
+export function loadApprovedRules(home: string): ApprovedRule[] {
+  try { return JSON.parse(readFileSync(join(home, 'approved-rules.json'), 'utf8')); } catch { return []; }
+}
+function saveApprovedRules(home: string, rules: ApprovedRule[]): void {
+  try { writeFileSync(join(home, 'approved-rules.json'), JSON.stringify(rules, null, 2)); } catch { /* best effort */ }
+}
+function matchesRule(rules: ApprovedRule[], toolName: string, args: Record<string, unknown>): boolean {
+  const argsStr = JSON.stringify(args);
+  return rules.some((r) => r.tool === toolName && argsStr.startsWith(r.argPrefix));
+}
+
 export function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.Interface): LoopApproval {
   const t = strings(cfg.locale ?? 'zh');
+  const home = homeDir();
   return {
     async ask(toolName, args) {
       if (yes || cfg.approval === 'auto') return true;
+      // Persistent rules: patterns the user previously approved are auto-passed
+      if (matchesRule(loadApprovedRules(home), toolName, args)) return true;
       const brief = JSON.stringify(args).slice(0, 120);
       if (!stdin.isTTY) {
         process.stdout.write(`\x1b[33m${t.approvalDeniedNoTty(toolName, brief)}\x1b[0m\n`);
@@ -139,7 +181,17 @@ export function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.I
       } finally {
         if (!sharedRl) rl.close();
       }
-      return answer === 'y' || answer === 'yes';
+      const granted = answer === 'y' || answer === 'yes';
+      // Save approved patterns for future auto-approval (skip simple argless tools)
+      if (granted && Object.keys(args).length > 0) {
+        const rules = loadApprovedRules(home);
+        const argsStr = JSON.stringify(args);
+        if (!rules.some((r) => r.tool === toolName && r.argPrefix === argsStr)) {
+          rules.push({ tool: toolName, argPrefix: argsStr, time: new Date().toISOString() });
+          saveApprovedRules(home, rules);
+        }
+      }
+      return granted;
     },
   };
 }
@@ -183,6 +235,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // per-session (stable attribution), decided before the prompt is built
   const pack = await contextPack(opts.task, session.id, { workspace, embedding });
 
+  const agentsMd = await discoverAgentsMd(ctx.cwd);
   const system = buildSystemPrompt({
     cwd: ctx.cwd,
     home: ctx.home,
@@ -191,6 +244,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     insights: pack.insights,
     model: cfg.provider.model,
     locale: cfg.locale,
+    agentsMd: agentsMd ?? undefined,
   });
 
   await session.user(opts.task);

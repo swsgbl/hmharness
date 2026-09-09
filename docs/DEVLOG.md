@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-09-09 · Codex/DeepSeek 智能体工程升级:三方调研+九项落地(124/124)
+
+**动机**:用户令"参考 Codex 开源和 DeepSeek Harness 的内核提示词来优化 hmharness"。
+三方并行调研(Codex Rust 源码五个模型专属提示词+update_plan/AGENTS.md/审批持久化/
+沙箱全链;DeepSeek Harness 事件溯源会话/三阶段工具执行/工具溢出文件/80%压缩压力;
+hmharness prompt.ts 完整重审)后比对出 15 项具体缺口,按影响/工作量排三批九项落地。
+
+**第一批·提示词重写+新工具(prompt.ts+tools.ts)**:
+- prompt.ts 新增 9 段指令(来源+作用):
+  ①[Codex]持久执行——"Persist until handled end-to-end"
+  ②[Codex]规划协议——非trivial 任务先 outline 2-4步,逐步确认
+  ③[Codex]并行优先——框架已支持 Promise.all,提示词首次告知模型
+  ④[Codex]Git 工作区纪律——不回退他人变更,发现意外改停问
+  ⑤[Codex]代码审查模式——findings first by severity with file:line
+  ⑥[DeepSeek]分段执行——先搜→再规划→最后执行
+  ⑦[DeepSeek]合理质疑——风险+替代方案主动提出
+  ⑧[融合]编辑纪律——配合 edit_file 工具,优先搜索替换
+  ⑨[新增]AGENTS.md 发现——向上遍历到工作区根(codex/claude/cursorrules 三文件名)
+- **edit_file 工具**(Codex apply_patch 哲学):搜索替换替代 write_file 全量覆盖;
+  old_string 唯一性校验→不唯一报偏移量拒绝;不 needsApproval(爆破范围限于
+  声明子串);注册进 baseTools 排在 write_file 之前。
+- AGENTS.md 被动发现:contextPack 前自动扫描,命中即注入 system prompt
+  "Project-level instructions"段(不注册为工具)。
+
+**第二批·循环增强(loop.ts+runner.ts)**:
+- **预算收口信号**(Codex token_budget_context + DeepSeek 80% pressure):上下文
+  使用量超80%注入system "wrap up"——不是截断,是收口信号。
+- **审批持久化**(Codex .rules):批准模式写入 approved-rules.json(工具名+参数前缀);
+  后续同类自动放行;硬拒绝永远覆盖。
+
+**第三批·测试(11 新用例,总计 124/124)**:
+prompt 4 个(edit_file/AGENTS.md 关键词存在性)+edit-file 5 个(唯一/非唯一/未找到/
+相同/空)+loop-budget 1 个(glm窗口真实预算下80%触发)+修正2处(review引号/预算下限)。
+
+---
+
 ## 2026-09-08 · 上下文工程收尾:工作区记忆隔离 + embedding 混合检索(五项全齐)
 
 **动机**:前三项(窗口登记表/预算自适应/rolling digest)落地后,用户令继续

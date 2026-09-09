@@ -7,7 +7,7 @@
  * no gate configured means deny (safe default). Between turns the
  * transcript is compacted against the context budget.
  */
-import { compactMessages, compactWithDigest } from './context.ts';
+import { compactMessages, compactWithDigest, transcriptChars } from './context.ts';
 import { adaptiveContextChars } from './window.ts';
 import type { ChatMessage, RegistryLike } from './loop-types.ts';
 import { chat, type DeltaKind } from './provider.ts';
@@ -64,10 +64,24 @@ export async function runLoop(opts: {
   const usage = { promptTokens: 0, completionTokens: 0 };
   const tools = registry.toOpenAITools();
 
+  let wrapupSignaled = false;
+
   for (let turn = 1; turn <= maxTurns; turn++) {
     const compacted = opts.summarizeContext
       ? await compactWithDigest(working, budget, opts.summarizeContext)
       : compactMessages(working, budget);
+
+    // Budget wrap-up signal: when context usage crosses 80%, inject a
+    // single system nudge to wind down instead of hard-cutting mid-thought
+    // (Codex's token-budget-context pattern; DeepSeek's 80% pressure trigger).
+    if (!wrapupSignaled && transcriptChars(compacted) > budget * 0.8) {
+      wrapupSignaled = true;
+      working.push({
+        role: 'system',
+        content: '[context budget] Context is running low. Wrap up the current task: summarize what was accomplished, suggest concrete next steps, and stop starting new sub-tasks.',
+      });
+    }
+
     const chatRes = await modelCall(provider, compacted, tools, {
       onDelta: events?.onDelta,
     });

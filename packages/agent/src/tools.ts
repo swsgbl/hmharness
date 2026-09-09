@@ -77,6 +77,44 @@ export const writeFileTool: Tool = {
   },
 };
 
+/** Surgical search-replace tool (adopted from Codex's apply_patch philosophy).
+ *  Safer than write_file for targeted edits: only changes the declared fragment,
+ *  refuses to run when old_string is not unique (prevents silent wrong-location
+ *  edits), and does NOT need approval - the blast radius is bounded to the
+ *  declared substring. The model must read the file first to know what to replace. */
+export const editFileTool: Tool = {
+  name: 'edit_file',
+  description: 'Surgical search-replace edit. Provide old_string (must appear exactly once in the file) and new_string to replace it. Prefer this over write_file for changes to existing files. old_string must be unique - if it appears more than once, the edit is refused (make it more specific).',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'file path' },
+      old_string: { type: 'string', description: 'the exact string to find and replace (must appear exactly once in the file)' },
+      new_string: { type: 'string', description: 'the replacement string' },
+    },
+    required: ['path', 'old_string', 'new_string'],
+  },
+  async execute(args, ctx) {
+    try {
+      const p = safePath(String(args.path), ctx.cwd);
+      const old = String(args.old_string ?? '');
+      const rep = String(args.new_string ?? '');
+      if (!old) return { output: 'old_string is empty - provide the text to replace', isError: true };
+      if (old === rep) return { output: 'old_string and new_string are identical - nothing to change', isError: true };
+      const content = await readFile(p, 'utf8');
+      const idx = content.indexOf(old);
+      if (idx < 0) return { output: `old_string not found in ${p} - read the file first to find the exact text`, isError: true };
+      const second = content.indexOf(old, idx + 1);
+      if (second >= 0) return { output: `old_string is not unique in ${p} (found at offset ${idx} and ${second}) - make it more specific by including surrounding context`, isError: true };
+      const out = content.slice(0, idx) + rep + content.slice(idx + old.length);
+      await writeFile(p, out, 'utf8');
+      return { output: `edited ${p}: replaced ${old.length} chars with ${rep.length} chars at offset ${idx}` };
+    } catch (err) {
+      return { output: String(err), isError: true };
+    }
+  },
+};
+
 export const listDirTool: Tool = {
   name: 'list_dir',
   description: 'List a directory: names with d/- prefix and size.',
@@ -597,4 +635,4 @@ export const seeImageTool: Tool = {
   },
 };
 
-export const baseTools: Tool[] = [readFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool];
+export const baseTools: Tool[] = [readFileTool, editFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool];
