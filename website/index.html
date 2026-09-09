@@ -121,12 +121,13 @@ footer li{list-style:none;margin:6px 0}
     <div class="card"><div class="ic">🏗️</div><h3 data-i18n="c1_h">参数化工程脚手架</h3><p data-i18n="c1_p"><code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。</p></div>
     <div class="card"><div class="ic">🖥️</div><h3 data-i18n="c2_h">模拟器全生命周期(零 IDE)</h3><p data-i18n="c2_p"><code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。</p></div>
     <div class="card"><div class="ic">📲</div><h3 data-i18n="c3_h">构建 · 装机 · 运行</h3><p data-i18n="c3_p">hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 <code>cjpm</code> 构建、官方 <code>codelinter</code> 门禁 —— 设备写操作全部走审批。</p></div>
-    <div class="card"><div class="ic">🧠</div><h3 data-i18n="c4_h">自进化双门禁</h3><p data-i18n="c4_p">洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升快照 → 保留门防背题复验 → 回归即回滚;进化只写 skills/ 与 memory/。</p></div>
-    <div class="card"><div class="ic">🔌</div><h3 data-i18n="c5_h">MCP 生态借力</h3><p data-i18n="c5_p">手写零依赖 MCP 客户端(stdio + Streamable HTTP),5800+ 社区服务器即插即用;远端工具默认受审批门禁。</p></div>
+    <div class="card"><div class="ic">🧠</div><h3 data-i18n="c4_h">自进化双门禁</h3><p data-i18n="c4_p">洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升进<b>金丝雀</b>(20% 会话采样)→ impact 判定(≥8 会话且 ≥10% 差才转正,有害即退役)→ 回归即回滚;判定记录原样发布在<a href="evidence/">证据页</a>。</p></div>
+    <div class="card"><div class="ic">🔌</div><h3 data-i18n="c5_h">MCP 双向生态</h3><p data-i18n="c5_p">客户端:手写零依赖(stdio + Streamable HTTP),5800+ 社区服务器即插即用;服务器:<code>hmh mcp-serve</code> 把鸿蒙工具链以原生工具供给 Claude Code / Codex / 任意 MCP 宿主,按工具名粒度豁免审批。</p></div>
     <div class="card"><div class="ic">🛰️</div><h3 data-i18n="c6_h">运维看家(生态雷达)</h3><p data-i18n="c6_p">8 源开源鸿蒙雷达每日 diff 脚手架与门禁假设,模型写简报、模板降级;issue 流 AI 只起草、人批准才发布,draft PR + 身份署名。</p></div>
-    <div class="card"><div class="ic">🎛️</div><h3 data-i18n="c7_h">双前端</h3><p data-i18n="c7_p">全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、SGR 鼠标)+ Web(浏览器审批、会话回放、<b>工作区</b>切换、目录选择器);<code>hmh tui</code> 一条命令自动带起网页端。</p></div>
-    <div class="card"><div class="ic">🛡️</div><h3 data-i18n="c8_h">安全内建</h3><p data-i18n="c8_p">deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计。</p></div>
+    <div class="card"><div class="ic">🎛️</div><h3 data-i18n="c7_h">双前端</h3><p data-i18n="c7_p">全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、<code>/resume</code> 会话恢复选择器、右对齐输入气泡、内置更新提醒)+ Web(浏览器审批、会话回放、<b>工作区</b>切换);<code>hmh tui</code> 一条命令自动带起网页端。</p></div>
+    <div class="card"><div class="ic">🛡️</div><h3 data-i18n="c8_h">安全内建</h3><p data-i18n="c8_p">deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计;<code>hmh state backup</code> 进化状态一键快照与恢复。</p></div>
     <div class="card"><div class="ic">🌍</div><h3 data-i18n="c9_h">国际化 & 多厂商</h3><p data-i18n="c9_p">zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。</p></div>
+    <div class="card"><div class="ic">📐</div><h3 data-i18n="c10_h">模型感知上下文工程</h3><p data-i18n="c10_p">上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。</p></div>
   </div>
 </div></section>
 
@@ -134,7 +135,7 @@ footer li{list-style:none;margin:6px 0}
   <div class="stats">
     <div class="stat"><b>7</b><span data-i18n="s1">单仓七包</span></div>
     <div class="stat"><b>0</b><span data-i18n="s2">运行时依赖(内核)</span></div>
-    <div class="stat"><b>25</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
+    <div class="stat"><b>115</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
     <div class="stat"><b>2</b><span data-i18n="s4">门禁(训练+保留)</span></div>
   </div>
 </div></section>
@@ -284,12 +285,13 @@ const I18N = {
     c1_h: '参数化工程脚手架', c1_p: '<code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。',
     c2_h: '模拟器全生命周期(零 IDE)', c2_p: '<code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。',
     c3_h: '构建 · 装机 · 运行', c3_p: 'hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 <code>cjpm</code> 构建、官方 <code>codelinter</code> 门禁 —— 设备写操作全部走审批。',
-    c4_h: '自进化双门禁', c4_p: '洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升快照 → 保留门防背题复验 → 回归即回滚;进化只写 skills/ 与 memory/。',
-    c5_h: 'MCP 生态借力', c5_p: '手写零依赖 MCP 客户端(stdio + Streamable HTTP),5800+ 社区服务器即插即用;远端工具默认受审批门禁。',
+    c4_h: '自进化双门禁', c4_p: '洞察挖掘 → 技能提案 → 训练门 A/B 基准(双样本,运气过不了门)→ 晋升进<b>金丝雀</b>(20% 会话采样)→ impact 判定(≥8 会话且 ≥10% 差才转正,有害即退役)→ 回归即回滚;判定记录原样发布在<a href="evidence/">证据页</a>。',
+    c5_h: 'MCP 双向生态', c5_p: '客户端:手写零依赖(stdio + Streamable HTTP),5800+ 社区服务器即插即用;服务器:<code>hmh mcp-serve</code> 把鸿蒙工具链以原生工具供给 Claude Code / Codex / 任意 MCP 宿主,按工具名粒度豁免审批。',
     c6_h: '运维看家(生态雷达)', c6_p: '8 源开源鸿蒙雷达每日 diff 脚手架与门禁假设,模型写简报、模板降级;issue 流 AI 只起草、人批准才发布,draft PR + 身份署名。',
-    c7_h: '双前端', c7_p: '全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、SGR 鼠标)+ Web(浏览器审批、会话回放、<b>工作区</b>切换、目录选择器);<code>hmh tui</code> 一条命令自动带起网页端。',
-    c8_h: '安全内建', c8_p: 'deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计。',
+    c7_h: '双前端', c7_p: '全屏 TUI(斜杠面板 ↑↓ 选择、滚轮翻页、<code>/resume</code> 会话恢复选择器、右对齐输入气泡、内置更新提醒)+ Web(浏览器审批、会话回放、<b>工作区</b>切换);<code>hmh tui</code> 一条命令自动带起网页端。',
+    c8_h: '安全内建', c8_p: 'deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计;<code>hmh state backup</code> 进化状态一键快照与恢复。',
     c9_h: '国际化 & 多厂商', c9_p: 'zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。',
+    c10_h: '模型感知上下文工程', c10_p: '上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。',
     s1: '单仓七包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '门禁(训练+保留)',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
@@ -322,12 +324,13 @@ const I18N = {
     c1_h: 'Parameterized Scaffolding', c1_p: '<code>harmony_project_create</code> generates any structure of multi-page + feature HAP + HAR libraries in one call; verified against real hvigor builds.',
     c2_h: 'Full Emulator Lifecycle, No IDE', c2_p: '<code>harmony_emulator_*</code> drives the official headless CLI directly: discover / catalog / create / start / stop / delete — every device model and variant on demand, without opening DevEco Studio.',
     c3_h: 'Build · Install · Run', c3_p: 'hvigor builds, hdc install/launch/logs/uninstall, Cangjie <code>cjpm</code> builds, and the official <code>codelinter</code> gate — every device write goes through approval.',
-    c4_h: 'Self-Evolution, Double-Gated', c4_p: 'Insight mining → skill proposals → training gate A/B bench (double-sampled — luck cannot pass) → promotion snapshot → holdout anti-memorization re-verification → instant rollback on regression. The loop writes only skills/ and memory/.',
-    c5_h: 'MCP Ecosystem on Tap', c5_p: 'A hand-written zero-dependency MCP client (stdio + Streamable HTTP); 5,800+ community servers plug and play. Remote tools are approval-gated by default.',
+    c4_h: 'Self-Evolution, Double-Gated', c4_p: 'Insight mining → skill proposals → training gate A/B bench (double-sampled — luck cannot pass) → promoted to a <b>canary</b> (20% of sessions) → impact verdict (full activation only on ≥8 sessions and ≥10% delta; harmful ones are retired) → instant rollback on regression. Every verdict is published verbatim on the <a href="evidence/">evidence page</a>.',
+    c5_h: 'MCP, Both Ways', c5_p: 'Client: hand-written zero-dependency (stdio + Streamable HTTP), 5,800+ community servers plug and play. Server: <code>hmh mcp-serve</code> exposes the HarmonyOS toolchain as native tools for Claude Code / Codex / any MCP host, with per-tool-name approval exemptions.',
     c6_h: 'Ops Keeper (Ecosystem Radar)', c6_p: 'An 8-source OpenHarmony radar diffs our scaffold & gate assumptions daily; model-written briefs with template fallback. The issue flow drafts replies and ships only human-approved draft PRs with AI attribution.',
-    c7_h: 'Two Frontends', c7_p: 'A fullscreen TUI (slash palette with arrow keys, mouse-wheel transcript) and a web UI (browser approvals, session replay, <b>workspaces</b>, folder picker). <code>hmh tui</code> brings the web UI up automatically.',
-    c8_h: 'Safety Baked In', c8_p: 'A deny-first approval gate lives in the loop kernel itself; destructive command patterns are hard-denied; evolution proposals pass a poisoning screen; sessions are append-only audited.',
+    c7_h: 'Two Frontends', c7_p: 'A fullscreen TUI (slash palette with arrow keys, mouse-wheel transcript, <code>/resume</code> session picker, right-aligned user bubbles, built-in update reminder) and a web UI (browser approvals, session replay, <b>workspaces</b>). <code>hmh tui</code> brings the web UI up automatically.',
+    c8_h: 'Safety Baked In', c8_p: 'A deny-first approval gate lives in the loop kernel itself; destructive command patterns are hard-denied; evolution proposals pass a poisoning screen; sessions are append-only audited; <code>hmh state backup</code> snapshots and restores the evolution state.',
     c9_h: 'i18n & Multi-Provider', c9_p: 'Bilingual zh/en UI and system prompts (<code>--locale=en</code>); any OpenAI-compatible provider, routed per purpose (chat / vision / evolve / bench).',
+    c10_h: 'Model-Aware Context Engineering', c10_p: 'A context-window registry scales the compaction budget to each model (128K = the legacy default; unknown models unchanged). Long sessions get a rolling digest (evicted content is distilled, not dropped); workspace-scoped memory; optional embedding hybrid retrieval.',
     s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'gates (training + holdout)',
     ins_title: 'Quick Start in Four Steps',
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
