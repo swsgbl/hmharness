@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/web",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "hmharness web frontend: local node:http server with SSE streaming, remote approval gate, and an embedded zero-build single page app.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,14 +15,14 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.5.2",
-    "@hmharness/evolution": "0.5.2",
-    "@hmharness/agent": "0.5.2"
+    "@hmharness/kernel": "0.5.3",
+    "@hmharness/evolution": "0.5.3",
+    "@hmharness/agent": "0.5.3"
   },
   "files": [
     "dist"
   ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/swsgbl/hmharness.git"

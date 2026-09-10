@@ -4,14 +4,21 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
-## [Unreleased - 外部评审六项落地]
+## [0.5.3] - 2026-09-10
 
-- **evidence 页外推性声明**:黄色声明"当前数据全部来自自设任务,外推性未验证"。
-- **approved-rules 安全修复**:结构化匹配替代字符串前缀(阻止路径穿越)。
-- **系统提示词 token 计数**:每次任务启动输出提示词体积。
-- **预设契约冒烟测试**(`scripts/preset-smoke.cjs`):每厂商最小 API 验证。
-- **雷达源新鲜度自检**:源最新数据 >90 天标 STALE。
-- **任务池外部信号注入器**(`scripts/tasks-from-radar.cjs`):雷达简报→进化任务。
+- **evidence 页外推性声明**(scripts/export-evidence.cjs):黄色声明"当前数据全部
+  来自自设任务,外推性未验证,待第一批外部用户数据验证"。
+- **approved-rules 安全修复**(agent/runner.ts):结构化匹配替代字符串前缀——
+  解析规则为 args 对象逐 key 匹配,字符串值前缀匹配但扩展部分检查 `..` 路径
+  穿越(附回归测试)。
+- **系统提示词 token 计数**(agent/runner.ts):每次任务输出
+  `[prompt] system: N chars (~M tokens) · AGENTS.md: yes/no`。
+- **预设契约冒烟测试**(scripts/preset-smoke.cjs):每厂商最小 API 调用验证
+  endpoint/auth/model 三件套,退出码 1 为 CI 门。
+- **雷达源新鲜度自检**(domain-ops/index.ts):扫描时检查源最新数据日期,
+  >90 天标 `STALE: Nd old` 为 FAIL。
+- **任务池外部信号注入器**(scripts/tasks-from-radar.cjs):雷达"值得关注"
+  条目→验证任务→外部池 selffeed-tasks-ext.jsonl,打破自指适应度景观。
 
 ## [0.5.2] - 2026-09-10
 
