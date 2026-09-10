@@ -13,7 +13,11 @@ function fakeChat() {
     turn++;
     if (turn === 1) {
       return {
-        message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c1', function: { name: 'noop', arguments: '{}' } }] },
+        message: {
+          role: 'assistant' as const,
+          content: null,
+          tool_calls: [{ id: 'c1', type: 'function' as const, function: { name: 'noop', arguments: '{}' } }],
+        },
         usage: { prompt_tokens: 10, completion_tokens: 10 },
       };
     }

@@ -6,6 +6,7 @@
  *
  * Order is load-bearing (each package installs its deps on publish):
  * kernel -> evolution -> domain-harmony -> domain-ops -> agent -> web -> cli
+ * -> codexhost-bridge
  * Every package publishes with --access public (scoped packages default to
  * restricted) and --registry npmjs (this machine's .npmrc points at
  * npmmirror, which is read-only).
@@ -16,14 +17,16 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli'];
+const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const DRY = process.argv.includes('--dry-run');
+const onlyIndex = process.argv.indexOf('--only');
+const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;
 const REG = 'https://registry.npmjs.org';
 
 // 0. preflight first - never publish a broken set
 console.log('--- preflight ---');
 try {
-  execSync('node scripts/publish-preflight.cjs', { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', timeout: 600000 });
+  execSync('node scripts/publish-preflight.cjs' + (ONLY ? ' ' + ONLY : ''), { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', timeout: 600000 });
 } catch {
   console.error('preflight failed - publish aborted');
   process.exit(1);
@@ -43,7 +46,11 @@ try {
 }
 
 // 2. ordered publish
-for (const name of ORDER) {
+for (const name of ONLY ? [ONLY] : ORDER) {
+  if (!ORDER.includes(name)) {
+    console.error('unknown package: ' + name + ' (expected one of ' + ORDER.join(', ') + ')');
+    process.exit(1);
+  }
   const dir = path.join(ROOT, 'packages', name);
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   const args = ['publish', '--access', 'public', '--registry', REG];
@@ -57,4 +64,4 @@ for (const name of ORDER) {
     process.exit(1);
   }
 }
-console.log('\nALL SEVEN PUBLISHED' + (DRY ? ' (dry-run)' : '') + ' - verify: npm view @hmharness/cli version');
+console.log('\nALL PUBLISHED' + (DRY ? ' (dry-run)' : '') + (ONLY ? ': @hmharness/' + ONLY : ' - verify: npm view @hmharness/cli version'));

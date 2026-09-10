@@ -1,11 +1,12 @@
 /**
  * Publish preflight (scripts/publish-preflight.cjs)
- * npm publish in this repo is a SEVEN-package ordered set: kernel ->
- * evolution -> domain-harmony -> domain-ops -> agent -> web -> cli. This
+ * npm publish in this repo is an EIGHT-package ordered set: kernel ->
+ * evolution -> domain-harmony -> domain-ops -> agent -> web -> cli ->
+ * codexhost-bridge. This
  * script verifies everything npm pack/publish would complain about,
  * WITHOUT publishing anything:
- *   1. every package builds (dist/ newer than every src file)
- *   2. dist main entry exists, bin shebang present where declared
+ *   1. every package builds (dist/ newer than every src file, or bin/ for source-only packages)
+ *   2. the main/bin entry exists, bin shebang present where declared
  *   3. workspace deps referenced by shipped packages are declared in
  *      package.json (npm cannot resolve undeclared @hmharness/* on install)
  *   4. npm pack --dry-run succeeds per package (tarball contents sane)
@@ -17,18 +18,27 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli'];
+const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
+const packages = requested.length ? requested : ORDER;
 let failures = 0;
 const fail = (msg) => { console.error('  FAIL ' + msg); failures++; };
 
-for (const name of ORDER) {
+for (const name of packages) {
+  if (!ORDER.includes(name)) {
+    fail('unknown package: ' + name + ' (expected one of ' + ORDER.join(', ') + ')');
+    continue;
+  }
   console.log('== @hmharness/' + name);
   const dir = path.join(ROOT, 'packages', name);
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-  const dist = path.join(dir, 'dist');
+  if (pkg.private === true) fail(name + ': package.json must not set private=true for npm publishing');
+  const isSourcePackage = name === 'codexhost-bridge';
+  const dist = path.join(dir, isSourcePackage ? 'bin' : 'dist');
+  const sourceRoot = path.join(dir, isSourcePackage ? 'bin' : 'src');
 
-  // 1. dist exists and is newer than every src file
-  if (!fs.existsSync(dist)) { fail(name + ': no dist/ - run the build first'); continue; }
+  // 1. shipped implementation exists and is newer than its source input
+  if (!fs.existsSync(dist)) { fail(name + ': no shipped implementation - run the build first'); continue; }
   let newestSrc = 0;
   const walk = (d) => {
     for (const f of fs.readdirSync(d, { withFileTypes: true })) {
@@ -38,10 +48,11 @@ for (const name of ORDER) {
       else if (/\.(ts|mts)$/.test(f.name)) newestSrc = Math.max(newestSrc, fs.statSync(p).mtimeMs);
     }
   };
-  walk(path.join(dir, 'src'));
-  const mainFile = path.join(dist, (pkg.main || '').replace(/^dist[\\/]/, ''));
-  if (!fs.existsSync(mainFile)) { fail(name + ': declared main missing in dist (' + pkg.main + ')'); }
-  else if (fs.statSync(mainFile).mtimeMs < newestSrc) { fail(name + ': dist is STALE (src newer) - rebuild before publish'); }
+  walk(sourceRoot);
+  const entry = pkg.main || (pkg.bin && Object.values(pkg.bin)[0]);
+  const mainFile = path.join(dir, entry || '');
+  if (!fs.existsSync(mainFile)) { fail(name + ': declared entry missing (' + entry + ')'); }
+  else if (fs.statSync(mainFile).mtimeMs < newestSrc) { fail(name + ': shipped implementation is STALE (source newer) - rebuild before publish'); }
 
   // 2. bin shebang
   if (pkg.bin) {
@@ -52,9 +63,17 @@ for (const name of ORDER) {
 
   // 3. workspace deps declared
   const deps = { ...pkg.dependencies };
-  const shippedDeps = fs.readdirSync(dist)
-    .filter((f) => f.endsWith('.js'))
-    .flatMap((f) => [...fs.readFileSync(path.join(dist, f), 'utf8').matchAll(/['"](@hmharness\/[a-z-]+)['"]/g)].map((m) => m[1]));
+  const shippedFiles = [];
+  const collectFiles = (d) => {
+    for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, f.name);
+      if (f.isDirectory()) collectFiles(p);
+      else if (/\.(js|mjs|cjs)$/.test(f.name)) shippedFiles.push(p);
+    }
+  };
+  collectFiles(dist);
+  const shippedDeps = shippedFiles
+    .flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/['"](@hmharness\/[a-z-]+)['"]/g)].map((m) => m[1]));
   for (const d of new Set(shippedDeps)) {
     if (!deps[d]) fail(name + ': dist imports ' + d + ' but package.json does not declare it');
   }
@@ -73,12 +92,12 @@ for (const name of ORDER) {
     for (const f of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, f.name);
       if (f.isDirectory()) scan(p);
-      else if (f.name.endsWith('.js') && secretRe.test(fs.readFileSync(p, 'utf8'))) { leaked = true; console.error('  LEAK in ' + p); }
+      else if (/\.(js|mjs|cjs)$/.test(f.name) && secretRe.test(fs.readFileSync(p, 'utf8'))) { leaked = true; console.error('  LEAK in ' + p); }
     }
   };
   scan(dist);
   if (leaked) fail(name + ': secret-looking string in dist');
 }
 
-console.log(failures === 0 ? '\nPREFLIGHT OK - safe to publish in order: ' + ORDER.map((o) => '@hmharness/' + o).join(' -> ') : '\nPREFLIGHT FAILED: ' + failures + ' issue(s)');
+console.log(failures === 0 ? '\nPREFLIGHT OK - safe to publish in order: ' + packages.map((o) => '@hmharness/' + o).join(' -> ') : '\nPREFLIGHT FAILED: ' + failures + ' issue(s)');
 process.exit(failures ? 1 : 0);

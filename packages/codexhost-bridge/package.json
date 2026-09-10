@@ -1,0 +1,40 @@
+{
+  "name": "@hmharness/codexhost-bridge",
+  "version": "0.5.3",
+  "description": "Machine-readable hmharness bridge for CodexHost and other agent desktop hosts.",
+  "type": "module",
+  "bin": {
+    "hmh-codexhost": "bin/hmh-codexhost.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@hmharness/agent": "0.5.3",
+    "@hmharness/kernel": "0.5.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "hmharness",
+    "codexhost",
+    "agent",
+    "bridge",
+    "ndjson",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git",
+    "directory": "packages/codexhost-bridge"
+  },
+  "homepage": "https://github.com/swsgbl/hmharness/tree/main/packages/codexhost-bridge",
+  "bugs": "https://github.com/swsgbl/hmharness/issues"
+}
