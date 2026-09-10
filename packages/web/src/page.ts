@@ -153,6 +153,13 @@ export const PAGE = `<!doctype html>
   .say b { color:#fff; }
   .msg-user { color:var(--text); background:var(--panel2); border-radius:12px; padding:8px 14px; margin:10px 0 6px auto; width:fit-content; max-width:74%; white-space:pre-wrap; }
   .queued { color:var(--warn); font-size:12.5px; margin:4px 0 4px auto; width:fit-content; max-width:74%; opacity:.85; }
+  .projgrp { width:100%; display:flex; align-items:center; gap:6px; background:none; border:0; color:var(--dim); font-size:12px; font-weight:600; padding:6px 8px; margin-top:8px; cursor:pointer; border-radius:6px; text-align:left; }
+  .projgrp:hover { color:var(--text); background:var(--panel2); }
+  .projgrp.cur { color:var(--cyan); }
+  .projgrp .pcaret { width:12px; flex:0 0 auto; opacity:.8; }
+  .projgrp .pname { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .projgrp .pcount { flex:0 0 auto; opacity:.65; font-weight:500; }
+  .projbody { padding-left:4px; }
   .thinkbox { border:1px solid var(--line); border-left:3px solid var(--dim); border-radius:8px; margin:8px 0; background:var(--panel); }
   .thinkhead { width:100%; display:flex; gap:8px; align-items:center; background:none; border:0; color:var(--dim); padding:6px 10px; cursor:pointer; font-size:12.5px; }
   .thinkhead:hover { color:var(--text); }
@@ -402,7 +409,7 @@ export const PAGE = `<!doctype html>
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', approve:'批准', deny:'拒绝',
-          approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)',
+          approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
           emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队',
@@ -420,7 +427,7 @@ export const PAGE = `<!doctype html>
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
-          approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)',
+          approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
           emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued',
@@ -1058,6 +1065,11 @@ export const PAGE = `<!doctype html>
     b.appendChild(acts);
     return b;
   }
+  /** Group sessions BY PROJECT (their cwd), one collapsible section each.
+   *  Registered workspaces show their display name; unregistered folders show
+   *  the last path segment. The current workspace's group is first and open;
+   *  others are collapsed by default so the sidebar stays scannable with
+   *  hundreds of sessions (user request: "按项目为主菜单归类"). */
   function renderSessions(filter) {
     var mine = document.getElementById('sessions');
     var other = document.getElementById('sessions-other');
@@ -1065,17 +1077,66 @@ export const PAGE = `<!doctype html>
     other.innerHTML = '';
     var f = (filter || '').toLowerCase();
     var curPath = (curWs.path || '').toLowerCase();
-    var otherCount = 0;
-    sessData.slice(0, 50).forEach(function (s) {
-      if (f && (s.id + ' ' + s.task).toLowerCase().indexOf(f) < 0) return;
-      var inWs = !!curPath && String(s.cwd || '').toLowerCase() === curPath;
-      if (inWs) mine.appendChild(sessRow(s));
-      else { other.appendChild(sessRow(s)); otherCount++; }
+
+    // workspace path -> display name (registered ones win)
+    var nameByPath = {};
+    (wsItems || []).forEach(function (w) {
+      if (w && w.path) nameByPath[String(w.path).toLowerCase()] = w.name || String(w.path).split(/[\\\\/]/).pop();
     });
-    var showOther = otherCount > 0;
-    document.getElementById('ph-other').style.display = showOther ? '' : 'none';
-    other.style.display = showOther ? '' : 'none';
-    if (!mine.children.length) mine.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + L.none2 + '</div>';
+    function projName(p) {
+      var key = String(p || '').toLowerCase();
+      if (nameByPath[key]) return nameByPath[key];
+      var seg = String(p || '').split(/[\\\\/]/).filter(Boolean).pop();
+      return seg || (L.ungrouped || 'ungrouped');
+    }
+
+    // bucket sessions by project path (newest-first order preserved from API)
+    var groups = {};
+    var groupOrder = [];
+    sessData.forEach(function (s) {
+      if (f && (s.id + ' ' + s.task + ' ' + (s.title || '')).toLowerCase().indexOf(f) < 0) return;
+      var key = String(s.cwd || '').toLowerCase();
+      if (!groups[key]) { groups[key] = { path: s.cwd || '', items: [] }; groupOrder.push(key); }
+      groups[key].items.push(s);
+    });
+    // current workspace first, then groups by size (biggest project first)
+    groupOrder.sort(function (a, b) {
+      if (a === curPath) return -1;
+      if (b === curPath) return 1;
+      return groups[b].items.length - groups[a].items.length;
+    });
+
+    var groupsEl = document.getElementById('sessions');
+    groupOrder.forEach(function (key, idx) {
+      var g = groups[key];
+      var isCur = key === curPath;
+      var head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'projgrp' + (isCur ? ' cur' : '');
+      var open = isCur || idx === 0 || !!f;
+      head.innerHTML = '<span class="pcaret">' + (open ? '\\u25BE' : '\\u25B8') + '</span>'
+        + '<span class="pname">' + projName(g.path) + '</span>'
+        + '<span class="pcount">' + g.items.length + '</span>';
+      groupsEl.appendChild(head);
+      var body = document.createElement('div');
+      body.className = 'projbody';
+      body.style.display = open ? '' : 'none';
+      g.items.forEach(function (s) { body.appendChild(sessRow(s)); });
+      groupsEl.appendChild(body);
+      head.onclick = function () {
+        var vis = body.style.display !== 'none';
+        body.style.display = vis ? 'none' : '';
+        head.querySelector('.pcaret').textContent = vis ? '\\u25B8' : '\\u25BE';
+      };
+    });
+
+    if (!groupOrder.length) {
+      groupsEl.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + L.none2 + '</div>';
+    }
+    // legacy elements are unused now (superseded by per-project groups)
+    if (other) other.style.display = 'none';
+    var ph = document.getElementById('ph-other');
+    if (ph) ph.style.display = 'none';
   }
   function loadSessions() {
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (d) {

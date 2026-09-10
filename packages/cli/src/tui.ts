@@ -1081,9 +1081,35 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       const tr = file ? await loadTranscript(file) : null;
       if (!tr || tr.messages.length === 0) { rt.addText(t.cmdResumeNotFound(arg), 'err'); return; }
       history = tr.messages;
-      const firstUser = tr.messages.find((m) => m.role === 'user')?.content ?? '';
       rt.clearScreen();
-      rt.addUser(firstUser.replace(/\n/g, ' ').slice(0, 120));
+      // Render the FULL session window, not just the first line (user
+      // feedback: "恢复的应该是整个会话窗口,而不仅仅是片段"). Long sessions
+      // are bounded from the tail so the visible window stays usable while
+      // the complete transcript still lives in `history` for the model.
+      const MAX_RENDER = 80;
+      const msgs = tr.messages;
+      const skipped = Math.max(0, msgs.length - MAX_RENDER);
+      rt.addText(
+        '--- resumed ' + (tr.id || arg) + ' · ' + msgs.length + ' messages'
+        + (skipped > 0 ? ' (' + skipped + ' earlier kept in context, not shown)' : '')
+        + ' ---',
+        'dim',
+      );
+      for (const m of (skipped > 0 ? msgs.slice(skipped) : msgs)) {
+        const text = typeof m.content === 'string' ? m.content : '';
+        if (m.role === 'user') {
+          rt.addUser(text.replace(/\n+/g, ' ').slice(0, 400));
+        } else if (m.role === 'assistant') {
+          const calls = (m as { tool_calls?: Array<{ function?: { name?: string } }> }).tool_calls ?? [];
+          if (text.trim()) rt.addText(text.slice(0, 2000));
+          for (const c of calls) rt.addText('● ' + CYAN(String(c.function?.name ?? 'tool')) + DIM(' …'), 'dim');
+        } else if (m.role === 'tool') {
+          const first = text.split('\n').find((l) => l.trim()) ?? '';
+          if (first) rt.addText('  ' + DIM('⎿ ' + first.trim().slice(0, 100)), 'dim');
+        } else if (m.role === 'system' && text && !text.startsWith('[context pruned')) {
+          rt.addText(DIM(text.slice(0, 300)), 'dim');
+        }
+      }
       rt.addText(t.cmdResumeLoaded(tr.messages.length), 'dim');
       return;
     }

@@ -339,7 +339,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
         let files: string[] = [];
         try {
-          files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl') && !f.startsWith('.')).sort().reverse().slice(0, 50);
+          files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl') && !f.startsWith('.')).sort().reverse().slice(0, 200);
         } catch {
           /* none */
         }
