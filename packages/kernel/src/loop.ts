@@ -54,19 +54,25 @@ export async function runLoop(opts: {
    *  evicts content, it is distilled into a persistent digest note instead
    *  of being dropped. Absent -> deterministic prune only. */
   summarizeContext?: (input: { previousDigest: string | null; evicted: string[] }) => Promise<string>;
-  /** Hard total turn cap — the safety valve (default: 5x the adaptive soft limit, max 400). */
+  /** Hard total turn cap — override for testing (default: unlimited; the
+   *  loop stops on idle detection, not turn count — Codex-style
+   *  fire-and-forget for long-running development tasks). */
   maxTotalTurns?: number;
-  /** Hard total token spend cap — prompt + completion combined (default: 10M). */
+  /** Idle detection: consecutive turns with zero successful tool calls
+   *  before the loop concludes the agent is stuck (default: 15). */
+  maxIdleTurns?: number;
+  /** Hard total token spend cap (default: 50M — generous enough for days). */
   maxTotalTokens?: number;
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
   const modelCall = opts.chatImpl ?? chat;
-  // Soft limit: where the wrap-up nudge fires (adaptive to context window).
+  // Codex-style: no turn cap. The loop runs until the model gives a final
+  // answer, goes idle (no successful tool calls for N turns), or hits a
+  // very generous token valve. Soft checkpoint nudges remain as guidance.
   const softTurnLimit = adaptiveMaxTurns(provider);
-  // Hard limit: the actual safety valve. If the model is still calling tools
-  // at the soft limit, we auto-continue — the loop only hard-stops here.
-  const hardTurnLimit = opts.maxTotalTurns ?? Math.min(softTurnLimit * 5, 400);
-  const hardTokenLimit = opts.maxTotalTokens ?? 10_000_000;
+  const hardTurnLimit = opts.maxTotalTurns ?? Infinity; // no cap by default
+  const maxIdle = opts.maxIdleTurns ?? 15; // stuck detector
+  const hardTokenLimit = opts.maxTotalTokens ?? 50_000_000;
   const budget = opts.maxContextChars ?? adaptiveContextChars(provider);
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
@@ -75,13 +81,13 @@ export async function runLoop(opts: {
 
   let wrapupSignaled = false;
   let turn = 0;
-  let reason: 'final' | 'turn-valve' | 'token-valve' = 'final';
+  let idleTurns = 0; // consecutive turns with no successful tool calls
+  let reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' = 'final';
 
-  // The loop runs until the model gives a final answer (no tool calls) OR a
-  // safety valve fires. The old "maxTurns stop" is replaced by a soft
-  // checkpoint: if the model is still actively working (calling tools) at
-  // the soft limit, the loop auto-continues — long-running tasks feel
-  // unlimited while the hard valves protect against runaway loops and cost.
+  // The loop runs until the model gives a final answer (no tool calls), goes
+  // idle (stuck), or hits a safety valve. Soft checkpoints at the adaptive
+  // turn limit nudge the model but don't stop it — days-long tasks run
+  // uninterrupted (Codex fire-and-forget philosophy).
   while (true) {
     turn++;
     if (turn > hardTurnLimit) { reason = 'turn-valve'; break; }
@@ -102,11 +108,11 @@ export async function runLoop(opts: {
     }
 
     // Soft turn checkpoint: at the adaptive limit, nudge to conclude — but
-    // the model can keep working if it's mid-task (auto-continue).
-    if (turn === softTurnLimit) {
+    // the model can keep working if it's mid-task (no cap, fire-and-forget).
+    if (turn === softTurnLimit || (turn > softTurnLimit && turn % softTurnLimit === 0)) {
       working.push({
         role: 'system',
-        content: `[turn checkpoint] You have been working for ${turn} turns. If the task is substantially complete, give your final answer now. If not, continue — the turn limit has been lifted; work until done.`,
+        content: `[turn checkpoint] You have been working for ${turn} turns. If the task is substantially complete, give your final answer. If not, continue — there is no turn limit; work until done.`,
       });
     }
 
@@ -193,15 +199,32 @@ export async function runLoop(opts: {
         content: p.output.length > 60_000 ? p.output.slice(0, 60_000) + '\n...[truncated]' : p.output,
       });
     }
+
+    // Idle detection: count consecutive turns where NO tool succeeded. A
+    // productive agent always has at least one successful call; N consecutive
+    // all-fail/all-skip turns = the agent is stuck in a loop (this replaces
+    // the old hard turn cap — Codex-style "run until done, not until N").
+    const anySuccess = planned.some((p) => !p.isError && !p.skip);
+    if (anySuccess) {
+      idleTurns = 0;
+    } else {
+      idleTurns++;
+      if (idleTurns >= maxIdle) {
+        reason = 'idle';
+        break;
+      }
+    }
     // Loop continues: the model was actively calling tools, so we keep going
-    // (auto-continuation past the soft turn limit). Only the safety valves
-    // (hardTurnLimit / hardTokenLimit) can stop us now.
+    // indefinitely (no turn cap). Only idle detection or the token valve stops us.
   }
 
-  // Safety valve fired
-  const text = reason === 'turn-valve'
-    ? `Safety turn limit reached (${turn - 1} turns, hard cap ${hardTurnLimit}). The session is preserved — send another message to continue with fresh limits.`
-    : `Token budget limit reached (~${usage.promptTokens + usage.completionTokens} tokens, cap ${hardTokenLimit}). The session is preserved — send another message to continue.`;
-  events?.onFinal?.(text, turn - 1);
-  return { text, turns: turn - 1, toolUses, messages: working, usage };
+  // Safety valve or idle detection fired
+  const executedTurns = reason === 'idle' ? turn : turn - 1;
+  const text = reason === 'idle'
+    ? `Agent appears stuck: ${maxIdle} consecutive turns with no successful tool calls. The session is preserved — review the transcript, adjust the approach, and send a new message to continue.`
+    : reason === 'turn-valve'
+      ? `Turn limit reached (${executedTurns} turns). The session is preserved — send another message to continue.`
+      : `Token budget limit reached (~${usage.promptTokens + usage.completionTokens} tokens). The session is preserved — send another message to continue.`;
+  events?.onFinal?.(text, executedTurns);
+  return { text, turns: executedTurns, toolUses, messages: working, usage };
 }

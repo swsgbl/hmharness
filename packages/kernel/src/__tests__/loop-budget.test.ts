@@ -98,5 +98,26 @@ test('hard turn valve: safety cap stops even if the model keeps calling tools', 
     maxTotalTurns: 10,
   });
   assert.equal(result.turns, 10, 'stopped at hard cap');
-  assert.match(result.text, /Safety turn limit/);
+  assert.match(result.text, /Turn limit reached/);
+});
+
+test('idle detection: 15 consecutive all-fail turns stops the loop (stuck agent)', async () => {
+  // A tool that ALWAYS fails → idle detector should stop after 15 turns
+  const brokenTool = { name: 'broken', description: 'always fails', parameters: { type: 'object' as const, properties: {} },
+    async execute() { return { output: 'error: something broke', isError: true }; },
+  };
+  const registry = { toOpenAITools: () => [], get: () => brokenTool };
+  const stuckModel = async () => ({
+    message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c', function: { name: 'broken', arguments: '{}' } }] },
+    usage: { prompt_tokens: 5, completion_tokens: 5 },
+  });
+  const result = await runLoop({
+    provider: glmWindow,
+    registry: registry as never,
+    messages: [{ role: 'user', content: 'do something' }],
+    ctx: { cwd: '.', home: '.' },
+    chatImpl: stuckModel,
+  });
+  assert.equal(result.turns, 15, 'stopped after 15 idle turns');
+  assert.match(result.text, /stuck/);
 });

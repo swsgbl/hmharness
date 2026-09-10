@@ -45,7 +45,12 @@ export async function chat(
   let authScheme: string = cfg.authHeader ?? 'bearer';
 
   let lastError = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Resilient retry: exponential backoff with jitter, up to 6 attempts
+  // (Codex-style fire-and-forget: network hiccups, 429s, and provider
+  // restarts should NEVER kill a long-running task). Retry-After header
+  // from 429s is honoured when present.
+  const MAX_RETRIES = 6;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
     try {
@@ -55,16 +60,23 @@ export async function chat(
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
-      if (res.status === 429 || res.status >= 500) {
+      if (res.status === 429) {
+        // honour server-provided retry delay; fall back to exponential backoff
+        const retryAfter = Number(res.headers.get('retry-after')) || Number(res.headers.get('x-ratelimit-reset')) || 0;
+        const delay = retryAfter > 0 ? retryAfter * 1000 : Math.min(30_000, 2000 * Math.pow(2, attempt));
+        lastError = `HTTP 429 (rate limited): ${(await res.text()).slice(0, 200)}`;
+        await sleep(delay + Math.random() * 1000); // jitter
+        continue;
+      }
+      if (res.status >= 500) {
+        const delay = Math.min(30_000, 2000 * Math.pow(2, attempt));
         lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
-        await sleep(1500 * (attempt + 1));
+        await sleep(delay + Math.random() * 1000);
         continue;
       }
       if (res.status === 401 && !cfg.authHeader && authScheme === 'bearer' && cfg.apiKey) {
-        // gateway rejected Bearer - try the other common scheme once
         authScheme = 'X-Api-Key';
         lastError = 'renegotiating auth: Bearer rejected, retrying with X-Api-Key';
-        attempt--;
         continue;
       }
       if (!res.ok) {
@@ -87,13 +99,18 @@ export async function chat(
       };
     } catch (err) {
       lastError = String(err);
-      if (!/abort|fetch failed|ECONN|timeout/i.test(lastError)) throw err;
-      await sleep(1500 * (attempt + 1));
+      // transient (network, timeout, connection reset): retry with backoff
+      if (/abort|fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|timeout|socket hang up/i.test(lastError)) {
+        const delay = Math.min(60_000, 3000 * Math.pow(2, attempt));
+        await sleep(delay + Math.random() * 2000);
+        continue;
+      }
+      throw err; // permanent error (bad JSON, logic error): don't retry
     } finally {
       clearTimeout(timer);
     }
   }
-  throw new Error(`provider: failed after retry (${cfg.baseUrl}): ${lastError}`);
+  throw new Error(`provider: failed after ${MAX_RETRIES} retries (${cfg.baseUrl}): ${lastError}`);
 }
 
 /** Assemble a ChatResponse from an SSE stream, emitting deltas as they land. */

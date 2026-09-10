@@ -11,12 +11,21 @@
 // background work inside the agent (self-evolution cycles etc.) must not
 // keep this one-shot process alive - we exit hard after the final line.
 import process from "node:process";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
-const { buildRegistry, runAgentTask } = await import("@hmharness/agent");
-const { loadConfig, listProviders, homeDir } = await import("@hmharness/kernel");
+// Prefer the hoisted sibling used by npm workspaces and global installs. This
+// also prevents a stale npm-link-local dependency shadowing the workspace build.
+const agentUrl = new URL("../../agent/dist/index.js", import.meta.url);
+const kernelUrl = new URL("../../kernel/dist/index.js", import.meta.url);
+const { buildRegistry, runAgentTask } = await import(
+  existsSync(agentUrl) ? agentUrl.href : "@hmharness/agent"
+);
+const { loadConfig, listProviders, homeDir } = await import(
+  existsSync(kernelUrl) ? kernelUrl.href : "@hmharness/kernel"
+);
 
 function fail(error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
