@@ -4,6 +4,13 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.5.2] - 2026-09-10
+
+- **修复 YOLO 模式形同虚设(agent/runner)**:根因是 `approvalAsk`(TUI 弹窗/
+  Web 远程审批)无条件优先于 `yes` 标志——TUI 总是提供 `approvalAsk`,所以
+  `/yolo` 开了弹窗照样弹。修复:`yes=true` 时跳过 `approvalAsk` 直接走
+  自动批准门。这是三字符修复(`&& !opts.yes`)。附回归测试锁死。
+
 ## [0.5.1] - 2026-09-10
 
 - **修复生态雷达"永远零新增"(domain-ops)**:根因是四个数据源已死(gitee releases

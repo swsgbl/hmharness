@@ -249,7 +249,12 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
 
   await session.user(opts.task);
 
-  const approval: LoopApproval = opts.approvalAsk ? { ask: opts.approvalAsk } : makeApproval(cfg, opts.yes === true);
+  // YOLO fix: when yes=true the caller's approvalAsk (TUI dialog, web remote
+  // gate) must NOT override the auto-approve gate - it used to take
+  // precedence unconditionally, so /yolo was cosmetic (user-reported).
+  const approval: LoopApproval = (opts.approvalAsk && !opts.yes)
+    ? { ask: opts.approvalAsk }
+    : makeApproval(cfg, opts.yes === true);
   spawnBase.current = {
     provider: resolveProvider(cfg, 'chat'),
     ctx,
