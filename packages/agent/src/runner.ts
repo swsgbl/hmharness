@@ -118,8 +118,30 @@ async function discoverAgentsMd(cwd: string): Promise<string | null> {
  *  P0 canary: ~20% of sessions (deterministic by session id) also receive
  *  the canary skill block, watermarked as experimental references - the
  *  impact loop compares these sessions against the rest. */
+/** Trivial-task detection: greetings, identity questions, and short chitchat
+ *  don't need memory/skills/insights injection (~4K tokens of overhead the
+ *  model ignores anyway). Skipping keeps the prompt lean for 90% of turns. */
+export function isTrivialTask(task: string): boolean {
+  const t = task.trim();
+  if (t.length > 100) return false; // long enough to be substantive
+  // note: no \b after CJK chars (they're outside \w so \b never fires there)
+  if (/^(你好|hi|hello|hey|嗨|哈喽|在吗|在么)[\s。.!！?？~～]*$/i.test(t)) return true;
+  if (/(你是谁|介绍.{0,4}自己|who are you|introduce yourself|what are you|你的名字|你叫什么)/i.test(t)) return true;
+  if (/^(谢谢|thanks|thank you|ok|好的|嗯|哦|收到|明白)[\s。.!！]*$/i.test(t)) return true;
+  if (/^(再见|bye|goodbye|exit|退出)[\s。.!！]*$/i.test(t)) return true;
+  return false;
+}
+
 export async function contextPack(task: string, sessionId?: string, opts: { workspace?: string | null; embedding?: EmbeddingProvider } = {}) {
   const home = homeDir();
+
+  // Trivial tasks (greetings, identity questions): skip memory/skills/insights
+  // injection entirely — the model doesn't need them for "你好" and they add
+  // ~4K tokens of noise that dilutes the identity anchor
+  if (isTrivialTask(task)) {
+    return { memory: '', skills: '', insights: '', skillsInjected: [] as string[] };
+  }
+
   const [memory, skills, insights] = await Promise.all([
     retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
     listSkills(home),

@@ -1,6 +1,6 @@
 {
   "name": "hmharness",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "description": "hmharness - a next-generation, self-evolving agent framework designed around the full HarmonyOS development lifecycle. Clean-room design; borrows the best 2026 ideas (loop engineering, MCP, skill-library evolution) without inheriting any runtime dependency.",
   "type": "module",

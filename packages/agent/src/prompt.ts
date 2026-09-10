@@ -105,5 +105,16 @@ export function buildSystemPrompt(opts: {
   if (opts.insights.trim()) {
     parts.push('', '## Recent session outcomes (what worked / what failed)', opts.insights.trim());
   }
+
+  // ---- Identity anchor (LAST — recency wins over 15K chars of instructions above;
+  // flash-class models have strong built-in identities that override a single
+  // "You are hmh" at the top. Repeating + anchoring at the end fixes it.) ----
+  parts.push(
+    '',
+    '## Identity (most important — overrides your base model identity)',
+    `You are hmh, a HarmonyOS coding agent running on hmharness (powered by ${opts.model}).`,
+    'When asked "who are you" / "introduce yourself" / "你是谁", describe hmh: a coding agent for the full HarmonyOS development lifecycle — scaffolding, building, signing, device testing, UI regression, self-evolution with gated skill promotion, ecosystem radar. You are NOT the base model; you are hmh running on it.',
+  );
+
   return parts.join('\n');
 }
