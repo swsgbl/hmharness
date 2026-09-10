@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-09-10 · /ops 雷达修复:功能不是摆设,源是死的
+
+**用户质疑**:"全面检查 /ops、/ops scan 是不是成了摆设。"
+
+**诊断(三层检查)**:
+1. 代码层:工具定义/CLI 命令/TUI 命令/runner 注册全链完好,不是没接线;
+2. 数据层:ops-log.jsonl 有 19 次扫描记录,briefs/ 有 10 份文件,功能一直在跑;
+3. **源层(根因)**:四个雷达源(gitee releases + github tags)全部陈旧——oh-docs
+   停在 2020 年(OpenHarmony-1.0),三个 GitHub tags 源停在 2024-01(weekly_20240115)。
+   OpenHarmony 仓库已不通过 releases/tags 发版,走的是 commit + milestone。所以扫描
+   永远返回 "0 new items",简报永远写"本期无变更"——**不是摆设,是哨兵站在了
+   死的岗哨上**。
+
+**修复**:源类型从 gitee-releases/github-tags 切换到 **github-commits**(GitHub
+commits API,per_page=5,按 commit SHA 前缀做 item ID)。探测验证:四个仓库的
+最新 commit 都在 2026-09(今天!),diff 立刻活了起来。
+
+**实测**:清旧快照重做基线(commit SHA 代替旧 tag 名)→第二次扫描检出 **16 条
+真实新增**,模型简报捕捉到 **OpenHarmony v7.0 Release/Beta1 标签**这个真实信号。
+
+**教训**:
+①**监控系统的最大风险不是"坏了"而是"安静地无效"**——工具正常运行、日志正常
+记录、简报正常生成,唯独数据源早已死了;必须定期验证源的"新鲜度"而不只是
+"可达性"(HTTP 200 ≠ 数据在更新);
+②探测脚本必须直连原始 API 检查数据日期,不能只看自家工具的输出(自家输出
+全绿恰恰是最大的麻痹)。
+
+---
+
 ## 2026-09-09 · Codex/DeepSeek 智能体工程升级:三方调研+九项落地(124/124)
 
 **动机**:用户令"参考 Codex 开源和 DeepSeek Harness 的内核提示词来优化 hmharness"。

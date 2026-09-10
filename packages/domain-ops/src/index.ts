@@ -20,7 +20,7 @@ import { channelTools } from './channel.ts';
 
 export interface RadarSource {
   key: string;
-  kind: 'gitee-releases' | 'github-tags';
+  kind: 'github-commits' | 'github-tags' | 'gitee-releases';
   repo: string; // "owner/name"
   label: string;
 }
@@ -41,11 +41,15 @@ export interface ScanReport {
   briefMode: 'model' | 'template' | 'none';
 }
 
+// Live sources: GitHub commit feeds on the four core OpenHarmony repos.
+// (The original gitee-releases/github-tags sources were DEAD - all pinned at
+// 2020/2024, so every scan showed "0 new items" and the radar looked like a
+// no-op. Commits update daily; the diff actually catches movement now.)
 const DEFAULT_SOURCES: RadarSource[] = [
-  { key: 'oh-docs', kind: 'gitee-releases', repo: 'openharmony/docs', label: 'OpenHarmony 文档/版本发布' },
-  { key: 'oh-ace', kind: 'github-tags', repo: 'openharmony/arkui_ace_engine', label: 'ArkUI 框架' },
-  { key: 'oh-ets', kind: 'github-tags', repo: 'openharmony/arkcompiler_ets_frontend', label: 'ArkTS/方舟编译器' },
-  { key: 'oh-ability', kind: 'github-tags', repo: 'openharmony/ability_ability_runtime', label: 'Ability 运行时' },
+  { key: 'oh-docs', kind: 'github-commits', repo: 'openharmony/docs', label: 'OpenHarmony 文档' },
+  { key: 'oh-ace', kind: 'github-commits', repo: 'openharmony/arkui_ace_engine', label: 'ArkUI 框架' },
+  { key: 'oh-ets', kind: 'github-commits', repo: 'openharmony/arkcompiler_ets_frontend', label: 'ArkTS/方舟编译器' },
+  { key: 'oh-ability', kind: 'github-commits', repo: 'openharmony/ability_ability_runtime', label: 'Ability 运行时' },
 ];
 
 function opsDir(home: string): string {
@@ -68,6 +72,17 @@ async function fetchJson(url: string, timeoutMs = 15_000): Promise<unknown> {
 }
 
 async function fetchSource(src: RadarSource): Promise<RadarItem[]> {
+  if (src.kind === 'github-commits') {
+    const data = (await fetchJson(`https://api.github.com/repos/${src.repo}/commits?per_page=5`)) as Array<{
+      sha: string; commit?: { message?: string; committer?: { date?: string } }; html_url?: string;
+    }>;
+    return data.map((c) => ({
+      id: c.sha?.slice(0, 12) ?? Math.random().toString(36),
+      title: `${src.label}: ${(c.commit?.message ?? '').split('\n')[0].slice(0, 80)}`,
+      url: c.html_url ?? `https://github.com/${src.repo}/commits`,
+      date: (c.commit?.committer?.date ?? '').slice(0, 10),
+    }));
+  }
   if (src.kind === 'gitee-releases') {
     const data = (await fetchJson(`https://gitee.com/api/v5/repos/${src.repo}/releases?per_page=5`)) as Array<{
       tag_name: string; name: string; html_url?: string; created_at?: string;

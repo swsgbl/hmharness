@@ -4,6 +4,13 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [Unreleased]
+
+- **修复生态雷达"永远零新增"(domain-ops)**:根因是四个数据源已死(gitee releases
+  停在 2020,github tags 停在 2024-01——OpenHarmony 已不用 releases/tags 发版)。
+  源切换为 **GitHub commits API**(按 commit SHA diff),实测第二次扫描即检出
+  16 条真实新增、捕捉到 OpenHarmony v7.0 Release/Beta 信号。
+
 ## [0.5.0] - 2026-09-09
 
 - **系统提示词重写(agent/prompt.ts)**:新增 9 段工程指令(来源:Codex 开源 + DeepSeek
