@@ -898,11 +898,83 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   }
 
   let history: ChatMessage[] = [];
+  // Task queue: new submissions during a running task are queued (not
+  // rejected, not run concurrently — sequential execution preserves history
+  // integrity). Slash commands still run immediately (they're quick).
+  const taskQueue: string[] = [];
+  let taskRunning = false;
+
   rt.onSubmit(() => {
     const line = rt.consumeInput().trim();
     if (!line) return;
-    void handleLine(line);
+    if (line.startsWith('/')) {
+      void handleLine(line);
+      return;
+    }
+    if (taskRunning) {
+      taskQueue.push(line);
+      rt.addText(`📋 queued: "${line.slice(0, 60)}${line.length > 60 ? '…' : ''}" (${taskQueue.length} waiting)`, 'dim');
+      return;
+    }
+    void executeTaskQueue(line);
   });
+
+  async function executeTaskQueue(firstTask: string): Promise<void> {
+    taskRunning = true;
+    let task: string | undefined = firstTask;
+    while (task) {
+      await runSingleTask(task);
+      task = taskQueue.shift();
+      if (task) rt.addText(`▶ next queued: "${task.slice(0, 60)}${task.length > 60 ? '…' : ''}"`, 'dim');
+    }
+    taskRunning = false;
+  }
+
+  async function runSingleTask(line: string): Promise<void> {
+    rt.addUser(line);
+    rt.setBusy(true, t.running);
+    let appender: ((c: string) => void) | null = null;
+    let kind: import('@hmharness/kernel').DeltaKind | null = null;
+    try {
+      const result = await runAgentTask({
+        task: line,
+        registry: reg,
+        cfg,
+        yes: autoApprove,
+        resumeMessages: history,
+        approvalAsk: (name, args) => rt.requestApproval(name, args),
+        events: {
+          onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
+          onDelta: (k, chunk) => {
+            if (k !== kind) {
+              if (kind === 'reasoning') rt.foldThinking();
+              appender = rt.startStream(k === 'reasoning' ? 'think' : 'say'); kind = k;
+            }
+            appender?.(chunk);
+          },
+          onToolCall: (name, args) => {
+            if (kind === 'reasoning') rt.foldThinking();
+            appender = null; kind = null;
+            const brief = name === 'run_command' && typeof args.command === 'string'
+              ? args.command
+              : JSON.stringify(args);
+            rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(brief.replace(/\s+/g, ' ').slice(0, 90))}`);
+          },
+          onToolResult: (name, output, isError) => {
+            const dot = isError ? RED('✗') : GREEN('•');
+            const first = output.split('\n').find((l) => l.trim()) ?? '';
+            rt.addText(`  ${dot} ${DIM('⎿ ' + first.trim().slice(0, 100))}`);
+          },
+        },
+      });
+      rt.setBusy(false);
+      rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
+      history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
+    } catch (err) {
+      rt.setBusy(false);
+      rt.addText(String(err), 'err');
+    }
+  }
 
   async function handleLine(line: string): Promise<void> {
     if (line === '/exit' || line === '/quit') {
@@ -1104,52 +1176,6 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         rt.setBusy(false);
       }
       return;
-    }
-
-    rt.addUser(line);
-    rt.setBusy(true, t.running);
-    let appender: ((c: string) => void) | null = null;
-    let kind: import('@hmharness/kernel').DeltaKind | null = null;
-    try {
-      const result = await runAgentTask({
-        task: line,
-        registry: reg,
-        cfg,
-        yes: autoApprove,
-        resumeMessages: history,
-        approvalAsk: (name, args) => rt.requestApproval(name, args),
-        events: {
-          onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
-          onDelta: (k, chunk) => {
-            if (k !== kind) {
-              if (kind === 'reasoning') rt.foldThinking(); // collapse before the next phase
-              appender = rt.startStream(k === 'reasoning' ? 'think' : 'say'); kind = k;
-            }
-            appender?.(chunk);
-          },
-          onToolCall: (name, args) => {
-            if (kind === 'reasoning') rt.foldThinking();
-            appender = null; kind = null;
-            // fold the args to their essence: for run_command the command
-            // string itself, otherwise a short JSON tail
-            const brief = name === 'run_command' && typeof args.command === 'string'
-              ? args.command
-              : JSON.stringify(args);
-            rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(brief.replace(/\s+/g, ' ').slice(0, 90))}`);
-          },
-          onToolResult: (name, output, isError) => {
-            const dot = isError ? RED('✗') : GREEN('•');
-            const first = output.split('\n').find((l) => l.trim()) ?? '';
-            rt.addText(`  ${dot} ${DIM('⎿ ' + first.trim().slice(0, 100))}`);
-          },
-        },
-      });
-      rt.setBusy(false);
-      rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
-      history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
-    } catch (err) {
-      rt.setBusy(false);
-      rt.addText(String(err), 'err');
     }
   }
 

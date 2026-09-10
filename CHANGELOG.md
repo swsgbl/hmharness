@@ -4,6 +4,15 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.6.1] - 2026-09-11
+
+- **TUI 任务排队(cli/tui.ts)**:AI 运行时输入框**始终可打字**，Enter 提交的
+  新任务自动排队(不并发、不拒绝)，当前任务完成后自动启动下一个。斜杠命令
+  仍然立即执行。排队时显示 `📋 queued: "..." (N waiting)`。
+- **Web 任务排队(web/server.ts)**:运行时 POST /api/task 从 **409 拒绝**改为
+  **200 接受并排队**，当前任务完成后自动启动下一个排队任务。SSE 广播排队
+  事件(queued/busy with fromQueue)。
+
 ## [0.6.0] - 2026-09-11
 
 - **Codex 式无限执行 + 网络韧性(架构变更)**:

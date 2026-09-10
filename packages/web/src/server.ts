@@ -46,6 +46,9 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   const { reg, clients } = await buildRegistry();
 
   let busy = false;
+  // Task queue: submissions while busy are queued and auto-started when the
+  // current task finishes (replaces the old 409 rejection)
+  const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean }> = [];
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
   // cross-task conversation memory (Claude-Code-style continuous thread):
@@ -439,10 +442,6 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/task') {
-        if (busy) {
-          json(res, 409, { error: 'a task is already running' });
-          return;
-        }
         const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean; mode?: string; fresh?: boolean };
         const text = String(body.text ?? '').trim();
         if (!text) {
@@ -450,6 +449,15 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           return;
         }
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
+        // Queue instead of reject: tasks submitted while busy are accepted
+        // and auto-started when the current one finishes (user request:
+        // "input always available, new tasks queue during execution")
+        if (busy) {
+          taskQueue.push({ text, mode, yes: body.yes === true, fresh: body.fresh === true });
+          broadcast('queued', { position: taskQueue.length, task: text });
+          json(res, 200, { ok: true, queued: true, position: taskQueue.length });
+          return;
+        }
         busy = true;
         broadcast('busy', { busy: true, task: text, mode });
         json(res, 200, { ok: true });
@@ -498,6 +506,48 @@ export async function startServer(opts: { port: number; host?: string }): Promis
             pendingApproval = null;
             broadcast('busy', { busy: false });
             broadcast('state', await stateObject());
+            // Auto-start the next queued task if any (queue mode)
+            const next = taskQueue.shift();
+            if (next) {
+              busy = true;
+              broadcast('busy', { busy: true, task: next.text, mode: next.mode, fromQueue: true });
+              void (async () => {
+                try {
+                  const resume = next.fresh ? [] : conversation;
+                  const result = await runAgentTask({
+                    task: next.text,
+                    registry: reg,
+                    cfg,
+                    yes: next.yes,
+                    resumeMessages: resume,
+                    approvalAsk: (next.yes || cfg.approval === 'auto') ? undefined : (name, args) =>
+                      new Promise<boolean>((resolve) => {
+                        const timer = setTimeout(() => {
+                          if (pendingApproval?.resolve === resolve) pendingApproval = null;
+                          broadcast('approvalDone', { name, granted: false, timeout: true });
+                          resolve(false);
+                        }, APPROVAL_TIMEOUT_MS);
+                        pendingApproval = { name, args, resolve, timer };
+                        broadcast('approvalReq', { name, args });
+                      }),
+                    events: {
+                      onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
+                      onToolCall: (name, args) => broadcast('toolCall', { name, args }),
+                      onToolResult: (name, output, isError) => broadcast('toolResult', { name, output: output.slice(0, 2000), isError }),
+                      onFinal: (r: { text: string; turns: number }) => broadcast('final', { text: r.text, turns: r.turns }),
+                    },
+                  });
+                  conversation = [...resume, { role: 'user', content: next.text }, ...result.messages.slice(resume.length + 2)];
+                  broadcast('final', { ...result, turnsInThread: Math.floor(conversation.length / 2) });
+                } catch (err) {
+                  broadcast('error', { message: String(err).slice(0, 400) });
+                } finally {
+                  busy = false;
+                  broadcast('busy', { busy: false });
+                  broadcast('state', await stateObject());
+                }
+              })();
+            }
           }
         })();
         return;
