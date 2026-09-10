@@ -4,6 +4,13 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.5.5] - 2026-09-11
+
+- **自动续跑(kernel/loop.ts)**:轮数上限从"硬停"改为"软检查点"——模型到达
+  自适应轮数时收到"continue if not done"提示,如果还在调工具就**自动继续**,
+  直到给出最终答案。硬安全阀:总轮数 5x 软上限(封顶 400)或总 token 10M。
+  **长任务体验从"25轮停→手动继续"变为"丢进去跑到完"**。
+
 ## [0.5.4] - 2026-09-11
 
 - **修复 25 轮自动停止的硬上限(kernel/loop.ts)**:maxTurns 从固定 25 改为

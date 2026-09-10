@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli'];
 const DRY = process.argv.includes('--dry-run');
 const onlyIndex = process.argv.indexOf('--only');
 const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;

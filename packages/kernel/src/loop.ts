@@ -54,14 +54,19 @@ export async function runLoop(opts: {
    *  evicts content, it is distilled into a persistent digest note instead
    *  of being dropped. Absent -> deterministic prune only. */
   summarizeContext?: (input: { previousDigest: string | null; evicted: string[] }) => Promise<string>;
+  /** Hard total turn cap — the safety valve (default: 5x the adaptive soft limit, max 400). */
+  maxTotalTurns?: number;
+  /** Hard total token spend cap — prompt + completion combined (default: 10M). */
+  maxTotalTokens?: number;
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
   const modelCall = opts.chatImpl ?? chat;
-  // Turn limit scales with the model's context window: 25 for small models,
-  // up to 80 for 1M-window models. The context compaction keeps the
-  // transcript within budget throughout, so the real ceiling is how many
-  // reasoning turns the model can sustain, not raw token count.
-  const maxTurns = opts.maxTurns ?? adaptiveMaxTurns(provider);
+  // Soft limit: where the wrap-up nudge fires (adaptive to context window).
+  const softTurnLimit = adaptiveMaxTurns(provider);
+  // Hard limit: the actual safety valve. If the model is still calling tools
+  // at the soft limit, we auto-continue — the loop only hard-stops here.
+  const hardTurnLimit = opts.maxTotalTurns ?? Math.min(softTurnLimit * 5, 400);
+  const hardTokenLimit = opts.maxTotalTokens ?? 10_000_000;
   const budget = opts.maxContextChars ?? adaptiveContextChars(provider);
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
@@ -69,20 +74,39 @@ export async function runLoop(opts: {
   const tools = registry.toOpenAITools();
 
   let wrapupSignaled = false;
+  let turn = 0;
+  let reason: 'final' | 'turn-valve' | 'token-valve' = 'final';
 
-  for (let turn = 1; turn <= maxTurns; turn++) {
+  // The loop runs until the model gives a final answer (no tool calls) OR a
+  // safety valve fires. The old "maxTurns stop" is replaced by a soft
+  // checkpoint: if the model is still actively working (calling tools) at
+  // the soft limit, the loop auto-continues — long-running tasks feel
+  // unlimited while the hard valves protect against runaway loops and cost.
+  while (true) {
+    turn++;
+    if (turn > hardTurnLimit) { reason = 'turn-valve'; break; }
+    if (usage.promptTokens + usage.completionTokens > hardTokenLimit) { reason = 'token-valve'; break; }
+
     const compacted = opts.summarizeContext
       ? await compactWithDigest(working, budget, opts.summarizeContext)
       : compactMessages(working, budget);
 
-    // Budget wrap-up signal: when context usage crosses 80%, inject a
-    // single system nudge to wind down instead of hard-cutting mid-thought
-    // (Codex's token-budget-context pattern; DeepSeek's 80% pressure trigger).
+    // Context budget wrap-up signal: when usage crosses 80%, nudge the model
+    // to wind down (Codex token_budget_context + DeepSeek 80% pressure).
     if (!wrapupSignaled && transcriptChars(compacted) > budget * 0.8) {
       wrapupSignaled = true;
       working.push({
         role: 'system',
         content: '[context budget] Context is running low. Wrap up the current task: summarize what was accomplished, suggest concrete next steps, and stop starting new sub-tasks.',
+      });
+    }
+
+    // Soft turn checkpoint: at the adaptive limit, nudge to conclude — but
+    // the model can keep working if it's mid-task (auto-continue).
+    if (turn === softTurnLimit) {
+      working.push({
+        role: 'system',
+        content: `[turn checkpoint] You have been working for ${turn} turns. If the task is substantially complete, give your final answer now. If not, continue — the turn limit has been lifted; work until done.`,
       });
     }
 
@@ -169,8 +193,15 @@ export async function runLoop(opts: {
         content: p.output.length > 60_000 ? p.output.slice(0, 60_000) + '\n...[truncated]' : p.output,
       });
     }
+    // Loop continues: the model was actively calling tools, so we keep going
+    // (auto-continuation past the soft turn limit). Only the safety valves
+    // (hardTurnLimit / hardTokenLimit) can stop us now.
   }
-  const text = `Turn limit reached (${maxTurns} turns). The session is preserved — continue with "hmh resume" or just send another message to pick up where this left off.`;
-  events?.onFinal?.(text, maxTurns);
-  return { text, turns: maxTurns, toolUses, messages: working, usage };
+
+  // Safety valve fired
+  const text = reason === 'turn-valve'
+    ? `Safety turn limit reached (${turn - 1} turns, hard cap ${hardTurnLimit}). The session is preserved — send another message to continue with fresh limits.`
+    : `Token budget limit reached (~${usage.promptTokens + usage.completionTokens} tokens, cap ${hardTokenLimit}). The session is preserved — send another message to continue.`;
+  events?.onFinal?.(text, turn - 1);
+  return { text, turns: turn - 1, toolUses, messages: working, usage };
 }
