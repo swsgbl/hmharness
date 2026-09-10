@@ -156,9 +156,29 @@ export function loadApprovedRules(home: string): ApprovedRule[] {
 function saveApprovedRules(home: string, rules: ApprovedRule[]): void {
   try { writeFileSync(join(home, 'approved-rules.json'), JSON.stringify(rules, null, 2)); } catch { /* best effort */ }
 }
-function matchesRule(rules: ApprovedRule[], toolName: string, args: Record<string, unknown>): boolean {
-  const argsStr = JSON.stringify(args);
-  return rules.some((r) => r.tool === toolName && argsStr.startsWith(r.argPrefix));
+/** Structured rule matching (review fix: raw string prefix was exploitable -
+ *  `node scripts/` prefix was hit by `node scripts/../../evil.js`). Now:
+ *  parses the rule as structured args, string values match by prefix BUT the
+ *  extension is checked for path traversal (`..` at the boundary blocks). */
+export function matchesRule(rules: ApprovedRule[], toolName: string, args: Record<string, unknown>): boolean {
+  return rules.some((r) => {
+    if (r.tool !== toolName) return false;
+    try {
+      const ruleArgs = JSON.parse(r.argPrefix) as Record<string, unknown>;
+      for (const [k, rv] of Object.entries(ruleArgs)) {
+        const av = args[k];
+        if (typeof rv === 'string' && typeof av === 'string') {
+          if (!av.startsWith(rv)) return false;
+          // path traversal: the extension after the approved prefix must not
+          // start with `..` (blocks `node scripts/` → `node scripts/../../x`)
+          if (av.slice(rv.length).startsWith('..')) return false;
+        } else if (rv !== av) {
+          return false;
+        }
+      }
+      return true;
+    } catch { return false; }
+  });
 }
 
 export function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.Interface): LoopApproval {
@@ -246,6 +266,12 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     locale: cfg.locale,
     agentsMd: agentsMd ?? undefined,
   });
+
+  // system prompt token count: the prompt has been quietly growing (Codex 9
+  // instructions + AGENTS.md + memory + skills + insights) while no cost gate
+  // watches IT - this makes the size visible every run (review finding #5)
+  const systemTokens = Math.ceil(system.length / 4);
+  events.onLine?.(`  [prompt] system: ${system.length} chars (~${systemTokens} tokens) · ${agentsMd ? 'AGENTS.md: yes' : 'no AGENTS.md'}`);
 
   await session.user(opts.task);
 

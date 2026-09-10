@@ -48,3 +48,13 @@ test('YOLO fix: when yes=true, caller-provided approvalAsk must NOT override aut
   // (if the bug were present, asked > 0)
   assert.equal(asked, 0, 'approvalAsk must not be consulted when yes=true');
 });
+
+test('approved-rules: structured matching blocks path traversal (review security fix)', async () => {
+  const mod = await import('../runner.ts');
+  const matchesRule = (mod as unknown as { matchesRule: (r: Array<{tool:string;argPrefix:string;time:string}>, t: string, a: Record<string, unknown>) => boolean }).matchesRule;
+  assert.equal(typeof matchesRule, 'function', 'matchesRule exported');
+  const rules = [{ tool: 'run_command', argPrefix: '{"command":"node scripts/"}', time: 'now' }];
+  assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/publish.cjs' }), true, 'path-safe extension passes');
+  assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/../../evil.js' }), false, 'path traversal blocked');
+  assert.equal(matchesRule(rules, 'write_file', { command: 'node scripts/x' }), false, 'different tool blocked');
+});

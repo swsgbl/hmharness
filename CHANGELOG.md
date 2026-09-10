@@ -4,6 +4,15 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [Unreleased - 外部评审六项落地]
+
+- **evidence 页外推性声明**:黄色声明"当前数据全部来自自设任务,外推性未验证"。
+- **approved-rules 安全修复**:结构化匹配替代字符串前缀(阻止路径穿越)。
+- **系统提示词 token 计数**:每次任务启动输出提示词体积。
+- **预设契约冒烟测试**(`scripts/preset-smoke.cjs`):每厂商最小 API 验证。
+- **雷达源新鲜度自检**:源最新数据 >90 天标 STALE。
+- **任务池外部信号注入器**(`scripts/tasks-from-radar.cjs`):雷达简报→进化任务。
+
 ## [0.5.2] - 2026-09-10
 
 - **修复 YOLO 模式形同虚设(agent/runner)**:根因是 `approvalAsk`(TUI 弹窗/

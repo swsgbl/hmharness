@@ -175,7 +175,19 @@ export async function scanRadar(opts: {
           const prevIds = new Set(prev!.seen[src.key] ?? []);
           for (const item of items) if (!prevIds.has(item.id)) newItems.push({ source: src.label, item });
         }
-        sourceStates.push({ key: src.key, ok: true, count: items.length });
+        // Source freshness guard: HTTP 200 ≠ data is alive (the "dead sentinel"
+        // lesson - all four sources returned 200 with data pinned at 2020/2024).
+        // Flag any source whose newest item is older than 90 days.
+        const newest = items.reduce((max, i) => (i.date > max ? i.date : max), '');
+        const staleDays = newest ? Math.floor((Date.now() - new Date(newest).getTime()) / 86400000) : Infinity;
+        if (staleDays > 90) {
+          sourceStates.push({
+            key: src.key, ok: false, count: items.length,
+            error: `STALE: newest data ${newest || 'no-date'} is ${Number.isFinite(staleDays) ? staleDays + 'd' : '?'} old (threshold 90d)`,
+          });
+        } else {
+          sourceStates.push({ key: src.key, ok: true, count: items.length });
+        }
       } catch (err) {
         // single-source failure never kills the scan
         sourceStates.push({ key: src.key, ok: false, count: 0, error: String(err).slice(0, 120) });

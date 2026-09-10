@@ -136,6 +136,7 @@ footer{margin-top:48px;color:var(--dim);font-size:12px;border-top:1px solid var(
 <div class="card"><div class="v">${num(DATA.benchCases)}</div><div class="k">bench 用例</div></div>
 </div>
 <p class="note">窗口:${num(DATA.firstCycle)} → ${num(DATA.lastCycle)} · 生成于 ${esc(DATA.generatedAt)}</p>
+<p style="background:rgba(224,179,76,.12);border:1px solid rgba(224,179,76,.3);border-radius:8px;padding:10px 14px;font-size:13.5px;color:#e0b34c"><b>⚠ 外推性声明:</b>当前数据全部来自<b>自设任务</b>(scripts/selffeed-tasks.json,作者编写),bench 用例同源。进化系统在此人造适应度景观上的表现<b>不代表</b>其在真实外部开发者任务上的效果。外推性待第一批外部用户数据验证。</p>
 
 <h2>每日进化轮次</h2>
 <table><tr><th>日期</th><th>轮次</th></tr>${dayRows}</table>
