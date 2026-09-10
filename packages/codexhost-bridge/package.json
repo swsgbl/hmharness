@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/codexhost-bridge",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Machine-readable hmharness bridge for CodexHost and other agent desktop hosts.",
   "type": "module",
   "bin": {
@@ -15,8 +15,8 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@hmharness/agent": "0.6.3",
-    "@hmharness/kernel": "0.6.3"
+    "@hmharness/agent": "0.6.4",
+    "@hmharness/kernel": "0.6.4"
   },
   "engines": {
     "node": ">=22"

@@ -666,6 +666,15 @@ flags:
     if (sub === 'status') {
       const up = await hmhWebUp(Number.isFinite(port) ? port : 7788);
       stdout.write(up ? t.webRunning(readWebPid() || 0, port) + '\n' : t.webNotRunning + '\n');
+      // stale-daemon warning: the daemon is a code snapshot from spawn time;
+      // after an upgrade it keeps serving old code until restarted
+      const { webDaemonStale } = await import('./web-daemon.ts');
+      const v = webDaemonStale();
+      if (up && v.stale) {
+        stdout.write(YELLOW(`⚠ daemon is running v${v.daemon} but CLI is v${v.cli} — stale code (new features missing). Run: hmh web stop && hmh web start\n`));
+      } else if (up && v.daemon) {
+        stdout.write(DIM(`daemon v${v.daemon}\n`));
+      }
       return;
     }
     if (sub === 'start') {

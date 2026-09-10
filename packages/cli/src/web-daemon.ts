@@ -3,9 +3,16 @@
  * Shared by `hmh web start|stop|status` and the TUI auto-link (hmh tui
  * brings the web UI up unless --no-web). One pid file + one log file under
  * HMH_HOME; the daemon runs detached with no window and survives terminals.
+ *
+ * VERSION-AWARE (this bit me twice): a daemon is a code snapshot frozen at
+ * spawn time. After `npm i -g @hmharness/cli@X` the running daemon still
+ * serves the OLD code — new features silently missing, and the user sees
+ * stale behavior forever. `ensureWebDaemon` now compares the daemon's
+ * recorded version against the running CLI and auto-restarts on mismatch.
  */
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
@@ -82,7 +89,8 @@ export function stopWebDaemon(): boolean {
   return killed;
 }
 
-/** Spawn the daemon (no window, detached). Returns the pid. */
+/** Spawn the daemon (no window, detached). Returns the pid. Records the
+ *  spawning CLI's version so a later upgrade can detect the stale snapshot. */
 function spawnWebDaemon(port: number, entry = process.argv[1]): number {
   const home = homeDir();
   const log = openSync(join(home, 'web.log'), 'a');
@@ -94,25 +102,61 @@ function spawnWebDaemon(port: number, entry = process.argv[1]): number {
   });
   child.unref();
   const pid = child.pid ?? 0;
-  if (pid > 0) writeFileSync(join(home, 'web.pid'), String(pid));
+  if (pid > 0) {
+    writeFileSync(join(home, 'web.pid'), String(pid));
+    try {
+      const v = createRequire(import.meta.url)('../package.json').version as string;
+      writeFileSync(join(home, 'web.version'), v);
+    } catch { /* best effort */ }
+  }
   return pid;
+}
+
+function daemonVersion(): string {
+  try { return readFileSync(join(homeDir(), 'web.version'), 'utf8').trim(); } catch { return ''; }
+}
+
+function cliVersion(): string {
+  try { return createRequire(import.meta.url)('../package.json').version as string; } catch { return ''; }
 }
 
 /**
  * Idempotent: if our web UI is already up (pid file alive, or the port
  * answers as hmh), keep it; otherwise spawn it and wait up to ~6s for
  * readiness. Returns true when the web UI is usable.
+ *
+ * Version check: a daemon spawned by an older CLI keeps serving old code
+ * (the user sees missing features for days). We compare the recorded daemon
+ * version with the current CLI and restart on mismatch.
  */
 export async function ensureWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1]): Promise<boolean> {
   const pid = readWebPid();
-  if (pid && alive(pid)) return true;
-  if (await hmhWebUp(port)) return true;
+  const daemonV = daemonVersion();
+  const myV = cliVersion();
+  const stale = daemonV !== '' && myV !== '' && daemonV !== myV;
+
+  if (!stale) {
+    if (pid && alive(pid)) return true;
+    if (await hmhWebUp(port)) return true;
+  } else {
+    // stale daemon: kill it (it may hold the pid OR just the port)
+    stopWebDaemon();
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
   spawnWebDaemon(port, entry);
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 500));
     if (await hmhWebUp(port)) return true;
   }
   return false;
+}
+
+/** Report whether the running daemon matches the current CLI version. */
+export function webDaemonStale(): { stale: boolean; daemon: string; cli: string } {
+  const d = daemonVersion();
+  const c = cliVersion();
+  return { stale: d !== '' && c !== '' && d !== c, daemon: d, cli: c };
 }
 
 export function startWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1]): { already: boolean; pid: number } {

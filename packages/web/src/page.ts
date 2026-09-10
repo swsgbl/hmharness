@@ -152,6 +152,7 @@ export const PAGE = `<!doctype html>
   .say pre { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.5; }
   .say b { color:#fff; }
   .msg-user { color:var(--text); background:var(--panel2); border-radius:12px; padding:8px 14px; margin:10px 0 6px auto; width:fit-content; max-width:74%; white-space:pre-wrap; }
+  .queued { color:var(--warn); font-size:12.5px; margin:4px 0 4px auto; width:fit-content; max-width:74%; opacity:.85; }
   .thinkbox { border:1px solid var(--line); border-left:3px solid var(--dim); border-radius:8px; margin:8px 0; background:var(--panel); }
   .thinkhead { width:100%; display:flex; gap:8px; align-items:center; background:none; border:0; color:var(--dim); padding:6px 10px; cursor:pointer; font-size:12.5px; }
   .thinkhead:hover { color:var(--text); }
@@ -404,7 +405,7 @@ export const PAGE = `<!doctype html>
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
-          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行',
+          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队',
           dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏',
           navChat:'对话', navBoard:'任务看板', navDev:'设备', navSk:'技能中心', ws:'工作区',
           viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
@@ -422,7 +423,7 @@ export const PAGE = `<!doctype html>
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
-          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running',
+          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued',
           dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear',
           navChat:'Chat', navBoard:'Task board', navDev:'Devices', navSk:'Skills', ws:'Workspace',
           viewChat:'Chat', viewBoard:'Task board', viewDev:'Devices', viewSk:'Skills',
@@ -602,11 +603,11 @@ export const PAGE = `<!doctype html>
       rs.classList.remove('yolo');
     }
     document.title = b ? '\\u25CF ' + L.running : L.title;
-    document.getElementById('send').disabled = b;
-    var input = document.getElementById('input');
-    input.disabled = b;
-    // visual cue that typing is parked while the agent runs (content kept)
-    input.style.opacity = b ? '.55' : '';
+    // The input stays ENABLED while the agent runs (user request): new tasks
+    // are accepted and queued server-side. The send button is also live —
+    // submitting during a run shows a "queued" notice instead of being dead.
+    // (Was: input.disabled = b — the input was parked during every run.)
+    window.__agentBusy = !!b;
   }
 
   function renderState(s) {
@@ -1158,7 +1159,12 @@ export const PAGE = `<!doctype html>
     var d = JSON.parse(e.data);
     setBusy(d.busy, d.mode);
     flushStream();
-    if (d.busy) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
+    // fromQueue: the task was already echoed when submitted - don't duplicate
+    if (d.busy && !d.fromQueue) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
+  });
+  es.addEventListener('queued', function (e) {
+    var d = JSON.parse(e.data);
+    el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \\u2014 ' + d.task);
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
@@ -1300,14 +1306,23 @@ export const PAGE = `<!doctype html>
   // ---- composer ----
   function sendTask(text) {
     if (!text) return;
+    // optimistic echo: show the task immediately whether it runs now or queues
+    clearEmpty();
+    switchView('chat');
+    if (!window.__agentBusy) el('div', 'msg-user', text);
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value })
-    }).then(function (r) {
-      if (r.status === 409) { clearEmpty(); switchView('chat'); el('div', 'err', L.alreadyRunning); }
-      return r.json();
-    }).catch(function (err) { clearEmpty(); el('div', 'err', String(err)); });
+    }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.d && res.d.queued) {
+          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' \\u2014 ' + text);
+        } else if (res.status === 409) {
+          el('div', 'err', L.alreadyRunning);
+        }
+      })
+      .catch(function (err) { el('div', 'err', String(err)); });
   }
   document.getElementById('send').onclick = function () {
     var input = document.getElementById('input');
