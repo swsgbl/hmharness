@@ -4,7 +4,7 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
-## [Unreleased]
+## [0.5.1] - 2026-09-10
 
 - **修复生态雷达"永远零新增"(domain-ops)**:根因是四个数据源已死(gitee releases
   停在 2020,github tags 停在 2024-01——OpenHarmony 已不用 releases/tags 发版)。
