@@ -235,6 +235,8 @@ export interface AgentTaskOptions {
   approvalAsk?: LoopApproval['ask'];
   resumeMessages?: ChatMessage[];
   events?: RunnerEvents;
+  /** AbortSignal: cancels the agent loop at the next turn boundary. */
+  signal?: AbortSignal;
 }
 
 /** Run one full agent task end-to-end; audit + insight recording included. */
@@ -317,6 +319,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     registry: opts.registry,
     messages,
     ctx,
+    signal: opts.signal,
     maxTurns: cfg.maxTurns,
     maxContextChars: cfg.maxContextChars,
     summarizeContext,

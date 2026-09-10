@@ -901,14 +901,29 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   // Task queue: new submissions during a running task are queued (not
   // rejected, not run concurrently — sequential execution preserves history
   // integrity). Slash commands still run immediately (they're quick).
+  // `!` prefix inserts at FRONT (urgent). Esc interrupts the running task.
   const taskQueue: string[] = [];
   let taskRunning = false;
+  let currentAbort: AbortController | null = null;
 
   rt.onSubmit(() => {
     const line = rt.consumeInput().trim();
     if (!line) return;
     if (line.startsWith('/')) {
       void handleLine(line);
+      return;
+    }
+    if (line.startsWith('!')) {
+      // urgent: strip the ! and insert at front of queue (or run immediately)
+      const urgent = line.slice(1).trim();
+      if (!urgent) return;
+      if (taskRunning) {
+        taskQueue.unshift(urgent);
+        rt.addText(`⚡ inserted at front: "${urgent.slice(0, 60)}${urgent.length > 60 ? '…' : ''}" (runs next)`, 'dim');
+        currentAbort?.abort(); // interrupt current to run the urgent task
+        return;
+      }
+      void executeTaskQueue(urgent);
       return;
     }
     if (taskRunning) {
@@ -933,6 +948,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   async function runSingleTask(line: string): Promise<void> {
     rt.addUser(line);
     rt.setBusy(true, t.running);
+    currentAbort = new AbortController();
     let appender: ((c: string) => void) | null = null;
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
     try {
@@ -942,6 +958,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         cfg,
         yes: autoApprove,
         resumeMessages: history,
+        signal: currentAbort.signal,
         approvalAsk: (name, args) => rt.requestApproval(name, args),
         events: {
           onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
@@ -973,6 +990,8 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     } catch (err) {
       rt.setBusy(false);
       rt.addText(String(err), 'err');
+    } finally {
+      currentAbort = null;
     }
   }
 
@@ -981,6 +1000,28 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       rt.destroy();
       for (const c of clients) c.close();
       process.exit(0);
+    }
+    if (line === '/queue' || line.startsWith('/queue ')) {
+      const sub = line.slice(7).trim();
+      if (sub === 'clear') {
+        const n = taskQueue.length;
+        taskQueue.length = 0;
+        rt.addText(n > 0 ? 'cleared ' + n + ' queued task(s)' : 'queue was already empty', 'dim');
+        return;
+      }
+      if (sub === 'skip' || sub === 'interrupt') {
+        if (!taskRunning) { rt.addText('no task is running', 'dim'); return; }
+        currentAbort?.abort();
+        rt.addText('interrupting current task (finishes in-flight tool calls)...', 'dim');
+        return;
+      }
+      // bare /queue: show status
+      const status = taskRunning ? 'running' : 'idle';
+      const queueList = taskQueue.length > 0
+        ? taskQueue.map((task, i) => '  ' + (i + 1) + '. ' + task.slice(0, 70)).join('\n')
+        : '  (empty)';
+      rt.addText('queue: ' + status + ' | ' + taskQueue.length + ' waiting\n' + queueList + '\n\ncommands: /queue clear, /queue skip, !<task> to insert at front', 'dim');
+      return;
     }
     if (line === '?' || line === '/help') {
       rt.addText(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n'), 'dim');

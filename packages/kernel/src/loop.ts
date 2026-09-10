@@ -43,6 +43,10 @@ export async function runLoop(opts: {
   messages: ChatMessage[];
   ctx: ToolContext;
   maxTurns?: number;
+  /** AbortSignal: when fired, the loop stops at the next turn boundary and
+   *  returns with reason "interrupted". Use for user-initiated cancellation
+   *  (Esc key, /queue skip, web API interrupt). */
+  signal?: AbortSignal;
   /** Explicit transcript budget override (chars). Default: scales with the
    *  model's context window (window.ts registry / provider.contextWindow). */
   maxContextChars?: number;
@@ -82,7 +86,7 @@ export async function runLoop(opts: {
   let wrapupSignaled = false;
   let turn = 0;
   let idleTurns = 0; // consecutive turns with no successful tool calls
-  let reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' = 'final';
+  let reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' | 'interrupted' = 'final';
 
   // The loop runs until the model gives a final answer (no tool calls), goes
   // idle (stuck), or hits a safety valve. Soft checkpoints at the adaptive
@@ -92,6 +96,7 @@ export async function runLoop(opts: {
     turn++;
     if (turn > hardTurnLimit) { reason = 'turn-valve'; break; }
     if (usage.promptTokens + usage.completionTokens > hardTokenLimit) { reason = 'token-valve'; break; }
+    if (opts.signal?.aborted) { reason = 'interrupted'; break; }
 
     const compacted = opts.summarizeContext
       ? await compactWithDigest(working, budget, opts.summarizeContext)
@@ -220,7 +225,9 @@ export async function runLoop(opts: {
 
   // Safety valve or idle detection fired
   const executedTurns = reason === 'idle' ? turn : turn - 1;
-  const text = reason === 'idle'
+  const text = reason === 'interrupted'
+    ? `Task interrupted by user at turn ${turn}. Partial results preserved — the transcript is resumable.`
+    : reason === 'idle'
     ? `Agent appears stuck: ${maxIdle} consecutive turns with no successful tool calls. The session is preserved — review the transcript, adjust the approach, and send a new message to continue.`
     : reason === 'turn-valve'
       ? `Turn limit reached (${executedTurns} turns). The session is preserved — send another message to continue.`
