@@ -4,6 +4,13 @@
 故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli。
 
+## [0.5.4] - 2026-09-11
+
+- **修复 25 轮自动停止的硬上限(kernel/loop.ts)**:maxTurns 从固定 25 改为
+  **随模型上下文窗口自适应**(25~80 轮)——131K 窗口 40 轮,Claude 200K 62 轮,
+  Gemini 1M 80 轮。上下文预算系统本身工作正常(用户的 950K token 会话在压缩
+  管理下持续运行),瓶颈是轮数上限而非上下文。turn 耗尽消息改为可操作指引。
+
 ## [0.5.3] - 2026-09-10
 
 - **evidence 页外推性声明**(scripts/export-evidence.cjs):黄色声明"当前数据全部

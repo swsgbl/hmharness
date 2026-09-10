@@ -67,3 +67,14 @@ export function contextBudgetChars(windowTokens: number | null): number {
 export function adaptiveContextChars(p: { model: string; contextWindow?: number }): number {
   return contextBudgetChars(contextWindowFor(p).windowTokens);
 }
+
+/** Adaptive turn limit: larger context windows sustain more turns before
+ *  quality degrades (the context budget system compacts throughout, so the
+ *  real ceiling is how many turns the model can reason over, not raw token
+ *  count). Floor 25 (small models), cap 80 (even 1M windows don't need more).
+ *  This fixes the "25 turns auto-stop" complaint — the context engineering
+ *  was working fine, the turn cap was the bottleneck. */
+export function adaptiveMaxTurns(p: { model: string; contextWindow?: number }): number {
+  const budget = contextBudgetChars(contextWindowFor(p).windowTokens);
+  return Math.max(25, Math.min(80, Math.floor(budget / 4000)));
+}

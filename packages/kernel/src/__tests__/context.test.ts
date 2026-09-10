@@ -63,6 +63,20 @@ test('adaptiveContextChars: provider -> budget in one call', () => {
   assert.equal(adaptiveContextChars({ model: 'mystery', contextWindow: 200_000 }), 250_000);
 });
 
+test('adaptiveMaxTurns: scales with window, floor 25, cap 80', async () => {
+  const { adaptiveMaxTurns } = await import('../window.ts');
+  // unknown model -> legacy budget 160K -> 40 turns
+  assert.equal(adaptiveMaxTurns({ model: 'mystery' }), 40);
+  // glm-class 131K window -> 163K budget -> 40 turns
+  assert.equal(adaptiveMaxTurns({ model: 'glm-5.3' }), 40);
+  // claude 200K -> 250K budget -> 62 turns
+  assert.equal(adaptiveMaxTurns({ model: 'claude-sonnet' }), 62);
+  // gemini 1M -> 1M budget (capped) -> 80 turns
+  assert.equal(adaptiveMaxTurns({ model: 'gemini-pro' }), 80);
+  // small window 8K -> 40K budget (floor) -> 25 turns minimum
+  assert.equal(adaptiveMaxTurns({ model: 'tiny', contextWindow: 8_000 }), 25);
+});
+
 /* -------- rolling digest -------- */
 
 test('compactWithDigest: evicted content becomes a persistent digest note; second pass MERGES it', async () => {

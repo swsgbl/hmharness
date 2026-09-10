@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/domain-harmony",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "hmharness HarmonyOS domain core: device, toolchain, build, and project lifecycle capabilities. HarmonyOS is the framework's native domain, not an add-on.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.5.3"
+    "@hmharness/kernel": "0.5.4"
   },
   "files": [
     "dist"

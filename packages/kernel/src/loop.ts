@@ -8,7 +8,7 @@
  * transcript is compacted against the context budget.
  */
 import { compactMessages, compactWithDigest, transcriptChars } from './context.ts';
-import { adaptiveContextChars } from './window.ts';
+import { adaptiveContextChars, adaptiveMaxTurns } from './window.ts';
 import type { ChatMessage, RegistryLike } from './loop-types.ts';
 import { chat, type DeltaKind } from './provider.ts';
 import type { ProviderConfig, ToolContext } from './types.ts';
@@ -57,7 +57,11 @@ export async function runLoop(opts: {
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
   const modelCall = opts.chatImpl ?? chat;
-  const maxTurns = opts.maxTurns ?? 25;
+  // Turn limit scales with the model's context window: 25 for small models,
+  // up to 80 for 1M-window models. The context compaction keeps the
+  // transcript within budget throughout, so the real ceiling is how many
+  // reasoning turns the model can sustain, not raw token count.
+  const maxTurns = opts.maxTurns ?? adaptiveMaxTurns(provider);
   const budget = opts.maxContextChars ?? adaptiveContextChars(provider);
   const working: ChatMessage[] = [...opts.messages];
   let toolUses = 0;
@@ -166,7 +170,7 @@ export async function runLoop(opts: {
       });
     }
   }
-  const text = `Turn budget exhausted (${maxTurns}). Last state preserved in the session log.`;
+  const text = `Turn limit reached (${maxTurns} turns). The session is preserved — continue with "hmh resume" or just send another message to pick up where this left off.`;
   events?.onFinal?.(text, maxTurns);
   return { text, turns: maxTurns, toolUses, messages: working, usage };
 }
