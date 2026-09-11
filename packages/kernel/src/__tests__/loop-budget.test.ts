@@ -61,7 +61,7 @@ test('auto-continue: model calling tools past the soft limit keeps going until i
     callCount++;
     if (callCount <= 50) {
       return {
-        message: { role: 'assistant' as const, content: null, tool_calls: [{ id: `c${callCount}`, function: { name: 'noop', arguments: '{}' } }] },
+        message: { role: 'assistant' as const, content: null, tool_calls: [{ id: `c${callCount}`, type: 'function' as const, function: { name: 'noop', arguments: '{}' } }] },
         usage: { prompt_tokens: 10, completion_tokens: 5 },
       };
     }
@@ -86,7 +86,7 @@ test('hard turn valve: safety cap stops even if the model keeps calling tools', 
   };
   const registry = { toOpenAITools: () => [], get: () => noop };
   const runaway = async () => ({
-    message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c', function: { name: 'noop', arguments: '{}' } }] },
+    message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c', type: 'function' as const, function: { name: 'noop', arguments: '{}' } }] },
     usage: { prompt_tokens: 10, completion_tokens: 5 },
   });
   const result = await runLoop({
@@ -108,7 +108,7 @@ test('idle detection: 15 consecutive all-fail turns stops the loop (stuck agent)
   };
   const registry = { toOpenAITools: () => [], get: () => brokenTool };
   const stuckModel = async () => ({
-    message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c', function: { name: 'broken', arguments: '{}' } }] },
+    message: { role: 'assistant' as const, content: null, tool_calls: [{ id: 'c', type: 'function' as const, function: { name: 'broken', arguments: '{}' } }] },
     usage: { prompt_tokens: 5, completion_tokens: 5 },
   });
   const result = await runLoop({

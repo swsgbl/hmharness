@@ -20,7 +20,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, type ProviderConfig, type Tool } from '@hmharness/kernel';
+import { chatVision, foundNothing, isVisionRefusal, type ProviderConfig, type Tool } from '@hmharness/kernel';
 
 const execCb = promisify(execFile);
 
@@ -39,6 +39,50 @@ export interface UiRegressionResult {
   saw: string | null;
   description: string;
   screenshot: string | null;
+  /** true when NO provider actually looked at the image (all blind/failed).
+   *  The verdict is then about the vision chain, NOT about the app: never
+   *  render it as a product FAIL - a tool that reports FAIL when its own
+   *  eyes are shut is worse than no tool. */
+  visionUnavailable?: boolean;
+  /** per-provider errors collected while walking the vision chain */
+  visionErrors?: string[];
+}
+
+/** Injectable vision call (tests substitute it; production uses chatVision). */
+export type VisionCall = (provider: ProviderConfig, prompt: string, imageDataUrl: string) => Promise<string>;
+
+/**
+ * Walk the vision chain until a provider truly LOOKS at the image. A reply
+ * that is a refusal ("I can't view the image" - what a text-only provider
+ * returns with HTTP 200) is treated as a provider failure and the next
+ * candidate is tried. Returns the first real description, or the collected
+ * errors when every provider was blind/dead.
+ */
+export async function describeWithChain(
+  chain: ProviderConfig[],
+  prompt: string,
+  imageDataUrl: string,
+  call: VisionCall = chatVision,
+): Promise<{ described: string | null; errors: string[] }> {
+  const errors: string[] = [];
+  for (const provider of chain) {
+    try {
+      const text = await call(provider, prompt, imageDataUrl);
+      if (isVisionRefusal(text)) {
+        errors.push(`${provider.model}: answered without seeing the image ("${text.trim().slice(0, 80)}")`);
+        continue;
+      }
+      return { described: text, errors };
+    } catch (err) {
+      errors.push(`${provider.model}: ${String(err).slice(0, 120)}`);
+    }
+  }
+  return { described: null, errors };
+}
+
+/** Keyword assertion on a genuine description (any hit wins). */
+export function assertKeywords(described: string, expect: string[]): string | null {
+  return expect.find((k) => described.toLowerCase().includes(k.toLowerCase())) ?? null;
 }
 
 /** Capture the device screen via hdc; returns the local file path. */
@@ -66,10 +110,14 @@ export async function captureDeviceScreen(hdc: string, target: string | undefine
 export async function runUiRegression(opts: {
   hdc: string;
   target?: string;
-  vision: ProviderConfig;
+  /** one provider, or the ordered chain (vision + visionFallbacks) */
+  vision: ProviderConfig | ProviderConfig[];
   cases: UiRegressionCase[];
   outDir: string;
+  /** test seam: substitute the multimodal call */
+  visionCall?: VisionCall;
 }): Promise<UiRegressionResult[]> {
+  const chain = Array.isArray(opts.vision) ? opts.vision : [opts.vision];
   const results: UiRegressionResult[] = [];
   for (const c of opts.cases) {
     const pre = opts.target ? ['-t', opts.target] : [];
@@ -89,20 +137,43 @@ export async function runUiRegression(opts: {
       results.push({ case: c.name, pass: false, saw: null, description: 'screenshot failed: ' + String(err).slice(0, 120), screenshot: null });
       continue;
     }
-    // vision describe
-    try {
-      const b64 = (await readFile(shot)).toString('base64');
-      const text = await chatVision(
-        opts.vision,
-        'Describe this device screen briefly. Then on the last line output exactly: FOUND: <the most prominent UI text you can read>.',
-        `data:image/jpeg;base64,${b64}`,
-      );
-      const described = text.trim();
-      const saw = c.expect.find((k) => described.toLowerCase().includes(k.toLowerCase())) ?? null;
-      results.push({ case: c.name, pass: Boolean(saw), saw, description: described.slice(0, 400), screenshot: shot });
-    } catch (err) {
-      results.push({ case: c.name, pass: false, saw: null, description: 'vision failed: ' + String(err).slice(0, 150), screenshot: shot });
+    // vision describe (through the chain; refusals do not count as seeing)
+    const b64 = (await readFile(shot)).toString('base64');
+    const { described, errors } = await describeWithChain(
+      chain,
+      'Describe this device screen briefly. Then on the last line output exactly: FOUND: <the most prominent UI text you can read>.',
+      `data:image/jpeg;base64,${b64}`,
+      opts.visionCall,
+    );
+    if (described === null) {
+      // EVERY provider failed to look: this says nothing about the app.
+      results.push({
+        case: c.name,
+        pass: false,
+        saw: null,
+        visionUnavailable: true,
+        visionErrors: errors,
+        description: `VISION PROVIDER FAILURE (no UI verdict): none of the ${chain.length} configured vision provider(s) could see the image - ${errors.join('; ')}`,
+        screenshot: shot,
+      });
+      continue;
     }
+    const text = described.trim();
+    const saw = assertKeywords(text, c.expect);
+    if (!saw && foundNothing(text)) {
+      // the model itself says it read no text: no evidence either way
+      results.push({
+        case: c.name,
+        pass: false,
+        saw: null,
+        visionUnavailable: true,
+        visionErrors: [...errors, `${chain[0].model}: reported no readable text on screen ("${text.slice(0, 120)}")`],
+        description: `NO VERDICT - the vision model reported no readable text on screen (blank screen, or a provider that cannot see): ${text.slice(0, 240)}`,
+        screenshot: shot,
+      });
+      continue;
+    }
+    results.push({ case: c.name, pass: Boolean(saw), saw, description: text.slice(0, 400), screenshot: shot, visionErrors: errors });
   }
   return results;
 }
@@ -126,16 +197,18 @@ export const harmonyUiRegression: Tool = {
     const bundle = String(args.bundle ?? '').trim();
     const expect = Array.isArray(args.expect) ? (args.expect as string[]).map(String).filter(Boolean) : [];
     if (!bundle || expect.length === 0) return { output: 'bundle and non-empty expect[] required', isError: true };
-    // vision provider from config (kernel routing)
-    const { loadConfig, resolveProvider } = await import('@hmharness/kernel');
+    // vision provider from config (kernel routing): the full chain, so a
+    // blind or dead provider is retried rather than graded as a UI verdict
+    const { loadConfig, visionProviderChain } = await import('@hmharness/kernel');
     const cfg = await loadConfig();
-    let vision: ProviderConfig;
+    let vision: ProviderConfig[];
     try {
-      vision = resolveProvider(cfg, 'vision');
-      if (!vision.apiKey) throw new Error('no key');
+      vision = visionProviderChain(cfg);
+      if (vision.length === 0 || !vision[0].apiKey) throw new Error('no key');
     } catch {
       return { output: 'No vision provider configured (vision block or providers+routing.vision) - harmony_ui_regression needs one.', isError: true };
     }
+    const chainNames = vision.map((p) => `${p.model}${p.supportsVision === false ? ' (marked text-only!)' : ''}`);
     // hdc
     const deveco = process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
     let hdc = 'hdc';
@@ -152,12 +225,31 @@ export const harmonyUiRegression: Tool = {
       outDir,
     });
     const r = results[0];
+    if (r.visionUnavailable) {
+      // The machine could not look at the screen. Report that loudly and do
+      // NOT dress it up as a product verdict.
+      return {
+        output: [
+          `UI regression: ${r.case}`,
+          `NO VERDICT - vision provider failure, not a UI result`,
+          `vision chain tried (${chainNames.join(' -> ')}):`,
+          ...(r.visionErrors ?? []).map((e) => `  - ${e}`),
+          ...(r.screenshot ? [`screenshot: ${r.screenshot}`] : []),
+          'Fix: point routing.vision at a model that accepts images, or mark the text-only one with "supportsVision": false so it is skipped.',
+          'Ground truth without vision: hdc shell uitest dumpLayout -p /data/local/tmp/layout.json (the view tree carries every node text).',
+        ].join('\n'),
+        isError: true,
+      };
+    }
     const lines = [
       `UI regression: ${r.case}`,
       r.saw ? `PASS - saw "${r.saw}" on screen` : `FAIL - none of [${expect.join(', ')}] visible`,
       ...(r.screenshot ? [`screenshot: ${r.screenshot}`] : []),
       `vision said: ${r.description}`,
     ];
+    if (r.visionErrors?.length) {
+      lines.push(`degraded chain (earlier provider(s) did not see the image): ${r.visionErrors.join('; ')}`);
+    }
     return { output: lines.join('\n'), isError: !r.pass };
   },
 };

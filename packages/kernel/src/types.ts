@@ -71,6 +71,14 @@ export interface ProviderConfig {
    *  built-in registry; the transcript budget then scales to the window
    *  (see window.ts) instead of the fixed legacy default. */
   contextWindow?: number;
+  /** Capability marker: can this model accept image input?
+   *  Set `false` on a text-only model that is (or might be) named by
+   *  `routing.vision`. resolveProvider('vision') then SKIPS it instead of
+   *  silently posting screenshots to a blind model - which answers HTTP 200
+   *  with "I can't view the image" and used to be graded as "the expected
+   *  UI text is not on screen" (a FALSE-NEGATIVE regression FAIL).
+   *  Omitted = unknown, and the provider is used as before. */
+  supportsVision?: boolean;
 }
 
 /** User-level configuration (HMH_HOME/config.json). */
@@ -114,13 +122,108 @@ export interface HmhConfig {
   };
 }
 
-/** Resolve a purpose to a concrete provider config (routing > legacy fields). */
+/** Resolve a purpose to a concrete provider config (routing > legacy fields).
+ *
+ * For 'vision' a provider explicitly marked `supportsVision: false` is NOT
+ * accepted: it is skipped so the dedicated `vision` block (or the chat
+ * default) wins instead. Rationale - `routing.vision` used to shadow the
+ * `vision` block unconditionally, so a text-only model there received every
+ * screenshot and replied "I can't view the image" with HTTP 200; the UI
+ * regression tool then reported a FAIL about the app instead of a provider
+ * failure (false negative, mis-attributed to the product). */
 export function resolveProvider(cfg: HmhConfig, purpose: 'chat' | 'vision' | 'evolve' | 'bench'): ProviderConfig {
-  const named = cfg.routing?.[purpose] ?? (purpose === 'vision' ? undefined : cfg.routing?.chat);
+  if (purpose === 'vision') {
+    const chain = visionProviderChain(cfg);
+    if (chain.length > 0) return chain[0];
+    return cfg.vision ?? cfg.provider;
+  }
+  const named = cfg.routing?.[purpose] ?? cfg.routing?.chat;
   if (named && cfg.providers?.[named]) return cfg.providers[named];
-  if (purpose === 'vision') return cfg.vision ?? cfg.provider;
   return cfg.provider;
 }
+
+/**
+ * Ordered vision candidates: routing.vision provider, the legacy `vision`
+ * block, then `visionFallbacks`; de-duplicated by endpoint+model and with
+ * providers marked `supportsVision: false` removed. If everything is marked
+ * blind the unfiltered list is returned, so callers still get today's
+ * (failing, but informative) behaviour instead of "no vision provider".
+ * A caller looping this chain turns a blind/dead provider into a retry
+ * rather than a wrong answer.
+ */
+export function visionProviderChain(cfg: HmhConfig): ProviderConfig[] {
+  const routed = cfg.routing?.vision ? cfg.providers?.[cfg.routing.vision] : undefined;
+  const all = [routed, cfg.vision, ...(cfg.visionFallbacks ?? []), cfg.provider].filter(
+    (p): p is ProviderConfig => Boolean(p && p.baseUrl),
+  );
+  const seen = new Set<string>();
+  const unique = all.filter((p) => {
+    const k = `${p.baseUrl}|${p.model}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const sighted = unique.filter((p) => p.supportsVision !== false);
+  return sighted.length > 0 ? sighted : unique;
+}
+
+/**
+ * Did the model answer "I can't see any image" instead of describing one?
+ * A blind (text-only) provider returns HTTP 200 with prose like this, so
+ * callers MUST NOT treat such a reply as evidence about the image - for UI
+ * regression that is the difference between a provider failure and a
+ * product FAIL. Checked on the head of the answer, where refusals live.
+ */
+export function isVisionRefusal(text: string): boolean {
+  const head = (text ?? '').trim().slice(0, 600);
+  if (!head) return false;
+  return VISION_REFUSAL_PATTERNS.some((re) => re.test(head));
+}
+
+/** Head-of-answer phrases that mean "I never looked at the image". Kept as
+ *  small separate patterns so each one is verifiable on its own. */
+export const VISION_REFUSAL_PATTERNS: RegExp[] = [
+  /i\s*(?:'|\u2019)?(?:m|am)\s*(?:not\s+able|unable)\s+to\s+(?:view|see|access|read|analy[sz]e)/i,
+  /i\s+can(?:'|\u2019)?t\s+(?:view|see|access|read|analy[sz]e)\s+(?:the|this|that|any|an)?\s*(?:\w+\s+)?(?:image|images|picture|photo|screenshot)/i,
+  /\bcannot\s+(?:view|see|access|read)\s+(?:the|this|that|any)?\s*(?:\w+\s+)?(?:image|images|picture|photo|screenshot)/i,
+  /unable\s+to\s+(?:view|see|process|access|analy[sz]e)\s+(?:the|this|any)?\s*(?:\w+\s+)?(?:image|images|picture|photo|screenshot)/i,
+  /no\s+image\s+(?:was\s+|is\s+)?(?:provided|attached|received|supplied|included)/i,
+  /i\s+don(?:'|\u2019)?t\s+see\s+(?:an|any)\s+image/i,
+  /i\s+(?:do\s+not|don(?:'|\u2019)?t)\s+have\s+(?:the\s+)?(?:ability|capability)\s+to\s+(?:view|see|process)\s+(?:image|images|the\s+image)/i,
+  /as\s+an?\s+(?:ai|artificial\s+intelligence|language\s+model|text[- ]only\s+model)[^.\n]{0,60}(?:can(?:'|\u2019)?t|cannot|unable|do\s+not)/i,
+  /\bi\s+can(?:'|\u2019)?t\s+\w+\s+(?:the|this)\s+(?:image|screenshot|picture|photo)/i,
+  /\u6211\s*(?:\u65e0\u6cd5|\u4e0d\u80fd|\u6ca1\u6cd5|\u770b\u4e0d\u5230)\s*(?:\u67e5\u770b|\u770b\u5230|\u8bc6\u522b|\u8bfb\u53d6|\u7406\u89e3|\u770b\u89c1)?[^\u3002\n]{0,12}(?:\u56fe\u7247|\u56fe\u50cf)/,
+  /(?:\u65e0\u6cd5|\u4e0d\u80fd)\s*(?:\u67e5\u770b|\u8bc6\u522b|\u8bfb\u53d6)\s*(?:\u56fe\u7247|\u56fe\u50cf)/,
+  /\u4f5c\u4e3a\s*(?:\u4e00\u4e2a)?\s*(?:AI|\u4eba\u5de5\u667a\u80fd|\u8bed\u8a00\u6a21\u578b|\u6587\u672c\u6a21\u578b)[^\u3002\n]{0,30}(?:\u65e0\u6cd5|\u4e0d\u80fd)/,
+  /(?:\u672a|\u6ca1\u6709)(?:\u6536\u5230|\u770b\u5230|\u68c0\u6d4b\u5230)\s*(?:\u4efb\u4f55)?\s*\u56fe\u7247/,
+  // observed live 2026-09-11 from the local text-only @quality endpoint:
+  // "The device screen cannot be described because the provided image is
+  //  unsupported or unavailable. FOUND: No readable UI text" - it parroted
+  // the required FOUND: line while admitting it never received the image.
+  /(?:image|screenshot|picture|photo)\s+(?:is\s+|was\s+|appears\s+)?(?:unsupported|unavailable|not\s+supported|invalid|unreadable|missing)/i,
+  /(?:unsupported|unavailable|invalid|unreadable)\s+(?:image|screenshot|picture|photo|image\s+format|attachment)/i,
+  /(?:cannot|can(?:'|\u2019)?t|unable\s+to)\s+be\s+described/i,
+  /(?:unable|not\s+able)\s+to\s+describe\s+(?:the|this|any)?\s*(?:image|screenshot|screen|picture|photo)/i,
+];
+
+/** The `FOUND: <text>` line the regression prompt demands, or null. */
+export function foundLineText(described: string): string | null {
+  const m = /found:\s*(.+)/i.exec(described ?? '');
+  return m ? m[1].trim().replace(/[.。]+$/, '') : null;
+}
+
+/**
+ * Did the model itself report reading NO text? Then there is no evidence
+ * about the app either way - the screen may be blank, or the provider may be
+ * blind. Either way this is "no verdict", NOT a product FAIL (confirm from
+ * the device view tree instead).
+ */
+export function foundNothing(described: string): boolean {
+  const fnd = foundLineText(described);
+  if (fnd === null) return false;
+  return /^(?:no|none|n\/?a|nil|nothing|null|-{1,3})[\s\S]{0,40}$/i.test(fnd) || /no\s+readable\s+(?:ui\s+)?text/i.test(fnd);
+}
+
 
 /** One row of `/model` listings: a named provider and what it currently serves. */
 export interface ProviderView {
@@ -136,7 +239,10 @@ export function listProviders(cfg: HmhConfig): ProviderView[] {
     const out: string[] = [];
     for (const p of ['chat', 'vision', 'evolve', 'bench'] as const) {
       const named = cfg.routing?.[p] ?? (p !== 'vision' ? cfg.routing?.chat : undefined);
-      if (named === n) out.push(p);
+      if (named !== n) continue;
+      // a provider marked text-only does not serve vision, whatever routing says
+      if (p === 'vision' && cfg.providers?.[n]?.supportsVision === false) continue;
+      out.push(p);
     }
     return out;
   };

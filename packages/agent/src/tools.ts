@@ -8,7 +8,7 @@ import { exec } from 'node:child_process';
 import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, homeDir, loadConfig, resolveProvider, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
+import { chatVision, homeDir, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 
 const execCb = promisify(exec);
 
@@ -621,17 +621,27 @@ export const seeImageTool: Tool = {
     const mime = /\.(jpg|jpeg)$/i.test(p) ? 'image/jpeg' : /\.webp$/i.test(p) ? 'image/webp' : 'image/png';
     const url = `data:${mime};base64,${data.toString('base64')}`;
     const question = String(args.question ?? 'Describe this image precisely and concisely.');
-    const chain: ProviderConfig[] = [resolveProvider(cfg, 'vision'), ...(cfg.visionFallbacks ?? [])].filter((x) => x.baseUrl);
+    // chain: routing.vision provider -> `vision` block -> visionFallbacks,
+    // with text-only providers (supportsVision: false) filtered out
+    const chain: ProviderConfig[] = visionProviderChain(cfg);
     const errors: string[] = [];
     for (const provider of chain) {
       try {
         const answer = await chatVision(provider, question, url);
+        // a blind provider answers HTTP 200 with a refusal - not an answer
+        if (isVisionRefusal(answer)) {
+          errors.push(`${provider.model}: cannot see images (replied "${answer.trim().slice(0, 60)}")`);
+          continue;
+        }
         return { output: `[${p}]\n${answer}` };
       } catch (err) {
-        errors.push(`${(provider as { model?: string }).model ?? '?'}: ${String(err).slice(0, 120)}`);
+        errors.push(`${provider.model}: ${String(err).slice(0, 120)}`);
       }
     }
-    return { output: `all vision providers failed:\n${errors.join('\n')}`, isError: true };
+    return {
+      output: `no vision provider could see the image (${chain.length} tried):\n${errors.join('\n')}`,
+      isError: true,
+    };
   },
 };
 
