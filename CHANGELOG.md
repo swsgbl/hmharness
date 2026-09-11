@@ -1,8 +1,45 @@
 # 更新日志(CHANGELOG)
 
 发布范围:npm org [@hmharness](https://www.npmjs.com/org/hmharness)(`@hmh` scope 已被他人占用,
-故以 @hmharness 发布——与仓库名一致)。七包有序依赖:kernel → evolution → domain-harmony
-→ domain-ops → agent → web → cli。
+故以 @hmharness 发布——与仓库名一致)。八包有序依赖:kernel → evolution → domain-harmony
+→ domain-ops → agent → web → cli → codexhost-bridge(用户的开源适配器,独立发版节奏)。
+
+## [0.6.7] - 2026-09-11
+
+外部审核(全部指控经可执行复现核实)+ 全网方案调研(Codex 三层沙箱模型、
+CVE 已登记的 allowlist 绕过手法、DGM/AlphaEvolve 安全共识、MDN Retry-After
+规范)后的安全与诚实修复批次:
+
+- **死代码工具注册(审核 Critical #1)**:web_search/web_fetch/browser_open/
+  desktop_screenshot/click/type/ssh_run 定义了但从未进 baseTools——README
+  宣称的"网络原生+桌面自动化"运行时不存在。全部注册,宣称成真。
+- **edit_file 审批分级(审核 Critical #2,采 Codex workspace-write 模型)**:
+  工作区内免审批;**HMH_HOME 永远审批**(config.json 能改写审批策略本身,
+  无门=一枪拆掉整个审批体系);工作区外审批;无 ctx 时失败关闭。kernel
+  的 needsApproval 签名加可选 ctx 参数。
+- **代码级自进化默认关闭(审核 Critical #3,采 DGM 论文"unsafe by default"
+  共识)**:`evolution.autoPatch=true` 显式开启才运行补丁循环;**拒绝在脏
+  工作树上运行**(旧版 git stash 吞掉用户未提交工作且从不 pop);revert
+  路径不再 `reset --hard`(main 上的硬重置正是毁工作的操作);修
+  harmony_devices→devices.ts 幽灵映射(该文件不存在,工具从未被提议)。
+- **SSH 门禁重写(kernel 新增 shellgate,双端共用)**:裸探测快速通道=
+  白名单动词+纯参数+**零 shell 元字符**;`find -delete`/`echo $(touch)`/
+  `>&`/`date -s` 等已登记绕过类(GHSA-cv3g-hj65-pcfh 等)全部阻断;修
+  TUI ssh_run 正则空分支死代码(`|>||` 匹配一切→所有探测都弹卡)。
+- **Retry-After 规范解析(MDN)**:只认 delta-seconds/HTTP-date 两种合法
+  格式,clamp ≤120s;**不再读 x-ratelimit-reset**(野外是 epoch 时间戳,
+  旧解析得 1.7e12ms 溢出 setTimeout→立即重试风暴)。
+- **token 阀 usage 兜底**:不报 usage 的网关上 50M 阀原先恒计 0(失控循环
+  无停点)——现按 chars/4 本地估算计入。
+- **matchesRule 全段 `..` 阻断**:边界检查漏掉
+  `node scripts/sub/../../evil.js`(首个差异段不是 ..)。
+- **诚实三修**:证据页 bench 用例计数 `.task`(原先 .txt/.json 恒显示 0,
+  违反导出器自己的"不静默零填充"规则);SELFFEED 预算键双拼写兼容
+  (cyclesPerDay 文档键原先完全不生效)且 token 上限真正执行(按日累计
+  estTokens 门);publish-preflight 挂 typecheck+单测(原先只查构建新鲜
+  度,"能编译"≠"能发布")。
+- 测试:shellgate 14 条载荷(全部审核绕过手法)、edit_file 分级 5 断言、
+  matchesRule 嵌套穿越、Retry-After 解析。
 
 ## [0.6.6] - 2026-09-11
 

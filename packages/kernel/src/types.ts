@@ -37,7 +37,7 @@ export interface Tool {
    * false means read-only / safe. Remote (MCP) tools default to needing
    * approval unless their server is marked trusted.
    */
-  needsApproval?(args: Record<string, unknown>): boolean;
+  needsApproval?(args: Record<string, unknown>, ctx?: ToolContext): boolean;
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>;
 }
 
@@ -105,8 +105,18 @@ export interface HmhConfig {
    *  error self-notes (every task, zero cost), Tier 2 = one model-call
    *  lesson per erroring task (instant reflection), Tier 3 = this - full
    *  cycle with bench gate. Guards unchanged: double-gate, holdout, poison
-   *  screen, writes only under skills/ and memory/. */
+   *  screen; writes skills/ + memory/ + evolution logs, and repo code only
+   *  when evolution.autoPatch is explicitly enabled. */
   autoEvolveEvery?: number;
+  /** Evolution-cycle options. autoPatch (default FALSE) opts into code-level
+   *  self-evolution (the DGM-style sandboxed patch loop). Off by default:
+   *  self-modifying systems are unsafe by default (the DGM paper's own
+   *  framing) - with it off, evolution writes only skills/ + memory/ + its
+   *  own logs, never repo code. */
+  evolution?: {
+    /** Enable the code-patch (self-modification) step. Default false. */
+    autoPatch?: boolean;
+  };
   /** Named vendor endpoints for multi-provider routing. */
   providers?: Record<string, ProviderConfig>;
   /** Per-purpose provider names resolved against `providers`. */

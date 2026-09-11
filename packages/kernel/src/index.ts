@@ -1,4 +1,5 @@
 export * from './types.ts';
+export * from './shellgate.ts';
 export * from './registry.ts';
 export * from './provider.ts';
 export * from './window.ts';

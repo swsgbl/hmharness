@@ -15,7 +15,7 @@
  */
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chat, type ProviderConfig } from '@hmharness/kernel';
+import { chat, loadConfig, type ProviderConfig } from '@hmharness/kernel';
 import { listCases, matchCase, seedCases, type BenchCase } from './bench.ts';
 import { deleteDraft, listCanary, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';
@@ -66,6 +66,9 @@ export interface EvolveReport {
   decayed?: string[];
   /** budget state at cycle start (observability) */
   budget?: { cyclesToday: number; maxCyclesPerDay?: number };
+  /** chars/4 estimate of this cycle's meta-call traffic; feeds the daily
+   *  token budget gate (readBudget sums today's entries) */
+  estTokens?: number;
 }
 
 /** Runs one bench case with the given skills block injected. */
@@ -113,13 +116,23 @@ export async function runEvolution(opts: {
   };
 
   // P0 evolution budget gate (AZR "safety alarms" + cost control): a day's
-  // cycle count and a per-cycle token ceiling live in config; overspending
-  // skips the cycle instead of burning money unattended.
+  // cycle count and a token ceiling live in config; overspending skips the
+  // cycle instead of burning money unattended. The token gate compares the
+  // summed estTokens of today's logged cycles against maxCyclesPerDay *
+  // maxTokensPerCycle (the old code read maxTokensPerCycle but never checked
+  // anything but cycles - the documented budget was decorative).
   const budget = await readBudget(home);
   const today = new Date().toISOString().slice(0, 10);
   if (budget.maxCyclesPerDay && budget.cyclesToday >= budget.maxCyclesPerDay) {
     report.outcomes.push({ name: '(budget)', action: 'error', reason: `daily cycle limit reached (${budget.cyclesToday}/${budget.maxCyclesPerDay} today) - skipped` });
     return report;
+  }
+  if (budget.maxCyclesPerDay && budget.maxTokensPerCycle) {
+    const dailyCap = budget.maxCyclesPerDay * budget.maxTokensPerCycle;
+    if ((budget.tokensToday ?? 0) >= dailyCap) {
+      report.outcomes.push({ name: '(budget)', action: 'error', reason: `daily token limit reached (~${budget.tokensToday}/${dailyCap} est-tokens today) - skipped` });
+      return report;
+    }
   }
 
   // 1. Seed bench cases on a fresh home so the gate always has a signal.
@@ -354,6 +367,17 @@ export async function runEvolution(opts: {
   // 6. CODE-LEVEL evolution: propose + sandbox-bench + merge/revert patches.
   // This is the DGM bridge - the agent can now modify its own tool code,
   // gated by the same bench discipline as skill promotion.
+  // OFF BY DEFAULT (DGM's own paper calls self-modifying systems "unsafe by
+  // default"; AlphaEvolve evolves external programs in isolation, never the
+  // live repo). Opt in with evolution.autoPatch=true in config.json - and
+  // even then it only ever touches the repo the evolution runs in, with
+  // human-reviewed sandbox benches before any merge.
+  const cfg = await loadConfig();
+  if (cfg.evolution?.autoPatch !== true) {
+    if (insights.length > 0 || notes.length > 0) {
+      say('  code-evolution: off (set evolution.autoPatch=true in config.json to enable)');
+    }
+  } else {
   try {
     const { proposePatches, runPatchSandbox } = await import('./patches.ts');
     const repoRoot = process.cwd();
@@ -376,6 +400,7 @@ export async function runEvolution(opts: {
     }
   } catch (err) {
     say(`  code-evolution skipped: ${String(err).slice(0, 120)}`);
+  }
   }
 
   // 7. Append-only memory distillation.
@@ -412,7 +437,14 @@ export async function runEvolution(opts: {
     say(`  impact/decay skipped: ${String(err).slice(0, 100)}`);
   }
 
-  // 7. Durable evolution log.
+  // 7. Durable evolution log. estTokens feeds the daily token budget gate:
+  // a chars/4 estimate of this cycle's meta-call traffic (proposals + bench
+  // outputs + distilled notes) - coarse on purpose, the gate only needs an
+  // order of magnitude to stop unattended spend.
+  const estTokensSpent = (proposals ?? []).reduce((n, p) => n + estTokens(p.skill_md ?? '') + estTokens(p.description ?? ''), 0)
+    + (report.memoryDistilled ? estTokens(report.memoryDistilled) : 0)
+    + (report.patchOutcomes ?? []).length * 4_000;
+  report.estTokens = estTokensSpent;
   const logDir = join(home, 'evolution');
   await mkdir(logDir, { recursive: true });
   await appendFile(join(logDir, 'log.jsonl'), JSON.stringify(report) + '\n', 'utf8');

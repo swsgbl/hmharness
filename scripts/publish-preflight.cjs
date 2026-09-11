@@ -5,6 +5,8 @@
  * codexhost-bridge. This
  * script verifies everything npm pack/publish would complain about,
  * WITHOUT publishing anything:
+ *   0. unit tests + typecheck pass (a compiling-but-broken build used to be
+ *      publishable: freshness != correctness)
  *   1. every package builds (dist/ newer than every src file, or bin/ for source-only packages)
  *   2. the main/bin entry exists, bin shebang present where declared
  *   3. workspace deps referenced by shipped packages are declared in
@@ -12,6 +14,7 @@
  *   4. npm pack --dry-run succeeds per package (tarball contents sane)
  *   5. no secrets under any dist/ (the repo-publication red line)
  * Exit code 0 = safe to run the real `npm publish -w <pkg>` sequence.
+ * (--skip-tests skips step 0 for offline republishing of an unchanged tree.)
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -23,6 +26,19 @@ const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const packages = requested.length ? requested : ORDER;
 let failures = 0;
 const fail = (msg) => { console.error('  FAIL ' + msg); failures++; };
+
+// 0. tests + typecheck once, before any per-package checks
+if (!process.argv.includes('--skip-tests')) {
+  console.log('== unit tests + typecheck');
+  for (const cmd of ['npm run typecheck', 'npm test']) {
+    try {
+      execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000 });
+      console.log('  ' + cmd + ': ok');
+    } catch (e) {
+      fail(cmd + ' failed - refusing to publish a broken build:\n' + String(e.stdout || e.stderr || '').slice(-800));
+    }
+  }
+}
 
 for (const name of packages) {
   if (!ORDER.includes(name)) {

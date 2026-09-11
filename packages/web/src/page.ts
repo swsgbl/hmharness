@@ -1391,6 +1391,7 @@ export const PAGE = `<!doctype html>
   // running and the box is empty. No slash commands, no separate stop
   // control - one affordance, state decides.
   function updateSendBtn() {
+    if (!L) return; // first frame before /api/state resolves - keep the static label
     var btn = document.getElementById('send');
     var hasText = !!document.getElementById('input').value.trim();
     var running = !!window.__agentBusy;

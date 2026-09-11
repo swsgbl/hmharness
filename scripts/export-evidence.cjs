@@ -47,7 +47,10 @@ const pareto = readJsonl(path.join(HOME, 'evolution', 'pareto', 'entries.jsonl')
 const insights = readJsonl(path.join(HOME, 'insights', 'insights.jsonl'));
 const memoryMd = readText(path.join(HOME, 'memory', 'memory.md'));
 let benchCases = null;
-try { benchCases = fs.readdirSync(path.join(HOME, 'bench', 'cases')).filter((f) => f.endsWith('.txt') || f.endsWith('.json')).length; } catch { /* absent */ }
+// bench.ts writes .task files - counting .txt/.json here zero-filled the
+// evidence page (3 real cases displayed as 0), violating the exporter's own
+// honesty rule. Count every case file and surface the directory name.
+try { benchCases = fs.readdirSync(path.join(HOME, 'bench', 'cases')).filter((f) => /\.(task|txt|json)$/.test(f)).length; } catch { /* absent */ }
 
 const cyclesByDay = {};
 const outcomes = [];      // {time, name, action, reason} - the honesty table

@@ -56,5 +56,8 @@ test('approved-rules: structured matching blocks path traversal (review security
   const rules = [{ tool: 'run_command', argPrefix: '{"command":"node scripts/"}', time: 'now' }];
   assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/publish.cjs' }), true, 'path-safe extension passes');
   assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/../../evil.js' }), false, 'path traversal blocked');
+  assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/sub/../../evil.js' }), false, 'NESTED traversal blocked (first differing segment is not ..)');
+  assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/a/b/../../../evil.js' }), false, 'deep traversal blocked');
+  assert.equal(matchesRule(rules, 'run_command', { command: 'node scripts/a\\b\\..\\..\\evil.js' }), false, 'windows-separator traversal blocked');
   assert.equal(matchesRule(rules, 'write_file', { command: 'node scripts/x' }), false, 'different tool blocked');
 });

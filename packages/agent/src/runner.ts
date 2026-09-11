@@ -180,8 +180,9 @@ function saveApprovedRules(home: string, rules: ApprovedRule[]): void {
 }
 /** Structured rule matching (review fix: raw string prefix was exploitable -
  *  `node scripts/` prefix was hit by `node scripts/../../evil.js`). Now:
- *  parses the rule as structured args, string values match by prefix BUT the
- *  extension is checked for path traversal (`..` at the boundary blocks). */
+ *  parses the rule as structured args, string values match by prefix AND no
+ *  path SEGMENT of the extension may be `..` (a boundary-only check missed
+ *  `node scripts/sub/../../evil.js`, whose first differing segment is `sub`). */
 export function matchesRule(rules: ApprovedRule[], toolName: string, args: Record<string, unknown>): boolean {
   return rules.some((r) => {
     if (r.tool !== toolName) return false;
@@ -191,9 +192,7 @@ export function matchesRule(rules: ApprovedRule[], toolName: string, args: Recor
         const av = args[k];
         if (typeof rv === 'string' && typeof av === 'string') {
           if (!av.startsWith(rv)) return false;
-          // path traversal: the extension after the approved prefix must not
-          // start with `..` (blocks `node scripts/` → `node scripts/../../x`)
-          if (av.slice(rv.length).startsWith('..')) return false;
+          if (av.slice(rv.length).split(/[\\/]+/).includes('..')) return false;
         } else if (rv !== av) {
           return false;
         }

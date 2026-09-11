@@ -15,6 +15,21 @@ export interface ChatResponse {
 
 export type DeltaKind = 'text' | 'reasoning';
 
+/** Parse a Retry-After header into a delay in ms (MDN: exactly two legal
+ *  forms - delta-seconds or HTTP-date), clamped to [0, 120s]. Returns 0 when
+ *  absent/illegal (caller falls back to exponential backoff). Deliberately
+ *  does NOT read x-ratelimit-reset: that header is an epoch timestamp in the
+ *  wild, which naive Number() parsing turned into a ~1.7e12 ms setTimeout
+ *  that overflowed and fired immediately - a retry storm. */
+export function parseRetryAfterMs(raw: string | null | undefined, maxMs = 120_000): number {
+  if (!raw) return 0;
+  const v = raw.trim();
+  if (/^\d{1,10}$/.test(v)) return Math.min(maxMs, Number(v) * 1000);
+  const at = Date.parse(v);
+  if (!Number.isNaN(at)) return Math.min(maxMs, Math.max(0, at - Date.now()));
+  return 0;
+}
+
 export interface ChatOptions {
   timeoutMs?: number;
   /** Streaming callback; presence switches the request to stream:true. */
@@ -61,9 +76,10 @@ export async function chat(
         signal: ctrl.signal,
       });
       if (res.status === 429) {
-        // honour server-provided retry delay; fall back to exponential backoff
-        const retryAfter = Number(res.headers.get('retry-after')) || Number(res.headers.get('x-ratelimit-reset')) || 0;
-        const delay = retryAfter > 0 ? retryAfter * 1000 : Math.min(30_000, 2000 * Math.pow(2, attempt));
+        // Retry-After per RFC/MDN has two legal forms: delta-seconds ("120")
+        // or HTTP-date ("Wed, 21 Oct 2015 07:28:00 GMT"). See
+        // parseRetryAfterMs for why x-ratelimit-reset is deliberately ignored.
+        const delay = parseRetryAfterMs(res.headers.get('retry-after')) || Math.min(30_000, 2000 * Math.pow(2, attempt));
         lastError = `HTTP 429 (rate limited): ${(await res.text()).slice(0, 200)}`;
         await sleep(delay + Math.random() * 1000); // jitter
         continue;

@@ -126,6 +126,18 @@ export async function runLoop(opts: {
     });
     usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
     usage.completionTokens += chatRes.usage?.completion_tokens ?? 0;
+    // Usage fallback: many OpenAI-compatible gateways never report usage
+    // (even with stream_options.include_usage), which used to leave the token
+    // valve counting zero - a runaway loop had NO stop. Estimate from the
+    // wire text instead (chars/4 heuristic): coarse, but the valve only needs
+    // an order of magnitude to trip at 50M.
+    if (!chatRes.usage || (!chatRes.usage.prompt_tokens && !chatRes.usage.completion_tokens)) {
+      const promptChars = compacted.reduce((n, m) => n + (m.content?.length ?? 0), 0);
+      const replyChars = (chatRes.message.content?.length ?? 0)
+        + (chatRes.message.tool_calls ?? []).reduce((n, c) => n + c.function.arguments.length, 0);
+      usage.promptTokens += Math.ceil(promptChars / 4);
+      usage.completionTokens += Math.ceil(replyChars / 4);
+    }
     const { message } = chatRes;
     events?.onAssistant?.(message);
 
@@ -171,7 +183,7 @@ export async function runLoop(opts: {
         p.output = `unparseable tool arguments for ${name}: ${call.function.arguments.slice(0, 200)}`;
         p.isError = true;
         p.skip = true;
-      } else if (tool.needsApproval?.(args)) {
+      } else if (tool.needsApproval?.(args, ctx)) {
         // Safe default: with no gate wired in, risky tools are denied.
         const granted = opts.approval ? await opts.approval.ask(name, args) : false;
         events?.onApproval?.(name, args, granted);

@@ -10,7 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readdir, readFile, rename, mkdir, writeFile, stat, open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
+import { homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
@@ -588,12 +588,14 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         if (!h) { json(res, 404, { error: 'unknown host', configured: Object.keys(hosts) }); return; }
         const command = String(body.command ?? '').trim();
         if (!command) { json(res, 400, { error: 'command required' }); return; }
-        // read-only probes: allow && / ; -chained probes when every segment
-        // starts with a probe verb and none writes
-        const segments = command.split(/&&|\|\||;|(?<!\|)\|/).map((x) => x.trim()).filter(Boolean);
-        const allProbes = segments.length > 0 && segments.every((seg) => /^(ls|cat|head|tail|df|du|free|uptime|whoami|hostname|uname|systemctl (status|list-units)|ps|grep|find|wc|date|echo|id)\b/.test(seg));
-        const writes = /rm\b|mv\b|dd\b|mkfs|reboot|shutdown|kill|systemctl (start|stop|restart)|apt|yum|tee\b|>>|>(?!\s*&)/i;
-        if (!allProbes || writes.test(command)) {
+        // Fast path = a BARE read-only probe (shared kernel shellgate): one
+        // allowlisted verb, plain arguments, zero shell metacharacters. The
+        // old per-segment verb allowlist + writes-regex was bypassable -
+        // `find -delete`, `echo $(touch /x)`, `echo hi >& /etc/file` and
+        // `date -s` all passed without approval (same bypass classes as
+        // GHSA-cv3g-hj65-pcfh / cli-mcp-server 0.2.5). Now: not a bare probe
+        // → approval, no exceptions.
+        if (!isBareProbe(command)) {
           if (body.approve !== true) { json(res, 403, { error: 'approval required', needsApproval: true }); return; }
         }
         try {

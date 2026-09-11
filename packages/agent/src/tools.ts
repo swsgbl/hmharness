@@ -8,7 +8,7 @@ import { exec } from 'node:child_process';
 import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { chatVision, homeDir, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
+import { chatVision, homeDir, isBareProbe, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 
 const execCb = promisify(exec);
 
@@ -78,10 +78,13 @@ export const writeFileTool: Tool = {
 };
 
 /** Surgical search-replace tool (adopted from Codex's apply_patch philosophy).
- *  Safer than write_file for targeted edits: only changes the declared fragment,
- *  refuses to run when old_string is not unique (prevents silent wrong-location
- *  edits), and does NOT need approval - the blast radius is bounded to the
- *  declared substring. The model must read the file first to know what to replace. */
+ *  Safer than write_file for targeted edits: only changes the declared fragment
+ *  and refuses to run when old_string is not unique. Approval follows the
+ *  Codex workspace-write tier model: inside the working directory an edit is
+ *  the agent's normal job (no card per edit); anything that resolves into
+ *  HMH_HOME is ALWAYS gated - config.json/workspaces.json/approved-rules.json
+ *  live there, and an ungated edit to them could rewrite approval policy
+ *  itself (e.g. approval:'auto', trusted MCP) and disarm every other gate. */
 export const editFileTool: Tool = {
   name: 'edit_file',
   description: 'Surgical search-replace edit. Provide old_string (must appear exactly once in the file) and new_string to replace it. Prefer this over write_file for changes to existing files. old_string must be unique - if it appears more than once, the edit is refused (make it more specific).',
@@ -89,10 +92,21 @@ export const editFileTool: Tool = {
     type: 'object',
     properties: {
       path: { type: 'string', description: 'file path' },
-      old_string: { type: 'string', description: 'the exact string to find and replace (must appear exactly once in the file)' },
+      old_string: { type: 'string', description: 'the exact string to find and replace (must appear exactly once)' },
       new_string: { type: 'string', description: 'the replacement string' },
     },
     required: ['path', 'old_string', 'new_string'],
+  },
+  needsApproval(args, ctx) {
+    if (!ctx) return true; // no context to bound the blast radius - gate it
+    const p = safePath(String(args.path ?? ''), ctx.cwd).replace(/\\/g, '/').toLowerCase();
+    const under = (base: string) => {
+      const b = base.replace(/\\/g, '/').toLowerCase();
+      return p === b || p.startsWith(b + '/');
+    };
+    if (under(ctx.home)) return true; // the agent's own state: always a card
+    if (under(ctx.cwd)) return false; // workspace-write: silent within cwd
+    return true; // outside the workspace: a card
   },
   async execute(args, ctx) {
     try {
@@ -528,11 +542,12 @@ export const sshRunTool: Tool = {
     required: ['host', 'command'],
   },
   needsApproval(args) {
-    const cmd = String(args.command ?? '');
-    // read-only probe allowlist - no destructive verbs, no pipes into writes
-    const probe = /^(ls|cat|head|tail|df|du|free|uptime|whoami|hostname|uname|systemctl (status|list-units)|ps|grep|find|wc|date|echo|id|ip |ifconfig|nmap --version)/.test(cmd);
-    const writes = /rm|mv|dd|mkfs|reboot|shutdown|kill|pkill|systemctl (start|stop|restart|enable|disable)|apt|yum|docker (rm|rmi|prune)|truncate|>||/i;
-    return !(probe && !writes);
+    // shared fast path (kernel shellgate): a BARE read-only probe runs without
+    // the card; everything else - substitution, redirects, find -exec,
+    // date -s, unknown verbs - asks. The old local regex ended in an empty
+    // alternation (`|>||`) which matched the empty string, so EVERY command
+    // tripped the card and the documented probe fast path was dead code.
+    return !isBareProbe(String(args.command ?? ''));
   },
   async execute(args) {
     const cfg = await loadConfig();
@@ -645,4 +660,7 @@ export const seeImageTool: Tool = {
   },
 };
 
-export const baseTools: Tool[] = [readFileTool, editFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool];
+export const baseTools: Tool[] = [
+  readFileTool, editFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool,
+  webSearchTool, webFetchTool, browserOpenTool, desktopScreenshotTool, desktopClickTool, desktopTypeTool, sshRunTool,
+];

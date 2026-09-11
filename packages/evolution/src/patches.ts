@@ -99,11 +99,13 @@ export async function applyPatch(repoRoot: string, patch: CodePatch): Promise<st
   return 'applied';
 }
 
-/** Create a sandbox git branch for testing a patch. */
+/** Create a sandbox git branch for testing a patch.
+ *  Precondition: the working tree is CLEAN (runPatchSandbox enforces this).
+ *  The old version stashed uncommitted user work here and never popped it -
+ *  a failed cycle silently swallowed the user's changes into a stash. Now a
+ *  dirty tree refuses the cycle outright instead of hiding the work. */
 export async function createSandbox(repoRoot: string, name: string): Promise<string> {
   const branch = `evolve/${name}-${Date.now().toString(36)}`;
-  // stash any stray working-tree changes first so the branch starts clean
-  await git( ['stash', '--include-untracked'], { cwd: repoRoot, timeout: 10_000 }).catch(() => undefined);
   await git( ['checkout', '-b', branch], { cwd: repoRoot, timeout: 10_000 });
   return branch;
 }
@@ -150,11 +152,13 @@ export async function sandboxBench(
   return cases.length > 0 ? pass / cases.length : -1;
 }
 
-/** Revert: go back to main, delete the sandbox branch (zero residue). */
+/** Revert: go back to main, delete the sandbox branch (zero residue).
+ *  No `reset --hard` anymore: the tree is guaranteed clean at entry (clean-
+ *  tree precondition) and the patch is committed on the sandbox branch, so
+ *  there is nothing to hard-reset - and a hard reset on main is exactly the
+ *  operation that can destroy a user's uncommitted work. */
 export async function revertSandbox(repoRoot: string, branch: string): Promise<void> {
   await git( ['checkout', 'main'], { cwd: repoRoot, timeout: 10_000 });
-  // discard any uncommitted changes on the sandbox branch
-  await git( ['reset', '--hard', 'HEAD'], { cwd: repoRoot, timeout: 5000 });
   await git( ['branch', '-D', branch], { cwd: repoRoot, timeout: 5000 });
 }
 
@@ -172,6 +176,16 @@ export async function runPatchSandbox(opts: {
 }): Promise<PatchOutcome> {
   const say = opts.log ?? (() => undefined);
   const { patch } = opts;
+  // clean-tree precondition: a dirty working tree means a human is mid-work
+  // in this repo - refuse rather than stash/reset around their changes
+  try {
+    const { stdout } = await git(['status', '--porcelain'], { cwd: opts.repoRoot, timeout: 10_000 });
+    if (stdout.trim()) {
+      return { name: patch.name, action: 'error', reason: 'working tree not clean - refusing to run a patch cycle in a repo with uncommitted changes (commit or stash them first)', branch: '' };
+    }
+  } catch (err) {
+    return { name: patch.name, action: 'error', reason: `git status failed: ${String(err).slice(0, 120)}`, branch: '' };
+  }
   say(`  code-patch "${patch.name}": creating sandbox branch`);
   let branch = '';
   try {
@@ -224,7 +238,7 @@ export async function proposePatches(
     web_search: 'packages/agent/src/tools.ts',
     web_fetch: 'packages/agent/src/tools.ts',
     harmony_build: 'packages/domain-harmony/src/index.ts',
-    harmony_devices: 'packages/domain-harmony/src/devices.ts',
+    harmony_devices: 'packages/domain-harmony/src/index.ts',
     // add more as insights reveal hot paths
   };
   const toolsUsed = (signals.toolUsage ?? {}) as Record<string, number>;

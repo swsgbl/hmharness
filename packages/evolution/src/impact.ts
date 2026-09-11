@@ -27,22 +27,35 @@ import type { Insight } from './insights.ts';
 export interface EvolutionBudget {
   maxCyclesPerDay?: number;
   maxTokensPerCycle?: number;
+  /** summed estTokens of today's logged cycles (filled by readBudget) */
+  tokensToday?: number;
 }
 
-/** How many evolve cycles already ran today (counts the log.jsonl). */
+/** How many evolve cycles already ran today (counts the log.jsonl).
+ *  Accepts BOTH key spellings: the code's maxCyclesPerDay/maxTokensPerCycle
+ *  and the documented-in-SELFFEED.md cyclesPerDay/tokensPerCycle - the docs
+ *  shipped with the short names, so users who configured by the book were
+ *  silently unlimited. */
 export async function readBudget(home: string): Promise<EvolutionBudget & { cyclesToday: number }> {
   const budget: EvolutionBudget & { cyclesToday: number } = { cyclesToday: 0 };
   try {
-    const cfg = JSON.parse(await readFile(join(home, 'config.json'), 'utf8')) as { evolutionBudget?: EvolutionBudget };
-    budget.maxCyclesPerDay = cfg.evolutionBudget?.maxCyclesPerDay;
-    budget.maxTokensPerCycle = cfg.evolutionBudget?.maxTokensPerCycle;
+    const cfg = JSON.parse(await readFile(join(home, 'config.json'), 'utf8')) as {
+      evolutionBudget?: EvolutionBudget & { cyclesPerDay?: number; tokensPerCycle?: number };
+    };
+    budget.maxCyclesPerDay = cfg.evolutionBudget?.maxCyclesPerDay ?? cfg.evolutionBudget?.cyclesPerDay;
+    budget.maxTokensPerCycle = cfg.evolutionBudget?.maxTokensPerCycle ?? cfg.evolutionBudget?.tokensPerCycle;
   } catch { /* no config / no budget - unlimited */ }
   const today = new Date().toISOString().slice(0, 10);
   try {
     const text = await readFile(join(home, 'evolution', 'log.jsonl'), 'utf8');
-    budget.cyclesToday = text.trim().split('\n')
-      .filter((l) => { try { return (JSON.parse(l) as { time: string }).time.startsWith(today); } catch { return false; } })
-      .length;
+    const todays = text.trim().split('\n')
+      .filter((l) => { try { return (JSON.parse(l) as { time: string }).time.startsWith(today); } catch { return false; } });
+    budget.cyclesToday = todays.length;
+    // token budget uses each cycle's logged estTokens (chars/4 estimate; the
+    // precise per-call usage is not threaded through the meta-call helpers)
+    budget.tokensToday = todays.reduce((n, l) => {
+      try { return n + ((JSON.parse(l) as { estTokens?: number }).estTokens ?? 0); } catch { return n; }
+    }, 0);
   } catch { /* no log yet */ }
   return budget;
 }
