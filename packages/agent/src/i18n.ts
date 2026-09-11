@@ -54,6 +54,8 @@ export interface Strings {
   tuiDeny: string;
   tuiApprovalHint: string;
   tuiHints: string;
+  /** idle-box hints while a task runs (TUI): stop affordance + queue depth */
+  tuiBusyHints: (queued: number) => string;
   /** live label while the model thinks (TUI) */
   thinking: string;
   /** final label after thinking folds away (TUI) */
@@ -159,6 +161,7 @@ const zh: Strings = {
   tuiDeny: '拒绝',
   tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
   tuiHints: 'enter 发送 · 滚轮/↑↓ 翻页 · ^P/^N 历史 · esc 清空 · 拖选复制 · ^C 退出 · /help',
+  tuiBusyHints: (queued) => `运行中 · 空行回车=停止 · 新输入=排队(${queued}) · esc 清空 · /help`,
   thinking: '思考中',
   thought: '已完成思考',
   tuiRunning: '运行中…',
@@ -254,6 +257,7 @@ const en: Strings = {
   tuiDeny: 'Deny',
   tuiApprovalHint: 'enter/y approve · esc/n deny',
   tuiHints: 'enter send · wheel/arrows scroll · ^P/^N history · esc clear · drag to copy · ^C quit · /help',
+  tuiBusyHints: (queued) => `running · Enter on empty line = stop · typing queues (${queued}) · esc clear · /help`,
   thinking: 'thinking',
   thought: 'thought (done)',
   tuiRunning: 'running…',

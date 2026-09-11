@@ -239,7 +239,19 @@ export const PAGE = `<!doctype html>
   #tools-row { display:flex; align-items:center; gap:8px; }
   select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:4px 8px; font-size:12px; outline:none; cursor:pointer; }
   #tokchip { color:var(--dim); font-family:var(--mono); font-size:11.5px; }
-  #send { margin-left:auto; }
+  #send { margin-left:auto; min-width:72px; transition:background .12s ease; }
+  #send.stop { background:var(--err); color:#fff; }
+
+  /* ---- queue bar (visible queue between runstatus and input card) ---- */
+  #queuebar { display:none; flex-direction:column; gap:4px; margin:0 2px 8px; }
+  #queuebar.on { display:flex; }
+  .qrow { display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:4px 8px 4px 10px; font-size:12.5px; color:var(--dim); }
+  .qrow .qn { color:var(--accent); font-family:var(--mono); font-size:11px; flex-shrink:0; }
+  .qrow .qt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qrow button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 2px; border-radius:4px; flex-shrink:0; }
+  .qrow button:hover { color:var(--err); background:var(--bg); }
+  #qclear { background:none; border:0; color:var(--dim); cursor:pointer; font-size:11.5px; padding:0 4px; width:fit-content; align-self:flex-end; border-radius:4px; }
+  #qclear:hover { color:var(--err); background:var(--panel2); }
 
   /* ---- details column ---- */
   #details { width:0; overflow:hidden; border-left:1px solid var(--line); background:var(--panel); transition:width .15s ease; display:flex; flex-direction:column; }
@@ -290,6 +302,7 @@ export const PAGE = `<!doctype html>
       <button id="tobot" class="ghost sm">↓</button>
       <div id="composer">
         <div id="runstatus"><span id="rs-spin">✻</span><span id="rs-text"></span></div>
+        <div id="queuebar"></div>
         <div id="approval">
           <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
           <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
@@ -408,7 +421,7 @@ export const PAGE = `<!doctype html>
   var lastAssistantText = '';
 
   var LABELS = {
-    zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', approve:'批准', deny:'拒绝',
+    zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
@@ -426,7 +439,7 @@ export const PAGE = `<!doctype html>
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
-    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', approve:'Approve', deny:'Deny',
+    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
@@ -449,7 +462,7 @@ export const PAGE = `<!doctype html>
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
     document.title = L.title;
-    document.getElementById('send').textContent = L.send;
+    updateSendBtn();
     document.getElementById('ap-yes').textContent = L.approve;
     document.getElementById('ap-no').textContent = L.deny;
     document.getElementById('approval-req-label').textContent = L.approvalReq;
@@ -615,11 +628,16 @@ export const PAGE = `<!doctype html>
     // submitting during a run shows a "queued" notice instead of being dead.
     // (Was: input.disabled = b — the input was parked during every run.)
     window.__agentBusy = !!b;
+    updateSendBtn();
   }
 
   function renderState(s) {
     state = s;
     setLabels(s.locale || 'zh');
+    renderQueue(s.queue || []);
+    // mid-run page reload: no 'busy' SSE event will fire until the task ends,
+    // so the composer state (stop button, runstatus) must come from state too
+    if (typeof s.busy === 'boolean' && s.busy !== !!window.__agentBusy) setBusy(s.busy);
     document.getElementById('model').textContent = s.model;
     document.getElementById('model2').textContent = s.model;
     renderModelPick(s);
@@ -1227,6 +1245,9 @@ export const PAGE = `<!doctype html>
     var d = JSON.parse(e.data);
     el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \\u2014 ' + d.task);
   });
+  es.addEventListener('queue', function (e) {
+    renderQueue(JSON.parse(e.data).items || []);
+  });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
     if (curKind !== d.kind) {
@@ -1365,6 +1386,30 @@ export const PAGE = `<!doctype html>
   };
 
   // ---- composer ----
+  // Codex-style single button: it is a SEND button when there is text to
+  // send (idle: runs now; busy: queues) and a STOP button when the agent is
+  // running and the box is empty. No slash commands, no separate stop
+  // control - one affordance, state decides.
+  function updateSendBtn() {
+    var btn = document.getElementById('send');
+    var hasText = !!document.getElementById('input').value.trim();
+    var running = !!window.__agentBusy;
+    if (running && !hasText) {
+      btn.textContent = '\\u23F9 ' + L.stop;
+      btn.classList.add('stop');
+      btn.title = L.stopTitle;
+    } else {
+      btn.textContent = hasText ? L.sendNow : L.send;
+      btn.classList.remove('stop');
+      btn.title = running ? L.queueTitle : '';
+    }
+  }
+  function interrupt() {
+    fetch('/api/interrupt', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.error) el('div', 'err', d.error); })
+      .catch(function (err) { el('div', 'err', String(err)); });
+  }
   function sendTask(text) {
     if (!text) return;
     // optimistic echo: show the task immediately whether it runs now or queues
@@ -1388,9 +1433,13 @@ export const PAGE = `<!doctype html>
   document.getElementById('send').onclick = function () {
     var input = document.getElementById('input');
     var text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    sendTask(text);
+    if (text) {
+      input.value = '';
+      updateSendBtn();
+      sendTask(text);
+      return;
+    }
+    if (window.__agentBusy) interrupt();
   };
   document.getElementById('input').onkeydown = function (e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -1398,6 +1447,33 @@ export const PAGE = `<!doctype html>
       document.getElementById('send').click();
     }
   };
+  document.getElementById('input').oninput = updateSendBtn;
+
+  // ---- queue bar ----
+  function renderQueue(items) {
+    var bar = document.getElementById('queuebar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    var list = items || [];
+    bar.classList.toggle('on', list.length > 0);
+    if (!list.length) return;
+    list.forEach(function (t, i) {
+      var row = document.createElement('div');
+      row.className = 'qrow';
+      var n = document.createElement('span'); n.className = 'qn'; n.textContent = '#' + (i + 1);
+      var tx = document.createElement('span'); tx.className = 'qt'; tx.textContent = t; tx.title = t;
+      var x = document.createElement('button'); x.type = 'button'; x.title = L.queueRemove; x.textContent = '\\u00D7';
+      x.onclick = function () {
+        fetch('/api/queue?i=' + i, { method: 'DELETE' }).catch(function () {});
+      };
+      row.appendChild(n); row.appendChild(tx); row.appendChild(x);
+      bar.appendChild(row);
+    });
+    var clear = document.createElement('button');
+    clear.id = 'qclear'; clear.type = 'button'; clear.textContent = L.queueClear;
+    clear.onclick = function () { fetch('/api/queue', { method: 'DELETE' }).catch(function () {}); };
+    bar.appendChild(clear);
+  }
 
   // ---- sidebar actions ----
   function newSession() {

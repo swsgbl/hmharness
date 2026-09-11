@@ -47,8 +47,11 @@ export async function startServer(opts: { port: number; host?: string }): Promis
 
   let busy = false;
   // Task queue: submissions while busy are queued and auto-started when the
-  // current task finishes (replaces the old 409 rejection)
+  // current task finishes (replaces the old 409 rejection). Codex-style: the
+  // send button doubles as the stop button, so the queue itself needs no
+  // commands - it is visible in the UI and interruptible per item.
   const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean }> = [];
+  let currentAbort: AbortController | null = null;
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
   // cross-task conversation memory (Claude-Code-style continuous thread):
@@ -100,6 +103,73 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   const broadcast = (event: string, data: unknown) => {
     for (const r of sseClients) sseSend(r, event, data);
   };
+  const broadcastQueue = () => broadcast('queue', { items: taskQueue.map((t) => t.text) });
+
+  // Single execution path for queued and direct tasks alike. The old shape
+  // duplicated the whole runner inside the finally-block to drain the queue -
+  // a degraded copy (missing onLine/onApproval, mismatched event names) that
+  // drifted every time the direct path changed. One runOne + one pump.
+  const runOne = async (item: { text: string; mode: string; yes: boolean; fresh: boolean }, fromQueue = false): Promise<void> => {
+    busy = true;
+    currentAbort = new AbortController();
+    broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue });
+    const unattended = item.yes || cfg.approval === 'auto';
+    try {
+      const resume = item.fresh ? [] : conversation;
+      const result = await runAgentTask({
+        task: item.text,
+        registry: reg,
+        cfg,
+        yes: item.yes,
+        resumeMessages: resume,
+        signal: currentAbort.signal,
+        // auto/yolo tasks must not wire the remote approval prompt at all -
+        // the remote gate used to override the yes flag unconditionally,
+        // which is why "auto" still popped approvals (the audited bug)
+        approvalAsk: unattended ? undefined : (name, args) =>
+          new Promise<boolean>((resolve) => {
+            const timer = setTimeout(() => {
+              if (pendingApproval?.resolve === resolve) pendingApproval = null;
+              broadcast('approvalDone', { name, granted: false, timeout: true });
+              resolve(false);
+            }, APPROVAL_TIMEOUT_MS);
+            pendingApproval = { name, args, resolve, timer };
+            broadcast('approvalReq', { name, args });
+          }),
+        events: {
+          onLine: (l) => broadcast('line', { text: l }),
+          onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
+          onToolCall: (name, args) => broadcast('tool', { name, args }),
+          onToolResult: (name, output, isError) =>
+            broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
+          onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
+          onFinal: (r) => {
+            // extend the cross-task thread: [..prior, user, ...new turns]
+            conversation = [...resume, { role: 'user', content: item.text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
+            broadcast('final', { ...r, turnsInThread: Math.floor(conversation.length / 2) });
+          },
+        },
+      });
+      // the result itself already fanned out via onFinal; nothing to return
+      void result;
+    } catch (err) {
+      broadcast('error', { message: String(err).slice(0, 400) });
+    } finally {
+      currentAbort = null;
+      pendingApproval = null;
+      busy = false;
+      broadcast('busy', { busy: false });
+      broadcast('state', await stateObject());
+    }
+  };
+  const pump = async (): Promise<void> => {
+    while (!busy && taskQueue.length > 0) {
+      const next = taskQueue.shift();
+      if (!next) break;
+      broadcastQueue();
+      await runOne(next, true);
+    }
+  };
 
   const stateObject = async () => {
     const [active, drafts, insights] = await Promise.all([listSkills(home), listDrafts(home), readInsights(home, 8)]);
@@ -117,6 +187,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       locale: cfg.locale ?? 'zh',
       busy,
       approvalPending: pendingApproval !== null,
+      queue: taskQueue.map((t) => t.text),
       workspace: currentWs() ?? null,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
       sshHosts: Object.entries(cfg.sshHosts ?? {}).map(([name, h]) => ({ name, host: h.host, user: h.user, port: h.port ?? 22 })),
@@ -449,108 +520,62 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           return;
         }
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
+        const item = { text, mode, yes: body.yes === true, fresh: body.fresh === true };
         // Queue instead of reject: tasks submitted while busy are accepted
         // and auto-started when the current one finishes (user request:
         // "input always available, new tasks queue during execution")
         if (busy) {
-          taskQueue.push({ text, mode, yes: body.yes === true, fresh: body.fresh === true });
+          taskQueue.push(item);
           broadcast('queued', { position: taskQueue.length, task: text });
+          broadcastQueue();
           json(res, 200, { ok: true, queued: true, position: taskQueue.length });
           return;
         }
-        busy = true;
-        broadcast('busy', { busy: true, task: text, mode });
         json(res, 200, { ok: true });
-        // auto/yolo tasks must not wire the remote approval prompt at all -
-        // the remote gate used to override the yes flag unconditionally,
-        // which is why "auto" still popped approvals (the audited bug)
-        const unattended = body.yes === true || cfg.approval === 'auto';
         // Runs detached; every event fans out to all SSE clients.
         void (async () => {
-          try {
-            const resume = body.fresh === true ? [] : conversation;
-            const result = await runAgentTask({
-              task: text,
-              registry: reg,
-              cfg,
-              yes: body.yes === true,
-              resumeMessages: resume,
-              approvalAsk: unattended ? undefined : (name, args) =>
-                new Promise<boolean>((resolve) => {
-                  const timer = setTimeout(() => {
-                    if (pendingApproval?.resolve === resolve) pendingApproval = null;
-                    broadcast('approvalDone', { name, granted: false, timeout: true });
-                    resolve(false);
-                  }, APPROVAL_TIMEOUT_MS);
-                  pendingApproval = { name, args, resolve, timer };
-                  broadcast('approvalReq', { name, args });
-                }),
-              events: {
-                onLine: (l) => broadcast('line', { text: l }),
-                onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
-                onToolCall: (name, args) => broadcast('tool', { name, args }),
-                onToolResult: (name, output, isError) =>
-                  broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
-                onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
-                onFinal: (r) => {
-                  // extend the cross-task thread: [..prior, user, ...new turns]
-                  conversation = [...resume, { role: 'user', content: text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
-                  broadcast('final', { ...r, turnsInThread: Math.floor(conversation.length / 2) });
-                },
-              },
-            });
-          } catch (err) {
-            broadcast('error', { message: String(err).slice(0, 400) });
-          } finally {
-            busy = false;
-            pendingApproval = null;
-            broadcast('busy', { busy: false });
-            broadcast('state', await stateObject());
-            // Auto-start the next queued task if any (queue mode)
-            const next = taskQueue.shift();
-            if (next) {
-              busy = true;
-              broadcast('busy', { busy: true, task: next.text, mode: next.mode, fromQueue: true });
-              void (async () => {
-                try {
-                  const resume = next.fresh ? [] : conversation;
-                  const result = await runAgentTask({
-                    task: next.text,
-                    registry: reg,
-                    cfg,
-                    yes: next.yes,
-                    resumeMessages: resume,
-                    approvalAsk: (next.yes || cfg.approval === 'auto') ? undefined : (name, args) =>
-                      new Promise<boolean>((resolve) => {
-                        const timer = setTimeout(() => {
-                          if (pendingApproval?.resolve === resolve) pendingApproval = null;
-                          broadcast('approvalDone', { name, granted: false, timeout: true });
-                          resolve(false);
-                        }, APPROVAL_TIMEOUT_MS);
-                        pendingApproval = { name, args, resolve, timer };
-                        broadcast('approvalReq', { name, args });
-                      }),
-                    events: {
-                      onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
-                      onToolCall: (name, args) => broadcast('toolCall', { name, args }),
-                      onToolResult: (name, output, isError) => broadcast('toolResult', { name, output: output.slice(0, 2000), isError }),
-                      onFinal: (r: { text: string; turns: number }) => broadcast('final', { text: r.text, turns: r.turns }),
-                    },
-                  });
-                  conversation = [...resume, { role: 'user', content: next.text }, ...result.messages.slice(resume.length + 2)];
-                  broadcast('final', { ...result, turnsInThread: Math.floor(conversation.length / 2) });
-                } catch (err) {
-                  broadcast('error', { message: String(err).slice(0, 400) });
-                } finally {
-                  busy = false;
-                  broadcast('busy', { busy: false });
-                  broadcast('state', await stateObject());
-                }
-              })();
-            }
-          }
+          await runOne(item);
+          await pump();
         })();
         return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/interrupt') {
+        // Codex-style stop: the send button doubles as a stop button while a
+        // task runs. Interrupts the CURRENT task only; queued items still run
+        // (clear them via DELETE /api/queue or per-item removal first).
+        if (!busy || !currentAbort) {
+          json(res, 200, { ok: false, busy });
+          return;
+        }
+        currentAbort.abort();
+        json(res, 200, { ok: true });
+        return;
+      }
+      if (url.pathname === '/api/queue') {
+        if (req.method === 'GET') {
+          json(res, 200, { items: taskQueue.map((t) => t.text), busy });
+          return;
+        }
+        if (req.method === 'DELETE') {
+          // no index: clear all; ?i=N: remove one queued item (UI's per-row ✕)
+          const idxRaw = url.searchParams.get('i');
+          if (idxRaw === null) {
+            const n = taskQueue.length;
+            taskQueue.length = 0;
+            broadcastQueue();
+            json(res, 200, { ok: true, cleared: n });
+            return;
+          }
+          const i = Number(idxRaw);
+          if (!Number.isInteger(i) || i < 0 || i >= taskQueue.length) {
+            json(res, 404, { error: 'no such queued item' });
+            return;
+          }
+          taskQueue.splice(i, 1);
+          broadcastQueue();
+          json(res, 200, { ok: true });
+          return;
+        }
       }
       if (req.method === 'POST' && url.pathname === '/api/ssh') {
         // proxy a remote command: the browser never sees keys or the ssh

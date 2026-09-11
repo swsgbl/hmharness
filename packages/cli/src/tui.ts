@@ -157,6 +157,9 @@ export class TuiRuntime {
   private approval: { name: string; args: unknown } | null = null;
   private approvalResolve: ((v: boolean) => void) | null = null;
   private running = true;
+  /** queued task count: the busy hints line shows it live (queue at a glance,
+   *  no /queue query needed) */
+  private queued = 0;
   private renderTimer?: NodeJS.Timeout;
   private exitResolve: (() => void) | null = null;
   private driver: (() => void) | null = null;
@@ -431,6 +434,11 @@ export class TuiRuntime {
 
   setStatus(s: string): void {
     this.status = s;
+    this.dirty = true;
+  }
+
+  setQueued(n: number): void {
+    this.queued = Math.max(0, n);
     this.dirty = true;
   }
 
@@ -826,9 +834,11 @@ export class TuiRuntime {
     }
     frame.push(DIM('└' + '─'.repeat(iw + 2) + '┘'));
 
-    const hints = this.scrollFromBottom > 0
-      ? `${DIM(this.t.tuiScrolled)}`
-      : `${DIM(this.t.tuiHints)}`;
+    const hints = this.busy
+      ? `${DIM(this.t.tuiBusyHints(this.queued))}`
+      : this.scrollFromBottom > 0
+        ? `${DIM(this.t.tuiScrolled)}`
+        : `${DIM(this.t.tuiHints)}`;
     const stat = this.status && !this.busy ? DIM(this.status) : '';
     frame.push(truncateTo(hints + ' '.repeat(Math.max(1, W - strWidth(stripAnsi(hints)) - strWidth(stat))) + stat, W - 1));
 
@@ -901,33 +911,32 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   // Task queue: new submissions during a running task are queued (not
   // rejected, not run concurrently — sequential execution preserves history
   // integrity). Slash commands still run immediately (they're quick).
-  // `!` prefix inserts at FRONT (urgent). Esc interrupts the running task.
+  // Codex-style interaction: ONE key does both jobs — Enter sends when there
+  // is text and STOPS the running task when the line is empty (the TUI
+  // equivalent of the send button that becomes a stop button). No `!` prefix,
+  // no /queue skip: the queue is visible in the busy hints line.
   const taskQueue: string[] = [];
   let taskRunning = false;
   let currentAbort: AbortController | null = null;
 
   rt.onSubmit(() => {
     const line = rt.consumeInput().trim();
-    if (!line) return;
+    if (!line) {
+      // empty Enter while running = stop (interrupts the current task;
+      // queued tasks still run — clear them first with /queue clear if not)
+      if (taskRunning) {
+        currentAbort?.abort();
+        rt.addText('⏹ interrupting current task (in-flight tool calls finish first; queued tasks still run)', 'dim');
+      }
+      return;
+    }
     if (line.startsWith('/')) {
       void handleLine(line);
       return;
     }
-    if (line.startsWith('!')) {
-      // urgent: strip the ! and insert at front of queue (or run immediately)
-      const urgent = line.slice(1).trim();
-      if (!urgent) return;
-      if (taskRunning) {
-        taskQueue.unshift(urgent);
-        rt.addText(`⚡ inserted at front: "${urgent.slice(0, 60)}${urgent.length > 60 ? '…' : ''}" (runs next)`, 'dim');
-        currentAbort?.abort(); // interrupt current to run the urgent task
-        return;
-      }
-      void executeTaskQueue(urgent);
-      return;
-    }
     if (taskRunning) {
       taskQueue.push(line);
+      rt.setQueued(taskQueue.length);
       rt.addText(`📋 queued: "${line.slice(0, 60)}${line.length > 60 ? '…' : ''}" (${taskQueue.length} waiting)`, 'dim');
       return;
     }
@@ -940,6 +949,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     while (task) {
       await runSingleTask(task);
       task = taskQueue.shift();
+      rt.setQueued(taskQueue.length);
       if (task) rt.addText(`▶ next queued: "${task.slice(0, 60)}${task.length > 60 ? '…' : ''}"`, 'dim');
     }
     taskRunning = false;
@@ -1006,21 +1016,17 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       if (sub === 'clear') {
         const n = taskQueue.length;
         taskQueue.length = 0;
+        rt.setQueued(0);
         rt.addText(n > 0 ? 'cleared ' + n + ' queued task(s)' : 'queue was already empty', 'dim');
         return;
       }
-      if (sub === 'skip' || sub === 'interrupt') {
-        if (!taskRunning) { rt.addText('no task is running', 'dim'); return; }
-        currentAbort?.abort();
-        rt.addText('interrupting current task (finishes in-flight tool calls)...', 'dim');
-        return;
-      }
-      // bare /queue: show status
+      // bare /queue: show status. Operations are key-based, not command-based:
+      // empty Enter stops the current task, typed input queues, this only inspects.
       const status = taskRunning ? 'running' : 'idle';
       const queueList = taskQueue.length > 0
         ? taskQueue.map((task, i) => '  ' + (i + 1) + '. ' + task.slice(0, 70)).join('\n')
         : '  (empty)';
-      rt.addText('queue: ' + status + ' | ' + taskQueue.length + ' waiting\n' + queueList + '\n\ncommands: /queue clear, /queue skip, !<task> to insert at front', 'dim');
+      rt.addText('queue: ' + status + ' | ' + taskQueue.length + ' waiting\n' + queueList + '\n\nempty Enter = stop current · typed Enter = queue · /queue clear = drop all', 'dim');
       return;
     }
     if (line === '?' || line === '/help') {
