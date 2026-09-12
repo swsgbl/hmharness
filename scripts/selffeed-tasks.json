@@ -12,7 +12,12 @@
     "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
     "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
     "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
-    "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
+    {
+      "task": "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "incremental steady-state 1.366s; CompileArkTS/PackageHap UP-TO-DATE (hap hash unchanged); ~1.2s fixed hvigor session cost; 4 tasks re-run due to missing declared outputs (SignHap expected without signing config)"
+    },
     "Run harmony_project_profile on the workspace app and audit the inventory numbers against the actual directory tree by hand-counting one module.",
     "Spawn two sub-agents with different roles (explorer vs implementer) on the same scaffold task and record their ok-rates for the role leaderboard.",
     "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
