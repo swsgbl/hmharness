@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@hmharness/kernel": "0.8.0",
-    "@hmharness/observability": "0.8.0"
+    "@hmharness/observability": "0.7.0"
   },
   "files": [
     "dist"

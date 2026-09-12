@@ -685,6 +685,29 @@ flags:
     }
     return;
   }
+
+  if (cmd === 'eval') {
+    // V2 M2: the Evaluator surface - hard evidence outranks LLM judgment.
+    await initHome();
+    const { allEvaluators } = await import('@hmharness/evaluation');
+    const { listCases } = await import('@hmharness/evolution');
+    const cases = await listCases(homeDir());
+    stdout.write('evaluators:\n' + allEvaluators.map((e) => '  ' + e.id.padEnd(16) + DIM('rank ' + e.evidenceKind) + '  ' + e.description.slice(0, 70)).join('\n') + '\n');
+    stdout.write('bench cases: ' + cases.length + ' (train ' + cases.filter((c) => !c.holdout).length + ' / holdout ' + cases.filter((c) => c.holdout).length + ')\n');
+    return;
+  }
+  if (cmd === 'capability') {
+    // V2 M4: capability manifests - declared risk/permissions per tool.
+    await initHome();
+    const { capabilityReport, authorize, buildRegistry } = await import('@hmharness/agent');
+    const { reg } = await buildRegistry({ announce: false });
+    const mode = rest.includes('--lockdown') ? 'lockdown' : 'standard';
+    for (const m of capabilityReport(reg)) {
+      const d = authorize(m, mode);
+      stdout.write('  ' + (d.allow ? GREEN('allow') : RED('DENY ')) + '  ' + m.risk.padEnd(8) + m.id.padEnd(22) + DIM(m.permissions.join(',')) + '\n');
+    }
+    return;
+  }
   if (cmd === 'tui') {
     await initHome();
     // tui(yes, noWeb): inside the TTY check the TUI auto-links the web UI

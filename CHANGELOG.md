@@ -1,3 +1,29 @@
+## [0.8.0] - 2026-09-12
+
+**V2 蓝图 P0 第二批(M2+M3+M4+M6)**——Evaluation/Sandbox/Capability/HarmonyBench:
+
+- **新包 @hmharness/evaluation(M2)**:Evaluator 契约+证据阶梯(build=1…llmJudge=7,
+  self-report=8);三评测器(text-assertion 五模式/command-exit execFile 硬证据/
+  llm-judge **分数硬顶 0.7**——裁判单独通过永远不算满分);evaluateRun 从
+  **轨迹记录**(outcome/工具完成率/错误观测)判定并把 judge.completed 回写
+  进可审计记录;runBenchCase 让进化门与评测共享同一断言核心。
+- **新包 @hmharness/sandbox(M3)**:隔离工作区(git 快照/恢复字节级/diff/
+  destroy)+ 三权限层(READ_ONLY 拒执行拒写/WORKSPACE_WRITE/FULL_ACCESS);
+  execFile 无 shell 字符串(shellgate 教义);恢复=reset --hard+clean 仅在
+  沙箱仓库内(ADR-0001 边界)。
+- **Capability 清单层(M4,agent/capability.ts)**:全部注册工具投影为
+  manifest(id/risk/permissions/requiresApproval/network/sideEffects)+
+  PolicyEngine(lockdown 拒绝一切 host/device/process 触达;revoke 覆盖一切
+  模式)。声明层叠加在现有执法层(needsApproval/shellgate/DENY)之上。
+- **HarmonyBench 3→26 案例(M6 第一批)**:scripts/bench-cases-v2.cjs 安装
+  23 个离线可验证案例(确定性金丝雀/工具知识/领域知识/结构化输出纪律),
+  全部 holdout——进化门预算不膨胀,构成晋升后复验语料。
+- **新 CLI**:hmh eval(评测器面+案例统计)、hmh capability(清单面,--lockdown
+  预览锁定模式判定)。
+- **SELFFEED 第 8 天**:codelinter 诚实 0 缺陷;**预算门首次生产触发**
+  (5/4 轮超限,当日循环如实跳过留痕)。
+- 测试:evaluation 5/sandbox 4/capability 2 全绿。
+
 # 更新日志(CHANGELOG)
 
 发布范围:npm org [@hmharness](https://www.npmjs.com/org/hmharness)(`@hmh` scope 已被他人占用,

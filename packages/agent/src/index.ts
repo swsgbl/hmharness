@@ -1,4 +1,5 @@
 export { baseTools, readFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool } from './tools.ts';
+export { manifestFor, capabilityReport, authorize, type CapabilityManifest, type CapabilityRisk, type PolicyMode } from './capability.ts';
 export { buildSystemPrompt } from './prompt.ts';
 export { strings, type Locale, type Strings } from './i18n.ts';
 export { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';
