@@ -21,10 +21,32 @@ export interface Insight {
   skillsInjected?: string[];
 }
 
+/**
+ * Secret redaction for everything that leaves the machine (insights feed the
+ * PUBLIC evidence page). Users paste API keys into task text ("新增 provider,
+ * sk-… 给 hmharness") and the audit trail must never publish them. Cover the
+ * shapes seen in the wild: OpenAI-style sk-, VolcEngine ark-<uuid>-<hex>,
+ * GitHub ghp_/npm_ tokens. GitHub Push Protection caught this class once
+ * (GH013, VolcEngine Ark) - it must be caught here first.
+ */
+const SECRET_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  { re: /sk-[A-Za-z0-9]{20,}/g, label: 'sk-[REDACTED]' },
+  { re: /ark-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-[0-9a-fA-F]{4,}/g, label: 'ark-[REDACTED]' },
+  { re: /gh[pousr]_[A-Za-z0-9]{20,}/g, label: 'ghp_[REDACTED]' },
+  { re: /npm_[A-Za-z0-9]{20,}/g, label: 'npm_[REDACTED]' },
+];
+
+export function redactSecrets(text: string): string {
+  let out = text;
+  for (const p of SECRET_PATTERNS) out = out.replace(p.re, p.label);
+  return out;
+}
+
 export async function recordInsight(home: string, insight: Insight): Promise<void> {
   const dir = join(home, 'insights');
   await mkdir(dir, { recursive: true });
-  await appendFile(join(dir, 'insights.jsonl'), JSON.stringify(insight) + '\n', 'utf8');
+  const clean = { ...insight, task: redactSecrets(insight.task) };
+  await appendFile(join(dir, 'insights.jsonl'), JSON.stringify(clean) + '\n', 'utf8');
 }
 
 /** Read recent insights as structured records (the evolve loop's raw feed). */

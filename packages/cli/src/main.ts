@@ -373,6 +373,13 @@ usage:
   hmh                      interactive REPL (conversation memory kept, /help for commands)
   hmh resume [id-prefix|--last]   continue a past session (bare = full-screen picker,
                              --last = newest session in this directory)
+  hmh project [status|checkpoint <label>|restore <id>|pause|resume|complete|
+               archive|release <ver>]   project runtime: git-plumbing
+                             checkpoints (your tree untouched), sandbox
+                             materialization, run continuation (V2 M8)
+  hmh experiment [list|show <id>|run <id> [--cases=N]|promote <id> [--human]|
+               rollback <target>]   evolution candidates: control/treatment
+                             bench arms + statistical promotion gate (V2 M9)
   hmh web start|stop|status   web UI as a silent background daemon (no window,
                              survives closing everything; log ~/.hmharness/web.log)
   hmh web [--port=7788]       web UI in the foreground (debugging)
@@ -763,8 +770,140 @@ flags:
     await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
     return; // startServer keeps the process alive
   }
-  if (cmd === 'resume') {
+  if (cmd === 'project') {
+    // V2 M8 project runtime (ADR-0002): checkpoints are plumbing snapshots -
+    // the user's index/refs/worktree are never touched; restore materializes
+    // a sandbox copy. `hmh project` alone = status of the current workspace.
     await initHome();
+    const home = homeDir();
+    const A = await import('@hmharness/agent');
+    const sub = rest[0] ?? 'status';
+    if (sub === 'status') {
+      const rec = await A.findProject(home, process.cwd());
+      if (!rec) {
+        stdout.write(`no project bound to ${process.cwd()}\n(hmh project checkpoint "<label>" starts one and snapshots it)\n`);
+        return;
+      }
+      stdout.write(CYAN(`project ${rec.projectId}`) + DIM(` · ${rec.state} · ${rec.workspace}\n`));
+      stdout.write(`  checkpoints: ${rec.checkpoints.length}${rec.checkpoints.length ? ' (latest ' + rec.checkpoints[rec.checkpoints.length - 1].id + ')' : ''}\n`);
+      stdout.write(`  runs: ${rec.runs.length} · decisions: ${rec.decisions.length} · releases: ${rec.releases.length}\n`);
+      for (const r of rec.releases) stdout.write(`  release ${GREEN(r.version)}${r.checkpointId ? DIM(' @' + r.checkpointId) : ''}\n`);
+      return;
+    }
+    if (sub === 'checkpoint') {
+      const label = rest.slice(1).join(' ').trim() || undefined;
+      const rec = await A.projectFor(home, process.cwd());
+      const cp = await A.checkpointProject(home, rec, label);
+      stdout.write(GREEN('✓') + ` checkpoint ${cp.id} · ${cp.files} files${label ? ` · ${label}` : ''} (git objects only - your tree is untouched)\n`);
+      return;
+    }
+    if (sub === 'restore') {
+      const id = rest[1] ?? '';
+      const rec = await A.findProject(home, process.cwd());
+      if (!rec || !id) { stdout.write('usage: hmh project restore <checkpoint-id>\n'); return; }
+      try {
+        const session = await A.restoreCheckpoint(home, rec, id);
+        stdout.write(GREEN('✓') + ` checkpoint ${id} materialized to sandbox copy:\n  ${session.dir}\n(inspect or run there - your workspace is untouched)\n`);
+      } catch (err) {
+        stdout.write(RED(String(err)) + '\n');
+      }
+      return;
+    }
+    if (sub === 'pause' || sub === 'resume' || sub === 'complete' || sub === 'archive') {
+      const rec = await A.findProject(home, process.cwd());
+      if (!rec) { stdout.write('no project bound to this directory\n'); return; }
+      const next = sub === 'pause' ? 'paused' : sub === 'resume' ? 'active' : sub === 'complete' ? 'completed' : 'archived';
+      try {
+        const out = await A.transitionProject(home, rec, next as 'paused');
+        stdout.write(GREEN('✓') + ` ${out.projectId} → ${out.state}\n`);
+      } catch (err) {
+        stdout.write(RED(String(err)) + '\n');
+      }
+      return;
+    }
+    if (sub === 'release') {
+      const version = rest[1] ?? '';
+      if (!version) { stdout.write('usage: hmh project release <version> [notes]\n'); return; }
+      const rec = await A.findProject(home, process.cwd());
+      if (!rec) { stdout.write('no project bound to this directory\n'); return; }
+      await A.releaseProject(home, rec, version, rest.slice(2).join(' ') || undefined);
+      stdout.write(GREEN('✓') + ` release ${version} pinned to latest checkpoint\n`);
+      return;
+    }
+    stdout.write('usage: hmh project [status|checkpoint <label>|restore <id>|pause|resume|complete|archive|release <ver>]\n');
+    return;
+  }
+  if (cmd === 'experiment') {
+    // V2 M9 candidate experiments (ADR-0003): Control/Treatment bench arms +
+    // two-proportion gate + promoted/rollback state. Agents never shortcut
+    // the gate - promoteCandidate enforces the report.
+    await initHome();
+    const home = homeDir();
+    const E = await import('@hmharness/evolution');
+    const sub = rest[0] ?? 'list';
+    if (sub === 'list') {
+      const list = await E.listCandidates(home);
+      const act = await E.activeVersions(home);
+      if (list.length === 0) { stdout.write('no candidates registered\n'); return; }
+      for (const c of list) {
+        const rep = await E.latestExperiment(home, c.id);
+        stdout.write(`${YELLOW(c.target.padEnd(12))} ${c.id} ${DIM(c.baseVersion + ' → ' + c.candidateVersion)}`
+          + (rep ? ` · ${rep.verdict === 'promote-eligible' ? GREEN(rep.verdict) : rep.verdict === 'reject' ? RED(rep.verdict) : DIM(rep.verdict)}` : DIM(' · untested'))
+          + (act[c.target] ? DIM(` · active: ${act[c.target].version}`) : '') + '\n');
+      }
+      return;
+    }
+    if (sub === 'show') {
+      const c = await E.getCandidate(home, rest[1] ?? '');
+      if (!c) { stdout.write('no such candidate\n'); return; }
+      stdout.write(CYAN(`${c.target} ${c.id}`) + DIM(` ${c.baseVersion} → ${c.candidateVersion}\n`));
+      stdout.write(`  hypothesis: ${c.hypothesis}\n  metric: ${c.expectedMetric} · origin: ${c.origin ?? '-'}\n`);
+      const rep = await E.latestExperiment(home, c.id);
+      if (rep) {
+        stdout.write(`  latest: control ${rep.control.pass}/${rep.control.n} vs treatment ${rep.treatment.pass}/${rep.treatment.n}`
+          + ` · diff ${(rep.diff * 100).toFixed(1)}% · p=${rep.p.toFixed(4)}\n`
+          + `  verdict: ${rep.verdict} (${rep.reason})\n`);
+      }
+      return;
+    }
+    if (sub === 'run') {
+      const id = rest[1] ?? '';
+      const cand = await E.getCandidate(home, id);
+      if (!cand) { stdout.write('no such candidate\n'); return; }
+      const maxCases = Number((rest.find((a) => a.startsWith('--cases=')) ?? '').slice(9)) || 12;
+      const cases = (await E.listCases(home)).filter((c) => !c.holdout);
+      if (cases.length === 0) { stdout.write('no bench cases - run scripts/bench-cases-v2.cjs or seed first\n'); return; }
+      stdout.write(DIM(`running ${Math.min(maxCases, cases.length)} gate cases x2 arms (bench route)…\n`));
+      const armRun = async (c: BenchCase, arm: 'control' | 'treatment'): Promise<{ pass: boolean; tokens: number }> => {
+        const runner = makeCaseRunner();
+        const out = await runner(c, arm === 'treatment' ? (cand.payload ?? '') : '');
+        return { pass: E.matchCase(out, c).pass, tokens: E.estTokens(c.prompt + out) };
+      };
+      const rep = await E.runCandidateExperiment(home, cand.id, { runCase: armRun, cases, maxCases });
+      stdout.write(`control ${rep.control.pass}/${rep.control.n} · treatment ${rep.treatment.pass}/${rep.treatment.n}`
+        + ` · diff ${(rep.diff * 100).toFixed(1)}% · p=${rep.p.toFixed(4)} · tokens ${rep.control.tokens}→${rep.treatment.tokens}\n`);
+      stdout.write(rep.verdict === 'promote-eligible' ? GREEN(`verdict: ${rep.verdict} (${rep.reason})`) : rep.verdict === 'reject' ? RED(`verdict: ${rep.verdict} (${rep.reason})`) : DIM(`verdict: ${rep.verdict} (${rep.reason})`) + '\n');
+      return;
+    }
+    if (sub === 'promote') {
+      const id = rest[1] ?? '';
+      const human = rest.includes('--human');
+      const r = await E.promoteCandidate(home, id, { approvedByHuman: human });
+      if (!r.ok) { stdout.write(RED('✗ ') + (r.error ?? '') + '\n'); return; }
+      stdout.write(GREEN('✓') + ` ${r.active!.target} active → ${r.active!.version} (previous pointer saved; hmh experiment rollback <target>)\n`);
+      return;
+    }
+    if (sub === 'rollback') {
+      const target = rest[1] ?? '';
+      const r = await E.rollbackCandidate(home, target as never);
+      if (!r.ok) { stdout.write(RED('✗ ') + (r.error ?? '') + '\n'); return; }
+      stdout.write(GREEN('✓') + ` ${target} rolled back to previous active version\n`);
+      return;
+    }
+    stdout.write('usage: hmh experiment [list|show <id>|run <id> [--cases=N]|promote <id> [--human]|rollback <target>]\n');
+    return;
+  }
+  if (cmd === 'resume') {    await initHome();
     const home = homeDir();
     // bare `hmh resume` on a TTY = codex `codex resume`: the TUI comes up
     // with the full-frame picker already open (typeahead, cwd filter, sort)

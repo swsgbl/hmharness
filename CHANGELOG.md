@@ -1,3 +1,40 @@
+## [0.8.4] - 2026-09-13
+
+**V2 蓝图 P1 第二批(M8+M9)**——Project Runtime + Evolution 泛化(ADR-0002/0003 先行):
+
+- **M8 Project Runtime(agent/project.ts)**:Project 实体(状态机 created→active→
+  paused→completed→archived,白名单校验)+ 检查点 + 决策日志 + 运行续接 + 发布钉住。
+  **检查点=git plumbing 快照**:临时索引(GIT_INDEX_FILE)+read-tree+add -A+
+  write-tree,对象落 .git/objects,**用户的索引/引用/分支/工作树零接触**(无需
+  commit 即可打点;真机冒烟:hmharness 脏树 191 文件快照,前后 git status 逐字节
+  相同);非 git 工作区降级目录拷贝。**恢复=物化沙箱副本**(git archive+tar 到
+  sandbox 会话),代码里不存在任何能重置用户工作区的路径。运行续接复用 0.8.2
+  rollout append(attachRun/resumeBundle);interrupt=记录+置 paused。CLI:
+  `hmh project status|checkpoint|restore|pause|resume|complete|archive|release`。
+- **M9 Evolution V2 泛化(evolution/candidates.ts)**:七类候选
+  (prompt/skill/context/tool_policy/model_router/workflow/harness)注册表
+  (注册即毒检)+ Control/Treatment 双臂实验 runner(ArmRunner 注入式,holdout
+  排除)+ 双比例双侧 z 检验(A&S 26.2.17 CDF;每臂<8 needs-data,p<0.05 且
+  diff≥+10% 才 promote-eligible,显著负向 reject——与 impact.ts 口径一致)+
+  **带门禁的晋升状态机**:无 promote-eligible 报告不晋升、激活前必写 previous
+  指针、agent 来源的 prompt/harness 候选需 `--human` 显式人工标记(生产提示词
+  不可被生产代理自改)、skill 目标仍走 promoteSkill 金丝雀通道。CLI:
+  `hmh experiment list|show|run|promote|rollback`。诚实边界:context/router
+  等目标的运行时注入点属 M10,active 登记簿先行。
+- ADR-0002/0003 落 docs/adr/;agent 新增 @hmharness/sandbox 依赖(M8 物化)。
+- 测试 +10(candidates 5:统计/注册毒检/实验/晋升门禁/回滚;project 5:生命
+  周期/find-or-create/git 快照零接触+物化字节比对/拷贝降级/运行续接+release)。
+- SELFFEED 第 11 天:SelfFeed1 双构建对比(增量缓存行为诊断:第二次构建
+  CompileArkTS/PackageHap 全 UP-TO-DATE,.hap hash 不变;剩余 ~1.2s 是 hvigor
+  固定会话成本;4 个任务因声明输出不存在每轮重跑)。evolve 被预算门第 4 次
+  生产拦截(5/4,如实留痕,不绕过)。
+- **安全修复(insights 密钥脱敏)**:GitHub Push Protection(GH013)拦截发现
+  审计数据里有真实 API key——用户把密钥打进任务文本("新增 provider sk-…"),
+  recordInsight 原样入库且 evidence 页公开发布。修=evolution/insights.ts 新增
+  redactSecrets(sk-/ark-/ghp_/npm_ 四形态),写入路径强制脱敏+存量两处
+  (HMH_HOME/insights.jsonl、evidence raw)原位清洗;**已泄露到聊天记录的
+  tokenrouter/火山方舟密钥建议用户自行撤换**。
+
 ## [0.8.2] - 2026-09-13
 
 - **会话恢复照搬 openai/codex 重设计**(用户指令"直接照搬开源框架 codex 的

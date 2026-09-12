@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/evolution",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "hmharness evolution subsystem: persistent memory, insight capture, skill library, and the bench that gives evolution its fitness signal. First-class kernel citizen, not a plugin.",
   "type": "module",
   "main": "dist/index.js",
