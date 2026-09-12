@@ -1,0 +1,32 @@
+{
+  "name": "@hmharness/evaluation",
+  "version": "0.8.0",
+  "description": "hmharness evaluation: the Evaluator/Judge contract (V2 blueprint M2). Hard evidence outranks LLM judgment - build results, exit codes, exact/regex assertions first; the LLM judge is a last resort and is labeled as such. Evaluations attach to trajectories (judge.completed events).",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@hmharness/kernel": "0.8.0",
+    "@hmharness/observability": "0.8.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

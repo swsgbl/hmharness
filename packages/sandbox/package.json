@@ -1,0 +1,28 @@
+{
+  "name": "@hmharness/sandbox",
+  "version": "0.8.0",
+  "description": "hmharness sandbox runtime (V2 blueprint M3): isolated workspaces with create/exec/read/write/snapshot/restore/diff/destroy, tiered permissions (READ_ONLY / WORKSPACE_WRITE / FULL_ACCESS), git-backed snapshots. Runtime owns agent turns; the sandbox owns workspace/process state (ADR-0001).",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
