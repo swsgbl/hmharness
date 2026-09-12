@@ -11,3 +11,5 @@ Thumbs.db
 
 *.v2bak
 .v2bak-trash/
+# staging dir for the ACL-locked website/evidence (content lands via git plumbing)
+website/evidence-new/

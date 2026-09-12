@@ -81,6 +81,22 @@ export interface Strings {
   cmdResumeNone: string;
   cmdResumeNotFound: (p: string) => string;
   cmdResumeLoaded: (n: number) => string;
+  /** Codex-style resume picker (v0.8.2 transplant) */
+  pickerTitle: string;
+  pickerHint1: string;
+  pickerHint2: string;
+  pickerEmpty: string;
+  pickerNoMatch: string;
+  pickerLoading: string;
+  pickerMore: string;
+  pickerPreviewNone: string;
+  pickerLabelFilter: string;
+  pickerLabelSort: string;
+  pickerValCwd: string;
+  pickerValAll: string;
+  pickerValUpdated: string;
+  pickerValCreated: string;
+  pickerPos: (pos: number, total: number, pct: string) => string;
   tuiRadarScanning: string;
   tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
   tuiPassRate: (pct: string) => string;
@@ -176,10 +192,25 @@ const zh: Strings = {
   tuiScrolled: '↑ 已上滚 · PgDn/End/滚轮 回底',
   tuiWebHint: '浏览器界面: 在另一个终端运行 hmh web --port=7788',
   updateHint: (latest) => `新版本 ${latest} 可用: npm i -g @hmharness/cli 更新`,
-  cmdResume: '恢复历史会话(/resume 打开选择器,↑↓ 选择,Enter 载入;输入 id 前缀过滤)',
+  cmdResume: '恢复历史会话(/resume 打开选择器,↑↓ 选择,Enter 载入;输入即过滤)',
   cmdResumeNone: '还没有历史会话',
   cmdResumeNotFound: (p) => `没有匹配 "${p}" 的会话`,
   cmdResumeLoaded: (n) => `已恢复会话(${n} 条消息),直接输入内容继续对话`,
+  pickerTitle: '恢复会话',
+  pickerHint1: 'Enter 恢复 · ↑↓ 浏览 · Tab 切筛选/排序 · ←→ 调整',
+  pickerHint2: 'Esc 关闭 · 输入即过滤(标题/id/目录/分支)',
+  pickerEmpty: '还没有会话',
+  pickerNoMatch: '没有匹配的会话',
+  pickerLoading: '正在加载会话…',
+  pickerMore: '↓ 加载更多…',
+  pickerPreviewNone: '(无消息)',
+  pickerLabelFilter: '筛选',
+  pickerLabelSort: '排序',
+  pickerValCwd: '当前目录',
+  pickerValAll: '全部',
+  pickerValUpdated: '最近更新',
+  pickerValCreated: '创建时间',
+  pickerPos: (pos, total, pct) => ` ${pos} / ${total} · ${pct}% `,
   tuiRadarScanning: '雷达扫描中…',
   tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,
@@ -272,10 +303,25 @@ const en: Strings = {
   tuiScrolled: '↑ scrolled up · PgDn/End/wheel back to bottom',
   tuiWebHint: 'web UI: run hmh web --port=7788 in another terminal',
   updateHint: (latest) => `version ${latest} available - update with: npm i -g @hmharness/cli`,
-  cmdResume: 'resume a past session (/resume opens the picker; arrows + Enter, type an id prefix to filter)',
+  cmdResume: 'resume a past session (/resume opens the picker; arrows + Enter, type to filter)',
   cmdResumeNone: 'no past sessions yet',
   cmdResumeNotFound: (p) => `no session matches "${p}"`,
   cmdResumeLoaded: (n) => `session resumed (${n} messages) - just type to continue`,
+  pickerTitle: 'Resume session',
+  pickerHint1: 'Enter resume · ↑↓ browse · Tab filter/sort · ←→ change',
+  pickerHint2: 'Esc close · type to filter (title/id/dir/branch)',
+  pickerEmpty: 'no sessions yet',
+  pickerNoMatch: 'no results for your search',
+  pickerLoading: 'Loading sessions…',
+  pickerMore: '↓ loading more…',
+  pickerPreviewNone: '(no message yet)',
+  pickerLabelFilter: 'Filter',
+  pickerLabelSort: 'Sort',
+  pickerValCwd: 'Cwd',
+  pickerValAll: 'All',
+  pickerValUpdated: 'Updated',
+  pickerValCreated: 'Created',
+  pickerPos: (pos, total, pct) => ` ${pos} / ${total} · ${pct}% `,
   tuiRadarScanning: 'scanning radar…',
   tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,

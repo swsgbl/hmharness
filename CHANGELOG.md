@@ -1,3 +1,40 @@
+## [0.8.2] - 2026-09-13
+
+- **会话恢复照搬 openai/codex 重设计**(用户指令"直接照搬开源框架 codex 的
+  恢复历史会话实现方式",源码调研 openai/codex codex-rs/rollout + tui/resume_picker):
+  - **rollout 存储(kernel/session.ts)**:新会话落
+    `sessions/YYYY/MM/DD/<id>.jsonl`(codex precompute_new_rollout_path),
+    首行 session_meta 带 git 分支(纯 fs 读 .git/HEAD,零依赖红线不破)与
+    forkedFrom;旧平铺布局继续可列可恢复(codex legacy rollout 同等待遇)。
+  - **Resume=append 语义**:`Session.resume()` 打开同一 rollout 追加而非
+    每任务新建文件(codex RolloutRecorderParams::Resume);REPL/TUI/Web 的
+    整段对话写同一个文件,`runAgentTask` 新增 sessionId 续写;/clear 开新
+    线程;撕裂行尾守卫(codex ensure_rollout_is_newline_terminated)。
+  - **listSessions**(codex get_threads 移植):MAX_SCAN_FILES=10000、
+    25/页锚点游标分页(新文件中途出现不重页)、updated/created 双排序、
+    cwd 过滤、64KB 单读头提取标题+meta(codex HEAD_RECORD_LIMIT 思路)。
+  - **Codex 式选择器(cli/resume-picker.ts + TUI 全屏 modal)**:typeahead
+    小写子串过滤(标题/id/目录/分支,Row::matches_query)、Filter[Cwd|All]×
+    Sort[Updated|Created] 工具栏(Tab 循环焦点,←→ 切值即重载)、❯ 选中标记
+    +反色高亮、底部两行快捷键+`pos/total·pct%` 进度、距底 5 行预取下一页
+    (LOAD_NEAR_THRESHOLD)、查询无本地命中继续翻页搜索(SearchState::Active)、
+    过期分页响应用 token 丢弃(request_token)。
+  - **入口全覆盖**:bare `hmh resume`(TTY)= 启动即开选择器(codex
+    `codex resume`)、`hmh resume --last` = 当前目录最新(codex --last)、
+    `/resume` TUI modal、`/resume <prefix>` 直载、Web /api/sessions 改走
+    kernel listSessions(+nextCursor/branch/createdAt 字段)。
+- **M5 完成生产接线**:retrieveMemory 的最终选择现在由蓝图权重 ContextRanker
+  驱动(旧打分→relevance,时间→recency,distilled→importance 0.8,cost=chars/4),
+  RANK_WEIGHTS 从库+测试变成真实检索路径(memory 7/7 回归绿)。
+- **SELFFEED 第 10 天**:工具链健康检查发现 **Windows 更新 KB5124114/KB5124108
+  弄坏仓颉(cjpm)工具链**(hdc/hvigorw/ohpm 不受影响);完整基线快照+两条教训
+  固化进记忆(轨迹只存 120 字符 preview,完整输出须当场固化;%ERRORLEVEL% 对
+  崩溃进程撒谎,真实退出码要用 Start-Process -PassThru)。
+- 测试 189+2 全绿(+13:kernel rollout/列表分页 5、picker 状态机 9、TUI modal
+  2,更新旧 palette 断言 2);typecheck 净。
+- evolution 以 **0.8.3** 上架(0.8.2 在一次被中断的发布里已带旧 kernel 依赖
+  占位,0.8.3 仅修正依赖钉到 kernel 0.8.2,代码与 0.8.2 相同)。
+
 ## [0.8.1] - 2026-09-12
 
 V2 P1 第一批(M5+M7 切片)+SELFFEED 第 9 天:

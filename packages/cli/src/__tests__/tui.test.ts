@@ -264,54 +264,57 @@ test('addUser: chat-style - blank line gap above/below, right-aligned against th
   } finally { h.restore(); }
 });
 
-test('session picker: bare /resume + Enter OPENS the live list; arrows move; second Enter selects it', async () => {
-  // the interaction the user demanded: the list must be NAVIGABLE, not a
-  // printed dead end. Mirrors the /model two-stage picker tests.
+test('bare /resume + Enter submits the command; the driver opens the Codex-style modal', async () => {
+  // /resume is no longer intercepted into the old palette: submitting it runs
+  // the driver path that opens the full-frame picker (resume-picker.ts)
   const h = await makeTui();
   try {
-    h.rt.setSessionChoices([
-      { name: '2026-09-08T21-36-13', desc: 'hello session' },
-      { name: '2026-09-08T20-54-41', desc: 'codexhost stall debug' },
-      { name: '2026-09-08T18-25-31', desc: 'selffeed task' },
-    ]);
     for (const ch of '/resume') h.keys(ch);
-    h.keys('\r');                                  // bare /resume + Enter: OPEN, do not load row 0
-    let p = h.rt.paletteProbe();
-    assert.equal(p.input, '/resume ', 'picker focused with the session list');
-    assert.deepEqual(p.rows.slice(0, 3), ['2026-09-08T21-36-13', '2026-09-08T20-54-41', '2026-09-08T18-25-31']);
-    assert.equal(p.selected, 0);
-    h.keys('\x1b[B');                              // ↓ to the second session
-    p = h.rt.paletteProbe();
-    assert.equal(p.selected, 1);
-    h.keys('\r');                                  // second Enter runs the highlighted row
-    assert.deepEqual(h.submitted, ['/resume 2026-09-08T20-54-41'], 'Enter loads exactly the highlighted session');
-    // filtering: typing an id HEAD prefix narrows rows (same semantics as
-    // latestSession's startsWith match - mid-string prefixes don't filter)
-    h.rt.consumeInput();
-    for (const ch of '/resume 2026-09-08T21') h.keys(ch);
-    p = h.rt.paletteProbe();
-    assert.deepEqual(p.rows, ['2026-09-08T21-36-13']);
+    h.keys('\r');
+    assert.deepEqual(h.submitted, ['/resume']);
   } finally { h.restore(); }
 });
 
-test('firstUserLinePeek: 64KB head scan finds the first user event without a full parse', async () => {
-  const { firstUserLinePeek } = await import('../tui.ts');
-  const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
-  const dir = await mkdtemp(join(tmpdir(), 'hmh-peek-'));
+test('resume picker modal: loads rollouts from HMH_HOME, arrows + Enter pick, Esc closes', async () => {
+  const { Session } = await import('@hmharness/kernel');
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-modal-'));
+  const prevHome = process.env.HMH_HOME;
+  process.env.HMH_HOME = dir;
   try {
-    const f = join(dir, 's.jsonl');
-    // session/start line + a first user line - the normal head shape
-    await writeFile(f, JSON.stringify({ t: 'session/start', id: 'x', model: 'm', cwd: 'c' }) + '\n'
-      + JSON.stringify({ t: 'user', text: '第一条输入' }) + '\n'
-      + JSON.stringify({ t: 'assistant', text: 'x'.repeat(200_000) }) + '\n', 'utf8');
-    assert.equal(await firstUserLinePeek(f), '第一条输入');
-    // no user event in the head -> empty preview, no throw
-    const f2 = join(dir, 'none.jsonl');
-    await writeFile(f2, JSON.stringify({ t: 'session/start' }) + '\n', 'utf8');
-    assert.equal(await firstUserLinePeek(f2), '');
-    // missing file -> empty preview, no throw
-    assert.equal(await firstUserLinePeek(join(dir, 'nope.jsonl')), '');
+    const a = Session.create(dir, process.cwd(), 'm');
+    await a.user('first alpha task');
+    const b = Session.create(dir, process.cwd(), 'm');
+    await b.user('second beta task');
+    const h = await makeTui();
+    try {
+      const pickP = h.rt.openResumePicker();
+      // the first page lands asynchronously - poll the rendered modal frame
+      const deadline = Date.now() + 5000;
+      let frame = '';
+      while (Date.now() < deadline) {
+        frame = h.rt.paletteProbe().frameText;
+        if (frame.includes('alpha')) break;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      assert.match(frame, /alpha/);
+      assert.match(frame, /beta/);
+      assert.match(frame, /恢复会话|Resume session/, 'title row renders');
+      // updated-desc order: beta (newer) is row 0; ↓ lands on alpha, Enter picks it
+      h.keys('\x1b[B');
+      h.keys('\r');
+      const pick = await Promise.race([pickP, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('picker never resolved')), 2000))]);
+      assert.equal(pick?.kind, 'resume');
+      if (pick?.kind === 'resume') assert.equal(pick.row.title, 'first alpha task');
+      // reopened picker: a plain Esc (empty query) closes without a pick
+      const p2 = h.rt.openResumePicker();
+      await new Promise((r) => setTimeout(r, 150));
+      h.keys('\x1b');
+      assert.deepEqual(await p2, { kind: 'close' });
+    } finally { h.restore(); }
   } finally {
+    if (prevHome === undefined) delete process.env.HMH_HOME;
+    else process.env.HMH_HOME = prevHome;
     await rm(dir, { recursive: true, force: true });
   }
 });

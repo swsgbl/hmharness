@@ -256,6 +256,9 @@ export interface AgentTaskOptions {
   /** Overrides the terminal gate (web supplies a remote one). */
   approvalAsk?: LoopApproval['ask'];
   resumeMessages?: ChatMessage[];
+  /** Continue THIS session's rollout (append) instead of starting a new one -
+   *  codex Resume semantics: one thread, one JSONL, appended across turns. */
+  sessionId?: string;
   events?: RunnerEvents;
   /** AbortSignal: cancels the agent loop at the next turn boundary. */
   signal?: AbortSignal;
@@ -266,7 +269,10 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   const cfg = opts.cfg ?? (await loadConfig());
   const ctx = opts.ctx ?? { cwd: process.cwd(), home: homeDir() };
   const events = opts.events ?? {};
-  const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);
+  // resume = append to the same rollout; a missing/unreadable id falls back
+  // to a fresh session so a renamed-away file never breaks the conversation
+  const session = (opts.sessionId ? await Session.resume(ctx.home, opts.sessionId) : null)
+    ?? Session.create(ctx.home, ctx.cwd, cfg.provider.model);
   // V2 M1 flight recorder: every run leaves a typed, replayable trajectory
   // under <home>/runs/<run-id>/. Best-effort by contract - storage failures
   // are swallowed inside the recorder and can never fail the task itself.

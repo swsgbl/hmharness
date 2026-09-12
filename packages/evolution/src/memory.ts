@@ -19,6 +19,7 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import { rankContext } from './ranker.ts';
 
 export interface MemoryNote {
   time: string;
@@ -183,11 +184,31 @@ export async function retrieveMemory(
   } else {
     ranked = scoreNotes(notes, task, opts.workspace);
   }
+  // V2 M5: the blueprint-weighted ContextRanker governs the final pick.
+  // Existing scores become `relevance`; recency derives from the note time
+  // (distillations are curated -> more important); dependency/similarity stay
+  // neutral until richer signals exist. Cost = chars/4.
+  const maxScore = Math.max(1, ...ranked.map((r) => r.score));
+  const newestTime = Date.parse(notes[notes.length - 1]?.time ?? '') || Date.now();
+  const oldestTime = Date.parse(notes[0]?.time ?? '') || newestTime;
+  const span = Math.max(1, newestTime - oldestTime);
+  const reRanked = rankContext(ranked.map(({ note, score }) => ({
+    source: 'memory',
+    contentRef: note.text,
+    relevance: score / maxScore,
+    recency: span > 1 ? (Date.parse(note.time) - oldestTime) / span : 1,
+    importance: /^\(distilled\)/.test(note.text) ? 0.8 : 0.5,
+    dependency: 0.5,
+    similarity: 0.5,
+    tokenCost: Math.ceil(note.text.length / 4),
+  })));
   const picked: MemoryNote[] = [];
   const seen = new Set<string>();
-  for (const { note } of ranked.slice(0, topK)) {
-    picked.push(note);
-    seen.add(note.text);
+  for (const c of reRanked.slice(0, topK)) {
+    const hit = ranked.find((r) => r.note.text === c.contentRef);
+    if (!hit || seen.has(hit.note.text)) continue;
+    picked.push(hit.note);
+    seen.add(hit.note.text);
   }
   for (const note of (newest > 0 ? notes.slice(-newest) : [])) {
     if (!seen.has(note.text)) picked.push(note);

@@ -5,7 +5,7 @@
  *   hmh init                 create HMH_HOME skeleton + config
  *   hmh "do something"       one-shot task (full agent loop, streaming)
  *   hmh                      interactive REPL (conversation memory kept)
- *   hmh resume [id-prefix]   continue a past session by id prefix (or latest)
+ *   hmh resume [id-prefix|--last] continue a past session (bare: codex-style picker)
  *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
  *   hmh tui                  lite terminal UI (status header + slash commands)
  *   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
@@ -30,6 +30,7 @@ import {
   initHome,
   latestSession,
   listProviders,
+  listSessions,
   loadConfig,
   loadTranscript,
   mcpServerTools,
@@ -75,6 +76,8 @@ interface TaskOptions {
   registry?: Registry;
   clients?: McpClient[];
   resumeMessages?: ChatMessage[];
+  /** append to this rollout instead of starting a new one (codex Resume) */
+  sessionId?: string;
 }
 
 async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ messages: ChatMessage[]; sessionId: string }> {
@@ -102,6 +105,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
     cfg,
     yes: taskOpts.yes,
     resumeMessages: taskOpts.resumeMessages,
+    sessionId: taskOpts.sessionId,
     events: {
       onLine: (l) => stdout.write(DIM(`  ${l}\n`)),
       onDelta: (kind, chunk) => {
@@ -133,7 +137,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
   return { messages: result.messages, sessionId: result.sessionId };
 }
 
-async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void> {
+async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSessionId?: string): Promise<void> {
   const home = homeDir();
   let cfg = await loadConfig();
   let autoApprove = yes;
@@ -156,6 +160,9 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
   // The REPL keeps conversation memory across its own lines (and any
   // resumed history); each line re-injects fresh memory/skills.
   let history: ChatMessage[] = initialHistory ? [...initialHistory] : [];
+  // one rollout per conversation: the first task creates it, later lines and
+  // `hmh resume` sessions append to it (codex thread semantics)
+  let currentSessionId: string | undefined = initialSessionId;
   try {
     while (true) {
       let line: string;
@@ -248,6 +255,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
           // line-mode twin of the TUI /clear: clear the conversation so the
           // next task starts fresh (REPL counterpart was missing)
           history = [];
+          currentSessionId = undefined;
           stdout.write(DIM(t.cmdClearDone) + '\n');
           continue;
         }
@@ -287,10 +295,12 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[]): Promise<void>
         continue;
       }
       try {
-        const r = await runTask(line, { yes: autoApprove, sharedRl: rl, registry: reg, clients, resumeMessages: history });
+        const r = await runTask(line, { yes: autoApprove, sharedRl: rl, registry: reg, clients, resumeMessages: history, sessionId: currentSessionId });
         // working transcript = [system, ...resumeMessages, user, ...new turns];
         // only the NEW turns (past the replayed prefix) extend history.
         history = [...history, { role: 'user', content: line }, ...r.messages.slice(history.length + 2)];
+        // one rollout per REPL conversation (codex thread semantics)
+        currentSessionId = r.sessionId;
       } catch (err) {
         stdout.write(`error: ${String(err)}\n`);
       }
@@ -361,7 +371,8 @@ async function main(): Promise<void> {
 usage:
   hmh "do something"       one-shot task (full agent loop, streaming)
   hmh                      interactive REPL (conversation memory kept, /help for commands)
-  hmh resume [id-prefix]   continue a past session by id prefix (or latest)
+  hmh resume [id-prefix|--last]   continue a past session (bare = full-screen picker,
+                             --last = newest session in this directory)
   hmh web start|stop|status   web UI as a silent background daemon (no window,
                              survives closing everything; log ~/.hmharness/web.log)
   hmh web [--port=7788]       web UI in the foreground (debugging)
@@ -754,7 +765,22 @@ flags:
   }
   if (cmd === 'resume') {
     await initHome();
-    const file = await latestSession(homeDir(), arg);
+    const home = homeDir();
+    // bare `hmh resume` on a TTY = codex `codex resume`: the TUI comes up
+    // with the full-frame picker already open (typeahead, cwd filter, sort)
+    if (!arg && !rest.includes('--last') && stdin.isTTY) {
+      const { tui } = await import('./tui.ts');
+      await tui(yes, false, { resumeAtStart: true });
+      return;
+    }
+    // `--last`: newest rollout in THIS cwd (codex resume --last)
+    let file: string | null = null;
+    if (rest.includes('--last')) {
+      const page = await listSessions(home, { cwd: process.cwd(), limit: 1 });
+      file = page.items[0]?.file ?? null;
+    } else {
+      file = await latestSession(home, arg);
+    }
     if (!file) {
       stdout.write(arg ? `No session matches prefix "${arg}".\n` : 'No sessions yet.\n');
       return;
@@ -765,7 +791,8 @@ flags:
       return;
     }
     stdout.write(DIM(`resuming ${tr.id} · ${tr.messages.length} messages · model ${tr.model}\n`));
-    await repl(yes, tr.messages);
+    // repl keeps appending to THIS rollout for the whole conversation
+    await repl(yes, tr.messages, tr.id);
     return;
   }
   if (cmd && !cmd.startsWith('-')) {

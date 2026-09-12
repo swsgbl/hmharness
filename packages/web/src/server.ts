@@ -7,10 +7,10 @@
  * this is a local companion, never exposed.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readdir, readFile, rename, mkdir, writeFile, stat, open } from 'node:fs/promises';
+import { readdir, readFile, rename, mkdir, writeFile, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
+import { homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, findSessionFile, listSessions, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
@@ -55,8 +55,11 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
   // cross-task conversation memory (Claude-Code-style continuous thread):
-  // every task resumes the working transcript, so follow-ups have context
+  // every task resumes the working transcript, so follow-ups have context.
+  // currentSessionId keeps the whole web conversation on ONE rollout file
+  // (codex thread semantics); fresh=true starts a new thread.
   let conversation: ChatMessage[] = [];
+  let currentSessionId: string | undefined;
 
   // ---- workspaces: the agent's project contexts ----
   // A workspace is a project directory; switching one chdirs the server so
@@ -122,6 +125,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         cfg,
         yes: item.yes,
         resumeMessages: resume,
+        sessionId: item.fresh ? undefined : currentSessionId,
         signal: currentAbort.signal,
         // auto/yolo tasks must not wire the remote approval prompt at all -
         // the remote gate used to override the yes flag unconditionally,
@@ -146,6 +150,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           onFinal: (r) => {
             // extend the cross-task thread: [..prior, user, ...new turns]
             conversation = [...resume, { role: 'user', content: item.text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
+            currentSessionId = r.sessionId;
             broadcast('final', { ...r, turnsInThread: Math.floor(conversation.length / 2) });
           },
         },
@@ -408,24 +413,16 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
-        let files: string[] = [];
-        try {
-          files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl') && !f.startsWith('.')).sort().reverse().slice(0, 200);
-        } catch {
-          /* none */
-        }
-        // first line of each jsonl is session/start with the workspace cwd
-        const cwdOf = async (file: string): Promise<string> => {
-          try {
-            const fd = await open(file, 'r');
-            const buf = Buffer.alloc(600);
-            await fd.read(buf, 0, 600, 0);
-            await fd.close();
-            return String(JSON.parse(buf.toString('utf8').split('\n')[0] ?? '{}').cwd ?? '');
-          } catch {
-            return '';
-          }
-        };
+        // shared kernel listing (codex get_threads transplant): date-nested +
+        // legacy layouts, cursor paging, head-read titles. cwd query param
+        // scopes to one workspace (the sidebar groups client-side anyway).
+        const qLimit = Number(url.searchParams.get('limit') ?? '200');
+        const qCwd = url.searchParams.get('cwd');
+        const page = await listSessions(home, {
+          limit: Number.isFinite(qLimit) && qLimit > 0 ? Math.min(qLimit, 200) : 200,
+          sort: url.searchParams.get('sort') === 'created' ? 'created' : 'updated',
+          ...(qCwd ? { cwd: qCwd } : {}),
+        });
         // board cards come from the insight archive (task/outcome/turns/tools)
         const bySession = new Map((await readInsights(home, 200)).map((i) => [i.session, i]));
         // custom titles (rename) ride in workspaces.json; audit files stay immutable
@@ -434,23 +431,21 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           const wsRaw = JSON.parse(await readFile(join(home, 'workspaces.json'), 'utf8')) as Record<string, unknown>;
           sessionTitles = (wsRaw.sessionTitles ?? {}) as Record<string, string>;
         } catch { /* none yet */ }
-        const sessions = await Promise.all(
-          files.map(async (f) => {
-            const id = f.replace(/\.jsonl$/, '');
-            const i = bySession.get(id);
-            return {
-              id,
-              title: sessionTitles[id] ?? '',
-              task: i?.task ?? '',
-              outcome: i?.outcome ?? '',
-              turns: i?.turns ?? 0,
-              toolUses: i?.toolUses ?? 0,
-              time: i?.time ?? '',
-              cwd: await cwdOf(join(home, 'sessions', f)),
-            };
-          }),
-        );
-        json(res, 200, { sessions, workspace: currentWs() ?? null });
+        const sessions = page.items.map((s) => ({
+          id: s.id,
+          title: sessionTitles[s.id] ?? '',
+          // first user message straight from the rollout head (kernel readSessionHead)
+          task: s.title || bySession.get(s.id)?.task || '',
+          outcome: bySession.get(s.id)?.outcome ?? '',
+          turns: bySession.get(s.id)?.turns ?? 0,
+          toolUses: bySession.get(s.id)?.toolUses ?? 0,
+          time: bySession.get(s.id)?.time ?? s.updatedAt,
+          cwd: s.cwd,
+          branch: s.branch ?? '',
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        }));
+        json(res, 200, { sessions, nextCursor: page.nextCursor, workspace: currentWs() ?? null });
         return;
       }
       if (req.method === 'POST' && url.pathname.startsWith('/api/sessions/')) {
@@ -460,7 +455,12 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         const id = decodeURIComponent(parts[0]).replace(/[^a-zA-Z0-9_:.@-]/g, '');
         const op = parts[1] ?? '';
         const body = JSON.parse((await readBody(req)) || '{}') as { title?: string };
-        const file = join(home, 'sessions', `${id}.jsonl`);
+        // date-nested layouts mean the file no longer sits at sessions/<id>.jsonl
+        const file = await findSessionFile(home, id);
+        if (!file) {
+          json(res, 404, { error: 'session not found' });
+          return;
+        }
         const trashDir = join(home, 'sessions', 'trash');
         const archiveDir = join(home, 'sessions', 'archive');
         try {
@@ -498,8 +498,8 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
         const id = decodeURIComponent(url.pathname.slice('/api/sessions/'.length)).replace(/[^a-zA-Z0-9_:.@-]/g, '');
-        const file = join(home, 'sessions', `${id}.jsonl`);
-        const tr = await loadTranscript(file);
+        const file = await findSessionFile(home, id);
+        const tr = file ? await loadTranscript(file) : null;
         if (!tr) {
           json(res, 404, { error: 'session not found' });
           return;

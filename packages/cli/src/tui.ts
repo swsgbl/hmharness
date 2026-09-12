@@ -13,11 +13,11 @@
 import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
-import { open as fopen } from 'node:fs/promises';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, type ChatMessage } from '@hmharness/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
+import { formatRow, initialPickerState, pickerKey, reducePicker, toolbarLine, visibleRows, type PickerState } from './resume-picker.ts';
 
 /** installed version, shown in the TUI header (v0.4.0) so users always
  *  know which build they are talking to - resolves in both src/ and dist/ */
@@ -174,8 +174,6 @@ export class TuiRuntime {
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** rows for the `/resume ` session picker (id prefix + first user line) */
-  private sessionChoices: Array<{ name: string; desc: string }> = [];
   /** Wheel/click handling: NO mouse reporting by default - select/copy
    *  always works and terminals translate the wheel to arrow keys on the
    *  alternate screen. Reporting turns on ONLY while a palette is open
@@ -207,11 +205,6 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  setSessionChoices(list: Array<{ name: string; desc: string }>): void {
-    this.sessionChoices = list;
-    this.dirty = true;
-  }
-
   /** Focus the /model picker (used by the bare `/model` command so the
    *  printed list is never a dead end - the live palette opens on it). */
   openModelPicker(): void {
@@ -221,13 +214,112 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  /** Focus the /resume session picker - same live palette as /model:
-   *  arrows/wheel navigate, Enter loads the highlighted session. */
-  openSessionPicker(): void {
-    this.input = '/resume ';
-    this.caret = this.input.length;
-    this.cmdIdx = 0;
+  /* ---------------- Codex-style resume picker modal ---------------- */
+
+  /** While open the picker owns every key/wheel event and the whole frame -
+   *  the codex alt-screen picker contract. resolve fires on Enter (resume)
+   *  or Esc/Ctrl-C (close). */
+  private resumeModal: {
+    st: PickerState;
+    resolve: (v: { kind: 'resume'; row: SessionSummary } | { kind: 'close' }) => void;
+    /** monotonic token: stale page responses are dropped (codex request_token) */
+    token: number;
+  } | null = null;
+
+  openResumePicker(): Promise<{ kind: 'resume'; row: SessionSummary } | { kind: 'close' } | null> {
+    if (this.resumeModal) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      this.resumeModal = { st: initialPickerState('updated', true), resolve, token: 0 };
+      this.dirty = true;
+      void this.loadPickerPage(undefined, true);
+    });
+  }
+
+  /** Fetch one listSessions page (reset=true restarts from page 1 after a
+   *  toolbar change). Dedupes by id, drops stale responses by token. */
+  private async loadPickerPage(cursor: string | undefined, reset: boolean): Promise<void> {
+    const modal = this.resumeModal;
+    if (!modal) return;
+    const token = ++modal.token;
+    const st0 = reset
+      ? { ...modal.st, rows: [] as SessionSummary[], selected: 0, nextCursor: null, loading: true, initial: true }
+      : { ...modal.st, loading: true };
+    modal.st = st0;
     this.dirty = true;
+    let page;
+    try {
+      page = await listSessions(homeDir(), {
+        ...(reset ? {} : { cursor }),
+        sort: st0.sort,
+        cwd: st0.cwdOnly ? process.cwd() : null,
+      });
+    } catch {
+      page = { items: [], nextCursor: null, numScanned: 0, reachedScanCap: false };
+    }
+    const live = this.resumeModal;
+    if (!live || live.token !== token) return;
+    const seen = new Set(reset ? [] : live.st.rows.map((r) => r.id));
+    live.st = {
+      ...live.st,
+      rows: [...live.st.rows, ...page.items.filter((i) => !seen.has(i.id))],
+      nextCursor: page.nextCursor,
+      loading: false,
+      initial: false,
+    };
+    this.dirty = true;
+  }
+
+  private pickerInput(key: string): void {
+    const modal = this.resumeModal;
+    if (!modal) return;
+    const { state, effect } = reducePicker(modal.st, key);
+    modal.st = state;
+    this.dirty = true;
+    if (effect.kind === 'accept') {
+      this.resumeModal = null;
+      modal.resolve({ kind: 'resume', row: effect.row });
+    } else if (effect.kind === 'close') {
+      this.resumeModal = null;
+      modal.resolve({ kind: 'close' });
+    } else if (effect.kind === 'reload') {
+      void this.loadPickerPage(undefined, true);
+    } else if ((effect.kind === 'load-more' || effect.kind === 'search-more') && !state.loading && state.nextCursor) {
+      void this.loadPickerPage(state.nextCursor, false);
+    }
+  }
+
+  /** Full-frame picker layout (codex draw_picker): title / search+toolbar /
+   *  list window / two hint lines / position footer. */
+  private renderResumePicker(frame: string[], W: number, H: number): void {
+    const st = this.resumeModal!.st;
+    const t = this.t;
+    const count = ` ${st.rows.length}${st.loading ? '…' : ''} `;
+    frame.push(truncateTo(BOLD(' ' + t.pickerTitle) + ' '.repeat(Math.max(1, W - strWidth(t.pickerTitle) - count.length - 1)) + DIM(count), W));
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(' ' + toolbarLine(st, {
+      filter: t.pickerLabelFilter, sort: t.pickerLabelSort, cwd: t.pickerValCwd, all: t.pickerValAll, updated: t.pickerValUpdated, created: t.pickerValCreated,
+    }, W - 2, (s, on) => (on ? CYAN(BOLD(s)) : DIM(s))));
+    frame.push(DIM('─'.repeat(W)));
+    const vis = visibleRows(st);
+    const listH = Math.max(3, H - 8);
+    const from = vis.length > listH
+      ? Math.min(Math.max(0, st.selected - Math.floor(listH / 2)), vis.length - listH)
+      : 0;
+    if (from > 0) frame.push(DIM('  ↑ more'));
+    for (let i = 0; i < listH && from + i < vis.length; i++) {
+      const sel = from + i === st.selected;
+      const plain = truncateTo(formatRow(vis[from + i], sel, W - 1), W - 1);
+      frame.push(sel ? '\x1b[7m' + plain + ' '.repeat(Math.max(0, W - 1 - strWidth(plain))) + '\x1b[27m' : ' ' + plain);
+    }
+    if (st.loading) frame.push(DIM('  ' + (vis.length === 0 ? t.pickerLoading : t.pickerMore)));
+    else if (vis.length === 0) frame.push(DIM('  ' + (st.query ? t.pickerNoMatch : t.pickerEmpty)));
+    else if (from + listH < vis.length) frame.push(DIM('  ↓ more'));
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(DIM(truncateTo('  ' + t.pickerHint1, W - 1)));
+    frame.push(DIM(truncateTo('  ' + t.pickerHint2, W - 1)));
+    const pos = vis.length ? st.selected + 1 : 0;
+    const posLine = t.pickerPos(pos, vis.length, vis.length ? String(Math.round((pos / vis.length) * 100)) : '0');
+    frame.push(' '.repeat(Math.max(0, W - posLine.length - 1)) + DIM(posLine));
   }
 
   /** Run the highlighted palette row (shared by Enter and palette clicks);
@@ -237,7 +329,6 @@ export class TuiRuntime {
     const pick = hits.length ? hits[Math.min(this.cmdIdx, hits.length - 1)].name : '';
     if (pick) {
       if (this.input.startsWith('/model')) this.input = `/model ${pick} `;
-      else if (this.input.startsWith('/resume')) this.input = `/resume ${pick}`;
       else this.input = pick + ' ';
       this.caret = this.input.length;
       this.cmdIdx = 0;
@@ -303,9 +394,10 @@ export class TuiRuntime {
     stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
   }
 
-  /** The palette data source: `/model ` opens the model picker, `/resume `
-   *  the session picker, otherwise slash commands. Rows are {name, desc} so
-   *  all three share one renderer, keyboard and click machinery. */
+  /** The palette data source: `/model ` opens the model picker, otherwise
+   *  slash commands. (/resume submits straight through to the driver, which
+   *  opens the Codex-style full-frame picker - resume-picker.ts.) Rows are
+   *  {name, desc} so both share one renderer, keyboard and click machinery. */
   private panelItems(input: string): Array<{ name: string; desc: string }> {
     if (input === '/model' || input.startsWith('/model ')) {
       const q = input.slice(6).trim().toLowerCase();
@@ -315,10 +407,6 @@ export class TuiRuntime {
         .map((p) => ({ name: p.name, desc: `${p.model}${p.envVar ? ' · set ' + p.envVar : ' · local'}` }));
       const all = [...configured, ...rest];
       return q ? all.filter((i) => i.name.toLowerCase().startsWith(q)) : all;
-    }
-    if (input === '/resume' || input.startsWith('/resume ')) {
-      const q = input.slice(7).trim().toLowerCase();
-      return q ? this.sessionChoices.filter((i) => i.name.toLowerCase().startsWith(q)) : this.sessionChoices;
     }
     return matchCommands(input).map((c) => ({ name: c.name, desc: String(this.t[c.key as keyof typeof this.t]) }));
   }
@@ -348,6 +436,12 @@ export class TuiRuntime {
 
   private quit(): void {
     this.running = false;
+    // an open picker never resolves on its own once the TUI exits
+    if (this.resumeModal) {
+      const resolve = this.resumeModal.resolve;
+      this.resumeModal = null;
+      resolve({ kind: 'close' });
+    }
     this.exitResolve?.();
   }
 
@@ -490,6 +584,14 @@ export class TuiRuntime {
     // previous program send these; normalize to the CSI forms this UI
     // matches so navigation never silently dies
     if (/^\x1bO[A-H]$/.test(data)) data = '\x1b[' + data[2];
+    // resume picker modal owns every event while open - keyboard AND wheel
+    // (codex: the picker runs its own event loop until it resolves)
+    if (this.resumeModal) {
+      const wheel = parseWheel(data);
+      const key = wheel !== 0 ? (wheel < 0 ? 'up' : 'down') : pickerKey(data);
+      if (key !== null) this.pickerInput(key);
+      return;
+    }
     // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. With
     // button-event mode (1002) everything else - click, drag, release,
     // motion - still belongs to the terminal's native selection.
@@ -556,14 +658,10 @@ export class TuiRuntime {
       // Claude Code's two-stage flow: Enter shows the dialog, arrows/wheel
       // move, a second Enter confirms the highlighted row. The old behavior
       // silently switched to the first model on the very first Enter.
+      // (/resume needs no interception: submitting it opens the Codex-style
+      // modal via the driver, and '/resume <prefix>' loads directly.)
       if (this.input === '/model') {
         this.openModelPicker();
-        return;
-      }
-      // same two-stage rule for /resume: bare command + Enter opens the
-      // session picker (focus moves to the list), never loads row 0 blindly
-      if (this.input === '/resume') {
-        this.openSessionPicker();
         return;
       }
       // palette open: Enter runs the highlighted row (a command, or a
@@ -576,9 +674,7 @@ export class TuiRuntime {
       if (hits.length) {
         this.input = this.input.startsWith('/model')
           ? `/model ${hits[Math.min(this.cmdIdx, hits.length - 1)].name} `
-          : this.input.startsWith('/resume')
-            ? `/resume ${hits[Math.min(this.cmdIdx, hits.length - 1)].name}`
-            : hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
+          : hits[Math.min(this.cmdIdx, hits.length - 1)].name + ' ';
         this.caret = this.input.length;
         this.cmdIdx = 0;
         this.dirty = true;
@@ -674,6 +770,11 @@ export class TuiRuntime {
     const W = stdout.columns || 100;
     const H = stdout.rows || 30;
     const frame: string[] = [];
+    if (this.resumeModal) {
+      this.renderResumePicker(frame, W, H);
+      this.flushFrame(frame, H);
+      return;
+    }
     // modal mouse reporting follows the palette (see syncMouseReporting);
     // click rows are re-recorded every frame because screen positions move
     this.syncMouseReporting();
@@ -854,6 +955,10 @@ export class TuiRuntime {
     // pending wrap a full-width line leaves behind — "\x1b[B" joins would skip
     // a row on immediate-wrap terminals (conhost) and push the frame past the
     // last line, scrolling the header away and clipping the input box.
+    this.flushFrame(frame, H);
+  }
+
+  private flushFrame(frame: string[], H: number): void {
     const visible = frame.slice(0, H);
     let out = '';
     for (let i = 0; i < visible.length; i++) out += `\x1b[${i + 1};1H\x1b[2K${visible[i]}`;
@@ -863,29 +968,7 @@ export class TuiRuntime {
 
 /* ---------------- driver ---------------- */
 
-/** First user line of a session file WITHOUT a full parse: peek the first
- *  64KB, scan lines for the first user event. With hundreds of sessions a
- *  full loadTranscript per row would stall the picker for seconds; the user
- *  event is always near the head, so the peek is O(64KB) per session. */
-export async function firstUserLinePeek(file: string): Promise<string> {
-  try {
-    const fh = await fopen(file, 'r');
-    try {
-      const buf = Buffer.alloc(65_536);
-      const { bytesRead } = await fh.read(buf, 0, 65_536, 0);
-      for (const line of buf.toString('utf8', 0, bytesRead).split('\n')) {
-        if (!line.includes('"user"')) continue;
-        try {
-          const ev = JSON.parse(line) as { t?: string; text?: string };
-          if (ev.t === 'user' && typeof ev.text === 'string') return ev.text;
-        } catch { /* partial line at the buffer edge - no preview */ }
-      }
-    } finally { await fh.close(); }
-  } catch { /* unreadable file - no preview */ }
-  return '';
-}
-
-export async function tui(yes: boolean, noWeb = false): Promise<void> {
+export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: boolean } = {}): Promise<void> {
   let cfg = await loadConfig();
   let autoApprove = yes || cfg.approval === 'auto';
   if (!stdin.isTTY) {
@@ -916,6 +999,15 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
   }
 
   let history: ChatMessage[] = [];
+  // Codex thread semantics: one rollout file per conversation. The first task
+  // creates it; every later turn (and everything after /resume) appends to it.
+  let currentSessionId: string | undefined;
+  // `hmh resume` startup: the picker comes up before the first prompt (codex
+  // `codex resume` behavior); Esc leaves a fresh conversation
+  if (opts.resumeAtStart) {
+    const pick = await rt.openResumePicker();
+    if (pick?.kind === 'resume') await resumeInto(pick.row.file);
+  }
   // Task queue: new submissions during a running task are queued (not
   // rejected, not run concurrently — sequential execution preserves history
   // integrity). Slash commands still run immediately (they're quick).
@@ -976,6 +1068,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         cfg,
         yes: autoApprove,
         resumeMessages: history,
+        sessionId: currentSessionId,
         signal: currentAbort.signal,
         approvalAsk: (name, args) => rt.requestApproval(name, args),
         events: {
@@ -1009,6 +1102,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         },
       });
       rt.setBusy(false);
+      currentSessionId = result.sessionId;
       rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
       history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
     } catch (err) {
@@ -1017,6 +1111,44 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     } finally {
       currentAbort = null;
     }
+  }
+
+  /** Load a rollout into the conversation: `history` for the model, a tail
+   *  window for the eye, and currentSessionId so the next turn APPENDS to
+   *  the same rollout (codex Resume semantics - one thread, one file). */
+  async function resumeInto(file: string): Promise<void> {
+    const tr = await loadTranscript(file);
+    if (!tr || tr.messages.length === 0) { rt.addText(t.cmdResumeNotFound(tr?.id ?? file), 'err'); return; }
+    history = tr.messages;
+    currentSessionId = tr.id;
+    rt.clearScreen();
+    // long sessions render from the tail so the visible window stays usable
+    // while the complete transcript lives in `history` for the model
+    const MAX_RENDER = 80;
+    const msgs = tr.messages;
+    const skipped = Math.max(0, msgs.length - MAX_RENDER);
+    rt.addText(
+      '--- resumed ' + tr.id + ' · ' + msgs.length + ' messages'
+      + (skipped > 0 ? ' (' + skipped + ' earlier kept in context, not shown)' : '')
+      + ' ---',
+      'dim',
+    );
+    for (const m of (skipped > 0 ? msgs.slice(skipped) : msgs)) {
+      const text = typeof m.content === 'string' ? m.content : '';
+      if (m.role === 'user') {
+        rt.addUser(text.replace(/\n+/g, ' ').slice(0, 400));
+      } else if (m.role === 'assistant') {
+        const calls = (m as { tool_calls?: Array<{ function?: { name?: string } }> }).tool_calls ?? [];
+        if (text.trim()) rt.addText(text.slice(0, 2000));
+        for (const c of calls) rt.addText('● ' + CYAN(String(c.function?.name ?? 'tool')) + DIM(' …'), 'dim');
+      } else if (m.role === 'tool') {
+        const first = text.split('\n').find((l) => l.trim()) ?? '';
+        if (first) rt.addText('  ' + DIM('⎿ ' + first.trim().slice(0, 100)), 'dim');
+      } else if (m.role === 'system' && text && !text.startsWith('[context pruned')) {
+        rt.addText(DIM(text.slice(0, 300)), 'dim');
+      }
+    }
+    rt.addText(t.cmdResumeLoaded(tr.messages.length), 'dim');
   }
 
   async function handleLine(line: string): Promise<void> {
@@ -1047,7 +1179,9 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
       rt.addText(COMMANDS.map((c) => '  ' + c.name.padEnd(11) + ' ' + String(t[c.key as keyof typeof t])).join('\n'), 'dim');
       return;
     }
-    if (line === '/clear') { rt.clearScreen(); return; }
+    // /clear = new thread (codex /new): blank screen, drop the in-memory
+    // transcript AND start a fresh rollout on the next task
+    if (line === '/clear') { rt.clearScreen(); history = []; currentSessionId = undefined; return; }
     if (line === '/status') { rt.setStatus(t.tuiStatus(cfg.locale ?? 'zh', skills.length, chatModel)); return; }
     if (line === '/tools') {
       for (const tool of reg.list()) rt.addText(`${tool.name}${tool.needsApproval ? YELLOW(' [gated]') : ''} — ${tool.description.split('\n')[0].slice(0, 80)}`);
@@ -1073,64 +1207,19 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     }
     if (line === '/resume' || line.startsWith('/resume ')) {
       const arg = line.slice(8).trim();
-      const { latestSession, loadTranscript } = await import('@hmharness/kernel');
-      const { readdir } = await import('node:fs/promises');
-      // ALL sessions, newest first - no arbitrary "recent 8" cap (user
-      // challenge: "不应该是所有历史会话吗"). Previews use the 64KB peek,
-      // never a full parse, so hundreds of rows still open instantly; the
-      // palette scrolls and head-prefix filtering narrows fast.
-      let files: string[] = [];
-      try { files = (await readdir(join(home, 'sessions'))).filter((f) => f.endsWith('.jsonl')); } catch { /* none */ }
-      files.sort();
-      const recent = files.reverse();
-      const rows: Array<{ name: string; desc: string }> = [];
-      for (const f of recent) {
-        const firstUser = await firstUserLinePeek(join(home, 'sessions', f));
-        rows.push({ name: f.slice(0, 18), desc: (firstUser || '(无预览)').replace(/\n/g, ' ').slice(0, 56) });
-      }
-      rt.setSessionChoices(rows);
+      // bare /resume opens the Codex-style full-frame picker (typeahead,
+      // cwd filter, sort toolbar, lazy pages). It is a modal: it cannot share
+      // the screen with a running task's streaming output.
       if (!arg) {
-        // bare /resume opens the LIVE picker - same arrows/wheel/Enter/click
-        // machinery as /model; a printed text list is a dead end (user-
-        // reported: "上下键无法选择")
-        if (rows.length === 0) { rt.addText(t.cmdResumeNone, 'dim'); return; }
-        rt.openSessionPicker();
+        if (taskRunning) { rt.addText('task running - stop it first (empty Enter), then /resume', 'dim'); return; }
+        const pick = await rt.openResumePicker();
+        if (!pick || pick.kind !== 'resume') return;
+        await resumeInto(pick.row.file);
         return;
       }
       const file = await latestSession(home, arg);
-      const tr = file ? await loadTranscript(file) : null;
-      if (!tr || tr.messages.length === 0) { rt.addText(t.cmdResumeNotFound(arg), 'err'); return; }
-      history = tr.messages;
-      rt.clearScreen();
-      // Render the FULL session window, not just the first line (user
-      // feedback: "恢复的应该是整个会话窗口,而不仅仅是片段"). Long sessions
-      // are bounded from the tail so the visible window stays usable while
-      // the complete transcript still lives in `history` for the model.
-      const MAX_RENDER = 80;
-      const msgs = tr.messages;
-      const skipped = Math.max(0, msgs.length - MAX_RENDER);
-      rt.addText(
-        '--- resumed ' + (tr.id || arg) + ' · ' + msgs.length + ' messages'
-        + (skipped > 0 ? ' (' + skipped + ' earlier kept in context, not shown)' : '')
-        + ' ---',
-        'dim',
-      );
-      for (const m of (skipped > 0 ? msgs.slice(skipped) : msgs)) {
-        const text = typeof m.content === 'string' ? m.content : '';
-        if (m.role === 'user') {
-          rt.addUser(text.replace(/\n+/g, ' ').slice(0, 400));
-        } else if (m.role === 'assistant') {
-          const calls = (m as { tool_calls?: Array<{ function?: { name?: string } }> }).tool_calls ?? [];
-          if (text.trim()) rt.addText(text.slice(0, 2000));
-          for (const c of calls) rt.addText('● ' + CYAN(String(c.function?.name ?? 'tool')) + DIM(' …'), 'dim');
-        } else if (m.role === 'tool') {
-          const first = text.split('\n').find((l) => l.trim()) ?? '';
-          if (first) rt.addText('  ' + DIM('⎿ ' + first.trim().slice(0, 100)), 'dim');
-        } else if (m.role === 'system' && text && !text.startsWith('[context pruned')) {
-          rt.addText(DIM(text.slice(0, 300)), 'dim');
-        }
-      }
-      rt.addText(t.cmdResumeLoaded(tr.messages.length), 'dim');
+      if (!file) { rt.addText(t.cmdResumeNotFound(arg), 'err'); return; }
+      await resumeInto(file);
       return;
     }
     if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
