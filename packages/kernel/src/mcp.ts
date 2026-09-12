@@ -28,6 +28,12 @@ function nextId(): number {
   nextId.n = (nextId.n ?? 0) + 1;
   return nextId.n;
 }
+
+/** Transport-level failure worth one retry (and worth explaining in the tool
+ *  result instead of leaking a bare "TypeError: fetch failed"). */
+function isTransientTransport(msg: string): boolean {
+  return /fetch failed|terminated|ECONN|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|timeout|abort|socket|premature close|UND_ERR/i.test(msg);
+}
 namespace nextId {
   export var n: number | undefined;
 }
@@ -173,7 +179,23 @@ export class McpClient {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
+      // one retry for transient transport failures: a dead/restarting MCP
+      // server used to surface a bare "TypeError: fetch failed" straight to
+      // the model as the tool result
+      let res: Response | undefined;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          res = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
+          break;
+        } catch (err) {
+          if (attempt === 0 && isTransientTransport(String(err))) {
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          throw err;
+        }
+      }
+      if (!res) throw new Error('no response');
       const sid = res.headers.get('mcp-session-id');
       if (sid) this.sessionId = sid;
       if (!res.ok) throw new Error(`mcp/${this.serverName}: HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -185,6 +207,13 @@ export class McpClient {
         body = await res.json();
       }
       return body as RpcResult;
+    } catch (err) {
+      const msg = String(err);
+      if (/^mcp\//.test(msg)) throw err; // already annotated (HTTP status, parse)
+      const hint = isTransientTransport(msg)
+        ? ` - the MCP server at ${cfg.url} is unreachable or cut the connection`
+        : '';
+      throw new Error(`mcp/${this.serverName}: request failed (${msg})${hint}`);
     } finally {
       clearTimeout(timer);
     }

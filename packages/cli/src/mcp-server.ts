@@ -102,8 +102,12 @@ export async function serveMcp(): Promise<void> {
         const name = msg.params?.name ?? '';
         const tool = byName.get(name);
         if (!tool) {
-          void logCall(name, false, 0);
-          reply(msg.id, { content: [{ type: 'text', text: `unknown or not exposed tool: ${name}` }], isError: true });
+          // log-then-reply: the call log is an audit trail ("external agents'
+          // HarmonyOS usage"), so it must be durable BEFORE the caller can see
+          // the response. Fire-and-forget here raced with the client reading
+          // the file, so a rejected call sometimes had no log line yet.
+          void logCall(name, false, 0).then(() =>
+            reply(msg.id, { content: [{ type: 'text', text: `unknown or not exposed tool: ${name}` }], isError: true }));
           break;
         }
         const t0 = Date.now();

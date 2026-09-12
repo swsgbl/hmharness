@@ -600,7 +600,8 @@ export const PAGE = `<!doctype html>
     log.scrollTop = log.scrollHeight;
     return {
       add: function (c) { body.textContent += c; autoscroll(); },
-      finalize: function () { box.classList.remove('open'); }
+      finalize: function () { box.classList.remove('open'); },
+      discard: function () { if (box.parentNode) box.parentNode.removeChild(box); }
     };
   }
   function sayBlock() {
@@ -609,7 +610,8 @@ export const PAGE = `<!doctype html>
     var txt = '';
     return {
       add: function (c) { txt += c; e.textContent = txt; autoscroll(); },
-      finalize: function () { e.innerHTML = mdLite(txt); lastAssistantText = txt; autoscroll(); }
+      finalize: function () { e.innerHTML = mdLite(txt); lastAssistantText = txt; autoscroll(); },
+      discard: function () { if (e.parentNode) e.parentNode.removeChild(e); }
     };
   }
   function setBusy(b, mode) {
@@ -1250,6 +1252,13 @@ export const PAGE = `<!doctype html>
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
+    if (d.kind === 'reset') {
+      // provider retried after a mid-stream cut: drop the half answer so the
+      // regenerated text is not shown as a duplicate
+      if (curBlock && curBlock.discard) curBlock.discard();
+      curBlock = null; curKind = null;
+      return;
+    }
     if (curKind !== d.kind) {
       flushStream();
       clearEmpty();

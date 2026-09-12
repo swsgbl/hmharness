@@ -377,7 +377,7 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  startStream(kind: 'think' | 'say'): (chunk: string) => void {
+  startStream(kind: 'think' | 'say'): ((chunk: string) => void) & { drop: () => void } {
     const width = Math.max(20, (stdout.columns || 100) - 2);
     const lines: string[] = [];
     let buf = kind === 'think' ? '∴ ' : '';
@@ -400,10 +400,18 @@ export class TuiRuntime {
     repaint();
     this.entries.push(entry);
     this.scrollFromBottom = 0;
-    return (chunk: string) => {
+    const append = (chunk: string) => {
       buf += chunk;
       repaint();
     };
+    // a provider retry restarts the response: remove THIS block so the
+    // regenerated text does not appear as a second copy of a half answer
+    append.drop = () => {
+      const i = this.entries.indexOf(entry);
+      if (i >= 0) this.entries.splice(i, 1);
+      this.dirty = true;
+    };
+    return append;
   }
 
   /** Collapse a streamed thinking block to its final folded summary line. */
@@ -959,7 +967,7 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
     rt.addUser(line);
     rt.setBusy(true, t.running);
     currentAbort = new AbortController();
-    let appender: ((c: string) => void) | null = null;
+    let appender: (((c: string) => void) & { drop: () => void }) | null = null;
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
     try {
       const result = await runAgentTask({
@@ -973,6 +981,12 @@ export async function tui(yes: boolean, noWeb = false): Promise<void> {
         events: {
           onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
           onDelta: (k, chunk) => {
+            if (k === 'reset') {
+              // provider retry after a mid-stream cut: drop the half answer
+              appender?.drop?.();
+              appender = null; kind = null;
+              return;
+            }
             if (k !== kind) {
               if (kind === 'reasoning') rt.foldThinking();
               appender = rt.startStream(k === 'reasoning' ? 'think' : 'say'); kind = k;

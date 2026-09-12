@@ -13,7 +13,23 @@ export interface ChatResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-export type DeltaKind = 'text' | 'reasoning';
+export type DeltaKind = 'text' | 'reasoning' | 'reset';
+
+/** Transient failures worth retrying. `terminated` is undici's TypeError for
+ *  a socket cut mid-body (gateway dropped a long stream, proxy reset, server
+ *  restart) - the case that used to kill the whole task with a raw
+ *  `TypeError: terminated` because it matched none of the old patterns. */
+const TRANSIENT_RE = /abort|terminated|fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|timeout|socket hang up|other side closed|premature close|UND_ERR|EPIPE|no response body/i;
+
+/** Human hint for the failure classes users actually hit. */
+function transientHint(msg: string): string {
+  if (/terminated|socket hang up|other side closed|premature close/i.test(msg)) {
+    return ' - the connection was cut mid-response (gateway dropped a long stream or a proxy reset it)';
+  }
+  if (/abort|timeout/i.test(msg)) return ' - the provider stopped sending data (idle/timeout)';
+  if (/fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|UND_ERR/i.test(msg)) return ' - the provider endpoint was unreachable (network/DNS)';
+  return '';
+}
 
 /** Parse a Retry-After header into a delay in ms (MDN: exactly two legal
  *  forms - delta-seconds or HTTP-date), clamped to [0, 120s]. Returns 0 when
@@ -32,8 +48,13 @@ export function parseRetryAfterMs(raw: string | null | undefined, maxMs = 120_00
 
 export interface ChatOptions {
   timeoutMs?: number;
-  /** Streaming callback; presence switches the request to stream:true. */
+  /** Streaming callback; presence switches the request to stream:true.
+   *  kind 'reset' carries an empty chunk and means: the previous attempt died
+   *  mid-stream and is being retried - discard what you streamed for it. */
   onDelta?(kind: DeltaKind, chunk: string): void;
+  /** Retry policy for transient failures. Defaults: 6 attempts, 3s base with
+   *  exponential backoff and jitter, capped at 60s per wait. */
+  retry?: { attempts?: number; baseMs?: number };
 }
 
 export async function chat(
@@ -61,13 +82,20 @@ export async function chat(
 
   let lastError = '';
   // Resilient retry: exponential backoff with jitter, up to 6 attempts
-  // (Codex-style fire-and-forget: network hiccups, 429s, and provider
-  // restarts should NEVER kill a long-running task). Retry-After header
-  // from 429s is honoured when present.
-  const MAX_RETRIES = 6;
+  // (Codex-style fire-and-forget: network hiccups, 429s, provider restarts,
+  // and mid-stream socket cuts should NEVER kill a long-running task).
+  const MAX_RETRIES = opts.retry?.attempts ?? 6;
+  const BASE_MS = opts.retry?.baseMs ?? 3000;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
+    // Did this attempt stream anything to the UI before dying? A mid-stream
+    // cut leaves partial deltas on screen; retrying would duplicate them, so
+    // clients are told to drop the partial block first (DeltaKind 'reset').
+    let emitted = false;
+    const emit: typeof opts.onDelta = streaming
+      ? (kind, chunk) => { if (kind !== 'reset') emitted = true; opts.onDelta!(kind, chunk); }
+      : undefined;
     try {
       const res = await fetch(endpoint(cfg.baseUrl), {
         method: 'POST',
@@ -100,7 +128,7 @@ export async function chat(
       }
       if (streaming) {
         clearTimeout(timer);
-        return await consumeStream(res, opts.onDelta!);
+        return await consumeStream(res, emit!);
       }
       const data = (await res.json()) as any;
       const choice = data.choices?.[0];
@@ -115,10 +143,13 @@ export async function chat(
       };
     } catch (err) {
       lastError = String(err);
-      // transient (network, timeout, connection reset): retry with backoff
-      if (/abort|fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|timeout|socket hang up/i.test(lastError)) {
-        const delay = Math.min(60_000, 3000 * Math.pow(2, attempt));
-        await sleep(delay + Math.random() * 2000);
+      // transient (network, timeout, connection reset, mid-stream cut): retry
+      if (TRANSIENT_RE.test(lastError)) {
+        // the attempt already painted partial text: tell clients to drop it so
+        // the retry does not append a second copy of the same answer
+        if (emitted) opts.onDelta?.('reset', '');
+        const delay = Math.min(60_000, BASE_MS * Math.pow(2, attempt));
+        await sleep(delay + Math.random() * Math.min(2000, BASE_MS));
         continue;
       }
       throw err; // permanent error (bad JSON, logic error): don't retry
@@ -126,7 +157,7 @@ export async function chat(
       clearTimeout(timer);
     }
   }
-  throw new Error(`provider: failed after ${MAX_RETRIES} retries (${cfg.baseUrl}): ${lastError}`);
+  throw new Error(`provider: failed after ${MAX_RETRIES} attempts (${cfg.baseUrl}): ${lastError}${transientHint(lastError)}`);
 }
 
 /** Assemble a ChatResponse from an SSE stream, emitting deltas as they land. */
@@ -134,7 +165,8 @@ async function consumeStream(
   res: Response,
   onDelta: (kind: DeltaKind, chunk: string) => void,
 ): Promise<ChatResponse> {
-  const reader = res.body!.getReader();
+  if (!res.body) throw new TypeError('provider: no response body (streaming requested)');
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
   let text = '';
@@ -202,6 +234,11 @@ async function consumeStream(
     await pump();
   } finally {
     clearTimeout(idleTimer);
+    // Cancel the body rather than releaseLock(): when the idle guard won the
+    // race, reader.read() is still outstanding and releaseLock() throws
+    // "Cannot release a readable stream reader..." - which would REPLACE the
+    // real error (a mid-stream cut / idle timeout) with a meaningless one.
+    await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
   const ordered = [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);

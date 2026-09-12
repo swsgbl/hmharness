@@ -4,6 +4,40 @@
 故以 @hmharness 发布——与仓库名一致)。八包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli → codexhost-bridge(用户的开源适配器,独立发版节奏)。
 
+## [0.6.8] - 2026-09-11
+
+运行时稳定性修复(用户实测日志驱动:反复 `TypeError: terminated`,任务中断、只能
+手打"继续"):
+
+- **`TypeError: terminated` 归入可重试(核心)**:这是 undici 在 socket 被中途
+  掐断时的报错(网关切长流/代理重置/服务重启)——旧重试正则
+  (`abort|fetch failed|ECONN|...`)不含它,于是被当"永久错误"直接抛出,**任务
+  当场死亡**。现在 transient 分类覆盖 `terminated|other side closed|
+  premature close|UND_ERR|EPIPE|no response body` 等,断流自动重试。
+- **重试前发 reset 信号,半截输出不再重复**:断流时已有部分文字上屏,直接重试
+  会出现"半句话 + 完整答案"两份。新增 `DeltaKind 'reset'`:内核在重试前通
+  知前端丢弃本轮流式块——TUI 的流追加器带 `drop()` 移除该 entry,Web 的
+  say/think 块带 `discard()` 移除 DOM 节点。测试验证 deltas 序列为
+  `[text 半句, reset, text 完整答案]`。
+- **错误信息可读化**:不再抛裸 undici 错,改为
+  `provider: failed after N attempts (url): ... - 连接被中途切断(网关丢弃长流
+  或代理重置)` / `- 提供商停止发送数据(空闲超时)` / `- 端点不可达(网络/DNS)`。
+- **consumeStream 清理修复**:空闲守卫胜出时 `reader.read()` 仍挂起,
+  `releaseLock()` 会抛 "Cannot release a readable stream reader..." **掩盖真
+  实错误**;改为先 `reader.cancel()` 再释放,并对空 body 明确报错(原先
+  `res.body!` 非空断言会在网关异常时空指针)。
+- **MCP 传输失败可读化 + 重试一次**:死掉/重启中的 MCP 服务器原先把裸
+  `TypeError: fetch failed` 直接当工具结果返回给模型;现在重试一次并注明
+  "MCP server 不可达或连接被切断"。
+- **附带真实 bug(MCP 审计日志竞态)**:`mcp-server.ts` 未知工具分支
+  `void logCall(...)` 不等待就回响应,导致 `insights/mcp-calls.jsonl` 的拒绝
+  记录**时有时无**(实测 8 次跑 2 次缺失)。审计日志必须"先落盘再可见",
+  改为 log-then-reply。修后 8/8 稳定。
+- **重试策略可配置**:`ChatOptions.retry{attempts,baseMs}`(默认 6 次/3s 指数
+  退避),供调用方与测试使用。
+- 测试:+4 断流韧性(本地假服务器模拟 socket destroy → 断言重试与 reset 顺序)、
+  不可达端点报错可读性、非流式回归。
+
 ## [0.6.7] - 2026-09-11
 
 外部审核(全部指控经可执行复现核实)+ 全网方案调研(Codex 三层沙箱模型、
