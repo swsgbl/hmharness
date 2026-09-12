@@ -27,7 +27,8 @@ import { brief, createTrajectoryRecorder } from '@hmharness/observability';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
+import { extractFeatures, routeDecision, recordRoutingOutcome } from '@hmharness/kernel';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, redactSecrets, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -278,6 +279,26 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // are swallowed inside the recorder and can never fail the task itself.
   const traj = createTrajectoryRecorder(ctx.home, { task: opts.task, model: cfg.provider.model, cwd: ctx.cwd });
   traj.emit('run.started', 'user', { task: brief(opts.task, 400) });
+  // V2 M10 shadow router: log what the adaptive router WOULD pick vs the live
+  // static route - data for a later, gated switch (never steers traffic now)
+  {
+    const routing = (cfg as { routing?: Record<string, string> }).routing ?? {};
+    const features = extractFeatures(opts.task);
+    const sug = routeDecision(features, {
+      actual: routing.chat ?? 'default',
+      harmonyRoute: routing['chat-harmony'],
+      heavyRoute: routing['chat-heavy'],
+      defaultRoute: routing.chat ?? 'default',
+    });
+    void recordRoutingOutcome(ctx.home, {
+      time: new Date().toISOString(),
+      task: redactSecrets(opts.task).slice(0, 400),
+      features: sug.features,
+      actual: sug.actual,
+      suggested: sug.suggested,
+      reason: sug.reason,
+    }).catch(() => undefined);
+  }
   // workspace scoping + optional embedding hybrid for memory retrieval.
   // Embeddings only when routing.embedding is EXPLICITLY set - an inherited
   // chat route would 404 on /embeddings once per task for nothing.
@@ -404,6 +425,27 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     { success: result.reason === 'final', reason: result.reason },
     { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },
   );
+  // routing.outcome backfill: did the ACTUAL route succeed? (shadow stats)
+  {
+    const routing = (cfg as { routing?: Record<string, string> }).routing ?? {};
+    const features = extractFeatures(opts.task);
+    const sug = routeDecision(features, {
+      actual: routing.chat ?? 'default',
+      harmonyRoute: routing['chat-harmony'],
+      heavyRoute: routing['chat-heavy'],
+      defaultRoute: routing.chat ?? 'default',
+    });
+    void recordRoutingOutcome(ctx.home, {
+      time: new Date().toISOString(),
+      task: redactSecrets(opts.task).slice(0, 400),
+      features: sug.features,
+      actual: sug.actual,
+      suggested: sug.suggested,
+      reason: sug.reason,
+      outcome: result.reason === 'final' ? 'ok' : result.reason,
+      tokens: result.usage.promptTokens + result.usage.completionTokens,
+    }).catch(() => undefined);
+  }
 
   // ---- instant feedback: learn from THIS task's mistakes, not 8 tasks later ----
   // Tier 1 (always, zero cost): raw error pattern → memory self-note. Lowered

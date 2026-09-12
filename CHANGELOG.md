@@ -1,3 +1,32 @@
+## [0.9.0] - 2026-09-13
+
+**V2 蓝图 P1/P3 收官(M10+M11)**——Trajectory Dataset + Shadow Router + RL 前置门
+(ADR-0004/0005)。至此蓝图 M0-M11 全部闭合:
+
+- **M10a Dataset 管线(evolution/dataset.ts)**:runs/ 轨迹 → filter(兼容 M1
+  recorder 嵌套 schema 与扁平形态)→ dedupe(task+outcome+turns+tools 指纹,
+  重复失败轮只留一条)→ label → reward(**可解释映射**:ok 从 1.0 起每 10% 工具
+  失败率扣 0.1(扣减封顶 0.6),非 ok 封顶 0.3,llmJudge 证据等级 ≥5 永不超
+  0.7——与 M2 硬顶一致)→ 版本化落盘(manifest 含扫描窗口/过滤指纹/切分种子/
+  reward 直方图)→ 确定性 8:2 train/eval 切分。**导出即脱敏**(redactSecrets
+  全量过一遍,evidence 页教训)。CLI:`hmh dataset build|list|show`。真机:
+  43 轨迹 → 19 样本(15/4)。
+- **M10b Shadow Model Router(kernel/router.ts)**:extractFeatures(complexity
+  启发式/语言/domain/expectedContext)+routeDecision 纯函数**建议**——不改
+  变现有静态路由;runner 每次 run 记录 routing.outcome(任务特征+实际路由+
+  建议路由+运行结果回填)到 evolution/routing.jsonl。**影子先行,门禁切换**
+  (与 M9 同纪律:统计显著前建议不接流)。CLI:`hmh route`。
+- **M11 RL 前置门(evolution/readiness.ts)**:六条件从真实磁盘证据逐条测量
+  (≥1000 高质量轨迹/≥100 bench 任务/reward-人工相关性标注/评估回归套件
+  稳定/版本可追溯/offline eval+holdout),任何条件不满足即 **optimize-first**
+  并点名应做的优化杠杆(data-collection/bench-expansion/reward-calibration/
+  eval-suite-stabilization)。**无任何强制进入 RL 的开关**——蓝图红线无绕行。
+  CLI:`hmh readiness`。真机:20/1000 轨迹 → optimize-first(data-collection)。
+- 测试 +11(dataset 4:reward 映射/确定性切分/过滤去重/脱敏导出;router 3:
+  特征提取/建议纯函数/记录统计 n≥8 地板;readiness 3:空仓/全满足/回归阻塞;
+  redact 1)。全套 211+2 绿。
+- SELFFEED 第 12 天:SelfFeed1 设备端到端(模拟器 install/launch/响应验证)。
+
 ## [0.8.4] - 2026-09-13
 
 **V2 蓝图 P1 第二批(M8+M9)**——Project Runtime + Evolution 泛化(ADR-0002/0003 先行):

@@ -5,7 +5,12 @@
     "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
     "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
     "Sign the newest unsigned hap with the debug identity and install+launch it on the emulator; report the lifecycle marker from hilog.",
-    "Run harmony_device_test end-to-end on the workspace app (install -> launch -> log marker -> uninstall) and report all four verdicts.",
+    {
+      "task": "Run harmony_device_test end-to-end on the workspace app (install -> launch -> log marker -> uninstall) and report all four verdicts.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "device_test E2E on SelfFeed1 emulator 5555: PASS install/launch/log-marker/uninstall; EntryAbility onCreate asserted; WindowScene render nodes in hilog"
+    },
     "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
     "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
     "Run the codelinter on the workspace entry module and summarize the top three rule categories.",

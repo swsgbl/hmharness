@@ -60,6 +60,7 @@ import { harmonyTools } from '@hmharness/domain-harmony';
 import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask, strings, type Locale } from '@hmharness/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const BOLD = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
@@ -380,6 +381,10 @@ usage:
   hmh experiment [list|show <id>|run <id> [--cases=N]|promote <id> [--human]|
                rollback <target>]   evolution candidates: control/treatment
                              bench arms + statistical promotion gate (V2 M9)
+  hmh dataset [list|build [ver]|show <ver> [--train|--eval]]
+                             trajectory -> versioned, redacted, split dataset (V2 M10)
+  hmh route                  shadow-router stats: agreement rate + outcome split (V2 M10)
+  hmh readiness              the RL gate: six conditions measured from real evidence (V2 M11)
   hmh web start|stop|status   web UI as a silent background daemon (no window,
                              survives closing everything; log ~/.hmharness/web.log)
   hmh web [--port=7788]       web UI in the foreground (debugging)
@@ -769,6 +774,70 @@ flags:
     const { startServer } = await import('@hmharness/web');
     await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
     return; // startServer keeps the process alive
+  }
+  if (cmd === 'dataset') {
+    // V2 M10: trajectory -> versioned dataset (filter/dedupe/reward/split)
+    await initHome();
+    const home = homeDir();
+    const E = await import('@hmharness/evolution');
+    const sub = rest[0] ?? 'list';
+    if (sub === 'build') {
+      const version = rest[1] && !rest[1].startsWith('--') ? rest[1] : undefined;
+      stdout.write(DIM('building dataset from runs/ …\n'));
+      const r = await E.buildDataset(home, { version });
+      const c = r.manifest.counts;
+      stdout.write(GREEN('✓') + ` ${r.manifest.version}: scanned ${c.scanned} → kept ${c.kept} (dropped ${c.dropped}, dupes ${c.duplicates})\n`);
+      stdout.write(`  train ${c.train} / eval ${c.eval} (seed ${r.manifest.splitSeed}) · filter ${r.manifest.filterFingerprint}\n`);
+      stdout.write(`  dir: ${r.dir}\n`);
+      return;
+    }
+    if (sub === 'list') {
+      const all = await E.listDatasets(home);
+      if (all.length === 0) { stdout.write('no dataset versions (hmh dataset build)\n'); return; }
+      for (const m of all) stdout.write(`${CYAN(m.version)} ${DIM(m.createdAt)} · kept ${m.counts.kept} (train ${m.counts.train}/eval ${m.counts.eval}) · filter ${m.filterFingerprint}\n`);
+      return;
+    }
+    if (sub === 'show') {
+      const version = rest[1] ?? '';
+      const split = rest.includes('--eval') ? 'eval' as const : rest.includes('--train') ? 'train' as const : undefined;
+      const samples = await E.loadDataset(home, version, split);
+      if (samples.length === 0) { stdout.write('no such dataset version or empty split\n'); return; }
+      for (const s of samples.slice(0, 30)) {
+        stdout.write(`${s.reward.toFixed(1)} ${s.outcome.padEnd(12)} ${YELLOW(`t${s.turns}`)} ${DIM(s.runId.slice(0, 22))} ${s.task.slice(0, 56).replace(/\s+/g, ' ')}\n`);
+      }
+      if (samples.length > 30) stdout.write(DIM(`… ${samples.length - 30} more\n`));
+      return;
+    }
+    stdout.write('usage: hmh dataset [list|build [version]|show <version> [--train|--eval]]\n');
+    return;
+  }
+  if (cmd === 'route') {
+    // V2 M10 shadow router stats: how often the adaptive suggestion disagrees
+    // with the live route, and whether disagreement correlates with outcomes
+    await initHome();
+    const home = homeDir();
+    const { routingStats } = await import('@hmharness/kernel');
+    const s = await routingStats(home);
+    stdout.write(`routing outcomes: ${s.total} · shadow agreed ${s.agreed} (disagreement ${(s.disagreementRate * 100).toFixed(0)}%)\n`);
+    for (const [reason, n] of Object.entries(s.byReason)) stdout.write(`  ${DIM(reason)}: ${n}\n`);
+    if (s.successAgree !== null) stdout.write(`success when agreed: ${(s.successAgree * 100).toFixed(0)}%${s.successDisagree !== null ? ` · when disagreed: ${(s.successDisagree * 100).toFixed(0)}%` : ''}\n`);
+    else stdout.write(DIM('agreement/success split needs >=8 labeled rows per side\n'));
+    return;
+  }
+  if (cmd === 'readiness') {
+    // V2 M11: the RL gate. All six conditions measured from real evidence;
+    // closed gate names the optimization to do instead. No bypass exists.
+    await initHome();
+    const home = homeDir();
+    const { rlReadiness } = await import('@hmharness/evolution');
+    const r = await rlReadiness(home);
+    stdout.write(BOLD(r.verdict === 'rl-eligible' ? GREEN('RL-ELIGIBLE') : YELLOW('OPTIMIZE-FIRST')) + '\n');
+    for (const c of r.conditions) {
+      const mark = c.met ? GREEN('✓') : RED('✗');
+      stdout.write(`  ${mark} ${c.id.padEnd(28)} ${String(c.current).slice(0, 40)} (need: ${String(c.threshold).slice(0, 44)})\n`);
+    }
+    if (r.recommendedLever) stdout.write(DIM(`\nrecommended lever: ${r.recommendedLever} (skill/prompt/router optimization first - blueprint M11)\n`));
+    return;
   }
   if (cmd === 'project') {
     // V2 M8 project runtime (ADR-0002): checkpoints are plumbing snapshots -
