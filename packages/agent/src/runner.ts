@@ -23,6 +23,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmharness/kernel';
+import { brief, createTrajectoryRecorder } from '@hmharness/observability';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -266,6 +267,11 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   const ctx = opts.ctx ?? { cwd: process.cwd(), home: homeDir() };
   const events = opts.events ?? {};
   const session = new Session(ctx.home, ctx.cwd, cfg.provider.model);
+  // V2 M1 flight recorder: every run leaves a typed, replayable trajectory
+  // under <home>/runs/<run-id>/. Best-effort by contract - storage failures
+  // are swallowed inside the recorder and can never fail the task itself.
+  const traj = createTrajectoryRecorder(ctx.home, { task: opts.task, model: cfg.provider.model, cwd: ctx.cwd });
+  traj.emit('run.started', 'user', { task: brief(opts.task, 400) });
   // workspace scoping + optional embedding hybrid for memory retrieval.
   // Embeddings only when routing.embedding is EXPLICITLY set - an inherited
   // chat route would 404 on /embeddings once per task for nothing.
@@ -295,6 +301,14 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // watches IT - this makes the size visible every run (review finding #5)
   const systemTokens = Math.ceil(system.length / 4);
   events.onLine?.(`  [prompt] system: ${system.length} chars (~${systemTokens} tokens) · ${agentsMd ? 'AGENTS.md: yes' : 'no AGENTS.md'}`);
+  traj.emit('context.assembled', 'system', {
+    systemChars: system.length,
+    systemTokens,
+    agentsMd: Boolean(agentsMd),
+    memoryChars: pack.memory.length,
+    skills: pack.skills.length,
+    insights: pack.insights.length,
+  });
 
   await session.user(opts.task);
 
@@ -349,6 +363,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       onDelta: (kind, chunk) => events.onDelta?.(kind, chunk),
       onToolCall: (name, args) => {
         toolsUsed.push(name);
+        traj.emit('tool.requested', 'tool', { name, args: brief(args, 120) });
         events.onToolCall?.(name, args);
       },
       onToolResult: (name, output, isError) => {
@@ -356,19 +371,33 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
           const list = toolErrors.get(name) ?? [];
           list.push(output.split('\n')[0].slice(0, 120));
           toolErrors.set(name, list);
+          traj.emit('error.observed', 'tool', { name, preview: brief(output, 160) });
         }
         void session.tool(name, output, isError);
+        traj.emit('tool.completed', 'tool', { name, isError, preview: brief(output, 120) });
         events.onToolResult?.(name, output, isError);
       },
       onApproval: (name, args, granted) => {
         void session.approval(name, granted);
+        traj.emit(granted ? 'tool.approved' : 'tool.denied', 'system', { name });
         events.onApproval?.(name, args, granted);
       },
       onAssistant: async (m) => {
+        // stamp the event when the message lands, not after the session
+        // write drains - awaiting first made model.responded land AFTER
+        // run.completed in the timeline
+        traj.emit('model.responded', 'agent', { contentChars: m.content?.length ?? 0, toolCalls: m.tool_calls?.length ?? 0 });
         await session.assistant(m.content ?? null, m.tool_calls);
       },
     },
+  }).catch((err: unknown) => {
+    traj.finish({ success: false, reason: 'error', error: brief(String(err), 200) }, { toolUses: toolsUsed.length });
+    throw err;
   });
+  traj.finish(
+    { success: result.reason === 'final', reason: result.reason },
+    { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },
+  );
 
   // ---- instant feedback: learn from THIS task's mistakes, not 8 tasks later ----
   // Tier 1 (always, zero cost): raw error pattern → memory self-note. Lowered

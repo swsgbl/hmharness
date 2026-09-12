@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const packages = requested.length ? requested : ORDER;
 let failures = 0;

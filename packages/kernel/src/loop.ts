@@ -35,6 +35,9 @@ export interface LoopResult {
   messages: ChatMessage[];
   /** Token usage summed across all model calls in this run (when reported). */
   usage: { promptTokens: number; completionTokens: number };
+  /** Why the loop stopped: final answer, idle detection, a safety valve, or
+   *  user interrupt - trajectory outcomes (M1) and UI labels consume it. */
+  reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' | 'interrupted';
 }
 
 export async function runLoop(opts: {
@@ -145,7 +148,7 @@ export async function runLoop(opts: {
     if (calls.length === 0) {
       const text = message.content ?? '';
       events?.onFinal?.(text, turn);
-      return { text, turns: turn, toolUses, messages: working, usage };
+      return { text, turns: turn, toolUses, messages: working, usage, reason: 'final' };
     }
 
     working.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
@@ -245,5 +248,5 @@ export async function runLoop(opts: {
       ? `Turn limit reached (${executedTurns} turns). The session is preserved — send another message to continue.`
       : `Token budget limit reached (~${usage.promptTokens + usage.completionTokens} tokens). The session is preserved — send another message to continue.`;
   events?.onFinal?.(text, executedTurns);
-  return { text, turns: executedTurns, toolUses, messages: working, usage };
+  return { text, turns: executedTurns, toolUses, messages: working, usage, reason };
 }

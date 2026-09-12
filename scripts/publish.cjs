@@ -5,8 +5,8 @@
  * then:  node scripts/publish.cjs
  *
  * Order is load-bearing (each package installs its deps on publish):
- * kernel -> evolution -> domain-harmony -> domain-ops -> agent -> web -> cli
- * -> codexhost-bridge
+ * kernel -> observability -> evolution -> domain-harmony -> domain-ops ->
+ * agent -> web -> cli -> codexhost-bridge
  * Every package publishes with --access public (scoped packages default to
  * restricted) and --registry npmjs (this machine's .npmrc points at
  * npmmirror, which is read-only).
@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const DRY = process.argv.includes('--dry-run');
 const onlyIndex = process.argv.indexOf('--only');
 const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;

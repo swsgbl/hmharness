@@ -62,6 +62,7 @@ const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const CYAN = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
+const RED = (s: string) => `\x1b[31m${s}\x1b[0m`;
 
 async function uiStrings(): Promise<ReturnType<typeof strings>> {
   const cfg = await loadConfig();
@@ -645,6 +646,43 @@ flags:
     stdout.write(list.length
       ? list.map((b) => `  ${b.id}  ${b.items.length} items${b.full ? ' (full)' : ''}  ${b.time}`).join('\n') + '\n'
       : DIM('  no backups yet - run "hmh state backup"\n'));
+    return;
+  }
+  if (cmd === 'replay') {
+    // V2 M1: typed trajectory replay. Bare `hmh replay` lists recent runs;
+    // `hmh replay <run-id>` renders the event timeline; --json dumps raw.
+    await initHome();
+    const { jsonlTrajectoryStore } = await import('@hmharness/observability');
+    const store = jsonlTrajectoryStore(homeDir());
+    const id = rest.find((a) => !a.startsWith('-'));
+    if (!id) {
+      const runs = await store.listRuns(20);
+      stdout.write(runs.length
+        ? runs.map((r) => {
+            const okc = r.outcome ? (r.outcome.success ? GREEN('✓') : RED('✗')) : YELLOW('…');
+            const m = r.metrics ? ` · ${r.metrics.turns ?? '?'}t/${r.metrics.toolUses ?? '?'}x` : '';
+            return `  ${okc} ${r.runId}  ${DIM(r.task.slice(0, 52))}${m}`;
+          }).join('\n') + '\n'
+        : DIM('  no runs yet - every task now records a trajectory automatically\n'));
+      return;
+    }
+    if (rest.includes('--json')) {
+      stdout.write(await store.exportRun(id, 'json'));
+      return;
+    }
+    const t = await store.getRun(id);
+    if (t.events.length === 0) { stdout.write(DIM(`no trajectory found for ${id}\n`)); return; }
+    const t0 = Date.parse(t.events[0].ts);
+    stdout.write(`run ${id} · ${t.model ?? '?'} · ${t.task.slice(0, 80)}\n`);
+    for (const e of t.events) {
+      const off = String(Math.max(0, Date.parse(e.ts) - t0)).padStart(7);
+      const icon = e.type.startsWith('tool.') ? CYAN('⚙') : e.type.startsWith('run.') ? (e.type === 'run.completed' ? GREEN('✓') : e.type === 'run.failed' ? RED('✗') : '▶') : e.type === 'error.observed' ? RED('!') : '·';
+      stdout.write(`  +${off}ms ${icon} ${e.type.padEnd(20)} ${DIM(JSON.stringify(e.payload).slice(0, 110))}\n`);
+    }
+    if (t.outcome) {
+      stdout.write(`  ${t.outcome.success ? GREEN('outcome: success') : RED('outcome: failed')} (${t.outcome.reason ?? '?'})`
+        + (t.metrics ? ` · ${t.metrics.turns ?? '?'} turns · ${t.metrics.toolUses ?? '?'} tools · ↑${t.metrics.promptTokens ?? '?'} ↓${t.metrics.completionTokens ?? '?'} tok` : '') + '\n');
+    }
     return;
   }
   if (cmd === 'tui') {

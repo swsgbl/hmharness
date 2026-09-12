@@ -4,6 +4,35 @@
 故以 @hmharness 发布——与仓库名一致)。八包有序依赖:kernel → evolution → domain-harmony
 → domain-ops → agent → web → cli → codexhost-bridge(用户的开源适配器,独立发版节奏)。
 
+## [0.7.0] - 2026-09-12
+
+**V2 蓝图第一阶段(M0+M1)——Trajectory 飞行记录仪**(依据 V2/V3 路线图与施工方案,
+外部主张已经全网核实:MCP 2026-07-28 无状态核心/Tasks、OpenAI Agents SDK
+Runtime-Sandbox 分离、Zed ACP、Microsoft Agent Lightning):
+
+- **新包 @hmharness/observability(零依赖)**:类型化 RunEvent schema v1
+  (22 种事件:run/context/model/tool/error/repair/judge/checkpoint 族)+
+  append-only JSONL TrajectoryStore(`HMH_HOME/runs/<run-id>/trajectory.jsonl`
+  + summary.json)+ TrajectoryRecorder(best-effort:存储故障永不杀任务,
+  串行队列防 JSONL 行交错)。载荷只含摘要(截断的工具名/参数/结果状态),
+  密钥永不进 trajectory(ADR-0001 规则 3)。
+- **runner 自动接线**:每个任务自动留完整轨迹——run.created/started →
+  context.assembled(system 提示词成本)→ model.responded(每轮)→
+  tool.requested/approved/denied/completed → error.observed →
+  run.completed/failed(带 turns/tools/tokens/outcome)。无需调用方改动。
+- **`hmh replay [run-id]`**:裸命令列最近 20 个 run(✓/✗/… + 任务 + 轮次);
+  带 id 渲染事件时间线(+偏移ms/图标/类型/载荷);`--json` 导出原始轨迹。
+- **kernel LoopResult 增加 `reason`**(final/idle/turn-valve/token-valve/
+  interrupted)——Trajectory outcome 的数据源,UI 也可用。
+- **M0 工件**:`docs/adr/ADR-0001-runtime-boundaries.md`(Runtime/Capability/
+  Sandbox/Observability 四层所有权,采纳已验证的 Agents SDK 分离原则)+
+  `docs/architecture/inventory.md`(现有资产盘点:蓝图里被低估的部分——技能
+  五态/canary A/B/deny-first/审批分级均已在 0.6.8 存在;真实缺口=M1 Trajectory
+  ←本次、M2 Evaluator、M3 Sandbox、M4 Capability、M6 HarmonyBench 规模化)。
+  基线 tag `v2-foundation-baseline` 指向 0.6.8。
+- 发布链九包:kernel → **observability** → evolution → …;测试 155→160
+  (+4 store/recorder/schema +1 runner 接线:provider 失败仍留完整轨迹)。
+
 ## [0.6.8] - 2026-09-11
 
 运行时稳定性修复(用户实测日志驱动:反复 `TypeError: terminated`,任务中断、只能

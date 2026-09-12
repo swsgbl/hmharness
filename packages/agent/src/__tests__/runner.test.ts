@@ -49,6 +49,47 @@ test('YOLO fix: when yes=true, caller-provided approvalAsk must NOT override aut
   assert.equal(asked, 0, 'approvalAsk must not be consulted when yes=true');
 });
 
+test('trajectory wiring: runAgentTask leaves a typed, replayable trajectory even when the provider fails', async () => {
+  const { mkdtemp, rm, readFile, readdir } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const home = await mkdtemp(join(tmpdir(), 'hmh-trajwire-'));
+  const prevHome = process.env.HMH_HOME;
+  process.env.HMH_HOME = home;
+  try {
+    // fake provider: fetch to a dead port fails fast with retries disabled
+    const { runAgentTask } = await import('../runner.ts');
+    const { Registry } = await import('@hmharness/kernel');
+    const { baseTools } = await import('../tools.ts');
+    await runAgentTask({
+      task: 'probe task',
+      registry: ((): unknown => { const r = new Registry(); for (const t of baseTools) r.register(t); return r; })() as never,
+      cfg: { ...defaultConfig(), provider: { baseUrl: 'http://127.0.0.1:1/v1', apiKey: 'k', model: 'm', timeoutMs: 300 } } as never,
+      yes: true,
+      events: {},
+    } as never).catch(() => null);
+    // recorder appends are queued behind retry backoff; allow drain
+    await new Promise((r) => setTimeout(r, 3_000));
+    const runsDir = join(home, 'runs');
+    const ids = await readdir(runsDir);
+    assert.ok(ids.length >= 1, 'a run directory exists');
+    const dir = join(runsDir, ids[0]);
+    const raw = await readFile(join(dir, 'trajectory.jsonl'), 'utf8');
+    const events = raw.trim().split('\n').map((l) => JSON.parse(l) as { type: string; actor: string; id?: string; ts?: string });
+    const types = events.map((e) => e.type);
+    assert.equal(types[0], 'run.created');
+    assert.ok(types.includes('context.assembled'), 'context event recorded');
+    assert.equal(types[types.length - 1], 'run.failed', 'provider failure recorded as run.failed');
+    assert.ok(events.every((e) => e.id && e.ts), 'events carry id+ts');
+    const summary = JSON.parse(await readFile(join(dir, 'summary.json'), 'utf8')) as { task: string; outcome: { success: boolean } };
+    assert.equal(summary.task, 'probe task');
+    assert.equal(summary.outcome.success, false);
+  } finally {
+    process.env.HMH_HOME = prevHome;
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('approved-rules: structured matching blocks path traversal (review security fix)', async () => {
   const mod = await import('../runner.ts');
   const matchesRule = (mod as unknown as { matchesRule: (r: Array<{tool:string;argPrefix:string;time:string}>, t: string, a: Record<string, unknown>) => boolean }).matchesRule;
