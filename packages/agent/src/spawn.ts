@@ -16,6 +16,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runLoop, type Session, type LoopApproval, type Registry, type Tool } from '@hmharness/kernel';
+import { roleCharter } from './roles.ts';
 
 export const MAX_SPAWN_DEPTH = 2;
 
@@ -91,7 +92,7 @@ export function makeSpawnTool(deps: SpawnDeps): Tool {
       type: 'object',
       properties: {
         task: { type: 'string', description: 'complete, self-contained instructions for the sub-agent' },
-        role: { type: 'string', description: 'optional label for this delegation, e.g. "explorer", "reviewer", "build-fixer" - roles accumulate success rates you will see next time' },
+        role: { type: 'string', description: 'optional role label; canonical roles carry a duty charter: planner / coder / tester / reviewer / judge / repairer (plus any custom label - roles accumulate success rates you will see next time)' },
         max_turns: { type: 'number', description: 'turn budget for the sub-agent (default 8, max 12)' },
       },
       required: ['task'],
@@ -119,7 +120,7 @@ export function makeSpawnTool(deps: SpawnDeps): Tool {
       }
       const system = [
         `You are a hmh sub-agent (depth ${childDepth}${role ? `, role: ${role}` : ''}). You have no conversation history beyond this task.`,
-        role ? `Perform the ${role} duty with that specialty's discipline.` : '',
+        role ? roleCharter(role) || `Perform the ${role} duty with that specialty's discipline.` : '',
         'Do exactly what the task asks, use tools as needed, verify before answering, and reply with a concise result (the caller only sees your final answer).',
       ].filter(Boolean).join('\n');
       base.onLine?.(`[${tag}] start: ${task.slice(0, 80)}`);

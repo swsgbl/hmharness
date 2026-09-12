@@ -1,3 +1,22 @@
+## [0.8.1] - 2026-09-12
+
+V2 P1 第一批(M5+M7 切片)+SELFFEED 第 9 天:
+
+- **M5 ContextRanker(evolution/ranker.ts)**:蓝图固定权重
+  (relevance .30/dependency .20/recency .15/importance .15/similarity .10/
+  tokenCost -.10)导出为单一常量供 Evolution 后续优化;rankContext 成本按批
+  归一+平手便宜优先;packContext 贪心装填 token 预算;classifyMemory 四类
+  记忆(episodic/semantic/procedural/project)按条目形态分类。
+- **M7 Agent Team 角色契约(agent/roles.ts)**:六个规范角色
+  planner/coder/tester/reviewer/judge/repairer 各带职责契约(判定角色契约
+  内嵌 M2 证据优先级:只认证据、自报不算、VERDICT 结尾);spawn_agent 的
+  role 参数命中规范名时注入契约到子代理系统提示词,自由标签行为不变;
+  角色成功率排行榜(已有)继续积累。
+- **SELFFEED 第 9 天**:破坏 module.json5→harmony_schema_check **精确点名
+  module.mainElement**(文件::路径+修复语义),恢复字段后复检转绿(闭环);
+  预算门第二次拦截(5/4,如实留痕);状态备份完成。
+- 测试 +5(ranker 3/roles 2),全套全绿。
+
 ## [0.8.0] - 2026-09-12
 
 **V2 蓝图 P0 第二批(M2+M3+M4+M6)**——Evaluation/Sandbox/Capability/HarmonyBench:
