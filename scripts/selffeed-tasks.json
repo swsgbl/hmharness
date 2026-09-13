@@ -11,7 +11,12 @@
       "doneAt": "2026-09-13",
       "finding": "device_test E2E on SelfFeed1 emulator 5555: PASS install/launch/log-marker/uninstall; EntryAbility onCreate asserted; WindowScene render nodes in hilog"
     },
-    "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
+    {
+      "task": "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "UI regression on SelfFeedR: screenshots A/B/C + uitest nav; baseline file-system baseline (sha256+expectations) recorded via hmh-baseline.cjs; real finding: harmony_emulator_stop fake success (fixed in 0.13.2 with post-kill process verification); ui_regression tool has no baseline param (semantic keyword check only) - workaround scripts reusable"
+    },
     {
       "task": "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
       "done": true,

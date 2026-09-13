@@ -208,7 +208,23 @@ export const harmonyEmulatorStop: Tool = {
         /* already gone */
       }
     }
-    return { output: `stopped: ${targets.map((t) => `${t.hvd} (pid ${t.pid})`).join(', ')}` };
+    // verify, never trust the kill report (day-19 SELFFEED: taskkill returned
+    // success while Emulator.exe was still alive for seconds) - poll until the
+    // CIM query no longer sees the target pids, bounded at ~15s
+    const wantGone = new Set(targets.map((t) => t.pid));
+    let stillAlive: number[] = [];
+    for (let waited = 0; waited <= 15_000; waited += 2000) {
+      await new Promise((res) => setTimeout(res, waited === 0 ? 1000 : 2000));
+      const now = await runningEmulators();
+      stillAlive = now.map((r) => r.pid).filter((pid) => wantGone.has(pid));
+      if (stillAlive.length === 0) break;
+    }
+    const stopped = targets.filter((t) => !stillAlive.includes(t.pid));
+    const stuck = targets.filter((t) => stillAlive.includes(t.pid));
+    const lines: string[] = [];
+    if (stopped.length > 0) lines.push(`stopped: ${stopped.map((t) => `${t.hvd} (pid ${t.pid})`).join(', ')} (verified gone)`);
+    if (stuck.length > 0) lines.push(`NOT stopped (process still alive after taskkill - kill it manually or retry): ${stuck.map((t) => `${t.hvd} (pid ${t.pid})`).join(', ')}`);
+    return { output: lines.join('\n'), ...(stuck.length > 0 ? { isError: true } : {}) };
   },
 };
 
