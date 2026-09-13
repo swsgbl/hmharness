@@ -128,14 +128,19 @@ footer li{list-style:none;margin:6px 0}
     <div class="card"><div class="ic">🛡️</div><h3 data-i18n="c8_h">安全内建</h3><p data-i18n="c8_p">deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计;<code>hmh state backup</code> 进化状态一键快照与恢复。</p></div>
     <div class="card"><div class="ic">🌍</div><h3 data-i18n="c9_h">国际化 & 多厂商</h3><p data-i18n="c9_p">zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。</p></div>
     <div class="card"><div class="ic">📐</div><h3 data-i18n="c10_h">模型感知上下文工程</h3><p data-i18n="c10_p">上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。</p></div>
+    <div class="card"><div class="ic">🧾</div><h3 data-i18n="c11_h">轨迹 · 评估 · 证据阶梯</h3><p data-i18n="c11_p">每次运行自动留下可回放轨迹(22 种类型化事件,JSONL);评测走证据阶梯——构建通过 &lt; 命令退出码 &lt; LLM 裁决,<b>裁判满分硬顶 0.7</b>,自报永远不算数。</p></div>
+    <div class="card"><div class="ic">🗃️</div><h3 data-i18n="c12_h">Project Runtime(零接触检查点)</h3><p data-i18n="c12_p"><code>hmh project checkpoint</code> 用 git plumbing 给任意工作区打字节级快照——不动你的索引/分支/工作树,无需 commit;恢复=物化到沙箱副本。<code>hmh project release</code> 把版本钉在检查点上。</p></div>
+    <div class="card"><div class="ic">🔁</div><h3 data-i18n="c13_h">五角色流水线 + 设备门</h3><p data-i18n="c13_p"><code>hmh pipeline</code> 一条命令走完 plan→code→test→review→judge(角色契约内建,FAIL 进修复循环);<code>--device</code> 把真机四步验证(install/launch/日志断言)作为证据交给裁判;<code>--release</code> 裁决通过自动出检查点+版本。</p></div>
+    <div class="card"><div class="ic">🧬</div><h3 data-i18n="c14_h">数据集 · 影子路由 · RL 门</h3><p data-i18n="c14_p"><code>hmh dataset</code> 轨迹→去重→可解释奖励→版本化训练/评估集(导出即脱敏);影子路由记录"本该用谁"积累统计;<code>hmh readiness</code> 六条件 RL 前置门——数据不成熟就明说先做优化,没有绕行开关。</p></div>
+    <div class="card"><div class="ic">⏯️</div><h3 data-i18n="c15_h">Codex 式会话恢复</h3><p data-i18n="c15_p">会话是日期嵌套的 rollout 日志:<code>hmh resume</code> 全屏选择器(输入即过滤、目录筛选、排序工具栏),恢复=追加同一日志——整段对话一个线程不断档。</p></div>
   </div>
 </div></section>
 
 <section style="padding-top:20px"><div class="wrap">
   <div class="stats">
-    <div class="stat"><b>7</b><span data-i18n="s1">单仓七包</span></div>
+    <div class="stat"><b>11</b><span data-i18n="s1">单仓十一包</span></div>
     <div class="stat"><b>0</b><span data-i18n="s2">运行时依赖(内核)</span></div>
-    <div class="stat"><b>115</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
+    <div class="stat"><b>219</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
     <div class="stat"><b>2</b><span data-i18n="s4">门禁(训练+保留)</span></div>
   </div>
 </div></section>
@@ -292,6 +297,11 @@ const I18N = {
     c8_h: '安全内建', c8_p: 'deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计;<code>hmh state backup</code> 进化状态一键快照与恢复。',
     c9_h: '国际化 & 多厂商', c9_p: 'zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。',
     c10_h: '模型感知上下文工程', c10_p: '上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。',
+    c11_h: '轨迹 · 评估 · 证据阶梯', c11_p: '每次运行自动留下可回放轨迹(22 种类型化事件,JSONL);评测走证据阶梯——构建通过 &lt; 命令退出码 &lt; LLM 裁决,<b>裁判满分硬顶 0.7</b>,自报永远不算数。',
+    c12_h: 'Project Runtime(零接触检查点)', c12_p: '<code>hmh project checkpoint</code> 用 git plumbing 给任意工作区打字节级快照——不动你的索引/分支/工作树,无需 commit;恢复=物化到沙箱副本。<code>hmh project release</code> 把版本钉在检查点上。',
+    c13_h: '五角色流水线 + 设备门', c13_p: '<code>hmh pipeline</code> 一条命令走完 plan→code→test→review→judge(角色契约内建,FAIL 进修复循环);<code>--device</code> 把真机四步验证(install/launch/日志断言)作为证据交给裁判;<code>--release</code> 裁决通过自动出检查点+版本。',
+    c14_h: '数据集 · 影子路由 · RL 门', c14_p: '<code>hmh dataset</code> 轨迹→去重→可解释奖励→版本化训练/评估集(导出即脱敏);影子路由记录"本该用谁"积累统计;<code>hmh readiness</code> 六条件 RL 前置门——数据不成熟就明说先做优化,没有绕行开关。',
+    c15_h: 'Codex 式会话恢复', c15_p: '会话是日期嵌套的 rollout 日志:<code>hmh resume</code> 全屏选择器(输入即过滤、目录筛选、排序工具栏),恢复=追加同一日志——整段对话一个线程不断档。',
     s1: '单仓七包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '门禁(训练+保留)',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
@@ -331,6 +341,11 @@ const I18N = {
     c8_h: 'Safety Baked In', c8_p: 'A deny-first approval gate lives in the loop kernel itself; destructive command patterns are hard-denied; evolution proposals pass a poisoning screen; sessions are append-only audited; <code>hmh state backup</code> snapshots and restores the evolution state.',
     c9_h: 'i18n & Multi-Provider', c9_p: 'Bilingual zh/en UI and system prompts (<code>--locale=en</code>); any OpenAI-compatible provider, routed per purpose (chat / vision / evolve / bench).',
     c10_h: 'Model-Aware Context Engineering', c10_p: 'A context-window registry scales the compaction budget to each model (128K = the legacy default; unknown models unchanged). Long sessions get a rolling digest (evicted content is distilled, not dropped); workspace-scoped memory; optional embedding hybrid retrieval.',
+    c11_h: 'Trajectories · Evaluation · Evidence Ladder', c11_p: 'Every run leaves a replayable trajectory (22 typed events, JSONL). Evaluation climbs an evidence ladder - build pass &lt; command exit codes &lt; LLM verdict - with a <b>hard 0.7 cap on the judge\'s score</b>; self-report never counts.',
+    c12_h: 'Project Runtime (zero-touch checkpoints)', c12_p: '<code>hmh project checkpoint</code> snapshots any workspace byte-exact via git plumbing - your index, branches and worktree are never touched, no commit needed. Restore materializes a sandbox copy. <code>hmh project release</code> pins a version to a checkpoint.',
+    c13_h: 'Five-role pipeline + device gate', c13_p: '<code>hmh pipeline</code> runs plan→code→test→review→judge in one command (role charters built in; FAIL loops into repair). <code>--device</code> hands the judge real on-device evidence (install/launch/log-marker); <code>--release</code> auto-issues a checkpoint + version once the verdict passes.',
+    c14_h: 'Dataset · Shadow router · RL gate', c14_p: '<code>hmh dataset</code> turns trajectories into a versioned, redacted train/eval set with interpretable rewards. The shadow router logs "who should have routed this" to accumulate statistics. <code>hmh readiness</code> gates RL behind six evidence-measured conditions - immature data means optimize first; there is no bypass.',
+    c15_h: 'Codex-style session resume', c15_p: 'Sessions are date-nested rollout logs: <code>hmh resume</code> opens a full-screen picker (type-to-filter, cwd filter, sort toolbar) and resuming APPENDS to the same log - one thread, never a fork.',
     s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'gates (training + holdout)',
     ins_title: 'Quick Start in Four Steps',
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
