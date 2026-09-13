@@ -12,7 +12,12 @@
       "finding": "device_test E2E on SelfFeed1 emulator 5555: PASS install/launch/log-marker/uninstall; EntryAbility onCreate asserted; WindowScene render nodes in hilog"
     },
     "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
-    "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
+    {
+      "task": "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "4/5 symbols found; UIAbility lifecycle + Want + loadContent verified; window.WindowStage + WindowStage are INDEX BLIND SPOTS (namespace-nested decls unparseable, @ohos.window.d.ts:79) - not SDK gaps"
+    },
     "Run the codelinter on the workspace entry module and summarize the top three rule categories.",
     "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
     "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",

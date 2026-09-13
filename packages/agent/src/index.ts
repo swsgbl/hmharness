@@ -6,6 +6,10 @@ export {
   transitionProject, attachRun, newProjectId,
   type CheckpointRef, type DecisionEntry, type ProjectRecord, type ProjectState,
 } from './project.ts';
+export {
+  mechanicalGate, parseVerdict, runPipeline,
+  type PipelineOptions, type PipelineReport, type StageRecord, type StageRole,
+} from './pipeline.ts';
 export { buildSystemPrompt } from './prompt.ts';
 export { strings, type Locale, type Strings } from './i18n.ts';
 export { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';

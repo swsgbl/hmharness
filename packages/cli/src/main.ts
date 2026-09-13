@@ -385,6 +385,8 @@ usage:
                              trajectory -> versioned, redacted, split dataset (V2 M10)
   hmh route                  shadow-router stats: agreement rate + outcome split (V2 M10)
   hmh readiness              the RL gate: six conditions measured from real evidence (V2 M11)
+  hmh pipeline "<task>"      role pipeline: plan→code→test→review→judge (+repair loop,
+                             VERDICT gate) - V3 first slice (ADR-0006)
   hmh web start|stop|status   web UI as a silent background daemon (no window,
                              survives closing everything; log ~/.hmharness/web.log)
   hmh web [--port=7788]       web UI in the foreground (debugging)
@@ -774,6 +776,42 @@ flags:
     const { startServer } = await import('@hmharness/web');
     await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
     return; // startServer keeps the process alive
+  }
+  if (cmd === 'pipeline') {
+    // V3 first slice (ADR-0006): plan -> code -> test -> review -> judge with
+    // a bounded repair loop; the judge's VERDICT line is the only stage gate.
+    const task = rest.join(' ').trim();
+    if (!task) { stdout.write('usage: hmh pipeline "<task>" [--repairs=N] [--turns=N]\n'); return; }
+    await initHome();
+    const home = homeDir();
+    const cfg2 = await loadConfig();
+    const { reg: preg, clients: preClients } = await buildRegistry({ announce: false });
+    const A = await import('@hmharness/agent');
+    stdout.write(DIM(`pipeline: plan → code → test → review → judge (route ${cfg2.provider.model})\n`));
+    try {
+      const r = await A.runPipeline({
+        task,
+        provider: resolveProvider(cfg2, 'chat'),
+        registry: preg,
+        ctx: { cwd: process.cwd(), home },
+        model: cfg2.provider.model,
+        home,
+        locale: cfg2.locale,
+        maxRepairs: Number((rest.find((a) => a.startsWith('--repairs=')) ?? '').slice(10)) || 2,
+        maxTurnsPerStage: Number((rest.find((a) => a.startsWith('--turns=')) ?? '').slice(8)) || 6,
+      });
+      for (const s of r.stages) {
+        const mark = s.verdict === 'PASS' ? GREEN('PASS') : s.verdict === 'FAIL' ? RED('FAIL') : DIM('····');
+        stdout.write(`  ${mark} ${YELLOW(s.stage.padEnd(9))} #${s.attempt} ${DIM(`${s.turns}t ${s.toolUses}tools`)}\n`);
+      }
+      const verdict = r.finalVerdict === 'PASS' ? GREEN('VERDICT: PASS') : RED(`VERDICT: ${r.finalVerdict}`);
+      stdout.write(`${verdict} ${DIM(`· status ${r.status} · repairs ${r.repairsUsed} · report ${home}\\pipelines\\${r.pipelineId}`)}\n`);
+    } catch (err) {
+      stdout.write(RED(String(err)) + '\n');
+    } finally {
+      for (const c of preClients) c.close();
+    }
+    return;
   }
   if (cmd === 'dataset') {
     // V2 M10: trajectory -> versioned dataset (filter/dedupe/reward/split)

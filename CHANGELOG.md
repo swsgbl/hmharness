@@ -1,3 +1,24 @@
+## [0.10.0] - 2026-09-13
+
+**V3 首切片(ADR-0006,蓝图 M12 方向)**——Pipeline Runtime:六角色流水线编排:
+
+- **agent/pipeline.ts**:plan→code→test→review→judge 五阶段,每阶段一次带
+  M7 角色契约的 runLoop;judge 契约的 `VERDICT: PASS|FAIL` 行是**唯一阶段门**;
+  FAIL 且未达上限 → reviewer/judge 的问题清单回灌 repairer → test/review 重
+  跑(修复循环,默认 2 次)。**机械断言先于 LLM judge**(M2 证据阶梯顺序用于
+  编排层):mechanicalGate(工具错误/contains/not-contains)全绿直接 PASS。
+- **预算纪律(真机冒烟驱动的修复)**:runLoop 的 maxTurns 只是软提示——首
+  次冒烟 review 阶段烧了 47 轮 150 工具打穿总预算,judge 没跑。修=阶段内
+  硬阀 maxTotalTurns(钳到剩余预算)+空闲检测收紧(plan 3/其余 4),单阶段
+  无法再吃光整条流水线。超预算以 status='budget' 诚实收场,finalVerdict=
+  none(无裁决优于编造裁决)。
+- **全程留痕**:每阶段 report 落 HMH_HOME/pipelines/<id>/stage-*.json + 汇总
+  pipeline.report.json;各阶段 runLoop 自动产生 M1 轨迹。真机冒烟:五阶段
+  23 轮完成,judge 引用实际文件内容(module.json5 mainElement/AppScope
+  bundleName)且诚实标注未复核项。
+- CLI:`hmh pipeline "<task>" [--repairs=N] [--turns=N]`。
+- 测试 +5(verdict 解析/机械门/快乐路径/修复循环到顶/预算截断)。
+
 ## [0.9.0] - 2026-09-13
 
 **V2 蓝图 P1/P3 收官(M10+M11)**——Trajectory Dataset + Shadow Router + RL 前置门
