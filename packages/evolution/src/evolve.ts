@@ -123,14 +123,26 @@ export async function runEvolution(opts: {
   // anything but cycles - the documented budget was decorative).
   const budget = await readBudget(home);
   const today = new Date().toISOString().slice(0, 10);
+  // Skipped cycles ARE data (SELFFEED honesty rule #2: absent/empty days must
+  // be visible). The early returns used to bypass the durable log entirely -
+  // a day's skips vanished without a trace and "0 skips" was unauditable
+  // (caught by the day-16 meta-audit). Persist before returning.
+  const persistSkip = async () => {
+    report.estTokens = 0;
+    const logDir = join(home, 'evolution');
+    await mkdir(logDir, { recursive: true });
+    await appendFile(join(logDir, 'log.jsonl'), JSON.stringify(report) + '\n', 'utf8');
+  };
   if (budget.maxCyclesPerDay && budget.cyclesToday >= budget.maxCyclesPerDay) {
     report.outcomes.push({ name: '(budget)', action: 'error', reason: `daily cycle limit reached (${budget.cyclesToday}/${budget.maxCyclesPerDay} today) - skipped` });
+    await persistSkip();
     return report;
   }
   if (budget.maxCyclesPerDay && budget.maxTokensPerCycle) {
     const dailyCap = budget.maxCyclesPerDay * budget.maxTokensPerCycle;
     if ((budget.tokensToday ?? 0) >= dailyCap) {
       report.outcomes.push({ name: '(budget)', action: 'error', reason: `daily token limit reached (~${budget.tokensToday}/${dailyCap} est-tokens today) - skipped` });
+      await persistSkip();
       return report;
     }
   }
