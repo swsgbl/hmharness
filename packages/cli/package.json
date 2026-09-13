@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/cli",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "hmharness command line: one-shot tasks, an interactive REPL, a fullscreen TUI, the web frontend, and direct tool invocation.",
   "type": "module",
   "main": "dist/main.js",
@@ -46,7 +46,7 @@
     "@hmharness/kernel": "0.9.0",
     "@hmharness/observability": "0.7.0",
     "@hmharness/evolution": "0.13.0",
-    "@hmharness/domain-harmony": "0.11.0",
+    "@hmharness/domain-harmony": "0.13.1",
     "@hmharness/domain-ops": "0.8.0",
     "@hmharness/agent": "0.11.0",
     "@hmharness/evaluation": "0.8.0",

@@ -43,7 +43,12 @@
     "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
     "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
     "Verify emulator state (list images + running instances) and write an insight about any mismatch between requested and actual state.",
-    "Create an app with three pages A->B->C wired by router, build it, install it, launch it, screenshot each page, and assert navigation actually happened via the UI text.",
+    {
+      "task": "Create an app with three pages A->B->C wired by router, build it, install it, launch it, screenshot each page, and assert navigation actually happened via the UI text.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "SelfFeedR three-page router app: 9 steps ALL PASS (scaffold 22 files / wiring / build 8.3s / emulator start / sign / install / launch / EntryAbility onCreate marker / cleanup) + uitest navigation proof Index-A-B-C + screenshot; emulator path bug surfaced and fixed in 0.13.1"
+    },
     "Run harmony_api_lookup for five symbols YOU (the agent) are least sure about from this SDK; for each, state whether the index confirmed or refuted your guess.",
     "Audit the last evolution cycle: read evolution/log.jsonl's latest entry and summarize what was proposed, what passed the gate, and why anything was rejected."
   ]

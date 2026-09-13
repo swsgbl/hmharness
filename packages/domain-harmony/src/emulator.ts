@@ -29,7 +29,19 @@ export function imageRoot(): string {
   return join(localAppData(), 'Huawei', 'Sdk');
 }
 function emulatorExe(): string {
-  return join(process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio', 'tools', 'emulator', 'Emulator.exe');
+  // same discoverability contract as findHdc: honor HM_DEVECO_HOME, then
+  // probe the standard install locations. The bare-drive default missed the
+  // common "Program Files" install and broke every emulator tool on stock
+  // DevEco setups (day-18 SELFFEED: the agent had to fake a junction).
+  if (process.env.HM_DEVECO_HOME) return join(process.env.HM_DEVECO_HOME, 'tools', 'emulator', 'Emulator.exe');
+  for (const home of ['C:\\Program Files\\Huawei\\DevEco Studio', 'D:\\Program Files\\Huawei\\DevEco Studio', 'C:\\DevEco-Studio']) {
+    const cand = join(home, 'tools', 'emulator', 'Emulator.exe');
+    try {
+      accessSync(cand);
+      return cand;
+    } catch { /* next */ }
+  }
+  return join('C:\\DevEco-Studio', 'tools', 'emulator', 'Emulator.exe');
 }
 
 interface DeployedDevice {

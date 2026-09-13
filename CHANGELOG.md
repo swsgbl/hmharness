@@ -1,3 +1,13 @@
+## [0.13.1] - 2026-09-13
+
+**Emulator 路径可发现性修复**(day-18 SELFFEED 真发现):emulatorExe 与 hdc 同病
+——默认 `C:\DevEco-Studio` 在标准安装上不存在,agent 被迫伪造 junction 才能起
+模拟器。修=同一探测链(HM_DEVECO_HOME → Program Files Huawei → 旧默认),
+无环境变量真机验证:harmony_emulator_list 直接列出 Pura 90 部署态。
+SELFFEED 第 18 天:任务池 17 全流程 **9 步全 PASS**(脚手架 22 文件/三页路由
+接线/构建 8.3s/模拟器起/签名/装机/启动/EntryAbility onCreate 断言/清理)+
+uitest 导航证明(Index→A→B→C)+截图。
+
 ## [0.13.0] - 2026-09-13
 
 **晋升质量地板**(day-16 元审计第二发现):旧门只要求"相对基线无回归"——基线
