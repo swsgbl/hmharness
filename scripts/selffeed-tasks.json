@@ -20,7 +20,12 @@
     },
     "Run the codelinter on the workspace entry module and summarize the top three rule categories.",
     "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
-    "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
+    {
+      "task": "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "cjpm still broken (KB5124114); no-network repair exhausted empirically (shim/KnownDLL/msvcrt WinSxS/rollback admin gates); recommendation: stay on ArkTS until vendor fix, admin rollback commands prepared"
+    },
     "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
     {
       "task": "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
