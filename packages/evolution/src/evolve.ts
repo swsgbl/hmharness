@@ -240,6 +240,19 @@ export async function runEvolution(opts: {
   }
   report.proposals = proposals;
 
+  // 4b. Promotion quality floor (day-16 meta-audit): "no regression" alone
+  // can promote a candidate that is still terrible when the BASELINE itself
+  // is weak (baseline 20% -> candidate 25% passes the old gate). An absolute
+  // minimum train pass rate closes that hole. Configurable via
+  // config.json evolution.minPassRate (default 0.6).
+  let minPassRate = 0.6;
+  try {
+    const cfg = JSON.parse(await readFile(join(home, 'config.json'), 'utf8')) as { evolution?: { minPassRate?: number } };
+    if (typeof cfg.evolution?.minPassRate === 'number' && cfg.evolution.minPassRate >= 0 && cfg.evolution.minPassRate <= 1) {
+      minPassRate = cfg.evolution.minPassRate;
+    }
+  } catch { /* default floor */ }
+
   // 5. A/B gate each proposal on the train set.
   for (const p of proposals.slice(0, maxProposals)) {
     say(`candidate "${p.name}": drafting + candidate bench`);
@@ -295,6 +308,20 @@ export async function runEvolution(opts: {
           lineage: { parentInsights: insightIds, scores: { train: candRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
         });
         say(`  rejected (${regression ? 'regression' : 'lower pass rate'})`);
+        continue;
+      }
+      if (candRate < minPassRate) {
+        await deleteDraft(home, p.name);
+        await recordParetoEntry(home, { name: p.name, parentInsights: insightIds, rejectedReason: `below quality floor (${candRate.toFixed(2)} < ${minPassRate})`, scores: { train: candRate }, metaModel: provider.model, at: new Date().toISOString() });
+        report.outcomes.push({
+          name: p.name,
+          action: 'rejected',
+          reason: `below quality floor: pass rate ${candRate} < min ${minPassRate} (non-regression vs a weak baseline ${baseRate} is not good enough)`,
+          baseline: { passRate: baseRate, cases: summary(baseResults) },
+          candidate: { passRate: candRate, cases: summary(candResults) },
+          lineage: { parentInsights: insightIds, scores: { train: candRate }, metaModel: provider.model, decidedAt: new Date().toISOString() },
+        });
+        say(`  rejected (below quality floor ${minPassRate})`);
         continue;
       }
       if (costRegressions.length > 0) {
@@ -363,7 +390,7 @@ export async function runEvolution(opts: {
       report.outcomes.push({
         name: p.name,
         action: 'promoted',
-        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''}) - promoted to CANARY (20% sessions, impact-gated full promotion)${archivedPrevious ? '; previous version archived' : ''}${weakGate ? ' [WEAK GATE: no holdout cases defined]' : ''}`,
+        reason: `no regression (train ${(candRate * 100).toFixed(0)}% vs ${(baseRate * 100).toFixed(0)}%${holdout.length ? `, holdout ${(holdoutRate * 100).toFixed(0)}%` : ''}; floor ≥${(minPassRate * 100).toFixed(0)}%) - promoted to CANARY (20% sessions, impact-gated full promotion)${archivedPrevious ? '; previous version archived' : ''}${weakGate ? ' [WEAK GATE: no holdout cases defined]' : ''}`,
         baseline: { passRate: baseRate, cases: summary(baseResults) },
         candidate: { passRate: candRate, cases: summary(candResults) },
         ...(holdout.length ? { holdout: { baselineRate: holdoutBaseRate, candidateRate: holdoutRate } } : {}),
