@@ -12,7 +12,11 @@ import { cp, mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promise
 import { join } from 'node:path';
 
 /** The irreplaceable set. `sessions/` (large, and evidence rather than
- *  state) is only included with --full. */
+ *  state) is only included with --full; `pipelines/` (stage reports,
+ *  re-runnable) likewise. `projects/` (M8 decisions+checkpoint refs) and
+ *  `runs/` (M1 trajectories - the dataset source and readiness evidence)
+ *  joined the default set with the V2 milestones: losing them wipes the
+ *  learning history that M10/M11 are built on. */
 const STATE_ITEMS = [
   'config.json',
   'workspaces.json',
@@ -23,6 +27,8 @@ const STATE_ITEMS = [
   'evolution',
   'bench',
   'ops',
+  'projects',
+  'runs',
 ] as const;
 
 async function exists(p: string): Promise<boolean> {
@@ -39,7 +45,7 @@ export async function backupState(home: string, opts: { full?: boolean } = {}): 
   const dir = join(backupsDir(home), id);
   await mkdir(dir, { recursive: true });
   const items: string[] = [...STATE_ITEMS];
-  if (opts.full) items.push('sessions');
+  if (opts.full) items.push('sessions', 'pipelines');
   const copied: string[] = [];
   for (const item of items) {
     const src = join(home, item);

@@ -781,7 +781,7 @@ flags:
     // V3 first slice (ADR-0006): plan -> code -> test -> review -> judge with
     // a bounded repair loop; the judge's VERDICT line is the only stage gate.
     const task = rest.join(' ').trim();
-    if (!task) { stdout.write('usage: hmh pipeline "<task>" [--repairs=N] [--turns=N] [--device=<hdc> --hap=<path> --bundle=<id> --ability=<name> --target=<t> --expect-log=<marker>]\n'); return; }
+    if (!task) { stdout.write('usage: hmh pipeline "<task>" [--repairs=N] [--turns=N] [--release=<ver>] [--device=<hdc> --hap=<path> --bundle=<id> --ability=<name> --target=<t> --expect-log=<marker>]\n'); return; }
     await initHome();
     const home = homeDir();
     const cfg2 = await loadConfig();
@@ -803,18 +803,21 @@ flags:
         // install/launch/log-marker pass; hap/bundle/ability come from flags
         ...(() => {
           const dev = rest.find((a) => a.startsWith('--device='));
-          if (!dev) return {};
+          const rel = rest.find((a) => a.startsWith('--release='));
           const flag = (name: string) => (rest.find((a) => a.startsWith(`--${name}=`)) ?? '').split('=').slice(1).join('=');
-          return {
-            deviceGate: {
+          const out: Record<string, unknown> = {};
+          if (dev) {
+            out.deviceGate = {
               hdc: dev.slice(9),
               ...(flag('target') ? { target: flag('target') } : {}),
               hap: flag('hap'),
               bundle: flag('bundle'),
               ability: flag('ability') || 'EntryAbility',
               expectLog: flag('expect-log') || 'onCreate',
-            },
-          };
+            };
+          }
+          if (rel) out.release = { version: rel.slice(10), ...(flag('notes') ? { notes: flag('notes') } : {}) };
+          return out;
         })(),
       });
       for (const s of r.stages) {
@@ -823,6 +826,7 @@ flags:
       }
       const verdict = r.finalVerdict === 'PASS' ? GREEN('VERDICT: PASS') : RED(`VERDICT: ${r.finalVerdict}`);
       stdout.write(`${verdict} ${DIM(`· status ${r.status} · repairs ${r.repairsUsed} · report ${home}\\pipelines\\${r.pipelineId}`)}\n`);
+      if (r.release) stdout.write(GREEN('✓') + ` released ${r.release.version} → project ${r.release.projectId} @ checkpoint ${r.release.checkpointId}\n`);
     } catch (err) {
       stdout.write(RED(String(err)) + '\n');
     } finally {

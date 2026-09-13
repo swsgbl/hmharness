@@ -39,6 +39,8 @@ export interface PipelineReport {
   finalVerdict: 'PASS' | 'FAIL' | 'none';
   stages: StageRecord[];
   repairsUsed: number;
+  /** set when opts.release ran on a PASS verdict (ADR-0008) */
+  release?: { projectId: string; version: string; checkpointId: string };
 }
 
 export interface PipelineOptions {
@@ -72,6 +74,11 @@ export interface PipelineOptions {
     /** injectable runner (tests); default = domain-harmony runDeviceTest */
     runDeviceTestImpl?: (o: DeviceTestOptions) => Promise<DeviceTestStep[]>;
   };
+  /** V3 release slice (ADR-0008): when the final verdict is PASS, bind the
+   *  work to the workspace's Project Runtime (M8): attach the run, checkpoint
+   *  the tree, and record a release pinned to that checkpoint. FAIL/budget
+   *  never release - no verdict, no version. */
+  release?: { version: string; notes?: string };
 }
 
 /** Pull the judge's verdict line out of the final text; absence = FAIL
@@ -138,6 +145,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
   let repairs = 0;
   let spent = 0;
   let status: PipelineReport['status'] = 'completed';
+  let releaseTick: PipelineReport['release'] | undefined;
   const startedAt = new Date().toISOString();
 
   const runStage = async (stage: StageRole, attempt: number, directive: string): Promise<StageRecord> => {
@@ -230,14 +238,30 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
       judge = await runStage('judge', repairs + 1, DIRECTIVES.judge(opts.task, evidenceSummary(stages)));
     }
 
-    return await finish(judge && judge.verdict !== 'n/a' ? judge.verdict : 'FAIL');
+    const verdict = judge && judge.verdict !== 'n/a' ? judge.verdict : 'FAIL';
+    // V3 release slice: only a PASS verdict earns a version (ADR-0008)
+    if (verdict === 'PASS' && opts.release) {
+      try {
+        const P = await import('./project.ts');
+        const proj = await P.projectFor(opts.home, opts.ctx.cwd);
+        await P.attachRun(opts.home, proj, pipelineId);
+        const cp = await P.checkpointProject(opts.home, proj, `pipeline ${pipelineId}`);
+        await P.releaseProject(opts.home, proj, opts.release.version, opts.release.notes ?? `pipeline ${pipelineId} VERDICT: PASS (${stages.length} stages, ${repairs} repairs)`);
+        releaseTick = { projectId: proj.projectId, version: opts.release.version, checkpointId: cp.id };
+      } catch (err) {
+        // release is bookkeeping - record the failure, never fail the pipeline
+        stages.push({ stage: 'judge', attempt: 0, verdict: 'n/a', text: `release binding failed: ${String(err).slice(0, 200)}`, turns: 0, toolUses: 0, reason: 'final' });
+      }
+    }
+    return await finish(verdict);
   } catch (err) {
     status = 'error';
     stages.push({ stage: 'judge' as PipelineStage, attempt: 0, verdict: 'FAIL', text: String(err).slice(0, 500), turns: 0, toolUses: 0, reason: 'final' });
     return await finish('FAIL');
   }
 
-  async function finish(verdict: PipelineReport['finalVerdict'] = 'none'): Promise<PipelineReport> {    const report: PipelineReport = {
+  async function finish(verdict: PipelineReport['finalVerdict'] = 'none'): Promise<PipelineReport> {
+    const report: PipelineReport = {
       pipelineId,
       task: opts.task,
       startedAt,
@@ -246,6 +270,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
       finalVerdict: verdict,
       stages,
       repairsUsed: repairs,
+      ...(releaseTick ? { release: releaseTick } : {}),
     };
     try { await writeFile(join(dir, 'pipeline.report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8'); } catch { /* best-effort */ }
     return report;

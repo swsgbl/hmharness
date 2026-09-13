@@ -174,6 +174,48 @@ test('runPipeline: failing device step is visible to the judge, judge still owns
   } finally { await rm(home, { recursive: true, force: true }); }
 });
 
+test('runPipeline: PASS + release binds checkpoint; FAIL never releases', async () => {
+  const passHome = await mkdtemp(join(tmpdir(), 'hmh-pipe6-'));
+  const passWs = await mkdtemp(join(tmpdir(), 'hmh-pipe6ws-'));
+  const failHome = await mkdtemp(join(tmpdir(), 'hmh-pipe7-'));
+  const failWs = await mkdtemp(join(tmpdir(), 'hmh-pipe7ws-'));
+  try {
+    // PASS path: release tick present, project record carries checkpoint+release
+    const pass = await runPipeline({ ...baseOpts(passHome, fakeLoop([
+      () => ({ text: 'plan' }),
+      () => ({ text: 'code' }),
+      () => ({ text: 'tests green' }),
+      () => ({ text: 'clean' }),
+      () => ({ text: 'VERDICT: PASS' }),
+    ]) as never, { release: { version: 'v1.2.3', notes: 'first cut' } }), ctx: { cwd: passWs, home: passHome } as never });
+    assert.equal(pass.finalVerdict, 'PASS');
+    assert.ok(pass.release, 'release tick recorded');
+    assert.match(pass.release!.checkpointId, /^cp_|^[0-9a-f]{10}$/);
+    const { loadProject } = await import('../project.ts');
+    const proj = await loadProject(passHome, pass.release!.projectId);
+    assert.ok(proj, 'project record created');
+    assert.equal(proj!.releases[0].version, 'v1.2.3');
+    assert.equal(proj!.releases[0].checkpointId, pass.release!.checkpointId, 'release pinned to its checkpoint');
+
+    // FAIL path: no release at all
+    const fail = await runPipeline({ ...baseOpts(failHome, fakeLoop([
+      () => ({ text: 'plan' }),
+      () => ({ text: 'code' }),
+      () => ({ text: 'tests broken' }),
+      () => ({ text: 'finding' }),
+      () => ({ text: 'VERDICT: FAIL' }),
+    ]) as never, { release: { version: 'v9.9.9' }, maxRepairs: 0 }), ctx: { cwd: failWs, home: failHome } as never });
+    assert.equal(fail.finalVerdict, 'FAIL');
+    assert.equal(fail.release, undefined, 'FAIL never releases');
+    assert.equal(await loadProject(failHome, 'proj_any'), null);
+  } finally {
+    await rm(passHome, { recursive: true, force: true });
+    await rm(passWs, { recursive: true, force: true });
+    await rm(failHome, { recursive: true, force: true });
+    await rm(failWs, { recursive: true, force: true });
+  }
+});
+
 test('runPipeline: global turn budget stops the chain honestly', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-pipe3-'));
   try {

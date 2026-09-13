@@ -219,6 +219,13 @@ export async function checkpointProject(home: string, rec: ProjectRecord, label?
   } else {
     const rel = `artifacts/cp-${Date.now().toString(36)}`;
     const dest = join(projDir(home, rec.projectId), rel);
+    // the copy fallback cannot handle the workspace containing the destination
+    // (workspace == home in degenerate setups) - say so plainly instead of
+    // letting cp throw EINVAL halfway through
+    const norm = (p: string) => resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+    if (norm(dest).startsWith(norm(rec.workspace) + '\\') || norm(dest).startsWith(norm(rec.workspace) + '/')) {
+      throw new Error(`checkpoint copy fallback requires the project workspace (${rec.workspace}) to be outside HMH_HOME (${home})`);
+    }
     await mkdir(dest, { recursive: true });
     await cp(rec.workspace, dest, { recursive: true, filter: (src) => !COPY_SKIP.has(src.split(/[\\/]/).pop() ?? '') });
     let files = 0;

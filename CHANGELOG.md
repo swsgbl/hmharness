@@ -1,3 +1,21 @@
+## [0.12.0] - 2026-09-13
+
+**V3 Release 切片(ADR-0008)**——裁决通过的产物才配版本号 + 状态备份覆盖 V2 资产:
+
+- **pipeline release 联动**:judge 最终 PASS 后自动执行 M8 动作——projectFor
+  (workspace)→attachRun→checkpointProject(label=pipeline id)→releaseProject
+  (version 钉住检查点);FAIL/budget 永不触发(无裁决无版本)。release 是
+  簿记动作:绑定失败记入 stages,永不推翻 PASS 裁决。report 新增 release
+  tick(projectId/version/checkpointId)。CLI:`hmh pipeline --release=<ver>
+  [--notes=]`,输出绑定行。
+- **state backup 覆盖 V2 资产**:STATE_ITEMS 停留在 0.6 时代——projects/
+  (M8 决策日志+检查点引用)与 runs/(M1 轨迹=dataset 源头+readiness 证据,
+  均不可再生)入默认集;pipelines/(阶段报告,可再生)随 --full。一次 home
+  损坏不再丢 V2 证据链。
+- **checkpoint copy fallback 加源/目标重叠守卫**(workspace==home 退化场景
+  的 EINVAL → 清晰报错)。
+- 测试 +1(PASS 绑定检查点/FAIL 永不释放);全套 219+2 绿。
+
 ## [0.11.0] - 2026-09-13
 
 **V3 第二切片(ADR-0007)**——Device Gate:模拟器证据接入流水线:

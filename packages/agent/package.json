@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/agent",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "hmharness agent execution layer: base tools, system prompt, sub-agent spawn, and the shared task runner that frontends (cli, web) drive.",
   "type": "module",
   "main": "dist/index.js",
