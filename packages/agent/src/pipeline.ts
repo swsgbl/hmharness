@@ -14,8 +14,9 @@ import { join } from 'node:path';
 import { runLoop, type ChatMessage, type LoopResult, type ProviderConfig, type Registry, type ToolContext } from '@hmharness/kernel';
 import { buildSystemPrompt } from './prompt.ts';
 import { roleCharter } from './roles.ts';
+import type { DeviceTestOptions, DeviceTestStep } from '@hmharness/domain-harmony';
 
-export type PipelineStage = 'plan' | 'code' | 'test' | 'review' | 'judge';
+export type PipelineStage = 'plan' | 'code' | 'test' | 'review' | 'judge' | 'device';
 /** stage labels used in runStage (repairer = the repair-loop role) */
 export type StageRole = PipelineStage | 'repairer';
 
@@ -57,6 +58,20 @@ export interface PipelineOptions {
   signal?: AbortSignal;
   /** injectable loop (tests); default kernel runLoop */
   runLoopImpl?: typeof runLoop;
+  /** V3 device gate (ADR-0007): when set, run an on-device install/launch/
+   *  log-marker/uninstall pass after the test stage and feed the four steps
+   *  to the judge as mechanical evidence. Pure command execution - no model
+   *  turns. */
+  deviceGate?: {
+    hdc: string;
+    target?: string;
+    hap: string;
+    bundle: string;
+    ability: string;
+    expectLog: string;
+    /** injectable runner (tests); default = domain-harmony runDeviceTest */
+    runDeviceTestImpl?: (o: DeviceTestOptions) => Promise<DeviceTestStep[]>;
+  };
 }
 
 /** Pull the judge's verdict line out of the final text; absence = FAIL
@@ -102,7 +117,7 @@ function stageMessages(opts: PipelineOptions, role: StageRole, directive: string
   ];
 }
 
-const DIRECTIVES: Record<PipelineStage, (task: string, extra: string) => string> = {
+const DIRECTIVES: Record<Exclude<PipelineStage, 'device'>, (task: string, extra: string) => string> = {
   plan: (task) => `Goal: ${task}\nProduce the numbered implementation plan (each step names its verification). Do not execute anything.`,
   code: (task, extra) => `Goal: ${task}\n${extra}\nImplement the plan now (surgical edits, cheapest verification per step).`,
   test: (task, extra) => `Goal: ${task}\n${extra}\nRun the verifications from the plan; probe edge cases; report input -> actual vs expected for each probe.`,
@@ -158,6 +173,34 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
     return rec;
   };
 
+  /** Device gate: run the four-step on-device pass, record it as a 'device'
+   *  stage (no model turns spent), and mirror it into the repair context.
+   *  Defined BEFORE the try block - the try body calls it (TDZ otherwise). */
+  const runDeviceGate = async (): Promise<void> => {
+    const g = opts.deviceGate!;
+    const runner = g.runDeviceTestImpl ?? (await import('@hmharness/domain-harmony')).runDeviceTest;
+    let steps: DeviceTestStep[];
+    try {
+      steps = await runner({ hdc: g.hdc, ...(g.target ? { target: g.target } : {}), hap: g.hap, bundle: g.bundle, ability: g.ability, expectLog: g.expectLog });
+    } catch (err) {
+      steps = [{ step: 'device-gate', pass: false, detail: String(err).slice(0, 300) }];
+    }
+    const allPass = steps.every((s) => s.pass);
+    const rec: StageRecord = {
+      stage: 'device',
+      attempt: repairs + 1,
+      verdict: allPass ? 'PASS' : 'FAIL',
+      text: steps.map((s) => `${s.pass ? 'PASS' : 'FAIL'} ${s.step}: ${s.detail}`).join('\n').slice(0, 4000),
+      turns: 0,
+      toolUses: 0,
+      reason: 'final',
+    };
+    stages.push(rec);
+    try {
+      await writeFile(join(dir, `stage-${String(stages.length).padStart(2, '0')}-device.json`), JSON.stringify(rec, null, 2) + '\n', 'utf8');
+    } catch { /* best-effort */ }
+  };
+
   try {
     // 1. plan
     const plan = await runStage('plan', 1, DIRECTIVES.plan(opts.task, ''));
@@ -169,6 +212,9 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
     // 3. test + repair loop (code+test rerun carries the reviewer/judge findings)
     let testOut = await runStage('test', 1, DIRECTIVES.test(opts.task, `Plan:\n${plan.text.slice(0, 1500)}`));
     if (spent >= totalBudget) { status = 'budget'; return await finish(); }
+    // 3b. device gate (V3 slice, ADR-0007): mechanical on-device evidence,
+    // zero model turns; judge sees it in the evidence summary
+    if (opts.deviceGate) await runDeviceGate();
     let review = await runStage('review', 1, DIRECTIVES.review(opts.task, ''));
     if (spent >= totalBudget) { status = 'budget'; return await finish(); }
     let judge = await runStage('judge', 1, DIRECTIVES.judge(opts.task, evidenceSummary(stages)));
@@ -178,6 +224,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
       await runStage('repairer', repairs, `Repair round ${repairs}.\n${findings}\nReproduce, fix minimally, re-verify.`);
       if (spent >= totalBudget) { status = 'budget'; break; }
       testOut = await runStage('test', repairs + 1, DIRECTIVES.test(opts.task, `Plan:\n${plan.text.slice(0, 1500)}\nRepair ${repairs} applied - re-verify.`));
+      if (opts.deviceGate) await runDeviceGate();
       review = await runStage('review', repairs + 1, DIRECTIVES.review(opts.task, `Repair ${repairs} was applied; focus on it.`));
       if (spent >= totalBudget) { status = 'budget'; break; }
       judge = await runStage('judge', repairs + 1, DIRECTIVES.judge(opts.task, evidenceSummary(stages)));
@@ -190,8 +237,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
     return await finish('FAIL');
   }
 
-  async function finish(verdict: PipelineReport['finalVerdict'] = 'none'): Promise<PipelineReport> {
-    const report: PipelineReport = {
+  async function finish(verdict: PipelineReport['finalVerdict'] = 'none'): Promise<PipelineReport> {    const report: PipelineReport = {
       pipelineId,
       task: opts.task,
       startedAt,
@@ -207,6 +253,6 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
 }
 
 function evidenceSummary(stages: StageRecord[]): string {
-  const relevant = stages.filter((s) => s.stage === 'test' || s.stage === 'review');
+  const relevant = stages.filter((s) => s.stage === 'test' || s.stage === 'review' || s.stage === 'device');
   return relevant.map((s) => `[${s.stage} #${s.attempt}] ${s.text.slice(0, 600)}`).join('\n\n').slice(0, 3000);
 }

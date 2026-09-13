@@ -54,9 +54,11 @@ export async function runDeviceTest(o: DeviceTestOptions): Promise<DeviceTestSte
     }
   });
   const steps: DeviceTestStep[] = [];
-  // 1. install
-  let r = await run(['install', '-r', o.hap], 120_000);
-  if (!r.ok || /fail/i.test(r.out)) r = await run(['app', 'install', '-r', o.hap], 120_000);
+  // 1. install - hdc mangles mixed-separator paths into "cwd + G:/..." on
+  //    Windows: always hand it a resolved native absolute path
+  const hapNative = resolve(o.hap);
+  let r = await run(['install', '-r', hapNative], 120_000);
+  if (!r.ok || /fail/i.test(r.out)) r = await run(['app', 'install', '-r', hapNative], 120_000);
   steps.push({ step: 'install', pass: r.ok && /success/i.test(r.out), detail: r.out.slice(0, 200) });
   if (!steps[0].pass) return steps;
   // 2. launch

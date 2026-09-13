@@ -26,7 +26,17 @@ import { harmonyUiRegression, runUiRegression, captureDeviceScreen, type UiRegre
 const exec = promisify(execFile);
 
 function devecoHome(): string {
-  return process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
+  if (process.env.HM_DEVECO_HOME) return process.env.HM_DEVECO_HOME;
+  // standard install locations probed in order: the old bare-drive default
+  // missed the common "Program Files" install and broke every device tool
+  // on stock DevEco setups (mcp-serve round-trip test caught it)
+  for (const home of ['C:\\Program Files\\Huawei\\DevEco Studio', 'D:\\Program Files\\Huawei\\DevEco Studio', 'C:\\DevEco-Studio']) {
+    try {
+      accessSync(join(home, 'sdk', 'default', 'openharmony', 'toolchains', 'hdc.exe'));
+      return home;
+    } catch { /* next */ }
+  }
+  return 'C:\\DevEco-Studio';
 }
 
 async function run(
@@ -441,7 +451,7 @@ export { parseSdkVersion, compareSdk, capabilitiesFor, CAPABILITY_MATRIX, type S
 export { harmonyBuildDoctor, diagnoseBuildFailure, firstErrorBlock } from './builddoctor.ts';
 export { harmonyProjectProfile, profileProject } from './profile.ts';
 export { harmonySign, resolveSigningIdentity, ensureDebugProfile, signHap, hapsignToolPaths, type SigningIdentity } from './signing.ts';
-export { harmonyDeviceTest, runDeviceTest, type DeviceTestStep } from './ondevice.ts';
+export { harmonyDeviceTest, runDeviceTest, type DeviceTestStep, type DeviceTestOptions } from './ondevice.ts';
 export { harmonyApiLookup, buildApiIndex, loadApiIndex, lookupSymbol, parseDeclaration, sdkApiDir, type ApiIndex, type ApiSymbolEntry } from './apikg.ts';
 export { harmonyUiRegression, runUiRegression, captureDeviceScreen, type UiRegressionCase, type UiRegressionResult } from './uiregress.ts';
 export { harmonyImageDownloadCheck } from './emulator.ts';

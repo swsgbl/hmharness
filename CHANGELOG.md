@@ -1,3 +1,20 @@
+## [0.11.0] - 2026-09-13
+
+**V3 第二切片(ADR-0007)**——Device Gate:模拟器证据接入流水线:
+
+- **pipeline deviceGate 选项**:test 阶段后(含每轮修复后)执行四步设备验证
+  (install/launch/log-marker/uninstall-cleanup,复用 M6 的 runDeviceTest),
+  结果记为 'device' stage 并进 judge 证据摘要。**零模型轮次**——纯命令执行,
+  四步各带 execFile 超时(120s/30s/轮询 6s/60s),无失控路径。
+- **失败语义**:任一步 FAIL 对 judge 可见(`[device #1] FAIL install: ...`),
+  但**裁决权在 judge**——设备未连接≠代码错误,机械层只负责让证据可见
+  (测试钉住:judge 指令含 device 证据,judge 仍可依全量证据自由裁决)。
+- **TDZ 教训**:runDeviceGate 定义在 try 块之后而调用在块内 →
+  ReferenceError(调试脚本 5 分钟定位);辅助函数先于使用点定义。
+- CLI:`hmh pipeline --device=<hdc> --hap= --bundle= [--ability=] [--target=]
+  [--expect-log=]`;domain-harmony 导出补 DeviceTestOptions 类型。
+- 测试 +2(device gate 零轮次通过/失败步骤对 judge 可见且裁决权在 judge)。
+
 ## [0.10.0] - 2026-09-13
 
 **V3 首切片(ADR-0006,蓝图 M12 方向)**——Pipeline Runtime:六角色流水线编排:

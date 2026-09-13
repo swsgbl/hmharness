@@ -110,6 +110,70 @@ test('runPipeline: FAIL verdict triggers repair rounds up to ceiling', async () 
   } finally { await rm(home, { recursive: true, force: true }); }
 });
 
+test('runPipeline: device gate runs after test, feeds judge, costs no turns', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-pipe4-'));
+  try {
+    const gateCalls: number[] = [];
+    const scripted = fakeLoop([
+      () => ({ text: 'plan' }),
+      () => ({ text: 'code', toolUses: 1 }),
+      () => ({ text: 'probes green', toolUses: 1 }),
+      () => ({ text: 'clean' }),
+      () => ({ text: 'device evidence seen. VERDICT: PASS' }),
+    ]);
+    const r = await runPipeline(baseOpts(home, scripted as never, {
+      deviceGate: {
+        hdc: 'hdc', hap: 'x.hap', bundle: 'b', ability: 'a', expectLog: 'onCreate',
+        runDeviceTestImpl: async () => {
+          gateCalls.push(1);
+          return [
+            { step: 'install', pass: true, detail: 'success' },
+            { step: 'launch', pass: true, detail: 'started' },
+            { step: 'log-marker', pass: true, detail: 'found' },
+            { step: 'uninstall', pass: true, detail: 'gone' },
+          ];
+        },
+      },
+    }));
+    assert.equal(r.finalVerdict, 'PASS');
+    assert.equal(gateCalls.length, 1, 'gate ran once (no repair loop)');
+    const dev = r.stages.find((s) => s.stage === 'device');
+    assert.ok(dev, 'device stage recorded');
+    assert.equal(dev!.verdict, 'PASS');
+    assert.equal(dev!.turns, 0, 'no model turns spent on the gate');
+    const files = await readdir(join(home, 'pipelines', r.pipelineId));
+    assert.ok(files.some((f) => f.includes('device')), 'device stage persisted');
+  } finally { await rm(home, { recursive: true, force: true }); }
+});
+
+test('runPipeline: failing device step is visible to the judge, judge still owns the verdict', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-pipe5-'));
+  try {
+    let judgeDirective = '';
+    const scripted = fakeLoop([
+      () => ({ text: 'plan' }),
+      () => ({ text: 'code' }),
+      () => ({ text: 'probes ok' }),
+      () => ({ text: 'no findings' }),
+      (directive) => { judgeDirective = directive; return { text: 'device failed but code is fine. VERDICT: FAIL - device unreachable' }; },
+    ]);
+    const r = await runPipeline(baseOpts(home, scripted as never, {
+      maxRepairs: 0,
+      deviceGate: {
+        hdc: 'hdc', hap: 'x.hap', bundle: 'b', ability: 'a', expectLog: 'onCreate',
+        runDeviceTestImpl: async () => [
+          { step: 'install', pass: false, detail: 'no device found' },
+        ],
+      },
+    }));
+    const dev = r.stages.find((s) => s.stage === 'device');
+    assert.equal(dev!.verdict, 'FAIL');
+    assert.match(judgeDirective, /\[device #1\]/, 'judge saw the device evidence');
+    assert.equal(r.finalVerdict, 'FAIL');
+    assert.equal(r.repairsUsed, 0);
+  } finally { await rm(home, { recursive: true, force: true }); }
+});
+
 test('runPipeline: global turn budget stops the chain honestly', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-pipe3-'));
   try {
