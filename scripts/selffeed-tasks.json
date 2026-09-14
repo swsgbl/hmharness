@@ -45,7 +45,12 @@
       "doneAt": "2026-09-13",
       "finding": "explorer+implementer dual-agent audit merged; identity table agreed (bundle com.example.selffeed1, SDK 6.1.1(24)); compileSdkVersion/targetSdkVersion absent flagged; debug-signing guidance for emulator installs"
     },
-    "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
+    {
+      "task": "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "26 cases, 13 pass (54%); config has no evolution.minPassRate key so default 0.6 floor applies; agent-flagged gap: bench results not persisted - fixed in 0.13.3 (evolution/benches history, first record 26/14/0.54); readiness eval-regression-stable now decidable"
+    },
     "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
     "Verify emulator state (list images + running instances) and write an insight about any mismatch between requested and actual state.",
     {

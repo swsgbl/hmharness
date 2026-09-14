@@ -1,4 +1,14 @@
-## [0.13.1] - 2026-09-13
+## [0.13.3] - 2026-09-13
+
+**bench 历史留档**(day-20 SELFFEED 发现的观测缺口):`runBench` 每次运行把
+判定记录(total/passed/passRate/逐案例明细)写入 `evolution/benches/<ts>.json`
+——此前该目录只有 readiness 在读没有任何人写,RL 门的"评估回归套件稳定"条件
+**永远无法满足**。首条历史已落盘(26 案例 14 过 0.54);两次运行后 readiness
+的稳定性条件即可判定。
+SELFFEED 第 20 天:任务 14 bench 逐案例判定——24+2 案例 13 过(54%),确认
+config 无 minPassRate 键(默认 0.6 生效);agent 建议的留档缺口当日修复。
+
+## [0.13.2] - 2026-09-13
 
 **Emulator 路径可发现性修复**(day-18 SELFFEED 真发现):emulatorExe 与 hdc 同病
 ——默认 `C:\DevEco-Studio` 在标准安装上不存在,agent 被迫伪造 junction 才能起

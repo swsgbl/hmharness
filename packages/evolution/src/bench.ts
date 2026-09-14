@@ -131,6 +131,21 @@ export async function runBench(
     }
   }
   const passed = results.filter((r) => r.pass).length;
+  // persist a history record: readiness's "eval-regression-stable" condition
+  // reads evolution/benches/*.json - without these records the RL gate's
+  // stability condition can never be met (day-20 audit gap)
+  try {
+    const dir = join(home, 'evolution', 'benches');
+    await mkdir(dir, { recursive: true });
+    const record = {
+      time: new Date().toISOString(),
+      total: cases.length,
+      passed,
+      passRate: cases.length === 0 ? 1 : passed / cases.length,
+      results: results.map((r) => ({ name: r.name, pass: r.pass, detail: r.detail.slice(0, 200) })),
+    };
+    await writeFile(join(dir, `${record.time.replace(/[:.]/g, '-')}.json`), JSON.stringify(record, null, 2) + '\n', 'utf8');
+  } catch { /* history is best-effort; the run result still returns */ }
   return { results, passRate: cases.length === 0 ? 1 : passed / cases.length };
 }
 
