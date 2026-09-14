@@ -123,8 +123,9 @@
     },
     {
       "task": "Verify the three SELFFEED workspaces (SelfFeed1/SelfFeedR/SelfFeedN/SelfFeedM) all still have valid build-profile.json5 - one line each.",
-      "expectedTurns": 2,
-      "evidenceType": "schema"
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "4 workspaces schema OK: SelfFeed1/R/N 3 files each, SelfFeedM 5 (feature module adds module.json5+oh-package.json5)"
     },
     {
       "task": "Check evolution/pareto entries: how many rejected candidates are in the pool now vs 4 at month-1 close?",
@@ -136,8 +137,9 @@
     },
     {
       "task": "Confirm the emulator image dir disk usage is unchanged vs the day-22 profile (data 1964MB + image 4512MB).",
-      "expectedTurns": 2,
-      "evidenceType": "verify"
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "zero disk drift vs day-22: data 1964MB + image 4512MB unchanged; repeated emulator sessions left no growth"
     },
     {
       "task": "Read the apikg index metadata and confirm symbolCount still matches the 22789 baseline (no silent reindex drift).",
@@ -146,6 +148,31 @@
       "done": true,
       "doneAt": "2026-09-14",
       "finding": "symbolCount 22789 stable; .bak explained: explicit 07:03 reindex after SDK path migration (resolve.ts fix side effect), 20210->22789 was that rebuild, backup-before-rewrite confirmed - NOT silent drift"
+    },
+    {
+      "task": "Run hmh route and report total routing outcomes + agreement rate (shadow router accumulation since 0.9.0).",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Verify the codexhost-bridge package still reports its version cleanly (npm registry view or local test) - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Run hmh label list and report how many unlabeled sessions are available in the pool (pick-list health).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Check evolution/log.jsonl: total cycle count and how many entries carry a (budget) skip - one line ratio.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Read the newest workflow-versioned artifact if any exist (evolution/workflows/) or confirm the dir is still empty awaiting the first promotion - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
     }
   ]
 }
