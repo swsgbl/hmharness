@@ -60,17 +60,48 @@
       "evidenceType": "build",
       "done": true,
       "doneAt": "2026-09-14",
-      "finding": "3 recent insights read, zero failures - no pattern to distill, note deliberately NOT written (no fabrication)"
+      "finding": "incremental cache reuse confirmed: 18/33 up-to-date incl CompileArkTS/PackageHap; only sub-10ms wiring tasks execute"
     },
     {
       "task": "Check whether cjpm state changed vs the day-17 finding (KB5124114 breakage) - one probe, one line.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "cjpm unchanged vs day-17: 0xC0000005 msvcrt, 4 fresh WER events; agent caught a false-signal (probe hang timing) and used WER count as ground truth"
     },
     {
       "task": "List the most recent pipeline runs under HMH_HOME/pipelines/ and verify each report JSON parses and carries a finalVerdict.",
       "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "both recent pipeline reports parse clean + carry finalVerdict FAIL (the 0.11 smoke runs, expected); 10-stage shape intact"
+    },
+    {
+      "task": "Verify the archived first-month dataset is intact: website/evidence-ds-2026-09 has index.html + raw/insights.jsonl + raw/log.jsonl and the raw files parse line-by-line as JSON.",
+      "expectedTurns": 2,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Run hmh readiness and report only which conditions changed vs the month-1 close (1/6 met).",
+      "expectedTurns": 1,
       "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the reward-human-labels file exists with exactly the quick-test label; report count vs 100.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Check the three bench history records: do all three agree on total case count (26)?",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Read the 5 most recent memory notes and confirm none reference the stale 927-files apikg baseline.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
     }
   ]
 }
