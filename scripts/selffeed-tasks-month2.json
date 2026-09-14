@@ -253,8 +253,9 @@
     },
     {
       "task": "Confirm all four SELFFEED workspaces still build green (4x harmony_build) - one line each.",
-      "expectedTurns": 3,
-      "evidenceType": "build"
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4/4 builds green: SelfFeed1 full 7.0s (w/ clean), R 1.2s/N 1.4s/M 1.3s (incremental, CompileArkTS UP-TO-DATE; M dual-module 36 up-to-date); honest caveat: incremental times not comparable to clean builds"
     },
     {
       "task": "Read the 30-day review (docs/SELFFEED-30d-review.md) and verify every recommendation from section 五 now has code shipped or a documented unlock path - yes/no per item.",
@@ -263,6 +264,31 @@
       "done": true,
       "doneAt": "2026-09-15",
       "finding": "review check: 3 YES + 1 partial (audit ratio 13/35 vs 8->2 target) + 1 NO (workflows never promoted - unlock path documented, no artifact); HONEST correction: day-1 commit overclaimed \"dir no longer structurally empty\" - mechanism unlocked it but nothing exercised it"
+    },
+    {
+      "task": "Week-3 canary: run hmh bench --impact and report only whether any verdict changed from needs-data.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Run one hmh evolve cycle (budget permitting) and report proposal outcomes - or the honest skip reason.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Verify the web daemon still serves /api/sessions with the V2 fields (nextCursor, branch) - one curl line.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Snapshot trajectory count again (readiness) - one growth line vs 72.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the 100-cycle evidence milestone entry is visible on the exported evidence page (grep the html).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
     }
   ]
 }
