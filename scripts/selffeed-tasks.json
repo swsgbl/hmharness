@@ -48,7 +48,12 @@
       "doneAt": "2026-09-13",
       "finding": "incremental steady-state 1.366s; CompileArkTS/PackageHap UP-TO-DATE (hap hash unchanged); ~1.2s fixed hvigor session cost; 4 tasks re-run due to missing declared outputs (SignHap expected without signing config)"
     },
-    "Run harmony_project_profile on the workspace app and audit the inventory numbers against the actual directory tree by hand-counting one module.",
+    {
+      "task": "Run harmony_project_profile on the workspace app and audit the inventory numbers against the actual directory tree by hand-counting one module.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "8 spot-checks ZERO drift vs disk (modules=1, pages=2 both real @Entry files, nav pair Index<->Detail verified, resources 4json/2png exact); profile misses: page reachability is not reported (nav pair found by hand) and no git-awareness for non-repo projects"
+    },
     {
       "task": "Spawn two sub-agents with different roles (explorer vs implementer) on the same scaffold task and record their ok-rates for the role leaderboard.",
       "done": true,
