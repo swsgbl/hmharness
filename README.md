@@ -28,7 +28,7 @@
 | **会话管理** | 历史会话重命名/归档/删除（trash 可恢复），悬停操作 |
 | **状态安全** | `hmh state backup|restore`——进化状态（技能/记忆/日志）快照与恢复，restore 前自动停放当前状态 |
 
-> **关于"自进化"的诚实注脚**:canary→impact 统计管线已就绪(暴露组 vs 对照组,≥8 会话且 ≥10% 差才晋升),但首个 30 天生产数据集仍在收集中——判定记录、被拒候选与原始日志原样发布在 [证据页 /evidence](https://swsgbl.github.io/hmharness/evidence/),协议见 [docs/SELFFEED.md](docs/SELFFEED.md)。在数据集发布前,"越用越聪明"是机制而非已证事实。
+> **关于"自进化"的诚实注脚**:canary→impact 统计管线已就绪(暴露组 vs 对照组,≥8 会话且 ≥10% 差才晋升);**首个 30 天生产数据集已发布并归档**——[首月证据数据集 /evidence/ds-2026-09](https://swsgbl.github.io/hmharness/evidence/ds-2026-09/),判定记录、被拒候选与原始日志原样公开,30 天复盘见 [docs/SELFFEED-30d-review.md](docs/SELFFEED-30d-review.md)。首月结论:30 天内零"统计可靠"晋升(门在拒绝噪声),但协议自暴露并修复了 7 个生产缺陷;"越用越聪明"仍未证实——被证实的是门与审计面在正确工作。
 >
 > **平台现状**:Windows 优先(鸿蒙工具链/模拟器/桌面自动化/TUI 终端适配均在此验证);macOS/Linux 为社区支持(核心内核与进化循环是纯 Node,域工具按可用性降级)。
 
