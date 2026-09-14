@@ -1,0 +1,58 @@
+{
+  "$comment": "SELFFEED month-2 task pool (v2.0 schema per docs/SELFFEED-30d-review.md section 五). Strategy shift: LIGHT tasks, high frequency - the 30-day review found trajectory volume (~2.6/day) is the binding constraint on the RL gate (needs ~136/day), not audit depth. Each task carries expectedTurns (1-5) and evidenceType (build|schema|device|audit|knowledge|verify). Day counter continues from month 1 (day 31 = first month-2 day).",
+  "pool": [
+    {
+      "task": "Verify SelfFeedM's two haps exist and record their sizes and mtimes (entry-default-unsigned.hap + login-default-unsigned.hap).",
+      "expectedTurns": 2,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Run harmony_schema_check on SelfFeedR and report the config file count and verdict.",
+      "expectedTurns": 1,
+      "evidenceType": "schema"
+    },
+    {
+      "task": "List installed emulator images and deployed instances (harmony_emulator_list) - one line each, note the stopped state.",
+      "expectedTurns": 1,
+      "evidenceType": "device"
+    },
+    {
+      "task": "Look up two symbols actually used in SelfFeedN (router.pushUrl and the page struct's @Entry decorator usage) via harmony_api_lookup and confirm they exist with file:line evidence.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "router.pushUrl confirmed @ohos.router.d.ts:257 + 3 overloads + UIContext:196 (project Index.ets:15 usage valid); EntryAbility correctly expected-miss (project-local class, not an SDK symbol) - lookup false-positive avoided"
+    },
+    {
+      "task": "Run hmh bench (one pass) and report only the pass rate + total cases; the bench-history record itself is the artifact.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Run harmony_toolchain_check and diff the per-tool verdicts against the day-17 baseline (cjpm broken). Report only what changed, if anything.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Read the 3 most recent insights and distill ONE memory note about a repeated failure pattern (or say none exists).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
+    },
+    {
+      "task": "Build SelfFeedN again and confirm the incremental cache reused task outputs (BUILD SUCCESSFUL + up-to-date count).",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Check whether cjpm state changed vs the day-17 finding (KB5124114 breakage) - one probe, one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "List the most recent pipeline runs under HMH_HOME/pipelines/ and verify each report JSON parses and carries a finalVerdict.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    }
+  ]
+}
