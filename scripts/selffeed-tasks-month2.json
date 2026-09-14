@@ -109,7 +109,33 @@
     },
     {
       "task": "Read the 5 most recent memory notes and confirm none reference the stale 927-files apikg baseline.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "no stale 927-baseline references: key entries (741/749/755) all dated 09-14 w/ 22789/542/528 numbers; one 927 mention is in an untrusted-signal exemplar list (correct usage)"
+    },
+    {
+      "task": "Run hmh dataset build and report kept/train/eval counts vs the last build (trajectory growth signal).",
       "expectedTurns": 2,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Verify the three SELFFEED workspaces (SelfFeed1/SelfFeedR/SelfFeedN/SelfFeedM) all still have valid build-profile.json5 - one line each.",
+      "expectedTurns": 2,
+      "evidenceType": "schema"
+    },
+    {
+      "task": "Check evolution/pareto entries: how many rejected candidates are in the pool now vs 4 at month-1 close?",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the emulator image dir disk usage is unchanged vs the day-22 profile (data 1964MB + image 4512MB).",
+      "expectedTurns": 2,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Read the apikg index metadata and confirm symbolCount still matches the 22789 baseline (no silent reindex drift).",
+      "expectedTurns": 1,
       "evidenceType": "knowledge"
     }
   ]
