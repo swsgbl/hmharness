@@ -348,25 +348,65 @@
     {
       "task": "Seed the experiment channel: register ONE real candidate (e.g. context target, hypothesis: ranker weights tweak) via the library and report its id - exercising the never-used path.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST candidate seeded: cand_mu1ig8as_58a3mp (context, mem-v4->v5, ranker weights hypothesis, origin human) - M9 registration path exercised; NOTE: running its experiment now would measure nothing (context injection points are M10+, ADR-0003 section 5) - first experiment run waits for a skill-target candidate"
     },
     {
       "task": "Snapshot month-2 day-17 metrics: trajectories count vs 75, dataset kept, daemon uptime.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 77 vs 75 (+2); 167 run dirs scanned"
     },
     {
       "task": "Check the emulator is still stopped and hdc targets empty after the day-14 cycle.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "emulator stopped, hdc targets empty - clean state"
     },
     {
       "task": "Read the newest 3 insights - any non-ok outcome since day-15? Report count only.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "0 non-ok insights since day-15 (whole-file failure mode is turn-budget only)"
     },
     {
       "task": "Confirm gh-pages and ndtool both serve the evidence page with the 100-cycle milestone (two HTTP 200s).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence page 200 on BOTH channels (github.io 423KB + ndtool.cn via socks5), byte-identical = same build, not soft-404"
+    },
+    {
+      "task": "Register a SKILL-target candidate (a small draft skill as payload) so the first hmh experiment run has a real injection contrast.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Run the first experiment: hmh experiment run <skill-candidate-id> --cases=8 - report the control/treatment arms and verdict.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Snapshot: does readiness reward-human-correlation show >1 yet (labels added)?",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Weekly daemon check: web status pid + a /api/state 200.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Check evidence raw insights line count growth vs the day-7 archive (458).",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }
