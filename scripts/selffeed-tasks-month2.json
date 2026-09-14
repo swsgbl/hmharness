@@ -78,22 +78,34 @@
     {
       "task": "Verify the archived first-month dataset is intact: website/evidence-ds-2026-09 has index.html + raw/insights.jsonl + raw/log.jsonl and the raw files parse line-by-line as JSON.",
       "expectedTurns": 2,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "archive intact: index.html + 3 raw jsonl (insights 458 / log 94 / pareto 4), 0 bad lines"
     },
     {
       "task": "Run hmh readiness and report only which conditions changed vs the month-1 close (1/6 met).",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "readiness vs month-1 close: trajectories 49->66 (+35%, volume strategy measurable); labels 1/100; 2 conditions green (stability+holdout)"
     },
     {
       "task": "Confirm the reward-human-labels file exists with exactly the quick-test label; report count vs 100.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "labels file exists w/ 1 quick-test label; gap 99 to target"
     },
     {
       "task": "Check the three bench history records: do all three agree on total case count (26)?",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "bench history now 5 records (not 3), ALL agree total=26; pass counts 14,14,16,16,16 - upward drift"
     },
     {
       "task": "Read the 5 most recent memory notes and confirm none reference the stale 927-files apikg baseline.",
