@@ -16,6 +16,7 @@ import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmharness/kernel';
+import { resolveDevecoHome } from './resolve.ts';
 
 const execCb = promisify(execFile);
 
@@ -101,7 +102,7 @@ export const harmonyDeviceTest: Tool = {
   needsApproval: () => true, // installs+launches+uninstalls on the device
   async execute(args, ctx) {
     // resolve hdc
-    const deveco = process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
+    const deveco = resolveDevecoHome();
     let hdc = 'hdc';
     try { await execCb(hdc, ['--version'], { timeout: 8000, windowsHide: true }); } catch {
       const cand = join(deveco, 'sdk', 'default', 'openharmony', 'toolchains', 'hdc.exe');

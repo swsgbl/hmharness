@@ -28,6 +28,7 @@ import { homedir } from 'node:os';
 import { join, resolve, win32 } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmharness/kernel';
+import { resolveDevecoHome } from './resolve.ts';
 
 const execCb = promisify(execFile);
 
@@ -141,7 +142,7 @@ export const harmonySign: Tool = {
   },
   needsApproval: () => true,
   async execute(args, ctx) {
-    const deveco = process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
+    const deveco = resolveDevecoHome();
     const p = hapsignToolPaths(deveco);
     if (!(await exists(p.jar))) return { output: `hap-sign-tool.jar not found at ${p.jar}. Set HM_DEVECO_HOME.`, isError: true };
     if (!(await exists(p.java))) return { output: `DevEco bundled java not found at ${p.java}. Set HM_DEVECO_HOME.`, isError: true };

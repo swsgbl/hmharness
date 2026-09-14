@@ -81,7 +81,12 @@
       "doneAt": "2026-09-14",
       "finding": "26 cases, 13 pass (54%); config has no evolution.minPassRate key so default 0.6 floor applies; agent-flagged gap: bench results not persisted - fixed in 0.13.3 (evolution/benches history, first record 26/14/0.54); readiness eval-regression-stable now decidable"
     },
-    "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
+    {
+      "task": "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "apikg 528/542 files + 22789 symbols real (stale \"927\" desc removed); refreshKnowledge was test-only dead code -> wired hmh knowledge refresh (offline no-op verified); SYSTEMIC: 7 callers carried hardcoded C:\\DevEco-Studio -> single resolve.ts now shared by all (index/emulator/apikg/lint/ondevice/signing/uiregress)"
+    },
     {
       "task": "Verify emulator state (list images + running instances) and write an insight about any mismatch between requested and actual state.",
       "done": true,

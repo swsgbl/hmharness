@@ -9,11 +9,12 @@ import { access } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Tool } from '@hmharness/kernel';
+import { resolveDevecoHome } from './resolve.ts';
 
 const exec = promisify(execFile);
 
 function devecoHome(): string {
-  return process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
+  return resolveDevecoHome();
 }
 
 /** Returns a launcher: either the bare command or [node, <run/index.js>]. */

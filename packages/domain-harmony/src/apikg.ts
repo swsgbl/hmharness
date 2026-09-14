@@ -1,7 +1,7 @@
 /**
  * @hmharness/domain-harmony - apikg (API knowledge graph, the codelin api_kg gap)
  * The agent guesses HarmonyOS APIs because it cannot SEE the SDK. The
- * declarations are right there on disk (ets/api/*.d.ts, 927 files) - this
+ * declarations are right there on disk (ets/api/*.d.ts, several hundred files) - this
  * module indexes them ONCE into HMH_HOME/apikg and answers lookups with
  * EVIDENCE: the declaration snippet + file:line + kit membership, so a
  * wrong API name is caught by "not in the SDK" instead of hallucinated.
@@ -14,6 +14,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Tool } from '@hmharness/kernel';
+import { resolveDevecoHome } from './resolve.ts';
 
 export interface ApiSymbolEntry {
   module: string;      // @ohos.xxx
@@ -162,7 +163,7 @@ export function lookupSymbol(index: ApiIndex, query: string, limit = 4): LookupR
 export const harmonyApiLookup: Tool = {
   name: 'harmony_api_lookup',
   description:
-    'Look up a HarmonyOS/ArkTS API symbol in the ACTUAL local SDK declarations (927 d.ts files indexed) - returns the declaration snippet with file:line evidence and kit membership. Use BEFORE writing code that calls any @ohos API: confirms the symbol exists, its exact signature context, and which kit it belongs to. A miss means "not in this SDK" - do not guess, reconsider the name or check the docs.',
+    'Look up a HarmonyOS/ArkTS API symbol in the ACTUAL local SDK declarations (the SDK d.ts tree, indexed on first use) - returns the declaration snippet with file:line evidence and kit membership. Use BEFORE writing code that calls any @ohos API: confirms the symbol exists, its exact signature context, and which kit it belongs to. A miss means "not in this SDK" - do not guess, reconsider the name or check the docs.',
   parameters: {
     type: 'object',
     properties: {
@@ -173,7 +174,7 @@ export const harmonyApiLookup: Tool = {
   needsApproval: () => false, // read-only; first call builds the local index
   async execute(args) {
     const { homedir } = await import('node:os');
-    const deveco = process.env.HM_DEVECO_HOME ?? 'C:\\DevEco-Studio';
+    const deveco = resolveDevecoHome();
     const home = process.env.HMH_HOME ?? join(homedir(), '.hmharness');
     const index = await loadApiIndex(deveco, home);
     if (!index || index.symbolCount === 0) {

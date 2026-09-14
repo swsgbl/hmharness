@@ -22,21 +22,12 @@ import { harmonySign } from './signing.ts';
 import { harmonyDeviceTest } from './ondevice.ts';
 import { harmonyApiLookup } from './apikg.ts';
 import { harmonyUiRegression, runUiRegression, captureDeviceScreen, type UiRegressionCase, type UiRegressionResult } from './uiregress.ts';
+import { resolveDevecoHome } from './resolve.ts';
 
 const exec = promisify(execFile);
 
 function devecoHome(): string {
-  if (process.env.HM_DEVECO_HOME) return process.env.HM_DEVECO_HOME;
-  // standard install locations probed in order: the old bare-drive default
-  // missed the common "Program Files" install and broke every device tool
-  // on stock DevEco setups (mcp-serve round-trip test caught it)
-  for (const home of ['C:\\Program Files\\Huawei\\DevEco Studio', 'D:\\Program Files\\Huawei\\DevEco Studio', 'C:\\DevEco-Studio']) {
-    try {
-      accessSync(join(home, 'sdk', 'default', 'openharmony', 'toolchains', 'hdc.exe'));
-      return home;
-    } catch { /* next */ }
-  }
-  return 'C:\\DevEco-Studio';
+  return resolveDevecoHome();
 }
 
 async function run(

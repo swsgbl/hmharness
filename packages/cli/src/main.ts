@@ -9,6 +9,7 @@
  *   hmh web [--port=7788]    local web frontend (SSE streaming + approvals)
  *   hmh tui                  lite terminal UI (status header + slash commands)
  *   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
+  hmh knowledge refresh     refresh static knowledge (fetch -> diff -> draft)
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
  *   hmh mcp                  show configured MCP servers and their tools
@@ -393,6 +394,7 @@ usage:
   hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
                            also starts the web UI in the background (--no-web skips)
   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
+  hmh knowledge refresh     refresh static knowledge (fetch -> diff -> draft)
   hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
                         Claude Code / Codex / any MCP host
                         (host config: npx -y @hmharness/cli mcp-serve)
@@ -611,6 +613,22 @@ flags:
       stdout.write(DIM('run "hmh providers --scan" to add them to config.json\n'));
     }
     void PROVIDER_PRESETS;
+    return;
+  }
+  if (cmd === 'knowledge') {
+    // day-29 SELFFEED: refreshKnowledge existed but was test-only dead code -
+    // wire the knowledge refresh into a real command (offline-safe by design:
+    // a clean no-op summary when nothing is reachable).
+    await initHome();
+    const home = homeDir();
+    const cfgK = await loadConfig();
+    const { refreshKnowledge } = await import('@hmharness/evolution');
+    const r = await refreshKnowledge({
+      home,
+      provider: resolveProvider(cfgK, 'evolve'),
+      say: (l) => stdout.write(DIM(`  ${l}\n`)),
+    });
+    stdout.write((r.draft ? GREEN('✓') + ' knowledge draft: ' + r.draft.name + ' — ' : '') + r.summary + '\n');
     return;
   }
   if (cmd === 'ops') {
