@@ -18,12 +18,23 @@ export interface DiagnosedError {
   evidence: string;
 }
 
-/** Cause classes: signature -> fix. Order matters (first hit wins). */
+/** Cause classes: signature -> fix. Order matters (first hit wins).
+ *  day-28 SELFFEED hardening: the sdk-version signature matches hvigor's
+ *  *error code* (Specification Limit Violation), not its mutable hint lines -
+ *  the old generic `config` regex only caught this defect incidentally via
+ *  the hint text. */
 const SIGNATURES: Array<{ re: RegExp; kind: string; fix: string }> = [
   {
     re: /Invalid value of DEVECO_SDK_HOME|sdk home|not find sdk|SdkHomePath/i,
     kind: 'sdk-home',
     fix: 'DEVECO_SDK_HOME is unset or wrong. Set HM_DEVECO_HOME (default C:\\DevEco-Studio) or export DEVECO_SDK_HOME=<DevEco>/sdk; our build wrapper already tries - set HM_DEVECO_HOME and retry.',
+  },
+  {
+    // hvigor error code for an implausible compatibleSdkVersion etc. - match
+    // the code itself so hint-wording churn cannot break classification
+    re: /Specification Limit Violation|compatibleSdkVersion.*(invalid|not|unsupported)|unsupported sdk version|sdk version.*(invalid|not match)/i,
+    kind: 'sdk-version',
+    fix: 'compatibleSdkVersion in build-profile.json5 does not match an installed SDK. Check the value against hmh devices/check output (installed SDK line) and fix products[0].compatibleSdkVersion; the schema check does NOT validate version plausibility - this doctor class is the net that catches it.',
   },
   {
     re: /signingConfigs|signing config|keystore|\.p12|\.cer|no signing/i,

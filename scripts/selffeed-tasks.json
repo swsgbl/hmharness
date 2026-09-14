@@ -51,7 +51,12 @@
       "doneAt": "2026-09-13",
       "finding": "cjpm still broken (KB5124114); no-network repair exhausted empirically (shim/KnownDLL/msvcrt WinSxS/rollback admin gates); recommendation: stay on ArkTS until vendor fix, admin rollback commands prepared"
     },
-    "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
+    {
+      "task": "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "two real defects exposed: (1) schema check passes junk SDK version 99.99.99(99) - version plausibility not validated; (2) doctor config-class match was INCIDENTAL (via hvigor hint line; stripped hint => UNKNOWN). Fixed in 0.13.4: new sdk-version signature matches the ERROR CODE (Specification Limit Violation) so hint churn cannot break it; restore byte-identical, rebuild green"
+    },
     {
       "task": "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
       "done": true,
