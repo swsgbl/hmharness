@@ -3,7 +3,12 @@
   "tasks": [
     "Scaffold a fresh HarmonyOS app named SelfFeedN with two pages (Index + Detail) and run harmony_schema_check on it; report any schema issues found.",
     "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
-    "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
+    {
+      "task": "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "doctor verified real (ran the actual build, produced this project hap); it is a failure classifier that short-circuits on green builds - agent replayed its 7-signature regex table against real build evidence; zero non-build file mtimes touched"
+    },
     "Sign the newest unsigned hap with the debug identity and install+launch it on the emulator; report the lifecycle marker from hilog.",
     {
       "task": "Run harmony_device_test end-to-end on the workspace app (install -> launch -> log marker -> uninstall) and report all four verdicts.",
