@@ -152,7 +152,10 @@
     {
       "task": "Run hmh route and report total routing outcomes + agreement rate (shadow router accumulation since 0.9.0).",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "136 outcomes, 100% agreement, 0% disagreement - healthy accumulation but ZERO contrast (no alt routes configured) so the disagreement-success correlation cannot be evaluated yet"
     },
     {
       "task": "Verify the codexhost-bridge package still reports its version cleanly (npm registry view or local test) - one line.",
@@ -162,17 +165,26 @@
     {
       "task": "Run hmh label list and report how many unlabeled sessions are available in the pool (pick-list health).",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "unlabeled pool is 186 sessions (CLI shows first 12 by design); bottleneck is the labeling ACT not the pool - hmh label <sid> <1-5>"
     },
     {
       "task": "Check evolution/log.jsonl: total cycle count and how many entries carry a (budget) skip - one line ratio.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "98 cycles total, 7 budget-skips = 7.1% skip ratio (82 carry cyclesToday counter)"
     },
     {
       "task": "Read the newest workflow-versioned artifact if any exist (evolution/workflows/) or confirm the dir is still empty awaiting the first promotion - one line.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "evolution/workflows/ absent - awaiting first *-workflow promotion (condition 5 unlocks with it)"
     }
   ]
 }
