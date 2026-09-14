@@ -1,7 +1,12 @@
 {
   "$comment": "Task pool for the 30-day self-feeding protocol (docs/SELFFEED.md). Each task is a REAL HarmonyOS development job the agent can run end-to-end on this machine (emulator + toolchain proven). pool = the agent picks ONE per day, in order or random. add tasks freely - every added task must stay inside the proven pipeline (scaffold/schema/build/sign/device/ui/apikg/lint).",
   "tasks": [
-    "Scaffold a fresh HarmonyOS app named SelfFeedN with two pages (Index + Detail) and run harmony_schema_check on it; report any schema issues found.",
+    {
+      "task": "Scaffold a fresh HarmonyOS app named SelfFeedN with two pages (Index + Detail) and run harmony_schema_check on it; report any schema issues found.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "default scaffold: 19-file skeleton, 1 page (Index), SDK 6.1.1(24); pages param is purely additive (same skeleton, extra pages/*.ets + main_pages entries); builds green twice (7.6s, 6.3s); minimal params right for one-screen apps, explicit pages strictly cheaper when count known"
+    },
     "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
     {
       "task": "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
