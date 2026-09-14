@@ -34,7 +34,12 @@
       "finding": "4/5 symbols found; UIAbility lifecycle + Want + loadContent verified; window.WindowStage + WindowStage are INDEX BLIND SPOTS (namespace-nested decls unparseable, @ohos.window.d.ts:79) - not SDK gaps"
     },
     "Run the codelinter on the workspace entry module and summarize the top three rule categories.",
-    "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
+    {
+      "task": "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "closed-loop on fresh SelfFeedN: BOTH corruptions caught with file::path+fix-semantics messages (missing mainElement AND invented deviceTypes array->string type violation); byte-identical restore verified (fc /b), final check green"
+    },
     {
       "task": "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
       "done": true,
