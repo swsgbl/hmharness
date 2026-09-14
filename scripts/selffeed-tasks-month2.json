@@ -35,24 +35,21 @@
     },
     {
       "task": "Run hmh bench (one pass) and report only the pass rate + total cases; the bench-history record itself is the artifact.",
-      "expectedTurns": 2,
-      "evidenceType": "build"
-    },
-    {
-      "task": "Run harmony_toolchain_check and diff the per-tool verdicts against the day-17 baseline (cjpm broken). Report only what changed, if anything.",
-      "expectedTurns": 2,
-      "evidenceType": "audit",
       "done": true,
       "doneAt": "2026-09-14",
       "finding": "bench pass 62% (16/26), third history record 2026-09-14T09-38-46-863Z.json - readiness stability now 3-sample"
     },
     {
-      "task": "Read the 3 most recent insights and distill ONE memory note about a repeated failure pattern (or say none exists).",
-      "expectedTurns": 2,
-      "evidenceType": "knowledge",
+      "task": "Run harmony_toolchain_check and diff the per-tool verdicts against the day-17 baseline (cjpm broken). Report only what changed, if anything.",
       "done": true,
       "doneAt": "2026-09-14",
-      "finding": "toolchain diff vs day-17: ZERO changes - hdc/hvigorw/ohpm OK, cjpm still 0xC0000005 (KB5124114/msvcrt KnownDLL), rollback still admin-gated"
+      "finding": "toolchain diff vs day-17: ZERO changes - hdc/hvigorw/ohpm OK, cjpm still 0xC0000005, rollback admin-gated"
+    },
+    {
+      "task": "Read the 3 most recent insights and distill ONE memory note about a repeated failure pattern (or say none exists).",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "3 recent insights read, zero failures - no pattern to distill, note deliberately NOT written (no fabrication)"
     },
     {
       "task": "Build SelfFeedN again and confirm the incremental cache reused task outputs (BUILD SUCCESSFUL + up-to-date count).",
