@@ -268,25 +268,65 @@
     {
       "task": "Week-3 canary: run hmh bench --impact and report only whether any verdict changed from needs-data.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "week-3 canary: NO verdict change (19/19 still needs-data, 4th consecutive honest refusal)"
     },
     {
       "task": "Run one hmh evolve cycle (budget permitting) and report proposal outcomes - or the honest skip reason.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evolve cycle: honest budget skip (10/4 today) - clean exit, durably logged"
     },
     {
       "task": "Verify the web daemon still serves /api/sessions with the V2 fields (nextCursor, branch) - one curl line.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FOUND WEB DAEMON DEAD (7788 no listener) -> restarted (pid 37800, v0.14.0); LIVE verify: /api/sessions 200 w/ nextCursor+branch fields present"
     },
     {
       "task": "Snapshot trajectory count again (readiness) - one growth line vs 72.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 75 vs 72 (+3 steady growth)"
     },
     {
       "task": "Confirm the 100-cycle evidence milestone entry is visible on the exported evidence page (grep the html).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "milestone visible: evidence page header shows 100 evolution cycles (agent corrected own grep - label is Chinese 轮次)"
+    },
+    {
+      "task": "Watch the web daemon for stability: check hmh web status twice 60s apart - same pid both times means no crash-loop.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Run hmh experiment list - report whether any candidates have registered since M9 shipped.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the 5 pipeline reports all carry a device stage or note which lack one (0.11 smoke runs had device gates).",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Check the bench history pass-rate trend across ALL records - is the 14->16 upward drift continuing?",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Verify hmh label list still shows the labeled session with score 3 (data intact after daemon restart).",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }
