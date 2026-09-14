@@ -190,27 +190,67 @@
     {
       "task": "Report the current test totals: count tests across all packages (npm test summary) - one line.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "228/228 tests pass (226 main + 2 bridge), ~5.5min full suite"
     },
     {
       "task": "Verify the pipelines dir grew since day-6 (was 5 runs) - report current run count.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pipelines stable at 5 runs, unchanged since day-6; each has 11 stage files + report"
     },
     {
       "task": "Check config.json providers list is unchanged vs the known 13-provider baseline - one line.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "13-provider baseline intact; +1 glm-vision (vision fallback) = 14 keys total"
     },
     {
       "task": "Run hmh readiness one-liner: which conditions are green now.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "readiness: 2 green (stability + holdout); trajectories 72/1000 (growing from 66); lever = data-collection"
     },
     {
       "task": "Confirm the evidence page raw files parse (insights/log/pareto) after the latest export - 0 bad lines expected.",
       "expectedTurns": 2,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence raw: 3 files, 575 lines, 0 parse failures"
+    },
+    {
+      "task": "Snapshot month-2 metrics: trajectories count, dataset kept, bench pass rate, label count - one health line.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Verify the emulator can still start+stop cleanly after 3 weeks (one cycle, ~90s) - PASS/FAIL both steps.",
+      "expectedTurns": 2,
+      "evidenceType": "device"
+    },
+    {
+      "task": "Check whether any memory notes reference month-1 dates as if current (staleness sweep) - report count only.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
+    },
+    {
+      "task": "Confirm all four SELFFEED workspaces still build green (4x harmony_build) - one line each.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Read the 30-day review (docs/SELFFEED-30d-review.md) and verify every recommendation from section 五 now has code shipped or a documented unlock path - yes/no per item.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
     }
   ]
 }
