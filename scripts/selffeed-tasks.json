@@ -7,7 +7,12 @@
       "doneAt": "2026-09-14",
       "finding": "default scaffold: 19-file skeleton, 1 page (Index), SDK 6.1.1(24); pages param is purely additive (same skeleton, extra pages/*.ets + main_pages entries); builds green twice (7.6s, 6.3s); minimal params right for one-screen apps, explicit pages strictly cheaper when count known"
     },
-    "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
+    {
+      "task": "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "feature module via tool param (modules=[{name:login,type:feature}]) - NOT by hand; 25 files (+6 vs minimal); dual-module build PASS 8.3s producing BOTH haps (entry+login); schema 5 files green; ergonomics: tool covers HAP-in-app, 0-page feature is valid"
+    },
     {
       "task": "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
       "done": true,
