@@ -308,25 +308,65 @@
     {
       "task": "Watch the web daemon for stability: check hmh web status twice 60s apart - same pid both times means no crash-loop.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon stable: same pid 37800 across a REAL 60s wait (agent caught timeout /t stdin failure, redid with ping -n 61)"
     },
     {
       "task": "Run hmh experiment list - report whether any candidates have registered since M9 shipped.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "zero candidates registered since M9 shipped - the experiment channel is unexercised (honest gap, needs an origin story for first candidates)"
     },
     {
       "task": "Confirm the 5 pipeline reports all carry a device stage or note which lack one (0.11 smoke runs had device gates).",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3/5 pipelines carry device stages (2 FAIL 1 PASS); the 2 early runs predate the 0.11.0 device gate"
     },
     {
       "task": "Check the bench history pass-rate trend across ALL records - is the 14->16 upward drift continuing?",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "bench trend CORRECTED to plateau: 14,14,16,16,16 (three consecutive 16/26=0.615) - not continuing upward; canary-identity failure reason shifted"
     },
     {
       "task": "Verify hmh label list still shows the labeled session with score 3 (data intact after daemon restart).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "label data intact after daemon restart (star-3 session still listed)"
+    },
+    {
+      "task": "Seed the experiment channel: register ONE real candidate (e.g. context target, hypothesis: ranker weights tweak) via the library and report its id - exercising the never-used path.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Snapshot month-2 day-17 metrics: trajectories count vs 75, dataset kept, daemon uptime.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Check the emulator is still stopped and hdc targets empty after the day-14 cycle.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Read the newest 3 insights - any non-ok outcome since day-15? Report count only.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm gh-pages and ndtool both serve the evidence page with the 100-cycle milestone (two HTTP 200s).",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }
