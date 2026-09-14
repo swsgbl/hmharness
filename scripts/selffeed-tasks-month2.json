@@ -428,27 +428,67 @@
     {
       "task": "Register a second skill candidate with a plausibly-useful skill (e.g. exact-output-discipline for reply-exact cases) and run its experiment - can any candidate produce a non-zero diff?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "second skill candidate cand_mu1k65n7_qldmc7 (exact-output-discipline): first run exposed the non-tools no-injection instrument defect -> fixed 0.14.2 -> rerun treatment 236 tokens (seen) vs control 268; 9/10 both, honest needs-data; 10-pt lift needs n~69/arm"
     },
     {
       "task": "Weekly canary: bench --impact - any verdict change?",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary skipped this batch (last ran day-16, 4 consecutive needs-data; next due with day-21+)"
     },
     {
       "task": "Snapshot trajectories vs 77.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 vs 77 (+6)"
     },
     {
       "task": "Check both experiments wrote reports under evolution/experiments/<id>/ (2 dirs, parseable).",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports: 3 candidate dirs, 6 reports total, all parseable"
     },
     {
       "task": "Confirm the 8 new train cases all appear non-holdout in listCases (train count = 10).",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "train count = 10 non-holdout confirmed"
+    },
+    {
+      "task": "Grow the train set toward the n=69 detection floor: add 20 more deterministic non-holdout cases (varied reply-exact/none/any/regex shapes).",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Run the exact-output-discipline experiment again at the larger n - does the diff become non-zero?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary: bench --impact - verdict change?",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Note the drafts canonicalization gap (skills/drafts/<name>.md vs listDrafts draft/<name>/SKILL.md) - write the draft in BOTH shapes so a future promotion finds it.",
+      "expectedTurns": 1,
+      "evidenceType": "knowledge"
     }
   ]
 }

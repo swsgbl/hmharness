@@ -323,7 +323,13 @@ function makeCaseRunner(): CaseRunner {
   return async (c: BenchCase, skillsPrompt: string) => {
     const cfg = await loadConfig();
     if (!c.tools) {
-      const r = await chat(resolveProvider(cfg, 'bench'), [{ role: 'user', content: c.prompt }]);
+      // day-50 instrument fix: non-tools cases MUST see the skills prompt as
+      // a system message - the old user-only call meant every skill candidate
+      // measured nothing (control tokens恒268, zero information)
+      const msgs = skillsPrompt
+        ? [{ role: 'system', content: skillsPrompt }, { role: 'user', content: c.prompt }] as Array<{ role: 'system' | 'user'; content: string }>
+        : [{ role: 'user', content: c.prompt }] as Array<{ role: 'system' | 'user'; content: string }>;
+      const r = await chat(resolveProvider(cfg, 'bench'), msgs);
       return r.message.content ?? '';
     }
     const reg = new Registry();

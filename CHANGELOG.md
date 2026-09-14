@@ -1,3 +1,12 @@
+## [0.14.2] - 2026-09-15
+
+**实验仪器第二缺陷修复**(day-50):非 tools 案例路径不注入 skills prompt——
+makeCaseRunner 的 chat 直呼只带 user 消息,一切 skill 候选对 reply-exact 类案例
+测不到(control tokens 恒 268=零信息)。修=skillsPrompt 非空时前置 system 消息。
+修复后重跑 cand_mu1k65n7:treatment tokens 236≠268(技能被真正看到),双臂 9/10、
+p=1.0、诚实 needs-data——**90% 天花板上 10 点提升需 n≈69/arm**(agent 用真
+verdictFor 无 LLM 计算给出),训练集扩容是下一解锁项。测试 230+2 绿。
+
 ## [0.14.1] - 2026-09-15
 
 **首个完整实验暴露的两处门禁缺陷修复**(day-49 SELFFEED,当日闭环):
