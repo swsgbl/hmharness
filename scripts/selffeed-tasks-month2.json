@@ -4,7 +4,10 @@
     {
       "task": "Verify SelfFeedM's two haps exist and record their sizes and mtimes (entry-default-unsigned.hap + login-default-unsigned.hap).",
       "expectedTurns": 2,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "SelfFeedM dual haps confirmed real: entry 15,446B + login 4,386B, same build mtime; login unsigned noted"
     },
     {
       "task": "Run harmony_schema_check on SelfFeedR and report the config file count and verdict.",
@@ -48,7 +51,10 @@
     {
       "task": "Build SelfFeedN again and confirm the incremental cache reused task outputs (BUILD SUCCESSFUL + up-to-date count).",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "3 recent insights read, zero failures - no pattern to distill, note deliberately NOT written (no fabrication)"
     },
     {
       "task": "Check whether cjpm state changed vs the day-17 finding (KB5124114 breakage) - one probe, one line.",
