@@ -1047,10 +1047,15 @@ flags:
       const maxCases = Number((rest.find((a) => a.startsWith('--cases=')) ?? '').slice(9)) || 12;
       const cases = (await E.listCases(home)).filter((c) => !c.holdout);
       if (cases.length === 0) { stdout.write('no bench cases - run scripts/bench-cases-v2.cjs or seed first\n'); return; }
+      // treatment injects the skill CONTENT, never the bare name string
+      // (day-49 fix: the first real experiment measured the instrument)
+      const treatmentPrompt = cand.target === 'skill' && cand.payload
+        ? await E.loadSkillPayload(home, cand.payload)
+        : (cand.payload ?? '');
       stdout.write(DIM(`running ${Math.min(maxCases, cases.length)} gate cases x2 arms (bench route)…\n`));
       const armRun = async (c: BenchCase, arm: 'control' | 'treatment'): Promise<{ pass: boolean; tokens: number }> => {
         const runner = makeCaseRunner();
-        const out = await runner(c, arm === 'treatment' ? (cand.payload ?? '') : '');
+        const out = await runner(c, arm === 'treatment' ? treatmentPrompt : '');
         return { pass: E.matchCase(out, c).pass, tokens: E.estTokens(c.prompt + out) };
       };
       const rep = await E.runCandidateExperiment(home, cand.id, { runCase: armRun, cases, maxCases });

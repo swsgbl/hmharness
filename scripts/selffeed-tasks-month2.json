@@ -388,25 +388,65 @@
     {
       "task": "Register a SKILL-target candidate (a small draft skill as payload) so the first hmh experiment run has a real injection contrast.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "skill candidate cand_mu1iogzo_y71xon registered (verify-before-claim draft as payload)"
     },
     {
       "task": "Run the first experiment: hmh experiment run <skill-candidate-id> --cases=8 - report the control/treatment arms and verdict.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST full experiment: control 9/10 vs treatment 9/10 (content-injected, tokens 268->254), p=1.0, honest needs-data - M9 chain end-to-end live; two gate defects found+fixed same day (0.14.1)"
     },
     {
       "task": "Snapshot: does readiness reward-human-correlation show >1 yet (labels added)?",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "labels still 1/100"
     },
     {
       "task": "Weekly daemon check: web status pid + a /api/state 200.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon pid 37800 stable"
     },
     {
       "task": "Check evidence raw insights line count growth vs the day-7 archive (458).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "insights 478 lines vs 458 at day-7 archive (+20)"
+    },
+    {
+      "task": "Register a second skill candidate with a plausibly-useful skill (e.g. exact-output-discipline for reply-exact cases) and run its experiment - can any candidate produce a non-zero diff?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary: bench --impact - any verdict change?",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Snapshot trajectories vs 77.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Check both experiments wrote reports under evolution/experiments/<id>/ (2 dirs, parseable).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Confirm the 8 new train cases all appear non-holdout in listCases (train count = 10).",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }

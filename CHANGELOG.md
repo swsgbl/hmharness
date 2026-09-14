@@ -1,3 +1,17 @@
+## [0.14.1] - 2026-09-15
+
+**首个完整实验暴露的两处门禁缺陷修复**(day-49 SELFFEED,当日闭环):
+
+- **skill 目标 treatment 注入真内容**(evolution/skillpayload.ts):payload=技能名,arm
+  现在加载 drafts/<name>.md(其次 skills/<name>.md)注入 markdown 本体——旧实现注入
+  裸名字串(+34 tokens),"测的是仪器不是技能"。测试 +2。
+- **训练集扩到 10 个非 holdout 案例**(scripts 侧 +8 train cases):旧训练集只有 2 个
+  < MIN_ARM_N=8,z 检验结构性永远 needs-data、晋升门不可达。
+- **M9 全链路端到端首通**:注册(skill 候选 verify-before-claim)→内容注入(双臂 tokens
+  268 vs 254 证实不同)→双臂 9/10 vs 9/10→z 检验 p=1.0→**诚实 needs-data 判定落盘**
+  (技能无可测提升=真结果,非机器故障)。
+- 测试 230+2 绿。
+
 ## [0.14.0] - 2026-09-14
 
 **SELFFEED 月 2 基础（30 天复盘修订落地）**：

@@ -1,6 +1,7 @@
 export * from './memory.ts';
 export * from './ranker.ts';
 export * from './candidates.ts';
+export * from './skillpayload.ts';
 export * from './dataset.ts';
 export * from './readiness.ts';
 export * from './labels.ts';
