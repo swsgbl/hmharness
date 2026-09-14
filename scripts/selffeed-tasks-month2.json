@@ -159,8 +159,9 @@
     },
     {
       "task": "Verify the codexhost-bridge package still reports its version cleanly (npm registry view or local test) - one line.",
-      "expectedTurns": 1,
-      "evidenceType": "verify"
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "codexhost-bridge v0.6.5 tests 2/2 PASS (224ms), version string clean; nothing published"
     },
     {
       "task": "Run hmh label list and report how many unlabeled sessions are available in the pool (pick-list health).",
@@ -185,6 +186,31 @@
       "done": true,
       "doneAt": "2026-09-14",
       "finding": "evolution/workflows/ absent - awaiting first *-workflow promotion (condition 5 unlocks with it)"
+    },
+    {
+      "task": "Report the current test totals: count tests across all packages (npm test summary) - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Verify the pipelines dir grew since day-6 (was 5 runs) - report current run count.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Check config.json providers list is unchanged vs the known 13-provider baseline - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Run hmh readiness one-liner: which conditions are green now.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the evidence page raw files parse (insights/log/pareto) after the latest export - 0 bad lines expected.",
+      "expectedTurns": 2,
+      "evidenceType": "verify"
     }
   ]
 }
