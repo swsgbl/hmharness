@@ -12,12 +12,18 @@
     {
       "task": "Run harmony_schema_check on SelfFeedR and report the config file count and verdict.",
       "expectedTurns": 1,
-      "evidenceType": "schema"
+      "evidenceType": "schema",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "SelfFeedR schema OK: 3 config files valid (structure+enums)"
     },
     {
       "task": "List installed emulator images and deployed instances (harmony_emulator_list) - one line each, note the stopped state.",
       "expectedTurns": 1,
-      "evidenceType": "device"
+      "evidenceType": "device",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "Pura 90 deployed (stopped), hdc targets empty, image HarmonyOS-6.1.1-B1/phone_all_x86 only"
     },
     {
       "task": "Look up two symbols actually used in SelfFeedN (router.pushUrl and the page struct's @Entry decorator usage) via harmony_api_lookup and confirm they exist with file:line evidence.",
