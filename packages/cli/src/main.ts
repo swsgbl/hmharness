@@ -10,6 +10,7 @@
  *   hmh tui                  lite terminal UI (status header + slash commands)
  *   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
   hmh knowledge refresh     refresh static knowledge (fetch -> diff -> draft)
+  hmh label [list|<session-id> <1-5> [note]]  human reward labeling (RL-gate condition 3)
  *   hmh devices|check        direct tool run, no model
  *   hmh tools                list all registered tools (native + MCP)
  *   hmh mcp                  show configured MCP servers and their tools
@@ -395,6 +396,7 @@ usage:
                            also starts the web UI in the background (--no-web skips)
   hmh ops [scan|brief|stats|status]  ops keeper: radar / npm download stats
   hmh knowledge refresh     refresh static knowledge (fetch -> diff -> draft)
+  hmh label [list|<session-id> <1-5> [note]]  human reward labeling (RL-gate condition 3)
   hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
                         Claude Code / Codex / any MCP host
                         (host config: npx -y @hmharness/cli mcp-serve)
@@ -613,6 +615,32 @@ flags:
       stdout.write(DIM('run "hmh providers --scan" to add them to config.json\n'));
     }
     void PROVIDER_PRESETS;
+    return;
+  }
+  if (cmd === 'label') {
+    // SELFFEED month-2: human reward-label channel (readiness condition 3).
+    //   hmh label list                 pick sessions to score
+    //   hmh label <session-id> <1-5>   score one session [note]
+    await initHome();
+    const home = homeDir();
+    const { labelSession, labelableSessions, readLabels } = await import('@hmharness/evolution');
+    if (rest[0] === 'list' || rest.length === 0) {
+      const rows = await labelableSessions(home);
+      const labeled = (await readLabels(home)).length;
+      stdout.write(`${CYAN(String(labeled))} labeled · unlabeled pool below (first ${rows.length})\n`);
+      for (const r of rows) {
+        const tag = r.label ? `${GREEN('★' + r.label.score)} ` : DIM('· ');
+        stdout.write(`  ${tag}${DIM(r.session.slice(0, 24))} ${r.task.slice(0, 60).replace(/\s+/g, ' ')}\n`);
+      }
+      stdout.write(DIM('score with: hmh label <session-id> <1-5> [note]\n'));
+      return;
+    }
+    const sid = rest[0] ?? '';
+    const score = Number(rest[1] ?? NaN);
+    const note = rest.slice(2).join(' ') || undefined;
+    const r = await labelSession(home, sid, score, note);
+    if (!r.ok) { stdout.write(RED('✗ ') + (r.reason ?? '') + '\n'); return; }
+    stdout.write(GREEN('✓') + ` labeled ${sid} = ${score}${note ? ` (${note})` : ''} · total ${r.count}/100 toward reward-human-correlation\n`);
     return;
   }
   if (cmd === 'knowledge') {

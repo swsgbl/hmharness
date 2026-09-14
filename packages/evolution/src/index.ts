@@ -3,6 +3,7 @@ export * from './ranker.ts';
 export * from './candidates.ts';
 export * from './dataset.ts';
 export * from './readiness.ts';
+export * from './labels.ts';
 export * from './insights.ts';
 export * from './skills.ts';
 export * from './bench.ts';

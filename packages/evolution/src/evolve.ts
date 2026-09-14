@@ -13,7 +13,7 @@
  *    config, security settings, or code
  *  - memory is append-only (ACE: rewriting is how context gets lost)
  */
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chat, loadConfig, type ProviderConfig } from '@hmharness/kernel';
 import { listCases, matchCase, seedCases, type BenchCase } from './bench.ts';
@@ -397,6 +397,23 @@ export async function runEvolution(opts: {
         lineage: { parentInsights: insightIds, scores: { train: candRate, holdout: holdout.length ? holdoutRate : undefined }, metaModel: provider.model, decidedAt: new Date().toISOString() },
       });
       say(`  promoted to canary${holdout.length ? ` (holdout ${(holdoutRate * 100).toFixed(0)}%)` : ' [weak gate: no holdout]'}`);
+      // AWM workflows are versioned artifacts: a promoted *-workflow skill is
+      // ALSO recorded under evolution/workflows/<name>.json - the readiness
+      // "version-provenance" condition scans that dir (it was permanently
+      // empty before this, making condition 5 structurally unmeetable).
+      if (/workflow$/.test(p.name)) {
+        try {
+          const wfDir = join(home, 'evolution', 'workflows');
+          await mkdir(wfDir, { recursive: true });
+          await writeFile(join(wfDir, `${p.name}.json`), JSON.stringify({
+            name: p.name,
+            version: candRate.toFixed(2),
+            skillMd: p.skill_md,
+            promotedAt: new Date().toISOString(),
+            trainPassRate: candRate,
+          }, null, 2) + '\n', 'utf8');
+        } catch { /* versioning is best-effort bookkeeping */ }
+      }
     } catch (err) {
       report.outcomes.push({ name: p.name, action: 'error', reason: String(err).slice(0, 200) });
       say(`  error: ${String(err).slice(0, 120)}`);

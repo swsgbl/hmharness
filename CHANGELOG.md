@@ -1,3 +1,18 @@
+## [0.14.0] - 2026-09-14
+
+**SELFFEED 月 2 基础（30 天复盘修订落地）**：
+
+- **`hmh label` 人工奖励标注通道**(evolution/labels.ts):`hmh label <session-id> <1-5> [note]`
+  写入 evolution/reward-human-labels.jsonl(按会话去重,首标生效);`hmh label list`
+  从洞察流挑未标注会话。readiness 的 reward-human-correlation 条件(需 100 条)首次有
+  写入路径——真机链路验证(1/100)。测试 +2。
+- **workflows 版本化激活**:AWM 归纳的 `*-workflow` 技能晋升时同时落
+  evolution/workflows/<name>.json(版本=train 通过率,含 md)——readiness 第五条件扫描的
+  目录此前永远为空,结构性不可满足;现在随 workflow 晋升自然解锁。
+- (0.13.4/0.13.5 条目并入:doctor sdk-version 错误码签名 + DevEco 发现单实现 resolve.ts
+  7→1 + knowledge refresh 接线,见各 commit message)
+- 测试 226+2 全绿。
+
 ## [0.13.3] - 2026-09-13
 
 **bench 历史留档**(day-20 SELFFEED 发现的观测缺口):`runBench` 每次运行把
