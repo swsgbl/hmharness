@@ -508,12 +508,52 @@
     {
       "task": "Author 10 ADVERSARIAL exactness cases the base model plausibly FAILS (long literal strings, near-miss distractors) - the only way a discipline skill can show lift.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "10 adversarial cases authored; only adv-mixed-2 defeats the base model (prettify: inserted space after colon in a JSON literal) - the skill draft lacked an anti-prettify clause; draft upgraded same day"
     },
     {
       "task": "Rerun the experiment at the new mix - does treatment finally move?",
       "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "n=40 rerun: 29/40 both arms (72.5% - adversarial cases lowered the ceiling), p=1.0 needs-data; the lift path = skill must FIX the specific failure mode, not just be present"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 steady"
+    },
+    {
+      "task": "Weekly daemon pid check + /api/state 200.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.3 stable"
+    },
+    {
+      "task": "Check pareto pool vs 4 entries.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pareto pool stable at 4"
+    },
+    {
+      "task": "Rerun the experiment with the upgraded anti-prettify draft - can treatment now pass adv-mixed-2?",
+      "expectedTurns": 3,
       "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary: bench --impact.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
     },
     {
       "task": "Snapshot trajectories vs 83.",
@@ -521,14 +561,14 @@
       "evidenceType": "audit"
     },
     {
-      "task": "Weekly daemon pid check + /api/state 200.",
+      "task": "Confirm the report history: 5+ reports across 3 candidates all parseable.",
       "expectedTurns": 1,
       "evidenceType": "verify"
     },
     {
-      "task": "Check pareto pool vs 4 entries.",
-      "expectedTurns": 1,
-      "evidenceType": "audit"
+      "task": "Month-2 half-point review: 22 days in - one honest paragraph on what the flywheel has bought (defects fixed, science learned) vs token spend.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
     }
   ]
 }
