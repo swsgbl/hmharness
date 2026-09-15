@@ -1,3 +1,13 @@
+## [0.14.6] - 2026-09-15
+
+**V3 第四切片:Pipeline Architecture 阶段**(ADR-0009,蓝图 V3 DoD 链
+Planner→Architecture→Coder 的缺失环节):
+- **architect 角色**(roles.ts):charter=结构决策(模块边界/数据流/接口契约/
+  技术取舍/风险,编号决策+rationale+blast radius,标最险一项),不执行不写码。
+- **pipeline 六阶段**:plan→**architect**→code→test→review→judge;code 的
+  directive 携带 plan+architecture 双上下文。
+- 团队七角色(原六+architect);pipeline 测试+断言更新;230+2 绿。
+
 ## [0.14.5] - 2026-09-15
 
 **实验报告 per-case 结果持久化**(day-56):ExperimentArm 增 results 数组

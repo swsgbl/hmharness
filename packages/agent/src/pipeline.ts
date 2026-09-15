@@ -16,7 +16,7 @@ import { buildSystemPrompt } from './prompt.ts';
 import { roleCharter } from './roles.ts';
 import type { DeviceTestOptions, DeviceTestStep } from '@hmharness/domain-harmony';
 
-export type PipelineStage = 'plan' | 'code' | 'test' | 'review' | 'judge' | 'device';
+export type PipelineStage = 'plan' | 'architect' | 'code' | 'test' | 'review' | 'judge' | 'device';
 /** stage labels used in runStage (repairer = the repair-loop role) */
 export type StageRole = PipelineStage | 'repairer';
 
@@ -126,6 +126,7 @@ function stageMessages(opts: PipelineOptions, role: StageRole, directive: string
 
 const DIRECTIVES: Record<Exclude<PipelineStage, 'device'>, (task: string, extra: string) => string> = {
   plan: (task) => `Goal: ${task}\nProduce the numbered implementation plan (each step names its verification). Do not execute anything.`,
+  architect: (task, extra) => `Goal: ${task}\n${extra}\nMake the structural decisions for this task: module boundaries, data flow, interface contracts, technology tradeoffs, risks. Numbered decisions with rationale; flag the riskiest one. No code.`,
   code: (task, extra) => `Goal: ${task}\n${extra}\nImplement the plan now (surgical edits, cheapest verification per step).`,
   test: (task, extra) => `Goal: ${task}\n${extra}\nRun the verifications from the plan; probe edge cases; report input -> actual vs expected for each probe.`,
   review: (_task, extra) => `Review the changes produced so far on disk.\n${extra}\nFindings first, severity-ordered, file:line evidence, no fixes.`,
@@ -213,11 +214,14 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineReport
     // 1. plan
     const plan = await runStage('plan', 1, DIRECTIVES.plan(opts.task, ''));
     if (spent >= totalBudget) { status = 'budget'; return await finish(); }
-    // 2. code (carries the plan)
-    await runStage('code', 1, DIRECTIVES.code(opts.task, `Approved plan:\n${plan.text.slice(0, 2000)}`));
+    // 2. architect (structural decisions between plan and code, V3 slice 4)
+    const arch = await runStage('architect', 1, DIRECTIVES.architect(opts.task, `Plan:\n${plan.text.slice(0, 1500)}`));
+    if (spent >= totalBudget) { status = 'budget'; return await finish(); }
+    // 3. code (carries plan + architecture)
+    await runStage('code', 1, DIRECTIVES.code(opts.task, `Approved plan:\n${plan.text.slice(0, 1500)}\nArchitecture decisions:\n${arch.text.slice(0, 1500)}`));
     if (spent >= totalBudget) { status = 'budget'; return await finish(); }
 
-    // 3. test + repair loop (code+test rerun carries the reviewer/judge findings)
+    // 4. test + repair loop (code+test rerun carries the reviewer/judge findings)
     let testOut = await runStage('test', 1, DIRECTIVES.test(opts.task, `Plan:\n${plan.text.slice(0, 1500)}`));
     if (spent >= totalBudget) { status = 'budget'; return await finish(); }
     // 3b. device gate (V3 slice, ADR-0007): mechanical on-device evidence,

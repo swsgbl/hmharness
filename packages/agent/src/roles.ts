@@ -15,6 +15,11 @@ export interface TeamRole {
 }
 
 export const TEAM_ROLES: Record<string, TeamRole> = {
+  architect: {
+    name: 'architect',
+    charter: 'ARCHITECT duty: make structural decisions - module boundaries, data flow, interface contracts, technology tradeoffs, and key risks. Output a numbered decision list where each decision names its rationale and its blast radius (what breaks if wrong). Never write code, never execute steps - decisions only. Flag the single riskiest decision explicitly.',
+    goodFor: 'structural decisions between planning and coding',
+  },
   planner: {
     name: 'planner',
     charter: 'PLANNER duty: decompose the goal into ordered, verifiable steps. Output a numbered plan where every step names its verification (command/check). Never execute the steps yourself - plan only. Flag risks and unknowns explicitly.',

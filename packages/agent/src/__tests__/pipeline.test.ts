@@ -53,6 +53,7 @@ test('runPipeline: happy path PASS, five stages, report persisted', async () => 
   try {
     const loop = fakeLoop([
       () => ({ text: '1. do x (verify: run y)' }),                      // plan
+      () => ({ text: 'A1: module split into core+ui. RISK: ui coupling.' }), // architect
       () => ({ text: 'implemented, build green', toolUses: 2 }),        // code
       () => ({ text: 'probes: edge -> ok vs expected ok', toolUses: 1 }), // test
       () => ({ text: 'no significant findings' }),                      // review
@@ -62,7 +63,7 @@ test('runPipeline: happy path PASS, five stages, report persisted', async () => 
     assert.equal(r.status, 'completed');
     assert.equal(r.finalVerdict, 'PASS');
     assert.equal(r.repairsUsed, 0);
-    assert.deepEqual(r.stages.map((s) => s.stage), ['plan', 'code', 'test', 'review', 'judge']);
+    assert.deepEqual(r.stages.map((s) => s.stage), ['plan', 'architect', 'code', 'test', 'review', 'judge']);
     const files = await readdir(join(home, 'pipelines', r.pipelineId));
     assert.ok(files.includes('pipeline.report.json'));
     const persisted = JSON.parse(await readFile(join(home, 'pipelines', r.pipelineId, 'pipeline.report.json'), 'utf8')) as PipelineReport;

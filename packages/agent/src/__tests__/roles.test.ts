@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TEAM_ROLES, TEAM_ROLE_NAMES, roleCharter } from '../roles.ts';
 
-test('six canonical team roles exist, each with a duty contract', () => {
-  assert.deepEqual(TEAM_ROLE_NAMES.sort(), ['coder', 'judge', 'planner', 'repairer', 'reviewer', 'tester']);
+test('seven canonical team roles exist, each with a duty contract (architect added V3 slice 4)', () => {
+  assert.deepEqual(TEAM_ROLE_NAMES.sort(), ['architect', 'coder', 'judge', 'planner', 'repairer', 'reviewer', 'tester']);
   for (const name of TEAM_ROLE_NAMES) {
     const r = TEAM_ROLES[name];
     assert.ok(r.charter.length > 60, name + ' has a real charter');
