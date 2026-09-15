@@ -700,20 +700,57 @@
     {
       "task": "Find a REAL weakness: probe 5 diverse capability classes bare (code generation, instruction-following with constraints, CJK mixed tasks, structured extraction, refusal-adjacent) - report which class the base actually fails.",
       "expectedTurns": 3,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weakness hunt: 5 classes probed bare - code-gen initially judged FAIL but full output re-review shows CORRECT code (author judge too strict AGAIN - required literal \"A-Za-z\" contiguous; code used equivalent [a-zA-Z0-9]); all 5 classes PASS. No common weakness class found at this model level"
     },
     {
       "task": "Author 5 cases in the weakest found class; bare-probe to confirm base fails >=3/5.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "no cases authored (no base-fail class to build on); no experiment run (null result, tokens saved)"
     },
     {
       "task": "Run the experiment with the stepwise skill ONLY IF the weak class is stepwise-fixable; otherwise record the honest mismatch.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "recorded honestly: skill lift at this model level may only be demonstrable on tools:loop behavioral cases, not prompt-class weaknesses"
     },
     {
       "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 85"
+    },
+    {
+      "task": "Month-2 close-out prep: draft the month-2 final review skeleton (what the flywheel bought: 8 instrument/gate defects, the science ladder, honest non-results).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
+    },
+    {
+      "task": "Run the weekly bench --impact as the month closes.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Snapshot all closing metrics: trajectories, dataset, bench history, labels, candidates.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Archive month-2 evidence dataset (ds-2026-10/) alongside month-1.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Freeze month-2 pool: report final done/total.",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }
