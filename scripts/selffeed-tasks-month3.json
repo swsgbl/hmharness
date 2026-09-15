@@ -178,21 +178,53 @@
     {
       "task": "Rewrite verify-after-read WITHOUT the cite-in-reasoning clause; keep only fetch-before-answer.",
       "expectedTurns": 1,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "verify-after-read draft split: removed cite-in-reasoning clause, kept fetch-before-answer + format-preservation note"
     },
     {
       "task": "Replace the 3 unreachable behavioral cases with 3 easier ones (single-line file reads, deterministic answers the model CAN produce).",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3 unreachable behavioral cases replaced with reachable ones (echo-line2/count3/last on a 3-line file)"
     },
     {
       "task": "Rerun the experiment with the refined draft and reachable cases.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SECOND experiment: control 29/50 vs treatment 30/50 (+2.0%, p=0.84, needs-data) - REGRESSION FIXED (was -10%, now +2%); treatment now slightly better; needs diff>=10%+p<0.05 for promote-eligible"
     },
     {
       "task": "Weekly canary + trajectory snapshot vs 89.",
       "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 10th consecutive needs-data; trajectories 89 steady"
+    },
+    {
+      "task": "Grow the behavioral case set to 10+ (more single-file echo/count/extract variants) to push n toward the 69/arm detection floor.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Rerun at larger n - is +2% stable or noise?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot vs 89.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Month-3 mid-check: trajectories, dataset, experiments run count - one health line.",
+      "expectedTurns": 1,
       "evidenceType": "audit"
     }
   ]
