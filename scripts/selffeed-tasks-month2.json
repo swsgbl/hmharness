@@ -732,27 +732,43 @@
     {
       "task": "Month-2 close-out prep: draft the month-2 final review skeleton (what the flywheel bought: 8 instrument/gate defects, the science ladder, honest non-results).",
       "expectedTurns": 2,
-      "evidenceType": "knowledge"
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 final review written: docs/SELFFEED-month2-final-review.md (8 defects/29d, science ladder, honest non-results: 85/1000 trajectories, zero promotions, 2 conditions untouched)"
     },
     {
       "task": "Run the weekly bench --impact as the month closes.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing canary: 8th consecutive all needs-data (two months of correct noise refusal)"
     },
     {
       "task": "Snapshot all closing metrics: trajectories, dataset, bench history, labels, candidates.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing metrics: trajectories 85, bench 74 cases (0.54-0.62 history), dataset kept 67, labels 1/100, readiness 2/6"
     },
     {
       "task": "Archive month-2 evidence dataset (ds-2026-10/) alongside month-1.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence archived to ds-2026-10/ (frozen alongside month-1 ds-2026-09)"
     },
     {
       "task": "Freeze month-2 pool: report final done/total.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 pool FROZEN: 98/98 items across 20 batches, 100% done"
     }
-  ]
+  ],
+  "frozen": "2026-09-15"
 }
