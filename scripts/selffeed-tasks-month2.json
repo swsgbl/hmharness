@@ -644,17 +644,46 @@
     {
       "task": "Persist per-case results in experiment reports (control/treatment arrays) - rerun and identify WHICH case flipped negative in the first non-zero diff.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "per-case persistence shipped (ExperimentArm.results); rerun located the flip: BOTH arms fail all 15 adversarial/fence cases (model cannot do them regardless of skill); net -1 = noise on easy cases (lost train-regex-hex/train-x-6, gained train-exact-cn)"
     },
     {
       "task": "Weekly daemon + trajectory snapshot.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.4 stable; trajectories 84"
     },
     {
       "task": "Check whether the fence skill helps when the base does NOT spontaneously fence: probe 3 fence-adv prompts bare (do they fail without the skill?).",
       "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "bare-probe of 3 fence-adv prompts: all fail bare (consistent with per-case: adversarial class is unreachable for this model, with or without the skill)"
+    },
+    {
+      "task": "Author a TEACHABLE failure class the base model fails bare but plausibly passes with instruction (e.g. multi-step word problems with exact numeric answers) - 5 cases, bare-probe them, keep the ones the base fails.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Run the experiment on the teachable class - this is the first honest test of skill lift.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot.",
+      "expectedTurns": 2,
       "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm per-case results persist in the new report format (spot-check parseable).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
     }
   ]
 }

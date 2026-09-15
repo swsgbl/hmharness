@@ -122,6 +122,8 @@ export interface ExperimentArm {
   n: number;
   passRate: number;
   tokens: number;
+  /** per-case rows (day-56): which case flipped is the point of a diff */
+  results?: Array<{ name: string; pass: boolean; tokens: number }>;
 }
 
 export interface ExperimentReport {
@@ -166,21 +168,27 @@ export async function runCandidateExperiment(
   // holdout cases are excluded from promotion gates (bench.ts anti-memorization)
   const gate = opts.cases.filter((c) => !c.holdout).slice(0, Math.max(1, opts.maxCases ?? 12));
   let cPass = 0, cTok = 0, tPass = 0, tTok = 0;
+  // per-case rows (day-56 observability: which case flipped is the whole
+  // point of a diff - aggregates alone cannot answer it)
+  const ctlRows: Array<{ name: string; pass: boolean; tokens: number }> = [];
+  const trtRows: Array<{ name: string; pass: boolean; tokens: number }> = [];
   for (const c of gate) {
     const ctl = await opts.runCase(c, 'control');
     if (ctl.pass) cPass++;
     cTok += ctl.tokens;
+    ctlRows.push({ name: c.name, pass: ctl.pass, tokens: ctl.tokens });
     const trt = await opts.runCase(c, 'treatment');
     if (trt.pass) tPass++;
     tTok += trt.tokens;
+    trtRows.push({ name: c.name, pass: trt.pass, tokens: trt.tokens });
   }
   const v = verdictFor({ pass: cPass, n: gate.length }, { pass: tPass, n: gate.length });
   const report: ExperimentReport = {
     candidateId,
     ranAt: new Date().toISOString(),
     cases: gate.length,
-    control: { pass: cPass, n: gate.length, passRate: gate.length ? cPass / gate.length : 0, tokens: cTok },
-    treatment: { pass: tPass, n: gate.length, passRate: gate.length ? tPass / gate.length : 0, tokens: tTok },
+    control: { pass: cPass, n: gate.length, passRate: gate.length ? cPass / gate.length : 0, tokens: cTok, results: ctlRows },
+    treatment: { pass: tPass, n: gate.length, passRate: gate.length ? tPass / gate.length : 0, tokens: tTok, results: trtRows },
     ...v,
   };
   const dir = join(home, 'evolution', 'experiments', candidateId);
