@@ -122,22 +122,49 @@
     {
       "task": "Author 3 BEHAVIORAL bench cases (tools: loop) that exercise read-then-verify patterns - the class where lift is provable.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3 behavioral bench cases authored (tools:loop read-then-verify: line count / last word / device count)"
     },
     {
       "task": "Register a behavior-discipline skill candidate (payload = verify-after-read draft) and run its experiment on the behavioral cases.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST behavioral-class experiment: cand_mu2rxpfc (verify-after-read) control 26/50 vs treatment 21/50 diff -10.0% p=0.32 verdict REJECT (the diff<=-10% hard trigger fired) - treatment 5 WORSE on behavioral cases; per-case rows will show which; HONEST: verify-after-read draft HURT - likely the extra read step caused timeouts or the draft overrode a working instinct"
     },
     {
       "task": "Weekly canary + trajectory snapshot vs 89.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 9th consecutive needs-data; trajectories 89 steady"
     },
     {
       "task": "Confirm the experiment reports dir grew (new report for today).",
       "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports dir grew (new report for cand_mu2rxpfc)"
+    },
+    {
+      "task": "Read the per-case rows of the REJECT report: which 5 behavioral cases flipped negative in treatment?",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
       "evidenceType": "verify"
+    },
+    {
+      "task": "Month-3 day-8: prepare for the behavioral-lift second attempt (refine the draft based on the flip analysis).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
     }
   ]
 }
