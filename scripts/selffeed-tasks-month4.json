@@ -1,0 +1,36 @@
+{
+  "$comment": "SELFFEED month-4 pool (CJK-exactness amplification per month-3 review: the 1 real lift was a Chinese exactness case; 12 cases target 10-20% lift = promote-eligible).",
+  "pool": [
+    {
+      "task": "Register cjk-exactness candidate and run its experiment at n=85.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "candidate registered (cand_mu2vrimk) BUT experiment NOT run - bare probe: base model 5/5 on simple CJK cases (tokens saved); the month-3 consistent win (train-exact-cn) was case-specific not class-general"
+    },
+    {
+      "task": "Bare-probe 5 cjk-ex-* cases to confirm the base model fails >=3/5 (reachable class).",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "bare probe 5/5 PASS - CJK class NOT reachable at simple level; need harder CJK traps (like train-exact-cn four-char claim vs 5-char reality)"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Daemon + /api/state check.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Confirm the experiment reports dir grew.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    }
+  ]
+}
