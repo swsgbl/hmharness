@@ -210,22 +210,54 @@
     {
       "task": "Grow the behavioral case set to 10+ (more single-file echo/count/extract variants) to push n toward the 69/arm detection floor.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral set grown to 11 cases (8 new: 5 target files, echo/count/sum/max variants); train=61"
     },
     {
       "task": "Rerun at larger n - is +2% stable or noise?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "THIRD experiment n=60: control 39/60 vs treatment 40/60 (+1.7%, p=0.85, needs-data) - treatment lead STABLE across two independent runs (+2.0% at n=50, +1.7% at n=60); not yet at the 10% promote threshold"
     },
     {
       "task": "Weekly daemon + trajectory snapshot vs 89.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 89 steady"
     },
     {
       "task": "Month-3 mid-check: trajectories, dataset, experiments run count - one health line.",
       "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-3 mid health: trajectories 89, train 61 cases, 3 experiment reports for cand_mu2rxpfc (reject/needs-data/needs-data - the arc shows the fix worked)"
+    },
+    {
+      "task": "Grow behavioral set to 25+ (duplicate each target-file task with different targets/extracts) - approaching the 69/arm floor.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Fourth run at n=70+ - is the +2% signal stable at scale?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
       "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the 4-report arc tells a coherent story (reject->fix->stable lead).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
     }
   ]
 }
