@@ -154,17 +154,46 @@
     {
       "task": "Read the per-case rows of the REJECT report: which 5 behavioral cases flipped negative in treatment?",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "REJECT flip analysis: ALL 5 negatives are train-hex-1..4 + train-regex-hex (the HEX generation cases) - treatment LOST hex-format compliance; 3 behavioral cases FAIL in BOTH arms (model cannot do them bare or skilled - unreachable class). ROOT CAUSE HYPOTHESIS: the verify-after-read draft tells the model to cite raw evidence in reasoning, which broke the hex-format-only-output discipline (verbose reasoning leaked into the reply)"
     },
     {
       "task": "Weekly daemon + trajectory snapshot.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 89"
     },
     {
       "task": "Month-3 day-8: prepare for the behavioral-lift second attempt (refine the draft based on the flip analysis).",
       "expectedTurns": 2,
-      "evidenceType": "knowledge"
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "second-attempt direction refined: split the skill into behavioral-only clauses (fetch-before-answer for file/tool references) WITHOUT the cite-in-reasoning clause that broke format discipline; also the 3 behavioral bench cases are unreachable for this model - need easier behavioral targets (single-file reads where the answer is deterministic)"
+    },
+    {
+      "task": "Rewrite verify-after-read WITHOUT the cite-in-reasoning clause; keep only fetch-before-answer.",
+      "expectedTurns": 1,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Replace the 3 unreachable behavioral cases with 3 easier ones (single-line file reads, deterministic answers the model CAN produce).",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Rerun the experiment with the refined draft and reachable cases.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
     }
   ]
 }
