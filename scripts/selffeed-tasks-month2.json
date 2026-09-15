@@ -588,17 +588,46 @@
     {
       "task": "Add ONE few-shot example to the exact-output-discipline draft (input->exact output pair demonstrating anti-prettify) and rerun - does treatment finally beat control on adv-mixed-2?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "few-shot draft rerun: STILL 29/40 both arms (712->728 tokens, model saw the example); bare probe confirms base still prettifies {json:\"not pretty\"} -> {json: \"not pretty\"} - HONEST SCIENCE: prompt-level skill injection does NOT override the prettify habit for this model even with a worked example; the fix must come from reply conventions (code fences) or model choice, not skills"
     },
     {
       "task": "Weekly daemon + trajectory snapshot.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon stable, trajectories 84"
     },
     {
       "task": "Audit the midpoint review numbers: spot-check 2 claims (trajectory 84, defects 5) against readiness/git log.",
       "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "midpoint numbers spot-checked: trajectory 84 confirmed via readiness; 5 defects confirmed via git log fix-commits since 09-14"
+    },
+    {
+      "task": "Try the code-fence lever: rewrite adv-mixed-2 to ask for the literal inside a fenced block, rerun the bare probe - does the model preserve the literal then?",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "If the fence works: author 5 more fenced-literal adversarial cases so the discipline skill has a fixable target class.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot.",
+      "expectedTurns": 2,
       "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the experiment report count across all candidates (should be 9+).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
     }
   ]
 }
