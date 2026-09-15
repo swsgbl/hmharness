@@ -82,27 +82,62 @@
     {
       "task": "Run hmh readiness - snapshot trajectories vs 85 (month-3 growth).",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 89 vs 85 (+4 month-3 behavioral growth)"
     },
     {
       "task": "Run one experiment on the stepwise skill at current train set (50 cases incl behavioral?) - or honestly report train is still prompt-only.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "stepwise experiment at n=50: control 29/50 vs treatment 28/50 (-2.0%, p=0.84, needs-data) - consistent with month-2 finding: prompt-class lift not provable on this model; behavioral-class experiments remain the path"
     },
     {
       "task": "Clean the leftover clutter in SelfFeedN root (.bak-doctor, build-start.txt) found on day-4.",
       "expectedTurns": 1,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SelfFeedN leftover clutter (.bak-doctor + build-start.txt) removed"
     },
     {
       "task": "Weekly daemon pid + /api/state check.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable"
     },
     {
       "task": "Snapshot: Pareto pool count vs 6.",
       "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pareto stable at 7 entries"
+    },
+    {
+      "task": "Author 3 BEHAVIORAL bench cases (tools: loop) that exercise read-then-verify patterns - the class where lift is provable.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Register a behavior-discipline skill candidate (payload = verify-after-read draft) and run its experiment on the behavioral cases.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
       "evidenceType": "audit"
+    },
+    {
+      "task": "Confirm the experiment reports dir grew (new report for today).",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
     }
   ]
 }
