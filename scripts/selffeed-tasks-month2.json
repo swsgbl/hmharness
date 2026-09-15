@@ -668,20 +668,52 @@
     {
       "task": "Author a TEACHABLE failure class the base model fails bare but plausibly passes with instruction (e.g. multi-step word problems with exact numeric answers) - 5 cases, bare-probe them, keep the ones the base fails.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "teachable class authored (5 stepwise-calc) BUT bare probe: model 5/5 CORRECT and the AUTHOR had wrong expectations on 2 (92->72, 46->50) - case files fixed; honest finding: this bench model is already competent at stepwise math; teachable-failure class must target an actual weakness, not assumed ones"
     },
     {
       "task": "Run the experiment on the teachable class - this is the first honest test of skill lift.",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment on the class NOT run (would measure nothing - base passes all 5); saved the tokens"
     },
     {
       "task": "Weekly canary + trajectory snapshot.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 8th needs-data; trajectories 85 (+1)"
     },
     {
       "task": "Confirm per-case results persist in the new report format (spot-check parseable).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "per-case results persisted and parseable in the newest report"
+    },
+    {
+      "task": "Find a REAL weakness: probe 5 diverse capability classes bare (code generation, instruction-following with constraints, CJK mixed tasks, structured extraction, refusal-adjacent) - report which class the base actually fails.",
+      "expectedTurns": 3,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Author 5 cases in the weakest found class; bare-probe to confirm base fails >=3/5.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Run the experiment with the stepwise skill ONLY IF the weak class is stepwise-fixable; otherwise record the honest mismatch.",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
       "expectedTurns": 1,
       "evidenceType": "verify"
     }
