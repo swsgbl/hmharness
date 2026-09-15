@@ -468,17 +468,52 @@
     {
       "task": "Grow the train set toward the n=69 detection floor: add 20 more deterministic non-holdout cases (varied reply-exact/none/any/regex shapes).",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "train set 10->30 (+20 deterministic mixed-shape cases incl CJK)"
     },
     {
       "task": "Run the exact-output-discipline experiment again at the larger n - does the diff become non-zero?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "n=30 rerun (after --cases off-by-one fix): 29/30 both arms, tokens 396->416, p=1.0 honest needs-data - base model passes deterministic cases w/o help; informative measurement needs cases the BASE fails"
     },
     {
       "task": "Weekly canary: bench --impact - verdict change?",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 5th consecutive all needs-data"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 steady"
+    },
+    {
+      "task": "Note the drafts canonicalization gap (skills/drafts/<name>.md vs listDrafts draft/<name>/SKILL.md) - write the draft in BOTH shapes so a future promotion finds it.",
+      "expectedTurns": 1,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "dual-shape drafts written (drafts/<n>.md + draft/<n>/SKILL.md) for both candidates"
+    },
+    {
+      "task": "Author 10 ADVERSARIAL exactness cases the base model plausibly FAILS (long literal strings, near-miss distractors) - the only way a discipline skill can show lift.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Rerun the experiment at the new mix - does treatment finally move?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
     },
     {
       "task": "Snapshot trajectories vs 83.",
@@ -486,9 +521,14 @@
       "evidenceType": "audit"
     },
     {
-      "task": "Note the drafts canonicalization gap (skills/drafts/<name>.md vs listDrafts draft/<name>/SKILL.md) - write the draft in BOTH shapes so a future promotion finds it.",
+      "task": "Weekly daemon pid check + /api/state 200.",
       "expectedTurns": 1,
-      "evidenceType": "knowledge"
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Check pareto pool vs 4 entries.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
     }
   ]
 }

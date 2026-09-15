@@ -1050,7 +1050,7 @@ flags:
       const id = rest[1] ?? '';
       const cand = await E.getCandidate(home, id);
       if (!cand) { stdout.write('no such candidate\n'); return; }
-      const maxCases = Number((rest.find((a) => a.startsWith('--cases=')) ?? '').slice(9)) || 12;
+      const maxCases = Number((rest.find((a) => a.startsWith('--cases=')) ?? '').slice('--cases='.length)) || 12;
       const cases = (await E.listCases(home)).filter((c) => !c.holdout);
       if (cases.length === 0) { stdout.write('no bench cases - run scripts/bench-cases-v2.cjs or seed first\n'); return; }
       // treatment injects the skill CONTENT, never the bare name string
