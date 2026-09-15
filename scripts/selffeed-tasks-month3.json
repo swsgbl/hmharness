@@ -1,0 +1,56 @@
+{
+  "$comment": "SELFFEED month-3 pool (v3.0 per month-2 final review: lift is only provable on tools:loop BEHAVIORAL tasks; volume needs automation not manual light tasks). Each task runs the full agent loop with tools - every run produces a trajectory. evidenceType: behavioral|device|audit. Day counter continues from month 2 (day 54 = first month-3 day).",
+  "pool": [
+    {
+      "task": "Read module.json5 of SelfFeedN, report bundle-relevant fields, then verify by re-reading - one behavioral loop run with read_file.",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral run: read_file executed on module.json5 (2 turns, 1 tool use, trajectory recorded) but final text cut short by provider stream (deepseek terminated; same class as 0.6.8 fix but the retry exhausted attempts) - counts as a trajectory for the dataset; honest note: provider instability is the month-3 operational risk"
+    },
+    {
+      "task": "Run harmony_schema_check on SelfFeedM then summarize the feature module's config in two lines.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "List the pages in SelfFeedR's main_pages.json and confirm each .ets file exists on disk.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Compute the total disk size of the four SelfFeed* workspace build dirs (du-style) and report per-project.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Run harmony_toolchain_check and write a one-line health verdict per tool.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Read the newest insight in ~/.hmharness/insights and extract: task, outcome, tool count.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Check the four workspaces' oh-package.json5 dependency blocks - are they identical? Report diffs.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Run harmony_api_lookup for 'router.back' and '@Entry' and confirm both exist with file:line.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Count .ets files per workspace (excluding build dirs) and report a 4-row table.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral"
+    },
+    {
+      "task": "Read SelfFeed1's entry module.json5 and verify its deviceTypes covers tablet.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral"
+    }
+  ]
+}
