@@ -242,22 +242,54 @@
     {
       "task": "Grow behavioral set to 25+ (duplicate each target-file task with different targets/extracts) - approaching the 69/arm floor.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral set grown to 25 cases (14 new across 5 more target files); train=75"
     },
     {
       "task": "Fourth run at n=70+ - is the +2% signal stable at scale?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FOURTH experiment n=75: control 54/75 vs treatment 55/75 (+1.3%, p=0.85, needs-data) - treatment lead consistent across THREE scales (+2.0%@50, +1.7%@60, +1.3%@75); converging to ~1 case advantage, not growing - the skill helps exactly 1 behavioral case consistently"
     },
     {
       "task": "Weekly canary + trajectory snapshot vs 89.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 11th consecutive needs-data; trajectories 89 steady"
     },
     {
       "task": "Confirm the 4-report arc tells a coherent story (reject->fix->stable lead).",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4-report arc coherent: reject(-10) -> fix -> +2.0 -> +1.7 -> +1.3 - the +1 case lead is REAL but SMALL (1/25 behavioral cases); promote-eligible needs 10% at this n"
+    },
+    {
+      "task": "Read the per-case rows of the n=75 report: which behavioral case does treatment consistently win that control loses?",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Month-3 close prep: draft the final review skeleton (self-correction arc + the 1-case real lift).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge"
+    },
+    {
+      "task": "Run the weekly bench --impact as month-3 closes.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Archive month-3 evidence (ds-2026-11/) + freeze pool.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
     }
   ]
 }
