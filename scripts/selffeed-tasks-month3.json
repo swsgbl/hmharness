@@ -274,22 +274,35 @@
     {
       "task": "Read the per-case rows of the n=75 report: which behavioral case does treatment consistently win that control loses?",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "flip analysis across 4 reports: the consistent win is train-exact-cn (x3) - the skill saves a CHINESE exactness case, NOT a behavioral one (honest correction); hex losses were one-off (fixed by clause-split)"
     },
     {
       "task": "Month-3 close prep: draft the final review skeleton (self-correction arc + the 1-case real lift).",
       "expectedTurns": 2,
-      "evidenceType": "knowledge"
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "final review written: docs/SELFFEED-month3-final-review.md (zero-defect month, self-correction arc, 1-case real lift = CJK exactness)"
     },
     {
       "task": "Run the weekly bench --impact as month-3 closes.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing canary: 11th consecutive all needs-data"
     },
     {
       "task": "Archive month-3 evidence (ds-2026-11/) + freeze pool.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence archived ds-2026-11; pool frozen 38/38"
     }
-  ]
+  ],
+  "frozen": "2026-09-15"
 }
