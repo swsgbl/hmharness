@@ -10,12 +10,14 @@
     {
       "task": "Run harmony_schema_check on SelfFeedM then summarize the feature module's config in two lines.",
       "expectedTurns": 2,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "finding": "SelfFeedM schema 5 files OK; feature module two-line summary produced"
     },
     {
       "task": "List the pages in SelfFeedR's main_pages.json and confirm each .ets file exists on disk.",
       "expectedTurns": 3,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "finding": "SelfFeedR 4/4 declared routes resolve to real .ets files (no dangling, no orphans)"
     },
     {
       "task": "Compute the total disk size of the four SelfFeed* workspace build dirs (du-style) and report per-project.",
@@ -25,7 +27,8 @@
     {
       "task": "Run harmony_toolchain_check and write a one-line health verdict per tool.",
       "expectedTurns": 2,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "finding": "toolchain: hdc/hvigorw/ohpm HEALTHY; cjpm BROKEN (known msvcrt regression, unchanged); agent honestly noted hollow-OK prefix"
     },
     {
       "task": "Read the newest insight in ~/.hmharness/insights and extract: task, outcome, tool count.",
