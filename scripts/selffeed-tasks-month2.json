@@ -548,27 +548,57 @@
     {
       "task": "Rerun the experiment with the upgraded anti-prettify draft - can treatment now pass adv-mixed-2?",
       "expectedTurns": 3,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "upgraded-draft rerun: 29/40 both arms STILL (anti-prettify clause did not fix adv-mixed-2 in treatment - the draft is present (tokens 804) but the model habit overrides it; next lever: few-shot example in the draft, not just the rule"
     },
     {
       "task": "Weekly canary: bench --impact.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 6th consecutive all needs-data"
     },
     {
       "task": "Snapshot trajectories vs 83.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 84 (+1 from 83)"
     },
     {
       "task": "Confirm the report history: 5+ reports across 3 candidates all parseable.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports: 3 candidates, 8 reports, all parseable"
     },
     {
       "task": "Month-2 half-point review: 22 days in - one honest paragraph on what the flywheel has bought (defects fixed, science learned) vs token spend.",
       "expectedTurns": 2,
-      "evidenceType": "knowledge"
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 midpoint review written to docs/SELFFEED-month2-midpoint.md: honest verdict = worth it on the flywheel-defect axis (5/22d matches month-1 rate), NOT on the volume axis (+71% slope but 12x short); label = defects-and-methodology month"
+    },
+    {
+      "task": "Add ONE few-shot example to the exact-output-discipline draft (input->exact output pair demonstrating anti-prettify) and rerun - does treatment finally beat control on adv-mixed-2?",
+      "expectedTurns": 3,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Audit the midpoint review numbers: spot-check 2 claims (trajectory 84, defects 5) against readiness/git log.",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
     }
   ]
 }
