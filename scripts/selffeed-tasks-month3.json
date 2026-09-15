@@ -26,7 +26,10 @@
     {
       "task": "Compute the total disk size of the four SelfFeed* workspace build dirs (du-style) and report per-project.",
       "expectedTurns": 3,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "build dirs total 8.45MB across 4 projects (tiny, cache-friendly); spotted leftover .bak-doctor + build-start.txt in SelfFeedN root (harmless clutter)"
     },
     {
       "task": "Run harmony_toolchain_check and write a one-line health verdict per tool.",
@@ -63,7 +66,10 @@
     {
       "task": "Count .ets files per workspace (excluding build dirs) and report a 4-row table.",
       "expectedTurns": 3,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SelfFeed1 deviceTypes [phone,tablet,2in1] - tablet confirmed, type=entry correct"
     },
     {
       "task": "Read SelfFeed1's entry module.json5 and verify its deviceTypes covers tablet.",
@@ -72,6 +78,31 @@
       "done": true,
       "doneAt": "2026-09-15",
       "finding": "ets counts: S1=3 R=5 N=3 M=3 (M has login/loginApi.ets not entry pages); build dirs excluded"
+    },
+    {
+      "task": "Run hmh readiness - snapshot trajectories vs 85 (month-3 growth).",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
+    },
+    {
+      "task": "Run one experiment on the stepwise skill at current train set (50 cases incl behavioral?) - or honestly report train is still prompt-only.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Clean the leftover clutter in SelfFeedN root (.bak-doctor, build-start.txt) found on day-4.",
+      "expectedTurns": 1,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly daemon pid + /api/state check.",
+      "expectedTurns": 1,
+      "evidenceType": "verify"
+    },
+    {
+      "task": "Snapshot: Pareto pool count vs 6.",
+      "expectedTurns": 1,
+      "evidenceType": "audit"
     }
   ]
 }
