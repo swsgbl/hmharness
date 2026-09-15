@@ -20,17 +20,34 @@
     {
       "task": "Weekly canary + trajectory snapshot vs 89.",
       "expectedTurns": 1,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 12th consecutive needs-data; trajectories 89 steady"
     },
     {
       "task": "Daemon + /api/state check.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; /api/state OK"
     },
     {
       "task": "Confirm the experiment reports dir grew.",
       "expectedTurns": 1,
-      "evidenceType": "verify"
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "total experiment reports: 19 across 4 candidates"
+    },
+    {
+      "task": "BONUS: count-conflict traps probed - model 3/3 follows string not wrong meta-claim",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "count-conflict CJK traps: model 3/3 correct (follows string, ignores wrong count declaration) - the CJK amplification path is EXHAUSTED at authorable level; this model has no prompt-class weakness we can reach"
     }
   ]
 }
