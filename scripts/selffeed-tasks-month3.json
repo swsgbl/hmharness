@@ -39,17 +39,26 @@
     {
       "task": "Read the newest insight in ~/.hmharness/insights and extract: task, outcome, tool count.",
       "expectedTurns": 2,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "newest insight extracted (task/outcome/tools)"
     },
     {
       "task": "Check the four workspaces' oh-package.json5 dependency blocks - are they identical? Report diffs.",
       "expectedTurns": 3,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4 workspace oh-package deps: all empty {} except name field; SelfFeedM has 3rd source package (login module)"
     },
     {
       "task": "Run harmony_api_lookup for 'router.back' and '@Entry' and confirm both exist with file:line.",
       "expectedTurns": 2,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "router.back confirmed @ohos.router.d.ts:490/512 (two overloads, ArkUI kit) + UIContext:366"
     },
     {
       "task": "Count .ets files per workspace (excluding build dirs) and report a 4-row table.",
@@ -59,7 +68,10 @@
     {
       "task": "Read SelfFeed1's entry module.json5 and verify its deviceTypes covers tablet.",
       "expectedTurns": 2,
-      "evidenceType": "behavioral"
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "ets counts: S1=3 R=5 N=3 M=3 (M has login/loginApi.ets not entry pages); build dirs excluded"
     }
   ]
 }
