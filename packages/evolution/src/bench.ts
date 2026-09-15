@@ -53,25 +53,36 @@ export function matchExpect(output: string, expect: string[]): boolean {
   return expect.every((e) => lower.includes(e.toLowerCase()));
 }
 
+/** Fence convention: when the reply is a fenced block, assertions test the
+ *  fence INNER content (day-55 finding: models preserve literals verbatim
+ *  inside code fences while normalizing them in prose - the fence is the
+ *  reply convention that makes exactness attainable for habit-prone models).
+ *  Tolerates a trailing space after the opening fence markers. */
+export function fenceInner(output: string): string {
+  const m = output.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)(?:\r?\n)?```/);
+  return m ? m[1] : output;
+}
+
 /** Full structured assertion: every declared mode must hold. */
 export function matchCase(output: string, c: Pick<BenchCase, 'expect' | 'expectExact' | 'expectRegex' | 'expectNone' | 'expectAny'>): { pass: boolean; detail: string } {
-  if (c.expectExact !== undefined && output.trim() !== c.expectExact.trim()) {
-    return { pass: false, detail: `exact mismatch: got "${output.trim().slice(0, 80)}"` };
+  const body = fenceInner(output);
+  if (c.expectExact !== undefined && body.trim() !== c.expectExact.trim()) {
+    return { pass: false, detail: `exact mismatch: got "${body.trim().slice(0, 80)}"` };
   }
   if (c.expectRegex !== undefined) {
     try {
-      if (!new RegExp(c.expectRegex).test(output)) return { pass: false, detail: `regex mismatch: /${c.expectRegex.slice(0, 60)}/` };
+      if (!new RegExp(c.expectRegex).test(body)) return { pass: false, detail: `regex mismatch: /${c.expectRegex.slice(0, 60)}/` };
     } catch {
       return { pass: false, detail: `invalid regex in case: ${c.expectRegex.slice(0, 40)}` };
     }
   }
-  if (c.expectNone && c.expectNone.some((e) => output.toLowerCase().includes(e.toLowerCase()))) {
+  if (c.expectNone && c.expectNone.some((e) => body.toLowerCase().includes(e.toLowerCase()))) {
     return { pass: false, detail: `forbidden marker present: ${c.expectNone.join(' && ')}` };
   }
-  if (c.expectAny && !c.expectAny.some((e) => output.toLowerCase().includes(e.toLowerCase()))) {
+  if (c.expectAny && !c.expectAny.some((e) => body.toLowerCase().includes(e.toLowerCase()))) {
     return { pass: false, detail: `none of the allowed markers found: ${c.expectAny.join(' || ')}` };
   }
-  if (!matchExpect(output, c.expect)) {
+  if (!matchExpect(body, c.expect)) {
     return { pass: false, detail: `missing "${c.expect.join('" && "')}" in output` };
   }
   return { pass: true, detail: 'ok' };

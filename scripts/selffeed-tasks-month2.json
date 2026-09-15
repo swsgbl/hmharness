@@ -612,22 +612,49 @@
     {
       "task": "Try the code-fence lever: rewrite adv-mixed-2 to ask for the literal inside a fenced block, rerun the bare probe - does the model preserve the literal then?",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "fence lever CONFIRMED by bare probe: literals preserved verbatim inside fences (json/long-string/pi); prose form still prettified"
     },
     {
       "task": "If the fence works: author 5 more fenced-literal adversarial cases so the discipline skill has a fixable target class.",
       "expectedTurns": 2,
-      "evidenceType": "build"
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "+5 fence-adv cases (nested json, escaped quote, double-comma csv, double-space yaml) - train=45"
     },
     {
       "task": "Weekly canary + trajectory snapshot.",
       "expectedTurns": 2,
-      "evidenceType": "audit"
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 7th needs-data; trajectories 84 steady"
     },
     {
       "task": "Confirm the experiment report count across all candidates (should be 9+).",
       "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST NON-ZERO DIFF in program history: control 29/45 vs treatment 28/45 (-2.2%, p=0.83) - arms finally diverged (negative direction, honest); per-case results not persisted in reports = observability gap queued"
+    },
+    {
+      "task": "Persist per-case results in experiment reports (control/treatment arrays) - rerun and identify WHICH case flipped negative in the first non-zero diff.",
+      "expectedTurns": 2,
+      "evidenceType": "build"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
       "evidenceType": "verify"
+    },
+    {
+      "task": "Check whether the fence skill helps when the base does NOT spontaneously fence: probe 3 fence-adv prompts bare (do they fail without the skill?).",
+      "expectedTurns": 2,
+      "evidenceType": "audit"
     }
   ]
 }
