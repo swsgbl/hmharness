@@ -1275,17 +1275,19 @@ export async function startServer(opts: { port: number; host?: string; version?:
         }
         const abs = resolve(p);
         try {
-          const { execFile } = await import('node:child_process');
-          const { promisify } = await import('node:util');
-          const run = promisify(execFile);
+          // explorer's exit code is unreliable (0/1 both mean "opened") —
+          // spawn fire-and-forget instead of awaiting a meaningful code
           if (process.platform === 'win32') {
+            const { spawn } = await import('node:child_process');
             const st2 = await stat(abs);
-            if (st2.isDirectory()) await run('explorer', [abs]);
-            else await run('explorer', ['/select,', abs]);
-          } else if (process.platform === 'darwin') {
-            await run('open', ['-R', abs]);
+            if (st2.isDirectory()) spawn('explorer', [abs], { detached: true, stdio: 'ignore' }).unref();
+            else spawn('explorer', ['/select,', abs], { detached: true, stdio: 'ignore' }).unref();
           } else {
-            await run('xdg-open', [abs]);
+            const { execFile } = await import('node:child_process');
+            const { promisify } = await import('node:util');
+            const run = promisify(execFile);
+            if (process.platform === 'darwin') await run('open', ['-R', abs]);
+            else await run('xdg-open', [abs]);
           }
           json(res, 200, { ok: true, path: abs });
         } catch (err) {
