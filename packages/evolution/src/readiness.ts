@@ -119,8 +119,18 @@ export async function rlReadiness(home: string): Promise<ReadinessReport> {
     workflows: false,
   };
   try {
-    const skills = await readdir(join(home, 'skills'));
-    provenance.skills = skills.some((s) => s.endsWith('.md'));
+    // skills layout has BOTH shapes in the wild: legacy flat `skills/<name>.md`
+    // and current `skills/active/<name>/` directories (plus `skills/drafts/*.md`).
+    // A top-level-only .md check silently fails every modern install.
+    const entries = await readdir(join(home, 'skills'), { withFileTypes: true });
+    const activeDir = entries.find((e) => e.isDirectory() && e.name === 'active');
+    const draftsDir = entries.find((e) => e.isDirectory() && e.name === 'drafts');
+    const flatMd = entries.some((e) => e.isFile() && e.name.endsWith('.md'));
+    let active = 0;
+    if (activeDir) active = (await readdir(join(home, 'skills', 'active'))).length;
+    let draftMd = 0;
+    if (draftsDir) draftMd = (await readdir(join(home, 'skills', 'drafts'))).filter((f) => f.endsWith('.md')).length;
+    provenance.skills = flatMd || active > 0 || draftMd > 0;
   } catch { /* none */ }
   try {
     const wf = await readdir(join(home, 'evolution', 'workflows'));

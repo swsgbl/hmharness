@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { rlReadiness } from '../readiness.ts';
 import { rewardFor } from '../dataset.ts';
 
-async function seed(home: string, opts: { runs: number; cases: number; holdout: number; humanLabels?: number; benchRecords?: number[]; skills?: boolean; workflows?: boolean }) {
+async function seed(home: string, opts: { runs: number; cases: number; holdout: number; humanLabels?: number; benchRecords?: number[]; skills?: boolean; skillsDirLayout?: boolean; workflows?: boolean }) {
   // trajectories: reward >= 0.5 => ok runs with low tool failure
   for (let i = 0; i < opts.runs; i++) {
     const dir = join(home, 'runs', `r${String(i).padStart(5, '0')}`);
@@ -36,6 +36,13 @@ async function seed(home: string, opts: { runs: number; cases: number; holdout: 
   if (opts.skills) {
     await mkdir(join(home, 'skills'), { recursive: true });
     await writeFile(join(home, 'skills', 's.md'), '# s\n', 'utf8');
+  }
+  if (opts.skillsDirLayout) {
+    // current layout: skills/active/<name>/SKILL.md + skills/drafts/<name>.md
+    await mkdir(join(home, 'skills', 'active', 'my-skill'), { recursive: true });
+    await writeFile(join(home, 'skills', 'active', 'my-skill', 'SKILL.md'), '# my-skill\n', 'utf8');
+    await mkdir(join(home, 'skills', 'drafts'), { recursive: true });
+    await writeFile(join(home, 'skills', 'drafts', 'd.md'), '# d\n', 'utf8');
   }
   if (opts.workflows) {
     await mkdir(join(home, 'evolution', 'workflows'), { recursive: true });
@@ -90,4 +97,13 @@ test('readiness: reward floor consistent with dataset reward mapping', async () 
   // a run with 40% tool failures rewards 0.6 (>= floor), 60% -> 0.4 (< floor)
   assert.ok(rewardFor('ok', 0.4) >= 0.5);
   assert.ok(rewardFor('ok', 0.6) < 0.5);
+});
+
+test('readiness: version-provenance accepts the directory skills layout (skills/active/<name>/)', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-rl4-'));
+  try {
+    await seed(home, { runs: 1000, cases: 100, holdout: 23, humanLabels: 100, benchRecords: [0.8, 0.82], skillsDirLayout: true, workflows: true });
+    const r = await rlReadiness(home);
+    assert.equal(r.verdict, 'rl-eligible', 'dir-per-skill layout must satisfy provenance (the live HMH_HOME shape)');
+  } finally { await rm(home, { recursive: true, force: true }); }
 });
