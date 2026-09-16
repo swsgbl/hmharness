@@ -17,8 +17,10 @@ const html = fs.readFileSync(file, 'utf8');
 let fail = 0;
 
 // 1. every inline <script> block must be syntactically valid JS
-const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)]
-  .map((m) => m[1]).filter((s) => s.trim());
+//    (data blocks such as type="application/ld+json" are skipped by design)
+const blocks = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)]
+  .filter((m) => !/\btype\s*=\s*["'](application\/|text\/json)/i.test(m[1]))
+  .map((m) => m[2]).filter((s) => s.trim());
 blocks.forEach((code, i) => {
   try { new Function(code); } catch (e) { console.log('SCRIPT-SYNTAX-FAIL block ' + i + ': ' + e.message); fail = 1; }
 });

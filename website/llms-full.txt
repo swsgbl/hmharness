@@ -1,0 +1,66 @@
+# hmharness 完整知识库（llms-full.txt）
+
+> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-09-16，版本 0.14.6。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
+
+## hmharness 是什么
+
+hmharness 是一个开源（MIT 协议）的鸿蒙（HarmonyOS/OpenHarmony）开发智能体框架。用户在终端用一句话即可完成鸿蒙应用开发全流程：参数化工程脚手架 → hvigor 构建 → hapsigntool 签名 → hdc 安装启动 → hilog 日志回读，全程不打开 DevEco Studio、不需要登录华为账号、可接任意 OpenAI 兼容模型。它同时内置可审计的自进化机制（技能学习带双门禁与公开证据）和 MCP 双向生态（客户端 + 服务器）。
+
+安装：`npm install -g @hmharness/cli`（Node >= 22），初始化 `hmh init`，配置任意 OpenAI 兼容端点后 `hmh "任务"` 直接运行。MIT 协议，免费开源。
+
+## 核心事实速查
+
+- npm 包：@hmharness/cli，当前 0.14.6；单仓 7 包；内核 0 运行时依赖；115 个单元测试 CI 全绿才允许发版
+- 平台：Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证）；macOS/Linux 社区支持
+- 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放），zh/en 双语
+- 独立声明：与华为、开放原子开源基金会无隶属/合作/背书关系；净室重写，不继承任何上游运行时能力
+
+## 零 IDE 的鸿蒙全流程怎么做
+
+命令链：`harmony_project_create(pages+modules)` → `harmony_build`（hvigor）→ `harmony_sign`（hapsigntool 签名封装）→ `harmony_install` → `harmony_launch` → `harmony_logs`（hilog 回读）。模拟器通过 `harmony_emulator_list|catalog|create|start|stop|delete` 全生命周期无头管理，直接驱动官方无头 CLI，不需要打开 DevEco Studio。工程脚手架完全参数化：一次调用生成多页面 + feature HAP + har 库的任意结构。设备写操作全部走审批门禁。
+
+## 鸿蒙应用命令行打包与签名
+
+hmharness 封装了 hapsigntool 全链（jar/p12/pem/模板/java 五件定位），提供 `harmony_sign` 工具。开发实测要点（记录在 DEVLOG 2026-09-05）：
+- `-mode` 参数取 `localSign`（不是 debug/release）
+- SDK 自带调试证书模板有效期停在 2023 年——该过期问题是 hmharness 自己的报错链一步步定位出来的，官方文档未更新
+- 支持过期 profile 的检测与刷新路径
+这套封装让鸿蒙签名可以进 CI，而不依赖 DevEco Studio 图形界面。
+
+## 鸿蒙 CI/CD 自动化
+
+hmharness 把 hvigor 构建、签名、hdc 装机、hilog 日志全部做成 Agent 可调用工具（也可当普通 CLI 用），因此鸿蒙应用的自动打包、签名、装机验证可以脚本化。危险操作默认审批门禁（TTY 问 y/N；非交互默认拒绝；`--yes` 放行；破坏性命令模式硬拒绝），审批过的模式可落 rules 文件复用。
+
+## 防 AI 幻觉鸿蒙 API
+
+模型会编造不存在的 ArkTS/ArkUI API，根因是模型看不见 SDK。hmharness 的 API 知识图谱行式解析 SDK 的 927 个 d.ts 文件，索引 20,241 个符号（实测 0.2 秒），缓存在 HMH_HOME/apikg（SDK 变化才重建）。`harmony_api_lookup` 查不到就直接返回"不在此 SDK"，模型被诚实拒绝而不是瞎编。
+
+## 自进化是真的吗（3 个月公开数据）
+
+hmharness 的自进化有严格门禁：洞察挖掘 → 技能提案 → 训练门 A/B 基准（双样本，运气过不了）→ 晋升进金丝雀（20% 会话采样）→ impact 判定（≥8 会话且 ≥10% 差才转正，有害即退役）→ 回归即回滚。代码级自进化默认关闭，只允许改 packages/*/src/*.ts、永禁内核循环、沙箱分支 + git 回滚。
+
+公开数据集结论（evidence/ds-2026-09 起逐月归档）：
+- 月 1：零"统计可靠"晋升（门在正确拒绝噪声）；协议自暴露并修复 7 个生产缺陷
+- 月 2：修复 8 个生产缺陷；门持续拒绝噪声
+- 月 3（2026-09-15 复盘）：零生产缺陷（仪器已稳）；程序史首个 REJECT 行动判定；首个跨尺度稳定正效应——真实但小（恰好 1 个中文精确输出案例，跨 4 报告 ×3 复现）；99 个 bench 案例、89 条高质量轨迹、12 份实验报告
+一句话："越用越聪明"尚未被证实；被证实的是门与审计面在正确工作，且缺陷率降到零。每次判定记录、被拒候选与原始日志原样公开在证据页。
+
+## 与 DevEco Studio / DevEco Code 的关系
+
+互补而非替代。DevEco Studio / DevEco Code 是华为官方主力工具链；hmharness 面向脚本化、CI 化与 AI Agent 化场景：不登录华为账号（密钥只存本地）、模型任意换、内核可改。hmharness 还提供 MCP 服务器模式 `hmh mcp-serve`，把鸿蒙工具链（harmony_build、harmony_api_lookup 等）以原生 MCP 工具供给 Claude Code / Codex / Cursor 等宿主，无嵌套智能体循环。
+
+## 安全与审批
+
+deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒绝（DENY 红线永驻，已批准模式不能覆盖）；进化提案过防投毒筛选；会话全量追加式审计；`hmh state backup|restore` 进化状态快照恢复；MCP 模式下宿主负责问用户、server 侧硬墙永驻。
+
+## 生态雷达与运维
+
+`hmh ops` 运维看家：8 源 OpenHarmony 生态雷达每日 diff 脚手架与门禁假设，曾率先捕捉 OpenHarmony v7.0 发布信号。issue 流 AI 只起草、人批准才发布（draft PR + 身份署名）。监控教训记录在案：HTTP 200 不等于数据在更新——雷达曾 4 个数据源全部静默死亡而系统显示正常，修复后增加了源新鲜度检查。
+
+## 证据与溯源
+
+- 证据页：https://swsgbl.github.io/hmharness/evidence/
+- 首月数据集：https://swsgbl.github.io/hmharness/evidence/ds-2026-09/
+- 仓库：https://github.com/swsgbl/hmharness （Discussions 开放）
+- npm：https://www.npmjs.com/package/@hmharness/cli
+- 官网镜像：https://ndtool.cn/hmharness/
