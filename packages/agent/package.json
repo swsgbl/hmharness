@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/agent",
-  "version": "0.14.6",
+  "version": "0.14.7",
   "description": "hmharness agent execution layer: base tools, system prompt, sub-agent spawn, and the shared task runner that frontends (cli, web) drive.",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,7 @@
   "dependencies": {
     "@hmharness/domain-harmony": "0.13.5",
     "@hmharness/domain-ops": "0.8.0",
-    "@hmharness/evolution": "0.14.5",
+    "@hmharness/evolution": "0.14.7",
     "@hmharness/kernel": "0.9.0",
     "@hmharness/observability": "0.7.0",
     "@hmharness/sandbox": "0.8.0"
