@@ -31,6 +31,8 @@
 > **关于"自进化"的诚实注脚**:canary→impact 统计管线已就绪(暴露组 vs 对照组,≥8 会话且 ≥10% 差才晋升);**首个 30 天生产数据集已发布并归档**——[首月证据数据集 /evidence/ds-2026-09](https://swsgbl.github.io/hmharness/evidence/ds-2026-09/),判定记录、被拒候选与原始日志原样公开,30 天复盘见 [docs/SELFFEED-30d-review.md](docs/SELFFEED-30d-review.md)。首月结论:30 天内零"统计可靠"晋升(门在拒绝噪声),但协议自暴露并修复了 7 个生产缺陷;"越用越聪明"仍未证实——被证实的是门与审计面在正确工作。
 >
 > **平台现状**:Windows 优先(鸿蒙工具链/模拟器/桌面自动化/TUI 终端适配均在此验证);macOS/Linux 为社区支持(核心内核与进化循环是纯 Node,域工具按可用性降级)。
+>
+> **十问十答**:零 IDE 开发鸿蒙、命令行打包签名(hapsigntool localSign 与过期证书模板)、CI/CD、防 ArkTS API 幻觉、自进化真实性——每条答案附证据出处:[官网 FAQ](https://swsgbl.github.io/hmharness/faq.html)(另有 [llms.txt](https://swsgbl.github.io/hmharness/llms.txt) 供 AI 检索入口)。
 
 ## 快速开始
 
