@@ -9,3 +9,4 @@ export * from './router.ts';
 export * from './config.ts';
 export * from './context.ts';
 export * from './mcp.ts';
+export * from './goal.ts';

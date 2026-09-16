@@ -805,9 +805,10 @@ flags:
       const up = await hmhWebUp(Number.isFinite(port) ? port : 7788);
       stdout.write(up ? t.webRunning(readWebPid() || 0, port) + '\n' : t.webNotRunning + '\n');
       // stale-daemon warning: the daemon is a code snapshot from spawn time;
-      // after an upgrade it keeps serving old code until restarted
+      // after an upgrade it keeps serving old code until restarted. The
+      // comparison uses the SERVED process's self-reported version.
       const { webDaemonStale } = await import('./web-daemon.ts');
-      const v = webDaemonStale();
+      const v = await webDaemonStale(Number.isFinite(port) ? port : 7788);
       if (up && v.stale) {
         stdout.write(YELLOW(`⚠ daemon is running v${v.daemon} but CLI is v${v.cli} — stale code (new features missing). Run: hmh web stop && hmh web start\n`));
       } else if (up && v.daemon) {
@@ -826,7 +827,9 @@ flags:
     }
     // default: foreground server (handy for debugging)
     const { startServer } = await import('@hmharness/web');
-    await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1' });
+    const { createRequire: cr } = await import('node:module');
+    const ver = (cr(import.meta.url)('../package.json').version as string) ?? '';
+    await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1', version: ver });
     return; // startServer keeps the process alive
   }
   if (cmd === 'pipeline') {

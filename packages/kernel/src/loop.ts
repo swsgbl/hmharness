@@ -20,6 +20,10 @@ export interface LoopEvents {
   onToolResult?(name: string, output: string, isError: boolean): void;
   /** Called when a tool requested approval. granted=false means denied. */
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
+  /** Fired when an injected user message entered the working transcript
+   *  (web Ctrl+Enter / TUI Enter-while-running). The message is appended
+   *  after the previous tool batch, before the next model call. */
+  onInjected?(message: string): void;
   onFinal?(text: string, turns: number): void;
 }
 
@@ -70,6 +74,16 @@ export async function runLoop(opts: {
   maxIdleTurns?: number;
   /** Hard total token spend cap (default: 50M — generous enough for days). */
   maxTotalTokens?: number;
+  /** Injected user messages (web Ctrl+Enter / TUI Enter-while-running):
+   *  called after every tool-result batch; the returned string (or null)
+   *  is appended to the working transcript as a user message before the
+   *  next model call. Absent -> no injection support (codex-style runtime
+   *  steering disabled). */
+  injectQueue?: () => string | null;
+  /** Polled at every turn boundary (and before the first model call): user
+   *  texts injected into the RUNNING loop (codex Enter-inject semantics).
+   *  poll() drains its pending queue; each entry becomes a user turn. */
+  injections?: { poll(): Array<{ text: string }> };
 }): Promise<LoopResult> {
   const { provider, registry, ctx, events } = opts;
   const modelCall = opts.chatImpl ?? chat;
@@ -100,6 +114,15 @@ export async function runLoop(opts: {
     if (turn > hardTurnLimit) { reason = 'turn-valve'; break; }
     if (usage.promptTokens + usage.completionTokens > hardTokenLimit) { reason = 'token-valve'; break; }
     if (opts.signal?.aborted) { reason = 'interrupted'; break; }
+
+    // Mid-run injection drain (codex Enter-inject semantics): entries queued
+    // while the previous round's model request / tool batch was in flight
+    // join the transcript here, so the NEXT model call sees them. An
+    // injection never affects a request already issued this round.
+    for (const inj of opts.injections?.poll() ?? []) {
+      working.push({ role: 'user', content: inj.text });
+      events?.onInjected?.(inj.text);
+    }
 
     const compacted = opts.summarizeContext
       ? await compactWithDigest(working, budget, opts.summarizeContext)
@@ -147,6 +170,15 @@ export async function runLoop(opts: {
     const calls = message.tool_calls ?? [];
     if (calls.length === 0) {
       const text = message.content ?? '';
+      // A runtime-steering injection may have arrived while this turn was in
+      // flight; honor it by continuing instead of ending (codex Enter while
+      // the last answer streams). Only end when the queue is empty.
+      const pending = opts.injectQueue?.();
+      if (pending) {
+        working.push({ role: 'user', content: pending });
+        events?.onInjected?.(pending);
+        continue;
+      }
       events?.onFinal?.(text, turn);
       return { text, turns: turn, toolUses, messages: working, usage, reason: 'final' };
     }
@@ -218,6 +250,15 @@ export async function runLoop(opts: {
         name: p.name,
         content: p.output.length > 60_000 ? p.output.slice(0, 60_000) + '\n...[truncated]' : p.output,
       });
+    }
+
+    // Runtime steering (codex Enter-while-running): a user message injected
+    // during the tool batch joins the transcript here, so the NEXT model call
+    // already sees it. Multiple pushes are drained in FIFO order.
+    const injected = opts.injectQueue?.();
+    if (injected) {
+      working.push({ role: 'user', content: injected });
+      events?.onInjected?.(injected);
     }
 
     // Idle detection: count consecutive turns where NO tool succeeded. A

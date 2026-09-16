@@ -7,15 +7,60 @@
  * this is a local companion, never exposed.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readdir, readFile, rename, mkdir, writeFile, stat } from 'node:fs/promises';
+import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute, findSessionFile, listSessions, PROVIDER_PRESETS, type ChatMessage } from '@hmharness/kernel';
+import {
+  homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
+  setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
+  saveProvider, deleteProvider, patchConfig, getGoal, setGoal,
+  findSessionFile, listSessions, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
+} from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
+import {
+  insideRoot, toRel, fuzzyScore, parseImageDataUrl, buildAttachmentsPrefix, buildImagePrefix,
+  isBinaryHead, SKIP_DIRS, MAX_SEARCH_DEPTH, MAX_SEARCH_ENTRIES, MAX_SEARCH_RESULTS, type SearchHit,
+} from './fs-utils.ts';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;
+
+/** Version of THIS serving process's code. The CLI's version-aware daemon
+ *  check compares the SERVED value against its own instead of trusting the
+ *  pid/version FILES — a file can be overwritten by a spawn that died on
+ *  EADDRINUSE while an older listener keeps the port (the stale-daemon
+ *  class of bugs, 0.6.4 lesson; the file-based check lied in the field). */
+const DAEMON_VERSION = (() => {
+  try { return createRequire(import.meta.url)('../package.json').version as string; } catch { return ''; }
+})();
+
+/** cfg fields the web settings center manages but HmhConfig does not (yet)
+ *  declare (theme). Cast locally instead of widening the kernel contract. */
+type WebCfg = HmhConfig & { theme?: 'dark' | 'light' | 'system' };
+
+/** Runtime-steering buffer: /api/inject pushes user text here while a task
+ *  runs; the runner's inject poll drains it between tool batches; cleared
+ *  when the busy task finishes. */
+const injectionQueue: string[] = [];
+
+/** /help text for the web subset - one command per line, zh/en short. */
+const COMMAND_HELP = [
+  '/help — 命令清单 / command list',
+  '/tools — 列出工具 / list tools',
+  '/skills — 列出技能 / list skills',
+  '/model — 列出模型路由；/model <name> 切换 / list routes; /model <name> switches',
+  '/lang [zh|en] — 切换语言 / switch UI language',
+  '/yolo [on|off] — 自动批准开关 / toggle auto-approve',
+  '/providers — 检测可用 provider；/providers scan 合并 / detect; scan merges',
+  '/mcp — MCP 服务器列表 / list MCP servers',
+  '/ops — HarmonyOS 环境体检；/ops scan 雷达扫描 / env check; scan',
+  '/status — 一行状态 / one-line status',
+  '/resume — 回看会话 / resume a session',
+  '/web — 本 UI 地址 / this UI',
+  '/exit — 退出提示 / how to exit',
+].join('\n');
 
 interface PendingApproval {
   name: string;
@@ -39,8 +84,13 @@ async function readBody(req: IncomingMessage, limit = 100_000): Promise<string> 
   return data;
 }
 
-export async function startServer(opts: { port: number; host?: string }): Promise<void> {
+export async function startServer(opts: { port: number; host?: string; version?: string }): Promise<void> {
   const host = opts.host ?? '127.0.0.1';
+  // the version the CLI spawns us with (the daemon's code snapshot); used by
+  // the version-aware staleness check. Absent (foreground debug) -> the web
+  // package's own version, which is never equal to the CLI's, so foreground
+  // servers always read as "fresh" only when the CLI passes its version.
+  const daemonVersion = opts.version ?? DAEMON_VERSION;
   const home = homeDir();
   const cfg = await loadConfig();
   const { reg, clients } = await buildRegistry();
@@ -71,6 +121,10 @@ export async function startServer(opts: { port: number; host?: string }): Promis
   const saveWorkspaces = () =>
     writeFile(wsFile, JSON.stringify({ current: wsCurrent, items: wsItems }, null, 2), 'utf8');
   const currentWs = (): WsItem | undefined => wsItems.find((w) => w.id === wsCurrent);
+  // workspace file surface: search/read/attachments all resolve against the
+  // active workspace (or the server cwd when none is selected)
+  const wsRoot = () => currentWs()?.path ?? process.cwd();
+  const insideWs = (p: string) => insideRoot(wsRoot(), p);
   try {
     const d = JSON.parse(await readFile(wsFile, 'utf8')) as { current?: string; items?: WsItem[] };
     wsItems = Array.isArray(d.items) ? d.items : [];
@@ -127,6 +181,12 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         resumeMessages: resume,
         sessionId: item.fresh ? undefined : currentSessionId,
         signal: currentAbort.signal,
+        // runtime steering: the runner polls this between tool batches and
+        // lands injected text as user messages in the live transcript
+        inject: { poll: () => injectionQueue.splice(0).map((text) => ({ text })) },
+        // per-session persistent goal (web settings "goal" card); fresh
+        // threads deliberately start without one
+        goal: item.fresh ? undefined : await getGoal(home, currentSessionId ?? 'web'),
         // auto/yolo tasks must not wire the remote approval prompt at all -
         // the remote gate used to override the yes flag unconditionally,
         // which is why "auto" still popped approvals (the audited bug)
@@ -147,6 +207,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
           onToolResult: (name, output, isError) =>
             broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
           onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
+          onInjected: (text) => broadcast('injected', { text }),
           onFinal: (r) => {
             // extend the cross-task thread: [..prior, user, ...new turns]
             conversation = [...resume, { role: 'user', content: item.text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
@@ -163,6 +224,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       currentAbort = null;
       pendingApproval = null;
       busy = false;
+      injectionQueue.length = 0; // stale steering text must not leak into the next task
       broadcast('busy', { busy: false });
       broadcast('state', await stateObject());
     }
@@ -194,6 +256,7 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       approvalPending: pendingApproval !== null,
       queue: taskQueue.map((t) => t.text),
       workspace: currentWs() ?? null,
+      daemonVersion,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
       sshHosts: Object.entries(cfg.sshHosts ?? {}).map(([name, h]) => ({ name, host: h.host, user: h.user, port: h.port ?? 22 })),
       providerPresets: PROVIDER_PRESETS
@@ -205,6 +268,35 @@ export async function startServer(opts: { port: number; host?: string }): Promis
       },
       insights: insights.map((i) => ({ time: i.time, task: i.task, outcome: i.outcome, tools: i.toolsUsed })),
       evolution,
+      // settings center snapshot: defaults mirror the kernel's documented ones
+      settings: {
+        approval: cfg.approval ?? 'ask',
+        autoEvolveEvery: cfg.autoEvolveEvery ?? 3,
+        autoPatch: cfg.evolution?.autoPatch ?? false,
+        theme: (cfg as WebCfg).theme ?? 'dark',
+      },
+      // provider detail for the settings UI. apiKey NEVER leaves the server:
+      // only presence + last-4 tail are exposed (a tail is a secret to no one
+      // but enough for the user to recognize which key is configured).
+      providersDetail: listProviders(cfg).map((p) => {
+        const raw = cfg.providers?.[p.name];
+        // the fallback 'default' row is backed by cfg.provider, not providers[]
+        const key = raw?.apiKey ?? (p.name === 'default' ? cfg.provider.apiKey : undefined);
+        return {
+          name: p.name,
+          model: p.model,
+          baseUrl: p.baseUrl,
+          authHeader: raw?.authHeader,
+          supportsVision: raw?.supportsVision,
+          timeoutMs: raw?.timeoutMs,
+          contextWindow: raw?.contextWindow,
+          hasKey: Boolean(key),
+          keyTail: key && key.length >= 4 ? key.slice(-4) : undefined,
+          purposes: p.purposes,
+        };
+      }),
+      // per-session persistent goal ('web' key when no thread is open yet)
+      goal: await getGoal(home, currentSessionId ?? 'web'),
     };
   };
 
@@ -513,20 +605,117 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/task') {
-        const body = JSON.parse((await readBody(req)) || '{}') as { text?: string; yes?: boolean; mode?: string; fresh?: boolean };
+        // image attachments ride base64 in the body: allow up to ~3x6MB decoded
+        const body = JSON.parse((await readBody(req, 32 * 1024 * 1024)) || '{}') as {
+          text?: unknown; yes?: boolean; mode?: string; fresh?: boolean;
+          attachments?: unknown; images?: unknown;
+        };
         const text = String(body.text ?? '').trim();
         if (!text) {
           json(res, 400, { error: 'text required' });
           return;
         }
+        // ---- @-file references: valid ones become a [referenced files] block ----
+        let prefix = '';
+        if (Array.isArray(body.attachments)) {
+          const rawList = body.attachments.filter((a): a is string => typeof a === 'string');
+          const valid: string[] = [];
+          for (const a of rawList) {
+            const p = resolve(a);
+            if (!insideWs(p)) continue; // path traversal refused
+            try {
+              if (!(await stat(p)).isFile()) continue;
+            } catch {
+              continue; // missing
+            }
+            valid.push(p);
+          }
+          if (rawList.length > 0 && valid.length === 0) {
+            json(res, 400, { error: 'no valid attachment path (must be an existing file inside the workspace)' });
+            return;
+          }
+          prefix += buildAttachmentsPrefix(valid.map((p) => toRel(wsRoot(), p)));
+        }
+        // ---- image attachments: vision chain describes each, then temp files go ----
+        let imagePrefix = '';
+        if (Array.isArray(body.images)) {
+          const parsed: Array<{ name: string; dataUrl: string; ext: 'png' | 'jpg' | 'webp'; buffer: Buffer }> = [];
+          for (const im of body.images.slice(0, 3)) {
+            const obj = (im ?? {}) as { name?: unknown; dataUrl?: unknown };
+            const dataUrl = typeof obj.dataUrl === 'string' ? obj.dataUrl : '';
+            const p = parseImageDataUrl(dataUrl);
+            if (!p) continue; // malformed / oversized items dropped
+            parsed.push({
+              name: typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : `image-${parsed.length + 1}`,
+              dataUrl,
+              ext: p.ext,
+              buffer: p.buffer,
+            });
+          }
+          if (Array.isArray(body.images) && body.images.length > 0 && parsed.length === 0) {
+            json(res, 400, { error: 'no valid image (data:image/(png|jpeg|jpg|webp);base64, and <= 6 MB)' });
+            return;
+          }
+          if (parsed.length > 0) {
+            const tmpDir = join(home, 'tmp');
+            await mkdir(tmpDir, { recursive: true });
+            const chain = visionProviderChain(cfg);
+            const tmpFiles: string[] = [];
+            for (let i = 0; i < parsed.length; i++) {
+              const tmpPath = join(tmpDir, `att-${Date.now()}-${i}.${parsed[i].ext}`);
+              await writeFile(tmpPath, parsed[i].buffer);
+              tmpFiles.push(tmpPath);
+            }
+            try {
+              for (let i = 0; i < parsed.length; i++) {
+                const { name, dataUrl } = parsed[i];
+                const n = i + 1;
+                if (chain.length === 0) {
+                  imagePrefix += buildImagePrefix(n, name, null);
+                  continue;
+                }
+                // seeImageTool.execute's chain discipline: walk the vision
+                // chain, skip refusal answers, fall through on errors
+                const errors: string[] = [];
+                let desc: string | null = null;
+                for (const provider of chain) {
+                  try {
+                    const answer = await chatVision(provider, 'Describe this image precisely and concisely.', dataUrl);
+                    if (isVisionRefusal(answer)) {
+                      errors.push(`${provider.model}: cannot see images (replied "${answer.trim().slice(0, 60)}")`);
+                      continue;
+                    }
+                    desc = answer;
+                    break;
+                  } catch (err) {
+                    errors.push(`${provider.model}: ${String(err).slice(0, 120)}`);
+                  }
+                }
+                imagePrefix += buildImagePrefix(n, name, desc ?? `(image ${n} could not be described: ${errors.join('; ')})`);
+              }
+            } finally {
+              // temp files are deleted whether or not the vision calls landed
+              for (const f of tmpFiles) {
+                try {
+                  await rm(f, { force: true });
+                } catch {
+                  /* best-effort cleanup */
+                }
+              }
+            }
+          }
+        }
+        // composed text (references first, then images, then the user text) is
+        // what runs, queues, and echoes in the 'busy' SSE event
+        const composed = prefix + imagePrefix + text;
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
-        const item = { text, mode, yes: body.yes === true, fresh: body.fresh === true };
+        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true };
         // Queue instead of reject: tasks submitted while busy are accepted
         // and auto-started when the current one finishes (user request:
         // "input always available, new tasks queue during execution")
         if (busy) {
           taskQueue.push(item);
-          broadcast('queued', { position: taskQueue.length, task: text });
+          broadcast('queued', { position: taskQueue.length, task: composed });
           broadcastQueue();
           json(res, 200, { ok: true, queued: true, position: taskQueue.length });
           return;
@@ -666,6 +855,373 @@ export async function startServer(opts: { port: number; host?: string }): Promis
         clearTimeout(p.timer);
         p.resolve(body.granted === true);
         json(res, 200, { ok: true, granted: body.granted === true });
+        return;
+      }
+      // ---- provider management (settings center) ----
+      if (req.method === 'POST' && url.pathname === '/api/providers') {
+        const body = JSON.parse((await readBody(req)) || '{}') as {
+          name?: unknown; baseUrl?: unknown; model?: unknown; apiKey?: unknown;
+          authHeader?: unknown; supportsVision?: unknown; timeoutMs?: unknown; contextWindow?: unknown;
+        };
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl.trim() : '';
+        const model = typeof body.model === 'string' ? body.model.trim() : '';
+        if (!name || !baseUrl || !model) {
+          json(res, 400, { error: 'name, baseUrl and model are required' });
+          return;
+        }
+        // apiKey omitted = keep the stored key (the UI never round-trips
+        // secrets); apiKey explicitly '' = clear it. Same for optional fields.
+        try {
+          const fresh = await saveProvider(name, {
+            baseUrl,
+            model,
+            ...(body.apiKey !== undefined ? { apiKey: String(body.apiKey) } : {}),
+            ...(typeof body.authHeader === 'string' && body.authHeader ? { authHeader: body.authHeader } : {}),
+            ...(typeof body.supportsVision === 'boolean' ? { supportsVision: body.supportsVision } : {}),
+            ...(typeof body.timeoutMs === 'number' && Number.isFinite(body.timeoutMs) && body.timeoutMs > 0 ? { timeoutMs: body.timeoutMs } : {}),
+            ...(typeof body.contextWindow === 'number' && Number.isFinite(body.contextWindow) && body.contextWindow > 0 ? { contextWindow: body.contextWindow } : {}),
+          });
+          cfg.provider = fresh.provider;
+          cfg.providers = fresh.providers;
+          cfg.routing = fresh.routing;
+          broadcast('state', await stateObject());
+          json(res, 200, { ok: true, name });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/providers/delete') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { name?: unknown };
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!name) {
+          json(res, 400, { error: 'name required' });
+          return;
+        }
+        try {
+          const fresh = await deleteProvider(name);
+          cfg.provider = fresh.provider;
+          cfg.providers = fresh.providers;
+          cfg.routing = fresh.routing;
+          broadcast('state', await stateObject());
+          json(res, 200, { ok: true });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      // ---- general settings ----
+      if (req.method === 'POST' && url.pathname === '/api/config') {
+        const body = JSON.parse((await readBody(req)) || '{}') as {
+          locale?: unknown; approval?: unknown; autoEvolveEvery?: unknown; autoPatch?: unknown; theme?: unknown;
+        };
+        const partial: Record<string, unknown> = {};
+        if (body.locale !== undefined) {
+          if (body.locale !== 'zh' && body.locale !== 'en') {
+            json(res, 400, { error: 'locale must be zh|en' });
+            return;
+          }
+          partial.locale = body.locale;
+        }
+        if (body.approval !== undefined) {
+          if (body.approval !== 'ask' && body.approval !== 'auto') {
+            json(res, 400, { error: 'approval must be ask|auto' });
+            return;
+          }
+          partial.approval = body.approval;
+        }
+        if (body.autoEvolveEvery !== undefined) {
+          const n = Number(body.autoEvolveEvery);
+          if (!Number.isInteger(n) || n < 0) {
+            json(res, 400, { error: 'autoEvolveEvery must be a non-negative integer' });
+            return;
+          }
+          partial.autoEvolveEvery = n;
+        }
+        if (body.autoPatch !== undefined) {
+          if (typeof body.autoPatch !== 'boolean') {
+            json(res, 400, { error: 'autoPatch must be boolean' });
+            return;
+          }
+          // lives under evolution.autoPatch in config.json
+          partial.evolution = { autoPatch: body.autoPatch };
+        }
+        if (body.theme !== undefined) {
+          if (body.theme !== 'dark' && body.theme !== 'light' && body.theme !== 'system') {
+            json(res, 400, { error: 'theme must be dark|light|system' });
+            return;
+          }
+          partial.theme = body.theme;
+        }
+        try {
+          const fresh = await patchConfig(partial);
+          // sync the in-memory cfg field-by-field (evolution object is merged,
+          // never wholesale-replaced, so other in-memory evolution fields survive)
+          if (fresh.locale !== undefined) cfg.locale = fresh.locale;
+          if (fresh.approval !== undefined) cfg.approval = fresh.approval;
+          if (fresh.autoEvolveEvery !== undefined) cfg.autoEvolveEvery = fresh.autoEvolveEvery;
+          if (fresh.evolution?.autoPatch !== undefined) cfg.evolution = { ...(cfg.evolution ?? {}), autoPatch: fresh.evolution.autoPatch };
+          if ((fresh as WebCfg).theme !== undefined) (cfg as WebCfg).theme = (fresh as WebCfg).theme;
+          broadcast('state', await stateObject());
+          json(res, 200, { ok: true });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      // ---- workspace file search (@-reference source) ----
+      if (req.method === 'GET' && url.pathname === '/api/fs/search') {
+        const rootParam = (url.searchParams.get('root') ?? '').trim();
+        const q = (url.searchParams.get('q') ?? '').trim();
+        if (!q) {
+          json(res, 400, { error: 'q required' });
+          return;
+        }
+        if (rootParam && !isAbsolute(rootParam)) {
+          json(res, 400, { error: 'root must be an absolute path' });
+          return;
+        }
+        const root = rootParam ? resolve(rootParam) : wsRoot();
+        if (!isAbsolute(root) || !insideWs(root)) {
+          json(res, 400, { error: 'root must be inside the active workspace' });
+          return;
+        }
+        const hits: Array<SearchHit & { score: number }> = [];
+        let visited = 0;
+        const walk = async (dir: string, depth: number): Promise<void> => {
+          if (depth > MAX_SEARCH_DEPTH || visited >= MAX_SEARCH_ENTRIES) return;
+          let entries;
+          try {
+            entries = await readdir(dir, { withFileTypes: true });
+          } catch {
+            return; // unreadable subtree is skipped, not fatal
+          }
+          for (const e of entries) {
+            if (visited >= MAX_SEARCH_ENTRIES) return; // budget hit: return what we have
+            visited++;
+            if (e.isSymbolicLink()) continue; // never follow links out of the root
+            const abs = join(dir, e.name);
+            if (e.isDirectory()) {
+              if (SKIP_DIRS.has(e.name)) continue;
+              await walk(abs, depth + 1);
+              continue;
+            }
+            if (!e.isFile()) continue;
+            const rel = toRel(wsRoot(), abs);
+            const score = fuzzyScore(q, rel);
+            if (score >= 0) hits.push({ rel, path: abs, kind: 'file', score });
+          }
+        };
+        await walk(root, 0);
+        hits.sort((a, b) => b.score - a.score || a.rel.localeCompare(b.rel));
+        const out = hits.slice(0, MAX_SEARCH_RESULTS).map(({ score: _score, ...h }) => h);
+        json(res, 200, { results: out, truncated: hits.length > MAX_SEARCH_RESULTS, total: hits.length });
+        return;
+      }
+      // ---- workspace file read (8KB binary sniff, 64KB cap) ----
+      if (req.method === 'GET' && url.pathname === '/api/fs/read') {
+        const p = (url.searchParams.get('path') ?? '').trim();
+        if (!p || !insideWs(p)) {
+          json(res, 400, { error: 'path must resolve inside the active workspace' });
+          return;
+        }
+        const abs = resolve(p);
+        let st;
+        try {
+          st = await stat(abs);
+        } catch {
+          json(res, 404, { error: `not found: ${abs}` });
+          return;
+        }
+        if (!st.isFile()) {
+          json(res, 400, { error: `not a file: ${abs}` });
+          return;
+        }
+        const cap = 64 * 1024;
+        const truncated = st.size > cap;
+        const fh = await open(abs, 'r');
+        try {
+          const bytes = Buffer.alloc(Math.min(st.size, cap));
+          await fh.read(bytes, 0, bytes.length, 0);
+          let binary = isBinaryHead(bytes.subarray(0, 8192));
+          let text: string | undefined;
+          if (!binary) {
+            // strict utf8: a decode failure means binary regardless of the sniff
+            try {
+              text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+            } catch {
+              binary = true;
+            }
+          }
+          json(res, 200, {
+            path: abs,
+            rel: toRel(wsRoot(), abs),
+            size: st.size,
+            ...(binary ? { binary } : { text }),
+            ...(truncated ? { truncated } : {}),
+          });
+        } finally {
+          await fh.close();
+        }
+        return;
+      }
+      // ---- runtime steering: inject text into the running task ----
+      if (req.method === 'POST' && url.pathname === '/api/inject') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { text?: unknown };
+        const text = typeof body.text === 'string' ? body.text.trim() : '';
+        if (!text) {
+          json(res, 400, { error: 'text required' });
+          return;
+        }
+        if (!busy) {
+          json(res, 409, { error: 'no task running' });
+          return;
+        }
+        injectionQueue.push(text);
+        broadcast('injected', { text });
+        json(res, 200, { ok: true });
+        return;
+      }
+      // ---- per-session persistent goal ----
+      if (req.method === 'POST' && url.pathname === '/api/goal') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { goal?: unknown };
+        const goal = typeof body.goal === 'string' ? body.goal : '';
+        const key = currentSessionId ?? 'web';
+        await setGoal(home, key, goal);
+        broadcast('goal', { goal: goal.trim() || null });
+        json(res, 200, { ok: true });
+        return;
+      }
+      // ---- slash-command dispatch (web subset) ----
+      if (req.method === 'POST' && url.pathname === '/api/command') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { line?: unknown };
+        const line = typeof body.line === 'string' ? body.line.trim() : '';
+        if (!line.startsWith('/')) {
+          json(res, 400, { error: 'command must start with /' });
+          return;
+        }
+        const okText = (text: string) => json(res, 200, { text });
+        const errText = (error: string, status = 400) => json(res, status, { error });
+        if (line === '/help') {
+          okText(COMMAND_HELP);
+          return;
+        }
+        if (line === '/tools') {
+          okText(reg.list().map((t) => `${t.name} — ${t.description.split('\n')[0]}`).join('\n') || '(no tools)');
+          return;
+        }
+        if (line === '/skills') {
+          const [active, drafts] = await Promise.all([listSkills(home), listDrafts(home)]);
+          okText([
+            ...active.map((s) => `+ ${s.name} — ${s.description}`),
+            ...drafts.map((s) => `~ ${s.name} — ${s.description}`),
+          ].join('\n') || '(no skills)');
+          return;
+        }
+        if (line === '/model' || line.startsWith('/model ')) {
+          const arg = line.slice(7).trim();
+          if (!arg) {
+            okText(listProviders(cfg).map((p) => `${p.name} — ${p.model}${p.purposes.length ? ' (' + p.purposes.join('/') + ')' : ''}`).join('\n') || '(no providers)');
+            return;
+          }
+          try {
+            const fresh = await setChatRoute(arg);
+            cfg.provider = fresh.provider;
+            cfg.providers = fresh.providers;
+            cfg.routing = fresh.routing;
+            broadcast('state', await stateObject());
+            okText(`chat → ${arg} · ${resolveProvider(cfg, 'chat').model}`);
+          } catch (err) {
+            errText(String(err).slice(0, 200));
+          }
+          return;
+        }
+        if (line === '/lang' || line.startsWith('/lang ')) {
+          const arg = line.slice(6).trim();
+          const target = arg === 'zh' || arg === 'en' ? arg : cfg.locale === 'zh' ? 'en' : 'zh';
+          const fresh = await setLocale(target);
+          cfg.locale = fresh.locale;
+          broadcast('state', await stateObject());
+          okText(target === 'zh' ? '语言已切换为中文 / locale: zh' : 'Locale switched to English / 语言: en');
+          return;
+        }
+        if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
+          const turnOn = line === '/yolo' ? cfg.approval !== 'auto' : line === '/yolo on';
+          try {
+            const fresh = await patchConfig({ approval: turnOn ? 'auto' : 'ask' });
+            cfg.approval = fresh.approval;
+            broadcast('state', await stateObject());
+            okText(turnOn ? '🔥 YOLO on' : 'approval back to ask');
+          } catch (err) {
+            errText(String(err).slice(0, 200));
+          }
+          return;
+        }
+        if (line === '/providers' || line === '/providers scan') {
+          try {
+            const found = await detectLocalProviders(cfg, readFile);
+            if (line === '/providers') {
+              okText(found.length
+                ? found.map((p) => `+ ${p.name} — ${p.model} (${p.envVar})`).join('\n') + '\n/providers scan 合并进配置 / run /providers scan to merge'
+                : '(没有检测到新的可用 provider / no new providers detected)');
+            } else {
+              if (!found.length) {
+                okText(`(无新增 / none new; configured: ${Object.keys(cfg.providers ?? {}).join(', ')})`);
+              } else {
+                const r = await addProviders(found.map((p) => ({ name: p.name, baseUrl: p.baseUrl, model: p.model })));
+                cfg.provider = r.cfg.provider;
+                cfg.providers = r.cfg.providers;
+                cfg.routing = r.cfg.routing;
+                broadcast('state', await stateObject());
+                okText(`✓ added: ${r.added.join(', ')}`);
+              }
+            }
+          } catch (err) {
+            errText(String(err).slice(0, 200));
+          }
+          return;
+        }
+        if (line === '/mcp') {
+          const entries = Object.entries(cfg.mcpServers ?? {});
+          okText(entries.length
+            ? entries.map(([n, c]) => `${n} — ${c.type}${c.trusted ? ' · trusted' : ' · gated'}`).join('\n')
+            : '(no MCP servers configured)');
+          return;
+        }
+        if (line === '/ops' || line === '/ops scan') {
+          try {
+            const mod = await import('@hmharness/domain-ops');
+            const tool = line === '/ops' ? mod.harmonyOpsStatus : mod.harmonyOpsRadarScan;
+            const r = await tool.execute({}, { cwd: process.cwd(), home });
+            okText(r.output);
+          } catch (err) {
+            errText(String(err).slice(0, 200));
+          }
+          return;
+        }
+        if (line === '/status') {
+          okText(`model ${resolveProvider(cfg, 'chat').model} · locale ${cfg.locale ?? 'zh'} · ${busy ? 'busy' : 'idle'} · queue ${taskQueue.length}`);
+          return;
+        }
+        if (line === '/resume' || line.startsWith('/resume ')) {
+          okText('在左侧会话列表点击会话即可回看 / resume: click a session in the left session list');
+          return;
+        }
+        if (line === '/web' || line.startsWith('/web ')) {
+          okText(`当前即 web UI: http://127.0.0.1:${opts.port} / you are already here`);
+          return;
+        }
+        if (line === '/exit' || line === '/quit') {
+          okText('关闭浏览器标签页即可；后台守护可用 hmh web stop / close this tab; hmh web stop kills the daemon');
+          return;
+        }
+        if (line === '/bench' || line.startsWith('/bench ') || line === '/evolve' || line.startsWith('/evolve ')) {
+          // heavy single-task-slot commands stay TUI/CLI-only in the web subset
+          errText('run in TUI/CLI (hmh bench / hmh evolve)');
+          return;
+        }
+        json(res, 404, { error: 'unknown command' });
         return;
       }
       json(res, 404, { error: 'not found' });

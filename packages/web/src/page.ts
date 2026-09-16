@@ -253,15 +253,122 @@ export const PAGE = `<!doctype html>
   #qclear { background:none; border:0; color:var(--dim); cursor:pointer; font-size:11.5px; padding:0 4px; width:fit-content; align-self:flex-end; border-radius:4px; }
   #qclear:hover { color:var(--err); background:var(--panel2); }
 
-  /* ---- details column ---- */
-  #details { width:0; overflow:hidden; border-left:1px solid var(--line); background:var(--panel); transition:width .15s ease; display:flex; flex-direction:column; }
-  #details.open { width:360px; }
-  #dhead { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
-  #dname { color:var(--accent); font-family:var(--mono); font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #dbody { flex:1; overflow-y:auto; padding:12px 14px; font-family:var(--mono); font-size:12px; }
+  /* ---- right column: tabbed (detail / files / preview), collapsible, draggable ---- */
+  /* settled design, W7: 右栏三 tab（详情/文件/预览），整体可折叠，宽度 300-600px
+     拖拽记忆（localStorage hmh-right-w）。取代旧的单功能工具详情抽屉。 */
+  #rightbar { width:0; overflow:hidden; border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; position:relative; }
+  #rightbar.open { width:360px; }
+  #rdrag { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5; }
+  #rightbar.open #rdrag:hover { background:var(--accent); opacity:.35; }
+  #rhead { display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  #rtabs { display:flex; gap:2px; background:var(--panel2); border-radius:7px; padding:2px; }
+  .rtab { background:none; border:0; color:var(--dim); cursor:pointer; font-size:12px; padding:3px 10px; border-radius:5px; }
+  .rtab.on { background:var(--bg); color:var(--accent); }
+  .rtab:hover { color:var(--text); }
+  #rhead .ghost { padding:2px 7px; }
+  #rbody { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .rtabpane { display:none; flex:1; overflow-y:auto; min-height:0; }
+  .rtabpane.on { display:block; }
+  #dname { color:var(--accent); font-family:var(--mono); font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:10px 14px 0; }
+  #dbody { padding:12px 14px; font-family:var(--mono); font-size:12px; }
   #dbody h4 { margin:10px 0 4px; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
   #dbody pre { white-space:pre-wrap; word-break:break-all; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:0; }
   #dempty { color:var(--dim); font-size:12px; margin:auto; text-align:center; padding:0 18px; }
+  /* ---- files tab (workspace tree, lazy dirs) ---- */
+  #ftree { padding:6px 8px; font-family:var(--mono); font-size:12px; }
+  .frow { display:flex; gap:7px; align-items:center; padding:3px 8px; border-radius:6px; cursor:pointer; white-space:nowrap; overflow:hidden; }
+  .frow:hover { background:var(--panel2); }
+  .frow .fic { flex:none; }
+  .frow.dir { color:var(--text); }
+  .frow.file { color:var(--dim); }
+  .frow.file:hover { color:var(--accent); }
+  .fkids { margin-left:14px; border-left:1px solid var(--line); padding-left:2px; }
+  /* ---- preview tab ---- */
+  #pview { padding:10px 12px; }
+  .pvhead { color:var(--accent); font-family:var(--mono); font-size:12px; margin-bottom:8px; word-break:break-all; }
+  .pvcode { white-space:pre-wrap; word-break:break-all; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:0; font-family:var(--mono); font-size:12px; }
+
+  /* ---- composer overlays: slash palette, @ file search, attachments ---- */
+  #composer { position:relative; }
+  #slashpanel, #atpanel { display:none; position:absolute; bottom:calc(100% - 4px); left:16px; right:16px; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.55); z-index:40; max-height:280px; overflow-y:auto; padding:4px; }
+  #slashpanel.on, #atpanel.on { display:block; }
+  .pickrow { display:flex; gap:10px; align-items:baseline; padding:7px 10px; border-radius:7px; cursor:pointer; font-size:12.5px; }
+  .pickrow:hover, .pickrow.sel { background:var(--panel2); }
+  .pickrow .pn { font-family:var(--mono); color:var(--accent); white-space:nowrap; }
+  .pickrow .pd { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pickrow .ph { font-family:var(--mono); color:var(--dim); font-size:11px; margin-left:auto; flex:none; }
+  .pickfoot { color:var(--dim); font-size:11px; padding:5px 10px 2px; border-top:1px dashed var(--line); margin-top:2px; }
+  #attbar { display:none; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  #attbar.on { display:flex; }
+  .attchip { display:flex; gap:6px; align-items:center; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:3px 6px 3px 9px; font-size:12px; font-family:var(--mono); color:var(--accent); max-width:280px; }
+  .attchip .atx { background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 3px; border-radius:4px; }
+  .attchip .atx:hover { color:var(--err); }
+  .attchip img { max-height:34px; max-width:64px; border-radius:4px; display:block; }
+  #attach { background:none; border:1px solid var(--line); color:var(--dim); cursor:pointer; font-size:14px; padding:2px 8px; border-radius:6px; }
+  #attach:hover { color:var(--accent); border-color:var(--accent); }
+  .msg-inject { color:var(--accent); background:rgba(49,168,255,.08); border:1px dashed rgba(49,168,255,.4); border-radius:10px; padding:5px 12px; margin:4px 0 4px auto; width:fit-content; max-width:74%; font-size:12.5px; }
+
+  /* ---- diff rendering (edit_file/write_file results) ---- */
+  .diffbox { border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:6px 0; background:var(--panel); }
+  .diffbox .dhead { display:flex; align-items:center; background:var(--panel2); padding:4px 10px; font-size:11px; color:var(--dim); font-family:var(--mono); }
+  .diffbox .dhead .copy { margin-left:auto; background:none; border:0; color:var(--dim); cursor:pointer; font-size:11px; padding:1px 4px; }
+  .diffbox .dhead .copy:hover { color:var(--accent); }
+  .diffbox pre { margin:0; font-family:var(--mono); font-size:12px; line-height:1.55; overflow-x:auto; white-space:pre; }
+  .diffbox .dline { min-width:max-content; padding:0 10px; }
+  .diffbox .dline.add { background:rgba(63,185,80,.13); color:#a5e6b0; }
+  .diffbox .dline.del { background:rgba(248,81,73,.13); color:#f2a9a5; }
+  .diffbox .dline.hunk { background:rgba(49,168,255,.08); color:var(--accent); }
+  /* ---- web_search link cards ---- */
+  .linkcard { display:flex; gap:8px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:4px 0; font-size:12.5px; }
+  .linkcard a { color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .linkcard a:hover { text-decoration:underline; }
+  .linkcard .lh { color:var(--dim); font-size:11px; font-family:var(--mono); margin-left:auto; flex:none; }
+  /* ---- syntax token colors (mini highlighter) ---- */
+  .tok-k { color:#ff7b72; }
+  .tok-s { color:#a5d6ff; }
+  .tok-c { color:#8b949e; font-style:italic; }
+  .tok-n { color:#79c0ff; }
+  /* ---- upgraded markdown ---- */
+  .say h1, .say h2, .say h3, .say h4 { margin:12px 0 6px; line-height:1.3; }
+  .say h1 { font-size:19px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .say h2 { font-size:16.5px; }
+  .say h3 { font-size:14.5px; }
+  .say h4 { font-size:13.5px; color:var(--dim); }
+  .say p { margin:6px 0; }
+  .say ul, .say ol { margin:6px 0 6px 0; padding-left:24px; }
+  .say li { margin:2px 0; }
+  .say blockquote { margin:8px 0; padding:2px 12px; border-left:3px solid var(--line); color:var(--dim); }
+  .say a { color:var(--accent); }
+  .say i { color:var(--text); opacity:.9; }
+  .say table { border-collapse:collapse; margin:8px 0; font-size:12.5px; }
+  .say table th, .say table td { border:1px solid var(--line); padding:4px 10px; text-align:left; }
+  .say table th { background:var(--panel2); }
+  .say code { cursor:text; }
+  /* ---- settings view ---- */
+  .setbox { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .provrow { display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:8px; background:var(--bg); }
+  .provrow .pmain { flex:1; min-width:0; }
+  .provrow .pnm { font-family:var(--mono); color:var(--accent); font-weight:600; font-size:13px; }
+  .provrow .pmeta { color:var(--dim); font-family:var(--mono); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .provrow .pkey { font-size:11px; color:var(--ok); font-family:var(--mono); }
+  .provrow .pkey.none { color:var(--warn); }
+  .provrow .ppur { font-size:10.5px; color:var(--dim); background:var(--panel2); border-radius:8px; padding:0 7px; }
+  .provrow .pacts { display:flex; gap:4px; flex:none; }
+  .provform { border:1px solid var(--accent); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--panel); }
+  .provform .fgrid { display:grid; grid-template-columns:110px 1fr; gap:7px 10px; align-items:center; }
+  .provform label { font-size:12px; color:var(--dim); }
+  .provform input[type=text], .provform input[type=password] { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:5px 8px; font:12px var(--mono); outline:none; width:100%; }
+  .provform input:focus { border-color:var(--accent); }
+  .presetgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
+  .presetrow { display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; }
+  .presetrow .pm { font-family:var(--mono); color:var(--text); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .presetrow .penv { font-size:10.5px; color:var(--dim); font-family:var(--mono); }
+  .setrow { display:flex; align-items:center; gap:12px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+  .setrow:last-of-type { border-bottom:0; }
+  .setrow span { flex:1; }
+  .setrow input[type=number] { width:80px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:4px 8px; font:12px var(--mono); outline:none; }
+  #set-msg { color:var(--ok); font-size:12.5px; margin-left:10px; }
+  #set-msg.err { color:var(--err); }
 </style>
 </head>
 <body>
@@ -275,6 +382,7 @@ export const PAGE = `<!doctype html>
       <button class="nav" data-view="devices"><span class="ico">📟</span><span class="txt minhide">设备</span></button>
       <button class="nav" data-view="ssh"><span class="ico">🖧</span><span class="txt minhide">SSH</span></button>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
+      <button class="nav" data-view="settings"><span class="ico">⚙️</span><span class="txt minhide">设置</span></button>
     </nav>
     <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="添加工作区">＋</button></span></div>
     <div id="wsbox" class="minhide">
@@ -307,9 +415,14 @@ export const PAGE = `<!doctype html>
           <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
           <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
         </div>
+        <div id="slashpanel"></div>
+        <div id="atpanel"></div>
+        <div id="attbar"></div>
+        <input type="file" id="imgfile" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
         <div id="inputcard">
           <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
           <div id="tools-row">
+          <button id="attach" type="button" title="粘贴或选择图片附件">📎</button>
           <select id="mode" title="approval mode">
             <option value="ask">🔒 审批询问</option>
             <option value="auto">⚡ 自动批准</option>
@@ -328,22 +441,60 @@ export const PAGE = `<!doctype html>
     <div id="view-devices" class="view">
       <div class="vhead"><h2 id="dev-title">设备</h2><button id="dev-refresh" class="ghost sm">↻ 刷新</button></div>
       <div id="dev-body"></div>
+    </div>
     <div id="view-ssh" class="view">
-          <div class="vhead"><h2 id="ssh-title">SSH</h2><button id="ssh-refresh" class="ghost sm">↻ 刷新</button></div>
+      <div class="vhead"><h2 id="ssh-title">SSH</h2><button id="ssh-refresh" class="ghost sm">↻ 刷新</button></div>
       <div id="ssh-body">
         <div id="ssh-empty" class="hint">未配置 SSH 主机 — 在 config.json 添加 sshHosts({name,host,user,port,keyPath}) 后刷新</div>
         <div id="ssh-panels"></div>
       </div>
     </div>
-    </div>
     <div id="view-skills" class="view">
       <div class="vhead"><h2 id="sk-title">技能中心</h2></div>
       <div id="sk-body"></div>
     </div>
+    <div id="view-settings" class="view">
+      <div class="vhead"><h2 id="set-title">设置</h2></div>
+      <div class="setbox" id="set-model">
+        <h3 class="sec" id="set-model-title">模型 / Providers</h3>
+        <div id="prov-list"></div>
+        <button id="prov-add" class="ghost sm">＋ 新增 provider</button>
+        <h3 class="sec" id="set-presets-title">内置预设（一键添加）</h3>
+        <div id="prov-presets" class="presetgrid"></div>
+      </div>
+      <div class="setbox" id="set-general">
+        <h3 class="sec" id="set-general-title">常规</h3>
+        <div class="setrow"><span id="set-locale-label">语言 locale</span><select id="set-locale"><option value="zh">中文</option><option value="en">English</option></select></div>
+        <div class="setrow"><span id="set-approval-label">默认审批模式</span><select id="set-approval"><option value="ask">🔒 ask（询问）</option><option value="auto">⚡ auto（自动放行）</option></select></div>
+        <div class="setrow"><span id="set-evolve-label">自动进化间隔 autoEvolveEvery（0=关闭）</span><input id="set-evolve" type="number" min="0" max="100"></div>
+        <div class="setrow"><span id="set-patch-label">代码级自进化 evolution.autoPatch（危险）</span><input id="set-patch" type="checkbox"></div>
+        <div style="margin-top:10px"><button id="set-save" class="primary sm">保存</button><span id="set-msg"></span></div>
+      </div>
+    </div>
   </div>
-  <div id="details">
-    <div id="dhead"><span id="dname"></span><button id="dclose" class="ghost sm" style="margin-left:auto">✕</button></div>
-    <div id="dbody"><div id="dempty">点击对话流中的工具行查看详情</div></div>
+  <div id="rightbar">
+    <div id="rdrag"></div>
+    <div id="rhead">
+      <div id="rtabs">
+        <button type="button" class="rtab on" data-tab="detail" id="rtab-detail">详情</button>
+        <button type="button" class="rtab" data-tab="files" id="rtab-files">文件</button>
+        <button type="button" class="rtab" data-tab="preview" id="rtab-preview">预览</button>
+      </div>
+      <button id="rcollapse" class="ghost sm" title="折叠右栏" style="margin-left:auto">»</button>
+      <button id="rclose" class="ghost sm" title="关闭右栏">✕</button>
+    </div>
+    <div id="rbody">
+      <div id="rtab-detail-pane" class="rtabpane on">
+        <div id="dname"></div>
+        <div id="dbody"><div id="dempty">点击对话流中的工具行查看详情</div></div>
+      </div>
+      <div id="rtab-files-pane" class="rtabpane">
+        <div id="ftree"></div>
+      </div>
+      <div id="rtab-preview-pane" class="rtabpane">
+        <div id="pview"><div class="hint" style="padding:10px">在文件树或对话中点击文件路径在此预览</div></div>
+      </div>
+    </div>
   </div>
   <div id="wspick">
     <div id="wsp-card">
@@ -438,7 +589,17 @@ export const PAGE = `<!doctype html>
           sesRename:'重命名', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
-          wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组' },
+          wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
+           navSet:'设置', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
+           setLocaleLabel:'语言 locale', setApprovalLabel:'默认审批模式', setEvolveLabel:'自动进化间隔 autoEvolveEvery（0=关闭）', setPatchLabel:'代码级自进化 autoPatch（危险，默认关）', setSave:'保存', setSaved:'已保存 ✓', setFailed:'保存失败',
+           provAdd:'＋ 新增 provider', provEdit:'编辑', provDelete:'删除', provSave:'保存', provCancel:'取消', provApiKeySet:'密钥已设置', provApiKeyNone:'未设置密钥', provAddPreset:'添加',
+           provName:'名称', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader(可选)', provSupportsVision:'支持视觉', provKeyPhNew:'新 provider 需要填写 apiKey', provKeyPhEdit:'留空=保持原密钥；输入空格再清空=删除密钥',
+           provDeleteConfirm:'删除该 provider?（config.json 就地改写，不可撤销）', presetEnv:'需环境变量', presetLocal:'本地端点',
+           rtabDetail:'详情', rtabFiles:'文件', rtabPreview:'预览', rcollapse:'折叠右栏', rclose:'关闭右栏',
+           pvHint:'在文件树或对话中点击文件路径在此预览', pvBinary:'二进制文件，无法预览（', pvTrunc:'(仅前 64KB)', pvNotFile:'文件不存在或在工作区外',
+           slashHint:'↑↓ 选择 · Enter 插入 · Esc 关闭', atHint:'↑↓ 选择 · Enter 插入路径 · Esc 关闭', injHint:'运行中: Enter=排队 · Ctrl+Enter=注入当前轮', injected:'已注入当前轮', queueNone:'(空)',
+           cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
+           webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
@@ -457,7 +618,17 @@ export const PAGE = `<!doctype html>
           sesRename:'Rename', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
           wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
-          wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped' }
+          wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
+           navSet:'Settings', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
+           setLocaleLabel:'locale', setApprovalLabel:'default approval mode', setEvolveLabel:'auto-evolve every N insights (0=off)', setPatchLabel:'code-level self-evolution autoPatch (dangerous, off by default)', setSave:'Save', setSaved:'Saved ✓', setFailed:'Save failed',
+           provAdd:'＋ add provider', provEdit:'Edit', provDelete:'Delete', provSave:'Save', provCancel:'Cancel', provApiKeySet:'api key set', provApiKeyNone:'no api key', provAddPreset:'Add',
+           provName:'name', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader (optional)', provSupportsVision:'supports vision', provKeyPhNew:'a new provider needs its apiKey', provKeyPhEdit:'blank = keep the existing key; type a space then clear = remove it',
+           provDeleteConfirm:'Delete this provider? (config.json is rewritten in place, not recoverable)', presetEnv:'needs env var', presetLocal:'local endpoint',
+           rtabDetail:'Detail', rtabFiles:'Files', rtabPreview:'Preview', rcollapse:'collapse', rclose:'close',
+           pvHint:'click a file path in the file tree or the chat to preview it here', pvBinary:'binary file, cannot preview (', pvTrunc:'(first 64KB only)', pvNotFile:'file not found or outside the workspace',
+           slashHint:'↑↓ select · Enter insert · Esc close', atHint:'↑↓ select · Enter insert path · Esc close', injHint:'while running: Enter=queue · Ctrl+Enter=inject this turn', injected:'injected into the current turn', queueNone:'(empty)',
+           cmdOk:'command output', cmdHelp:'commands', searchAt:'type @ to search workspace files…',
+           webCmds: { '/help':'list web commands', '/clear':'clear screen, new thread', '/status':'model/locale/queue state', '/model':'list/switch chat route', '/lang':'switch locale zh/en', '/yolo':'toggle hands-free approvals', '/providers':'detect local providers', '/tools':'list all tools', '/skills':'list skills', '/mcp':'list MCP servers', '/ops':'harmony toolchain check', '/ops scan':'ecosystem radar scan', '/resume':'revisit sessions in the sidebar', '/web':'show the web address', '/exit':'how to quit' } }
   };
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
@@ -495,13 +666,32 @@ export const PAGE = `<!doctype html>
     document.getElementById('wsp-ok').textContent = L.wsOk;
     document.getElementById('ws-new').title = L.pickTitle;
     document.getElementById('wscur').title = L.wsSwitch;
-    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk };
+    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
       if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
     });
     document.getElementById('viewchip').textContent =
-      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk })[curView] || curView;
+      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[curView] || curView;
+    // settings view chrome
+    document.getElementById('set-title').textContent = L.viewSet;
+    document.getElementById('set-model-title').textContent = L.setModelTitle;
+    document.getElementById('set-presets-title').textContent = L.setPresetsTitle;
+    document.getElementById('set-general-title').textContent = L.setGeneralTitle;
+    document.getElementById('set-locale-label').textContent = L.setLocaleLabel;
+    document.getElementById('set-approval-label').textContent = L.setApprovalLabel;
+    document.getElementById('set-evolve-label').textContent = L.setEvolveLabel;
+    document.getElementById('set-patch-label').textContent = L.setPatchLabel;
+    document.getElementById('set-save').textContent = L.setSave;
+    document.getElementById('prov-add').textContent = L.provAdd;
+    document.getElementById('rtab-detail').textContent = L.rtabDetail;
+    document.getElementById('rtab-files').textContent = L.rtabFiles;
+    document.getElementById('rtab-preview').textContent = L.rtabPreview;
+    document.getElementById('rcollapse').title = L.rcollapse;
+    document.getElementById('rclose').title = L.rclose;
+    var pvh = document.querySelector('#pview .hint');
+    if (pvh) pvh.textContent = L.pvHint;
+    if (document.getElementById('dempty')) document.getElementById('dempty').textContent = L.dempty;
   }
 
   /* ---- view switching / sidebar collapse ---- */
@@ -510,7 +700,7 @@ export const PAGE = `<!doctype html>
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       n.classList.toggle('on', n.getAttribute('data-view') === v);
     });
-    ['chat', 'board', 'devices', 'ssh', 'skills'].forEach(function (k) {
+    ['chat', 'board', 'devices', 'ssh', 'skills', 'settings'].forEach(function (k) {
       var elv = document.getElementById('view-' + k);
       if (elv) elv.classList.toggle('on', k === v);
     });
@@ -518,12 +708,13 @@ export const PAGE = `<!doctype html>
     if (shown) window.__AN.viewIn(shown);
     if (L) {
       document.getElementById('viewchip').textContent =
-        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk })[v] || v;
+        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[v] || v;
     }
     if (v === 'board') loadBoard();
     if (v === 'devices') loadDevices();
     if (v === 'ssh') renderSsh();
     if (v === 'skills') renderSkills();
+    if (v === 'settings') renderSettings();
   }
   Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
     n.onclick = function () { switchView(n.getAttribute('data-view')); };
@@ -564,21 +755,135 @@ export const PAGE = `<!doctype html>
     try { document.execCommand('copy'); } catch (e) {}
     ta.remove();
   }
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  /* ---- mini markdown renderer (A4): headings/bold/italic/inline code/lists/
+     tables/links/blockquote + code blocks with a tiny token highlighter.
+     Zero-dependency: hand-rolled line scanner, no regex back-reference minefields. ---- */
+  var KW = ' const let var function return if else for while import from export async await class new try catch throw type interface extends static void number string boolean true false null undefined switch case break continue default ';
+  function tokLine(line) {
+    var out = '';
+    var i = 0;
+    var N = line.length;
+    while (i < N) {
+      var ch = line.charAt(i);
+      var nxt = i + 1 < N ? line.charAt(i + 1) : '';
+      if (ch === '/' && nxt === '/') {
+        var e = line.indexOf('\n', i); if (e < 0) e = N;
+        out += '<span class="tok-c">' + line.slice(i, e) + '</span>';
+        i = e;
+      } else if (ch === '"' || ch === '\u0027') {
+        var q = ch; var j = i + 1; var body = '';
+        while (j < N) {
+          var c2 = line.charAt(j);
+          if (c2 === '\\\\') { body += c2 + (line.charAt(j + 1) || ''); j += 2; continue; }
+          if (c2 === q) break;
+          body += c2; j++;
+        }
+        out += '<span class="tok-s">' + q + body + q + '</span>';
+        i = j + 1;
+      } else if (/[A-Za-z_$]/.test(ch)) {
+        var k = i; var word = '';
+        while (k < N && /[A-Za-z0-9_$]/.test(line.charAt(k))) { word += line.charAt(k); k++; }
+        out += KW.indexOf(' ' + word + ' ') >= 0 ? '<span class="tok-k">' + word + '</span>' : word;
+        i = k;
+      } else if (/[0-9]/.test(ch)) {
+        var m2 = i; var num = '';
+        while (m2 < N && /[0-9._]/.test(line.charAt(m2))) { num += line.charAt(m2); m2++; }
+        out += '<span class="tok-n">' + num + '</span>';
+        i = m2;
+      } else { out += ch; i++; }
+    }
+    return out;
+  }
+  function inlineMd(s) {
+    return String(s)
+      .replace(/\u0060([^\u0060\n]+)\u0060/g, '<code>$1</code>')
+      .replace(/\\*\\*([^*\n]+)\\*\\*/g, '<b>$1</b>')
+      .replace(/(^|[^*\w])\\*([^*\n]+)\\*(?!\\*)/g, '$1<i>$2</i>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  }
+  function renderTable(rows) {
+    var out = '<table>';
+    rows.forEach(function (cells, ri) {
+      out += '<tr>';
+      cells.forEach(function (c) { out += ri === 0 ? '<th>' + c + '</th>' : '<td>' + c + '</td>'; });
+      out += '</tr>';
+    });
+    return out + '</table>';
+  }
+  function tableCells(line) {
+    return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(function (c) { return inlineMd(c.trim()); });
+  }
+  function isTableSep(line) { return /^\s*\|[\s:\-|]+\|\s*$/.test(line) && line.indexOf('-') >= 0; }
+  function mdProse(s) {
+    var lines = s.split('\n');
+    var out = '';
+    var para = [];
+    var list = null;
+    var table = null; // { rows: string[][], hasSep: boolean }
+    var quote = [];
+    function flushPara() { if (para.length) { out += '<p>' + inlineMd(para.join(' ')) + '</p>'; para.length = 0; } }
+    function flushList() { if (list) { out += '</' + list + '>'; list = null; } }
+    function flushQuote() { if (quote.length) { out += '<blockquote>' + inlineMd(quote.join(' ')) + '</blockquote>'; quote.length = 0; } }
+    function flushTable() {
+      if (!table) return;
+      if (table.hasSep && table.rows.length >= 2) out += renderTable(table.rows);
+      else out += '<p>' + inlineMd(table.rows.map(function (r) { return r.join(' | '); }).join(' | ')) + '</p>';
+      table = null;
+    }
+    lines.forEach(function (raw) {
+      var line = raw.replace(/\r$/, '');
+      var h = line.match(/^(#{1,4})\s+(.+)$/);
+      var ul = line.match(/^\s*[-*]\s+(.+)$/);
+      var ol = line.match(/^\s*\d+[.)]\s+(.+)$/);
+      var bq = line.match(/^\s*>\s?(.*)$/);
+      if (h) {
+        flushPara(); flushList(); flushQuote(); flushTable();
+        out += '<h' + h[1].length + '>' + inlineMd(h[2]) + '</h' + h[1].length + '>';
+      } else if (isTableSep(line)) {
+        if (table && table.rows.length === 1) { table.hasSep = true; }
+        else { flushQuote(); flushList(); para.push(line.trim()); }
+      } else if (/^\s*\|/.test(line) && line.indexOf('|') > 0) {
+        flushPara(); flushList(); flushQuote();
+        if (!table) table = { rows: [], hasSep: false };
+        table.rows.push(tableCells(line));
+      } else if (ul) {
+        flushPara(); flushQuote(); flushTable();
+        if (list !== 'ul') { flushList(); list = 'ul'; out += '<ul>'; }
+        out += '<li>' + inlineMd(ul[1]) + '</li>';
+      } else if (ol) {
+        flushPara(); flushQuote(); flushTable();
+        if (list !== 'ol') { flushList(); list = 'ol'; out += '<ol>'; }
+        out += '<li>' + inlineMd(ol[1]) + '</li>';
+      } else if (bq && bq[1].trim()) {
+        flushPara(); flushList(); flushTable();
+        quote.push(bq[1].trim());
+      } else if (line.trim() === '') {
+        flushPara(); flushList(); flushQuote(); flushTable();
+      } else {
+        flushList(); flushQuote(); flushTable();
+        para.push(line.trim());
+      }
+    });
+    flushPara(); flushList(); flushQuote(); flushTable();
+    return out;
+  }
   function mdLite(text) {
-    var esc = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    var parts = esc.split(/\\u0060\\u0060\\u0060/);
+    var esc = escHtml(text);
+    var parts = esc.split(/\u0060\u0060\u0060/);
     var out = '';
     for (var i = 0; i < parts.length; i++) {
       if (i % 2 === 1) {
-        var m = parts[i].match(/^([a-zA-Z0-9_+#-]*)\\n([\\s\\S]*)$/);
+        var m = parts[i].match(/^([a-zA-Z0-9_+#-]*)\n([\s\S]*)$/);
         var lang = (m && m[1]) || '';
         var body = m ? m[2] : parts[i];
+        var lines = body.split('\n').map(tokLine).join('\n');
         out += '<div class="codeblk"><div class="codebar"><span>' + (lang || 'text') +
-               '</span><button type="button" class="copy">' + (L ? L.copy : 'copy') + '</button></div><pre>' + body + '</pre></div>';
+               '</span><button type="button" class="copy">' + (L ? L.copy : 'copy') + '</button></div><pre>' + lines + '</pre></div>';
       } else {
-        out += parts[i]
-          .replace(/\\u0060([^\\u0060\\n]+)\\u0060/g, '<code>$1</code>')
-          .replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');
+        out += mdProse(parts[i]);
       }
     }
     return out;
@@ -629,6 +934,9 @@ export const PAGE = `<!doctype html>
     // are accepted and queued server-side. The send button is also live —
     // submitting during a run shows a "queued" notice instead of being dead.
     // (Was: input.disabled = b — the input was parked during every run.)
+    // settled design W6: 运行中 Enter=排队、Ctrl+Enter=注入当前轮（placeholder 提示）
+    var ph = document.getElementById('input');
+    if (ph) ph.placeholder = b ? L.injHint : L.placeholder;
     window.__agentBusy = !!b;
     updateSendBtn();
   }
@@ -654,6 +962,7 @@ export const PAGE = `<!doctype html>
     }
     document.getElementById('skills-n').textContent = s.skills.active.length + s.skills.drafts.length;
     if (curView === 'skills') renderSkills();
+    if (curView === 'settings') renderSettings();
   }
 
   /* ---- model picker (switches routing.chat; server persists + broadcasts) ---- */
@@ -1031,6 +1340,168 @@ export const PAGE = `<!doctype html>
     window.__AN.stagger('.skrow', box);
   }
 
+  /* ---- settings view (A1): providers CRUD + general settings ----
+     Every save rewrites config.json in place server-side and hot-swaps the
+     in-memory cfg (same pattern as /api/locale); apiKey is never echoed back
+     full — only hasKey + last 4 chars. No restart needed. */
+  function renderSettings() {
+    if (!state) return;
+    var box = document.getElementById('prov-list');
+    box.innerHTML = '';
+    (state.providersDetail || []).forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'provrow';
+      var main = document.createElement('div');
+      main.className = 'pmain';
+      var nm = document.createElement('div');
+      nm.className = 'pnm';
+      nm.textContent = p.name;
+      var meta = document.createElement('div');
+      meta.className = 'pmeta';
+      meta.textContent = p.baseUrl + ' \\u00B7 ' + p.model;
+      meta.title = meta.textContent;
+      var key = document.createElement('div');
+      key.className = 'pkey' + (p.hasKey ? '' : ' none');
+      key.textContent = p.hasKey ? L.provApiKeySet + ' \\u00B7\\u00B7\\u00B7' + (p.keyTail || '') : L.provApiKeyNone;
+      var pur = document.createElement('span');
+      pur.className = 'ppur';
+      pur.textContent = (p.purposes || []).join('/') || '-';
+      main.appendChild(nm); main.appendChild(meta); main.appendChild(key);
+      var acts = document.createElement('div');
+      acts.className = 'pacts';
+      var ed = document.createElement('button');
+      ed.className = 'ghost sm'; ed.type = 'button'; ed.textContent = L.provEdit;
+      ed.onclick = function () { openProvForm(p); };
+      var del = document.createElement('button');
+      del.className = 'danger sm'; del.type = 'button'; del.textContent = L.provDelete;
+      del.onclick = function () {
+        if (!window.confirm(L.provDeleteConfirm)) return;
+        fetch('/api/providers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name }) })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) { if (res.d && res.d.error) alert(res.d.error); })
+          .catch(function (e) { alert(String(e)); });
+      };
+      acts.appendChild(ed); acts.appendChild(del);
+      row.appendChild(main); row.appendChild(pur); row.appendChild(acts);
+      box.appendChild(row);
+    });
+    var pre = document.getElementById('prov-presets');
+    pre.innerHTML = '';
+    (state.providerPresets || []).forEach(function (p) {
+      var r = document.createElement('div');
+      r.className = 'presetrow';
+      var nm = document.createElement('span'); nm.className = 'pm'; nm.textContent = p.name + ' \\u00B7 ' + p.model;
+      var env = document.createElement('span'); env.className = 'penv';
+      env.textContent = p.local ? L.presetLocal : L.presetEnv + ' ' + p.envVar;
+      var add = document.createElement('button'); add.className = 'ghost sm'; add.type = 'button'; add.textContent = L.provAddPreset;
+      add.onclick = function () {
+        fetch('/api/providers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name, baseUrl: p.baseUrl, model: p.model, apiKey: '' }) })
+          .then(function (r2) { return r2.json().then(function (d2) { return { ok: r2.ok, d2: d2 }; }); })
+          .then(function (res) { if (res.d2 && res.d2.error) alert(res.d2.error); })
+          .catch(function (e) { alert(String(e)); });
+      };
+      r.appendChild(nm); r.appendChild(env); r.appendChild(add);
+      pre.appendChild(r);
+    });
+    var s = state.settings || {};
+    document.getElementById('set-locale').value = state.locale || 'zh';
+    document.getElementById('set-approval').value = s.approval || 'ask';
+    document.getElementById('set-evolve').value = String(s.autoEvolveEvery === undefined ? 3 : s.autoEvolveEvery);
+    document.getElementById('set-patch').checked = s.autoPatch === true;
+  }
+  function provField(lbl, id, val, type, ph) {
+    var wrap = document.createElement('div');
+    var l = document.createElement('label');
+    l.textContent = lbl;
+    var i = document.createElement('input');
+    i.type = type || 'text';
+    i.id = id;
+    i.value = val || '';
+    if (ph) i.placeholder = ph;
+    wrap.appendChild(l); wrap.appendChild(i);
+    return { wrap: wrap, input: i };
+  }
+  function openProvForm(p) {
+    // close any open form first (one form at a time)
+    var old = document.getElementById('prov-form');
+    if (old) old.remove();
+    var box = document.getElementById('prov-list');
+    var form = document.createElement('div');
+    form.className = 'provform';
+    form.id = 'prov-form';
+    var grid = document.createElement('div');
+    grid.className = 'fgrid';
+    var isNew = !p;
+    var fName = provField(L.provName, 'pf-name', p ? p.name : '', 'text');
+    if (!isNew) { fName.input.readOnly = true; fName.input.style.opacity = '.6'; }
+    var fBase = provField(L.provBaseUrl, 'pf-base', p ? p.baseUrl : '', 'text', 'https://api.example.com/v1');
+    var fModel = provField(L.provModel, 'pf-model', p ? p.model : '', 'text', 'model-id');
+    var fKey = provField(L.provApiKey, 'pf-key', '', 'password', isNew ? L.provKeyPhNew : L.provKeyPhEdit);
+    var fAuth = provField(L.provAuthHeader, 'pf-auth', (p && p.authHeader) || '', 'text', 'X-Api-Key');
+    var fVis = provField(L.provSupportsVision, 'pf-vis', '', 'checkbox');
+    if (p && p.supportsVision) fVis.input.checked = true;
+    fVis.wrap.style.display = 'flex'; fVis.wrap.style.gap = '6px'; fVis.wrap.style.alignItems = 'center';
+    fVis.wrap.style.gridColumn = '1 / 3';
+    fVis.input.style.width = 'auto';
+    grid.appendChild(fName.wrap); grid.appendChild(fBase.wrap); grid.appendChild(fModel.wrap);
+    grid.appendChild(fKey.wrap); grid.appendChild(fAuth.wrap); grid.appendChild(fVis.wrap);
+    var acts = document.createElement('div');
+    acts.style.marginTop = '10px';
+    acts.style.display = 'flex';
+    acts.style.gap = '8px';
+    var save = document.createElement('button');
+    save.className = 'primary sm'; save.type = 'button'; save.textContent = L.provSave;
+    var cancel = document.createElement('button');
+    cancel.className = 'ghost sm'; cancel.type = 'button'; cancel.textContent = L.provCancel;
+    save.onclick = function () {
+      var name = fName.input.value.trim();
+      var base = fBase.input.value.trim();
+      var model = fModel.input.value.trim();
+      if (!name || !base || !model) { alert(L.provName + '/' + L.provBaseUrl + '/' + L.provModel + ' required'); return; }
+      var payload = { name: name, baseUrl: base, model: model };
+      var kv = fKey.input.value;
+      if (kv === ' ') payload.apiKey = '';
+      else if (kv !== '') payload.apiKey = kv;
+      if (fAuth.input.value.trim()) payload.authHeader = fAuth.input.value.trim();
+      payload.supportsVision = fVis.input.checked;
+      fetch('/api/providers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) { if (res.d && res.d.error) alert(res.d.error); })
+        .catch(function (e) { alert(String(e)); });
+    };
+    cancel.onclick = function () { form.remove(); };
+    acts.appendChild(save); acts.appendChild(cancel);
+    form.appendChild(grid); form.appendChild(acts);
+    box.insertBefore(form, box.firstChild);
+    window.__AN.popIn(form);
+  }
+  document.getElementById('prov-add').onclick = function () { openProvForm(null); };
+  document.getElementById('set-save').onclick = function () {
+    var msg = document.getElementById('set-msg');
+    msg.className = '';
+    msg.textContent = '';
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locale: document.getElementById('set-locale').value,
+        approval: document.getElementById('set-approval').value,
+        autoEvolveEvery: Number(document.getElementById('set-evolve').value) || 0,
+        autoPatch: document.getElementById('set-patch').checked
+      })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || (res.d && res.d.error)) {
+          msg.className = 'err';
+          msg.textContent = L.setFailed + ': ' + ((res.d && res.d.error) || '');
+        } else {
+          msg.textContent = L.setSaved;
+          setTimeout(function () { msg.textContent = ''; }, 2500);
+        }
+      })
+      .catch(function (e) { msg.className = 'err'; msg.textContent = L.setFailed + ': ' + String(e); });
+  };
+
   function sessRow(s) {
     var b = document.createElement('button');
     b.className = 'sess';
@@ -1181,10 +1652,73 @@ export const PAGE = `<!doctype html>
     });
   }
 
+  /* ---- right column (W7): tabs 详情/文件/预览, collapsible, 300-600px drag ---- */
+  function openRight(tab) {
+    document.getElementById('rightbar').classList.add('open');
+    if (tab) switchRightTab(tab);
+  }
+  function closeRight() {
+    document.getElementById('rightbar').classList.remove('open');
+  }
+  function switchRightTab(tab) {
+    Array.prototype.forEach.call(document.querySelectorAll('.rtab'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.rtabpane'), function (p) {
+      p.classList.toggle('on', p.id === 'rtab-' + tab + '-pane');
+    });
+    if (tab === 'files') {
+      var ft = document.getElementById('ftree');
+      if (!ft.getAttribute('data-loaded')) {
+        ft.setAttribute('data-loaded', '1');
+        ft.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+        loadTree((state && state.workspace && state.workspace.path) || '', ft);
+      }
+    }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.rtab'), function (b) {
+    b.onclick = function () { openRight(b.getAttribute('data-tab')); };
+  });
+  document.getElementById('rclose').onclick = closeRight;
+  document.getElementById('rcollapse').onclick = function () {
+    document.getElementById('rightbar').classList.remove('open');
+  };
+  // drag resize (300-600px), remembered in localStorage
+  (function () {
+    var rb = document.getElementById('rightbar');
+    var drag = document.getElementById('rdrag');
+    var dragging = false;
+    function applyW(w) {
+      if (w) rb.style.width = w + 'px';
+    }
+    try {
+      var saved = localStorage.getItem('hmh-right-w');
+      if (saved && Number(saved) >= 300 && Number(saved) <= 600) applyW(Number(saved));
+    } catch (e) {}
+    drag.addEventListener('mousedown', function (ev) {
+      ev.preventDefault();
+      dragging = true;
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    });
+    window.addEventListener('mousemove', function (ev) {
+      if (!dragging) return;
+      var w = window.innerWidth - ev.clientX;
+      w = Math.max(300, Math.min(600, w));
+      applyW(w);
+      try { localStorage.setItem('hmh-right-w', String(w)); } catch (e) {}
+    });
+    window.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    });
+  })();
   function showDetails(seqId) {
     var d = toolRegistry[seqId];
     if (!d) return;
-    document.getElementById('details').classList.add('open');
+    openRight('detail');
     document.getElementById('dname').textContent = d.name;
     var body = document.getElementById('dbody');
     body.innerHTML = '';
@@ -1194,9 +1728,90 @@ export const PAGE = `<!doctype html>
     var p2 = document.createElement('pre'); p2.textContent = d.output || '(pending)';
     body.appendChild(h1); body.appendChild(p1); body.appendChild(h2); body.appendChild(p2);
   }
-  document.getElementById('dclose').onclick = function () {
-    document.getElementById('details').classList.remove('open');
-  };
+  /* ---- files tab: lazy workspace tree (server /api/fs?files=1) ---- */
+  function fileRow(name, rel, path, kind) {
+    var row = document.createElement('div');
+    row.className = 'frow ' + kind;
+    var ic = document.createElement('span'); ic.className = 'fic';
+    ic.textContent = kind === 'dir' ? '\\uD83D\\uDCC1' : '\\uD83D\\uDCC4';
+    var nm = document.createElement('span');
+    nm.textContent = name;
+    nm.title = rel;
+    row.appendChild(ic); row.appendChild(nm);
+    row.onclick = function () {
+      if (kind === 'dir') {
+        var kids = row.nextSibling;
+        if (kids && kids.className === 'fkids') {
+          var hidden = kids.style.display === 'none';
+          kids.style.display = hidden ? '' : 'none';
+          ic.textContent = hidden ? '\\uD83D\\uDCC2' : '\\uD83D\\uDCC1';
+          return;
+        }
+        var box = document.createElement('div');
+        box.className = 'fkids';
+        box.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+        row.after(box);
+        ic.textContent = '\\uD83D\\uDCC2';
+        loadTree(path, box);
+      } else {
+        openPreview(rel);
+      }
+    };
+    return row;
+  }
+  function loadTree(path, box) {
+    fetch('/api/fs?path=' + encodeURIComponent(path) + '&files=1')
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!box.isConnected) return;
+        box.innerHTML = '';
+        if (!res.ok) { box.innerHTML = '<div class="hint err">' + ((res.d && res.d.error) || 'failed') + '</div>'; return; }
+        var d = res.d;
+        (d.dirs || []).forEach(function (dir) { box.appendChild(fileRow(dir.name, dir.path, dir.path, 'dir')); });
+        (d.files || []).forEach(function (f) { box.appendChild(fileRow(f.name, f.rel, f.path, 'file')); });
+        if (!(d.dirs || []).length && !(d.files || []).length) box.innerHTML = '<div class="hint">' + L.none2 + '</div>';
+      })
+      .catch(function (e) { if (box.isConnected) box.innerHTML = '<div class="hint err">' + String(e) + '</div>'; });
+  }
+  function openPreview(rel) {
+    openRight('preview');
+    var box = document.getElementById('pview');
+    box.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+    fetch('/api/fs/read?path=' + encodeURIComponent(rel))
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        var d = res.d || {};
+        if (!res.ok || d.error) {
+          box.innerHTML = '<div class="err">' + (d.error || L.pvNotFile) + '</div>';
+          return;
+        }
+        if (d.binary) {
+          box.innerHTML = '<div class="hint">' + L.pvBinary + d.size + ' bytes)</div>';
+          return;
+        }
+        box.innerHTML = '';
+        var h = document.createElement('div');
+        h.className = 'pvhead';
+        h.textContent = (d.rel || rel) + (d.truncated ? ' ' + L.pvTrunc : '');
+        var pre = document.createElement('pre');
+        pre.className = 'pvcode';
+        pre.textContent = d.text || '';
+        box.appendChild(h); box.appendChild(pre);
+      })
+      .catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+  }
+  // clickable file paths inside the chat: a path-looking <code> opens the preview tab
+  function maybePath(t) {
+    return /^[A-Za-z0-9_.\\/-]+\.[a-zA-Z0-9]{1,8}$/.test(t) && t.length < 200 && t.indexOf(' ') < 0 && !/^https?:/.test(t);
+  }
+  log.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var code = t.closest('code');
+    if (code && !t.closest('.codebar') && !t.closest('.copy') && maybePath(code.textContent.trim())) {
+      openPreview(code.textContent.trim());
+    }
+  });
 
   // ---- streaming state ----
   var curBlock = null;
@@ -1232,6 +1847,85 @@ export const PAGE = `<!doctype html>
     if (th) { th.parentNode.classList.toggle('open'); }
   });
 
+  /* ---- keyed tool-result renderers (A4) ----
+     edit_file/write_file 结果含 unified diff → diff 卡片;web_search → 链接卡片;
+     其余保持定案 W1:折叠一行可展开,长日志折叠时只显示尾部 50 行。 */
+  function isDiffText(t) { return /^@@ /m.test(t) || (/^\\+\\+\\+ /m.test(t) && /^--- /m.test(t)); }
+  function renderDiff(d) {
+    var box = document.createElement('div');
+    box.className = 'diffbox';
+    var head = document.createElement('div');
+    head.className = 'dhead';
+    var t = document.createElement('span');
+    t.textContent = d.name;
+    var cp = document.createElement('button');
+    cp.type = 'button'; cp.className = 'copy'; cp.textContent = L ? L.copy : 'copy';
+    cp.onclick = function () { copyText(d.full); cp.textContent = '\\u2713'; setTimeout(function () { cp.textContent = L ? L.copy : 'copy'; }, 1200); };
+    head.appendChild(t); head.appendChild(cp);
+    box.appendChild(head);
+    var pre = document.createElement('pre');
+    var lines = (d.full || d.preview || '').split('\n');
+    if (lines.length > 400) lines = lines.slice(0, 400);
+    lines.forEach(function (l) {
+      var row = document.createElement('div');
+      row.className = 'dline' + (l.charAt(0) === '+' ? ' add' : l.charAt(0) === '-' ? ' del' : l.indexOf('@@') === 0 ? ' hunk' : '');
+      row.textContent = l;
+      pre.appendChild(row);
+    });
+    box.appendChild(pre);
+    log.appendChild(box);
+    autoscroll();
+  }
+  function renderSearchCards(d) {
+    var urls = [];
+    var re = /https?:\\/\\/[^\\s)"'<>]+/g;
+    var m;
+    while ((m = re.exec(d.full || d.preview || '')) !== null) {
+      if (urls.indexOf(m[0]) < 0) urls.push(m[0]);
+      if (urls.length >= 6) break;
+    }
+    urls.forEach(function (u) {
+      var card = document.createElement('div');
+      card.className = 'linkcard';
+      var a = document.createElement('a');
+      a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = u;
+      var h = document.createElement('span'); h.className = 'lh';
+      try { h.textContent = new URL(u).host; } catch (e2) {}
+      card.appendChild(a); card.appendChild(h);
+      log.appendChild(card);
+    });
+    autoscroll();
+  }
+  function foldToolResult(d) {
+    var fold = document.createElement('div');
+    fold.className = 'toolfold' + (d.isError ? ' err' : '');
+    var tri = document.createElement('span'); tri.className = 'tri'; tri.textContent = '\\u25B8';
+    var lab = document.createElement('span');
+    var pv = String(d.preview).replace(/\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
+    lab.textContent = pv || '(done)';
+    fold.appendChild(tri); fold.appendChild(lab);
+    var body = null;
+    fold.onclick = function () {
+      fold.classList.toggle('open');
+      if (!body) {
+        body = document.createElement('div');
+        body.className = d.isError ? 'toolres err' : 'toolres';
+        var full = d.full || d.preview || '';
+        var ls = full.split('\n');
+        if (ls.length > 60) {
+          var cut = document.createElement('div');
+          cut.style.color = 'var(--dim)';
+          cut.textContent = '\\u22EF ' + (ls.length - 50) + ' lines folded \\u00B7 showing tail 50';
+          body.appendChild(cut);
+          full = ls.slice(-50).join('\n');
+        }
+        body.appendChild(document.createTextNode(full));
+        fold.after(body);
+      } else { body.style.display = body.style.display === 'none' ? '' : 'none'; }
+    };
+    log.appendChild(fold);
+    autoscroll();
+  }
   var pendingToolRow = null;   // running tool row awaiting its result
   var es = new EventSource('/api/events');
   es.addEventListener('hello', function (e) { renderState(JSON.parse(e.data)); });
@@ -1313,26 +2007,13 @@ export const PAGE = `<!doctype html>
     for (var k in toolRegistry) {
       if (toolRegistry[k].name === d.name && toolRegistry[k].output === '') { toolRegistry[k].output = d.full || d.preview || ''; break; }
     }
-    // human-first: raw tool output folds to one line; click to inspect
-    var fold = document.createElement('div');
-    fold.className = 'toolfold' + (d.isError ? ' err' : '');
-    var tri = document.createElement('span'); tri.className = 'tri'; tri.textContent = '\u25B8';
-    var lab = document.createElement('span');
-    var pv = String(d.preview).replace(/\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
-    lab.textContent = pv || '(done)';
-    fold.appendChild(tri); fold.appendChild(lab);
-    var body = null;
-    fold.onclick = function () {
-      fold.classList.toggle('open');
-      if (!body) {
-        body = document.createElement('div');
-        body.className = d.isError ? 'toolres err' : 'toolres';
-        body.textContent = d.full || d.preview || '';
-        fold.after(body);
-      } else { body.style.display = body.style.display === 'none' ? '' : 'none'; }
-    };
-    log.appendChild(fold);
-    autoscroll();
+    // keyed views (A4); default keeps W1: fold to one line, click to expand
+    if (!d.isError && (d.name === 'edit_file' || d.name === 'write_file') && isDiffText(d.full || d.preview || '')) {
+      renderDiff(d);
+      return;
+    }
+    if (d.name === 'web_search') renderSearchCards(d);
+    foldToolResult(d);
   });
   es.addEventListener('approvalReq', function (e) {
     var d = JSON.parse(e.data);
@@ -1367,6 +2048,11 @@ export const PAGE = `<!doctype html>
       autoscroll();
     }
     loadSessions();
+  });
+  es.addEventListener('injected', function (e) {
+    flushStream();
+    clearEmpty();
+    el('div', 'msg-inject', '\\u21AA ' + (L ? L.injected : 'injected') + ': ' + JSON.parse(e.data).text);
   });
   es.addEventListener('error', function (e) {
     if (e.data) { flushStream(); el('div', 'err', 'error: ' + JSON.parse(e.data).message); }
@@ -1422,21 +2108,182 @@ export const PAGE = `<!doctype html>
   }
   function sendTask(text) {
     if (!text) return;
-    // optimistic echo: show the task immediately whether it runs now or queues
     clearEmpty();
     switchView('chat');
+    // slash commands route to /api/command (settled design W5: web subset),
+    // never the agent loop
+    if (text.charAt(0) === '/') {
+      if (text === '/clear') { newSession(); return; }
+      if (text === '/help') { renderCmdResult(WEB_CMD_NAMES.map(function (n) { return n + ' \\u2014 ' + ((L && L.webCmds && L.webCmds[n]) || ''); }).join('\n')); return; }
+      if (text === '/status') {
+        renderCmdResult((state ? state.model : '?') + ' · ' + (state ? state.locale : 'zh') + ' · ' + ((state && state.queue && state.queue.length) ? state.queue.length + ' queued' : 'idle'));
+        return;
+      }
+      el('div', 'msg-user', text);
+      fetch('/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ line: text }) })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
+        .then(function (res) {
+          if (res.status === 404 || (res.d && res.d.error)) renderCmdResult(res.d && res.d.error ? res.d.error : 'unknown command', true);
+          else if (res.d && res.d.text) renderCmdResult(res.d.text);
+        })
+        .catch(function (err) { renderCmdResult(String(err), true); });
+      return;
+    }
     if (!window.__agentBusy) el('div', 'msg-user', text);
+    var body = { text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value };
+    var files = [];
+    var images = [];
+    attachments.forEach(function (a) { if (a.kind === 'image') images.push({ name: a.name, dataUrl: a.dataUrl }); else files.push(a.path); });
+    if (files.length) body.attachments = files;
+    if (images.length) body.images = images;
+    attachments = [];
+    renderAtts();
     fetch('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value })
+      body: JSON.stringify(body)
     }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
       .then(function (res) {
         if (res.d && res.d.queued) {
-          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' \\u2014 ' + text);
+          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' — ' + text);
         } else if (res.status === 409) {
           el('div', 'err', L.alreadyRunning);
         }
+      })
+      .catch(function (err) { el('div', 'err', String(err)); });
+  }
+  function renderCmdResult(text, isErr) {
+    var d = document.createElement('div');
+    d.className = isErr ? 'toolres err' : 'toolres';
+    var h = document.createElement('span');
+    h.style.color = 'var(--accent)';
+    h.textContent = '[/ ' + (L ? L.cmdOk : 'cmd') + '] ';
+    d.appendChild(h);
+    d.appendChild(document.createTextNode(text));
+    log.appendChild(d);
+    autoscroll();
+  }
+  /* ---- slash palette (A2) + @ file search (A2) + attachments (A2) ---- */
+  var WEB_CMD_NAMES = ['/help', '/clear', '/status', '/model', '/lang', '/yolo', '/providers', '/tools', '/skills', '/mcp', '/ops', '/ops scan', '/resume', '/web', '/exit'];
+  function webCmdItems() {
+    return WEB_CMD_NAMES.map(function (n) { return { name: n, desc: (L && L.webCmds && L.webCmds[n]) || '' }; });
+  }
+  var attachments = [];
+  var palMode = null;  // 'slash' | 'at' | null
+  var palItems = [];
+  var palSel = 0;
+  var atTimer = null;
+  var atToken = 0;
+  function closePal() {
+    document.getElementById('slashpanel').classList.remove('on');
+    document.getElementById('atpanel').classList.remove('on');
+    palMode = null;
+    palItems = [];
+  }
+  function renderPal() {
+    if (!palMode) { closePal(); return; }
+    var panel = palMode === 'slash' ? document.getElementById('slashpanel') : document.getElementById('atpanel');
+    var other = palMode === 'slash' ? document.getElementById('atpanel') : document.getElementById('slashpanel');
+    other.classList.remove('on');
+    panel.classList.add('on');
+    panel.innerHTML = '';
+    var list = palItems;
+    palSel = Math.max(0, Math.min(palSel, list.length - 1));
+    list.slice(0, 8).forEach(function (it, i) {
+      var row = document.createElement('div');
+      row.className = 'pickrow' + (i === palSel ? ' sel' : '');
+      var pn = document.createElement('span'); pn.className = 'pn'; pn.textContent = it.name;
+      var pd = document.createElement('span'); pd.className = 'pd'; pd.textContent = it.desc || '';
+      row.appendChild(pn); row.appendChild(pd);
+      if (it.path) { var ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = it.path; row.appendChild(ph); }
+      row.onmousedown = function (ev) { ev.preventDefault(); pickPal(it); };
+      row.onmouseenter = function () { if (palSel !== i) { palSel = i; renderPal(); } };
+      panel.appendChild(row);
+    });
+    if (!list.length) {
+      var em = document.createElement('div');
+      em.className = 'pickfoot';
+      em.textContent = palMode === 'at' ? L.pvNotFile : '';
+      panel.appendChild(em);
+    }
+    var foot = document.createElement('div');
+    foot.className = 'pickfoot';
+    foot.textContent = palMode === 'slash' ? L.slashHint : L.atHint;
+    panel.appendChild(foot);
+  }
+  function pickPal(it) {
+    var input = document.getElementById('input');
+    if (palMode === 'slash') {
+      input.value = it.name + ' ';
+    } else if (palMode === 'at') {
+      addFileAtt(it);
+      input.value = input.value.replace(/@[\w./\\-]*$/, '');
+    }
+    closePal();
+    input.focus();
+    updateSendBtn();
+  }
+  function atQuery(v) {
+    var m = String(v).match(/@([\w./\\-]*)$/);
+    return m ? m[1] : null;
+  }
+  function scheduleAtSearch(q) {
+    if (atTimer) clearTimeout(atTimer);
+    atTimer = setTimeout(function () { doAtSearch(q); }, 150);
+  }
+  function doAtSearch(q) {
+    var token = ++atToken;
+    if (!q) { palItems = []; palSel = 0; renderPal(); return; }
+    fetch('/api/fs/search?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (token !== atToken || palMode !== 'at') return;
+        palItems = (res.ok ? (res.d.items || []) : []).map(function (it) { return { name: it.rel, desc: '', path: it.path }; });
+        palSel = 0;
+        renderPal();
+      })
+      .catch(function () {});
+  }
+  function renderAtts() {
+    var bar = document.getElementById('attbar');
+    bar.innerHTML = '';
+    bar.classList.toggle('on', attachments.length > 0);
+    attachments.forEach(function (a, i) {
+      var chip = document.createElement('span');
+      chip.className = 'attchip';
+      if (a.kind === 'image') {
+        var img = document.createElement('img');
+        img.src = a.dataUrl;
+        img.alt = a.name;
+        chip.appendChild(img);
+      }
+      var nm = document.createElement('span');
+      nm.textContent = a.kind === 'image' ? a.name : a.rel;
+      nm.title = a.path || a.name;
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'atx'; x.textContent = '\\u00D7';
+      x.onclick = function () { attachments.splice(i, 1); renderAtts(); };
+      chip.appendChild(nm); chip.appendChild(x);
+      bar.appendChild(chip);
+    });
+  }
+  function addFileAtt(it) {
+    if (attachments.some(function (a) { return a.kind === 'file' && a.path === it.path; })) return;
+    attachments.push({ kind: 'file', rel: it.name, path: it.path });
+    renderAtts();
+  }
+  function addImage(dataUrl, name) {
+    if (attachments.filter(function (a) { return a.kind === 'image'; }).length >= 3) { alert('max 3 images'); return; }
+    attachments.push({ kind: 'image', name: name, dataUrl: dataUrl });
+    renderAtts();
+  }
+  function injectNow(text) {
+    fetch('/api/inject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok && res.d && res.d.error) { el('div', 'err', res.d.error); return; }
+        document.getElementById('input').value = '';
+        updateSendBtn();
       })
       .catch(function (err) { el('div', 'err', String(err)); });
   }
@@ -1452,12 +2299,78 @@ export const PAGE = `<!doctype html>
     if (window.__agentBusy) interrupt();
   };
   document.getElementById('input').onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (palMode) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palItems.length - 1, palSel + 1); renderPal(); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(0, palSel - 1); renderPal(); return; }
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (palItems[palSel]) pickPal(palItems[palSel]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closePal(); return; }
+    }
+    if (e.key === 'Enter' && !e.isComposing) {
       e.preventDefault();
-      document.getElementById('send').click();
+      if (e.ctrlKey) {
+        // settled design W6: 运行中 Ctrl+Enter = 注入当前轮;空闲时与 Enter 同义
+        var it = this.value.trim();
+        if (!it) return;
+        if (window.__agentBusy) {
+          injectNow(it);
+        } else {
+          this.value = '';
+          updateSendBtn();
+          sendTask(it);
+        }
+        return;
+      }
+      if (!e.shiftKey) document.getElementById('send').click();
     }
   };
-  document.getElementById('input').oninput = updateSendBtn;
+  document.getElementById('input').oninput = function () {
+    updateSendBtn();
+    var v = this.value;
+    var aq = atQuery(v);
+    if (aq !== null) {
+      palMode = 'at';
+      scheduleAtSearch(aq);
+    } else if (v.charAt(0) === '/') {
+      palMode = 'slash';
+      palItems = webCmdItems().filter(function (c) { return c.name.indexOf(v) === 0; });
+      palSel = 0;
+      renderPal();
+    } else {
+      closePal();
+    }
+  };
+  // paste images (A2): the vision chain describes them server-side before the task runs
+  document.getElementById('input').addEventListener('paste', function (ev) {
+    var items = ev.clipboardData && ev.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it && it.kind === 'file' && /^image\//.test(it.type)) {
+        ev.preventDefault();
+        var f = it.getAsFile();
+        if (!f) continue;
+        if (f.size > 6 * 1024 * 1024) { alert('image too large (max 6MB)'); continue; }
+        var reader = new FileReader();
+        reader.onload = function () { addImage(String(reader.result), f.name || 'paste.png'); };
+        reader.readAsDataURL(f);
+        return;
+      }
+    }
+  });
+  document.getElementById('attach').onclick = function () { document.getElementById('imgfile').click(); };
+  document.getElementById('imgfile').onchange = function () {
+    var files = this.files || [];
+    for (var i = 0; i < files.length; i++) {
+      (function (f) {
+        if (!f || !/^image\//.test(f.type)) return;
+        if (f.size > 6 * 1024 * 1024) { alert('image too large (max 6MB)'); return; }
+        var reader = new FileReader();
+        reader.onload = function () { addImage(String(reader.result), f.name || 'image.png'); };
+        reader.readAsDataURL(f);
+      })(files[i]);
+    }
+    this.value = '';
+  };
 
   // ---- queue bar ----
   function renderQueue(items) {
@@ -1494,7 +2407,7 @@ export const PAGE = `<!doctype html>
       '<div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div>' +
       '<div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div>';
     wireExamples();
-    document.getElementById('details').classList.remove('open');
+    document.getElementById('rightbar').classList.remove('open');
   }
   function wireExamples() {
     Array.prototype.forEach.call(document.querySelectorAll('#empty .ex'), function (ex) {

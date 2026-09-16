@@ -27,6 +27,11 @@
 | W2 | 状态行(空闲/运行+模式徽标)在输入框上方——与 TUI T1 同构 | 跨前端一致 | 已入 | ✅ 生效 |
 | W3 | 审批三档 ask/auto/yolo;unattended(yes/auto)不挂远程审批钩子 | 审批根因修复(远程钩子无条件挂载覆盖 yes) | 已入 | ✅ 生效 |
 | W4 | 会话侧栏三操作:重命名(titles 映射)/归档(archive/)/删除(trash/ 可恢复),审计 jsonl 不可变 | 产品完整性 | 已入 | ✅ 生效 |
+| W5 | **设置中心**(侧栏第六项 ⚙):模型页=provider 增删改(baseUrl/apiKey/model 表单,保存即写 config.json 热更新;apiKey 省略=保留原值、显式空串=清除,stateObject 只回传 hasKey+末4位);常规页=locale/approval(ask|auto)/autoEvolveEvery/autoPatch/theme(dark|light|system) | 对标 dsh 设置→模型/常规;密钥不回传原则 | 本轮 | ✅ 生效 |
+| W6 | **输入区三件套**:①`/` 命令面板(Web 子集与 TUI COMMANDS 对齐,`POST /api/command` 分发);②`@` 文件模糊搜索(纯函数子序列打分,`GET /api/fs/search`,仅当前工作区、跳过 node_modules/.git/dist/.next/.cache、深度≤12、条目≤3000、结果≤20、symlink 不跟随);③图片粘贴/选择附件(png|jpeg|webp base64 白名单,解码后 ≤6MB,对接 see_image 视觉链) | 对标 dsh ui-commands/ui-reference/ui-attachment;零依赖内核一等公民 | 本轮 | ✅ 生效 |
+| W7 | **运行中注入**=Ctrl+Enter(输入非空且运行中):文本经 `POST /api/inject` 进内核 injections.poll,在轮边界注入为 user 消息;Enter 保持排队语义(不改);inject 只作用于当前轮,任务结束的迟到推送自然落入下一任务队列 | 对标 codex Enter-inject;与 TUI B1 共用内核注入机制 | 本轮 | ✅ 生效 |
+| W8 | **右栏 tab 体系**(详情/文件/预览):详情=原工具详情;文件=工作区只读树(`GET /api/fs/read` 64KB 上限+8KB NUL/控制字节嗅探+UTF-8 fatal 解码兜底,二进制给占位);预览=点击回答中的路径引用在右栏打开;可折叠+宽度拖拽 300-600px localStorage 记忆 | 对标 dsh ui-sidebar-right;路径引用点击经 maybePath 防误触 | 本轮 | ✅ 生效 |
+| W9 | **工具 keyed 渲染**:edit_file/write_file 结果按 unified diff 渲染(+绿/-红/@@灰/文件行 dim,`looksLikeDiff` 门);web_search 结果渲染为链接卡片;harmony 类长日志折叠尾部;代码块 token 着色(关键字/字符串/注释/数字)+复制键 | 对标 dsh ui-tool/ui-renderer;W1 折叠一行默认保留 | 本轮 | ✅ 生效 |
 
 ## CLI/REPL
 

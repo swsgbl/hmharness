@@ -19,6 +19,7 @@ export function buildSystemPrompt(opts: {
   model: string;
   locale?: string;
   agentsMd?: string;
+  goal?: string;
 }): string {
   const parts: string[] = [];
   const isWin = process.platform === 'win32';
@@ -51,7 +52,19 @@ export function buildSystemPrompt(opts: {
     // ---- [Codex] 用户反馈 ----
     '',
     "When the user gives feedback saying something didn't work, treat it as ground truth. Use available tools to verify the current state, identify the root cause, fix it, and explain what changed.",
+  );
 
+  // ---- 会话目标 ----
+  if (opts.goal) {
+    parts.push(
+      '',
+      '## Active goal',
+      'Work toward this goal across turns until it is complete or explicitly cleared:',
+      opts.goal,
+    );
+  }
+
+  parts.push(
     // ---- 宿主环境 ----
     '',
     '## Host environment (facts - rely on these, do not guess)',

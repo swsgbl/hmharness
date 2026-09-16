@@ -9,6 +9,7 @@ import {
   homeDir,
   loadConfig,
   resolveProvider,
+  getGoal,
   mcpServerTools,
   Registry,
   runLoop,
@@ -245,7 +246,25 @@ export interface RunnerEvents {
   onToolCall?(name: string, args: Record<string, unknown>): void;
   onToolResult?(name: string, output: string, isError: boolean): void;
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
+  /** A runtime-steering user message entered the running loop's transcript. */
+  onInjected?(message: string): void;
   onFinal?(r: { text: string; turns: number; toolUses: number; sessionId: string; usage?: { promptTokens: number; completionTokens: number } }): void;
+}
+
+/** Live runtime-steering channel (web Ctrl+Enter / TUI Enter-while-running):
+ *  the caller pushes user messages into `queue`; the running loop drains them
+ *  between tool batches. `active` flips to false when the task ends, so the
+ *  caller can route a late push into the next task's queue instead. */
+export interface InjectChannel {
+  queue: string[];
+  active: boolean;
+}
+
+/** Poll-shaped runtime steering (codex Enter-inject semantics): poll() is
+ *  drained at every turn boundary; each returned entry becomes a user turn
+ *  in the running loop. */
+export interface InjectPoll {
+  poll(): Array<{ text: string }>;
 }
 
 export interface AgentTaskOptions {
@@ -263,6 +282,17 @@ export interface AgentTaskOptions {
   events?: RunnerEvents;
   /** AbortSignal: cancels the agent loop at the next turn boundary. */
   signal?: AbortSignal;
+  /** Runtime-steering channel (web Ctrl+Enter / TUI Enter-while-running):
+   *  either the push queue (InjectChannel, drained between tool batches) or
+   *  the poll shape (drained at every turn boundary). */
+  inject?: InjectChannel | InjectPoll;
+  /** Fork this run from an existing session: the new rollout records the
+   *  parent session id as `forkedFrom` in its session_meta. */
+  forkFrom?: string;
+  /** Session goal: injected into the system prompt and persisted under
+   *  HMH_HOME/goals.json (when unset or null, the persisted goal for the
+   *  session is used, so the goal survives resumes/forks). */
+  goal?: string | null;
 }
 
 /** Run one full agent task end-to-end; audit + insight recording included. */
@@ -270,10 +300,17 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   const cfg = opts.cfg ?? (await loadConfig());
   const ctx = opts.ctx ?? { cwd: process.cwd(), home: homeDir() };
   const events = opts.events ?? {};
+  // inject accepts either the push channel (legacy) or the poll shape
+  const injectChannel = opts.inject && 'queue' in opts.inject ? opts.inject : undefined;
+  const injectPoll = opts.inject && 'poll' in opts.inject ? opts.inject : undefined;
+  if (injectChannel) injectChannel.active = true; // channel is live for this task
   // resume = append to the same rollout; a missing/unreadable id falls back
   // to a fresh session so a renamed-away file never breaks the conversation
   const session = (opts.sessionId ? await Session.resume(ctx.home, opts.sessionId) : null)
-    ?? Session.create(ctx.home, ctx.cwd, cfg.provider.model);
+    ?? Session.create(ctx.home, ctx.cwd, cfg.provider.model, opts.forkFrom ? { forkedFrom: opts.forkFrom } : {});
+  // session-level goal: explicit opts.goal wins; otherwise the persisted
+  // goal (HMH_HOME/goals.json) carries over into resumed/forked sessions
+  const goal = opts.goal ?? (await getGoal(ctx.home, session.id));
   // V2 M1 flight recorder: every run leaves a typed, replayable trajectory
   // under <home>/runs/<run-id>/. Best-effort by contract - storage failures
   // are swallowed inside the recorder and can never fail the task itself.
@@ -321,6 +358,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     model: cfg.provider.model,
     locale: cfg.locale,
     agentsMd: agentsMd ?? undefined,
+    ...(goal ? { goal } : {}),
   });
 
   // system prompt token count: the prompt has been quietly growing (Codex 9
@@ -385,9 +423,22 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     maxTurns: cfg.maxTurns,
     maxContextChars: cfg.maxContextChars,
     summarizeContext,
+    // runtime steering: drain the caller's injection channel after each tool
+    // batch; the injected text lands as a user message in the live transcript
+    // (web Ctrl+Enter / TUI Enter-while-running)
+    injectQueue: injectChannel ? () => injectChannel.queue.length ? injectChannel.queue.shift()! : null : undefined,
+    // poll-shaped steering: drained at every turn boundary (codex semantics)
+    injections: injectPoll,
     approval: spawnBase.current.approval,
     events: {
       onDelta: (kind, chunk) => events.onDelta?.(kind, chunk),
+      onInjected: (message) => {
+        // keep the rollout complete: an injected user message is part of the
+        // session transcript, not just the working copy
+        void session.user(message);
+        traj.emit('user.injected', 'user', { preview: brief(message, 160) });
+        events.onInjected?.(message);
+      },
       onToolCall: (name, args) => {
         toolsUsed.push(name);
         traj.emit('tool.requested', 'tool', { name, args: brief(args, 120) });
@@ -421,6 +472,9 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     traj.finish({ success: false, reason: 'error', error: brief(String(err), 200) }, { toolUses: toolsUsed.length });
     throw err;
   });
+  // the task ended (or died): late pushes must queue for the NEXT task instead
+  // of silently vanishing into a channel nothing drains
+  if (injectChannel) injectChannel.active = false;
   traj.finish(
     { success: result.reason === 'final', reason: result.reason },
     { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },

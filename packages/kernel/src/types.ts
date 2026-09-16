@@ -100,6 +100,8 @@ export interface HmhConfig {
   visionFallbacks?: ProviderConfig[];
   /** UI + system-prompt language. Default 'zh'. */
   locale?: 'zh' | 'en';
+  /** UI theme preference: 'dark' (default) | 'light' | 'system'. */
+  theme?: 'dark' | 'light' | 'system';
   /** Run a background evolution cycle after every N recorded insights
    *  (default 3; 0 disables). Tier 3 of the feedback ladder: Tier 1 = raw
    *  error self-notes (every task, zero cost), Tier 2 = one model-call

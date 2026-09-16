@@ -37,19 +37,28 @@ function alive(pid: number): boolean {
   }
 }
 
-/** cheap probe: does OUR server answer on the port (not just any listener)?
- *  Accepts ANY hmh /api/state shape - a daemon from an older build still
- *  serves the UI, and rejecting it made the TUI auto-link spawn a fresh
- *  daemon that died on EADDRINUSE every startup (the "lost setting" bug). */
-export async function hmhWebUp(port: number): Promise<boolean> {
+/** Probe the SERVED web server: is it up, and what version does the RUNNING
+ *  process report? The daemon self-reports its own code version via
+ *  /api/state.daemonVersion — this is the truth the staleness check uses.
+ *  An older daemon without the field reports version '' (file-based fallback
+ *  then applies). Accepts ANY hmh /api/state shape — a daemon from an older
+ *  build still serves the UI, and rejecting it made the TUI auto-link spawn
+ *  a fresh daemon that died on EADDRINUSE every startup ("lost setting"). */
+export interface WebProbe { up: boolean; version: string }
+export async function probeWeb(port: number): Promise<WebProbe> {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/api/state`, { signal: AbortSignal.timeout(1500) });
-    if (!r.ok) return false;
+    if (!r.ok) return { up: false, version: '' };
     const d = await r.json();
-    return !!d && typeof d === 'object';
+    return { up: !!d && typeof d === 'object', version: typeof d.daemonVersion === 'string' ? d.daemonVersion : '' };
   } catch {
-    return false;
+    return { up: false, version: '' };
   }
+}
+
+/** cheap probe: does OUR server answer on the port (not just any listener)? */
+export async function hmhWebUp(port: number): Promise<boolean> {
+  return (await probeWeb(port)).up;
 }
 
 /** Windows-first: find the PID LISTENING on 127.0.0.1:<port> via netstat.
@@ -67,7 +76,18 @@ function portOwnerPid(port: number): number {
   return 0;
 }
 
-export function stopWebDaemon(): boolean {
+/** Wait (bounded) until nothing answers on the port — used after evicting a
+ *  stale listener so the respawn does not die on EADDRINUSE. */
+export async function waitPortFree(port: number, maxMs = 4000): Promise<boolean> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    if (portOwnerPid(port) === 0) return true;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return portOwnerPid(port) === 0;
+}
+
+export function stopWebDaemon(port = DEFAULT_WEB_PORT): boolean {
   const pid = readWebPid();
   let killed = false;
   if (pid && alive(pid)) {
@@ -79,7 +99,7 @@ export function stopWebDaemon(): boolean {
   }
   try { unlinkSync(join(homeDir(), 'web.pid')); } catch { /* absent */ }
   // stale pid file but the port is still held (orphaned/old daemon): evict
-  const owner = portOwnerPid(DEFAULT_WEB_PORT);
+  const owner = portOwnerPid(port);
   if (owner && owner !== pid) {
     try {
       spawn('taskkill', ['/PID', String(owner), '/T', '/F'], { windowsHide: true });
@@ -122,26 +142,33 @@ function cliVersion(): string {
 
 /**
  * Idempotent: if our web UI is already up (pid file alive, or the port
- * answers as hmh), keep it; otherwise spawn it and wait up to ~6s for
- * readiness. Returns true when the web UI is usable.
+ * answers as hmh) at the CURRENT CLI version, keep it; otherwise evict and
+ * respawn, waiting up to ~6s for readiness. Returns true when the web UI is
+ * usable.
  *
- * Version check: a daemon spawned by an older CLI keeps serving old code
- * (the user sees missing features for days). We compare the recorded daemon
- * version with the current CLI and restart on mismatch.
+ * Staleness = what the SERVED process reports (/api/state.daemonVersion),
+ * not the web.version file: a file is overwritten by every spawn (even one
+ * that then died on EADDRINUSE) while the OLD listener keeps the port, so a
+ * file-based comparison can silently bless a stale daemon. Old daemons
+ * without the field report '' -> file-based comparison as the fallback.
  */
 export async function ensureWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1]): Promise<boolean> {
   const pid = readWebPid();
-  const daemonV = daemonVersion();
   const myV = cliVersion();
-  const stale = daemonV !== '' && myV !== '' && daemonV !== myV;
+  const served = await probeWeb(port);
+  // served version wins; '' means an old daemon without the field — fall back
+  // to the recorded file version for the comparison
+  const daemonV = served.version || daemonVersion();
+  const stale = myV !== '' && daemonV !== '' && daemonV !== myV;
 
   if (!stale) {
     if (pid && alive(pid)) return true;
-    if (await hmhWebUp(port)) return true;
+    if (served.up) return true;
   } else {
-    // stale daemon: kill it (it may hold the pid OR just the port)
-    stopWebDaemon();
-    await new Promise((r) => setTimeout(r, 600));
+    // stale daemon: kill it (it may hold the pid OR just the port) and wait
+    // for the port to free so the respawn cannot die on EADDRINUSE
+    stopWebDaemon(port);
+    await waitPortFree(port);
   }
 
   spawnWebDaemon(port, entry);
@@ -152,10 +179,13 @@ export async function ensureWebDaemon(port = DEFAULT_WEB_PORT, entry = process.a
   return false;
 }
 
-/** Report whether the running daemon matches the current CLI version. */
-export function webDaemonStale(): { stale: boolean; daemon: string; cli: string } {
-  const d = daemonVersion();
+/** Report whether the running daemon matches the current CLI version.
+ *  Prefers what the SERVED process reports; falls back to the recorded file
+ *  version for daemons that predate the self-reporting field. */
+export async function webDaemonStale(port = DEFAULT_WEB_PORT): Promise<{ stale: boolean; daemon: string; cli: string }> {
   const c = cliVersion();
+  const served = await probeWeb(port);
+  const d = served.version || daemonVersion();
   return { stale: d !== '' && c !== '' && d !== c, daemon: d, cli: c };
 }
 
