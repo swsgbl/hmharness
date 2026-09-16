@@ -27,10 +27,12 @@ const packages = requested.length ? requested : ORDER;
 let failures = 0;
 const fail = (msg) => { console.error('  FAIL ' + msg); failures++; };
 
-// 0. tests + typecheck once, before any per-package checks
+// 0. build once (workspace packages resolve each other through dist/*.d.ts,
+//    so typecheck needs the artifacts on a fresh checkout), then tests +
+//    typecheck, before any per-package checks
 if (!process.argv.includes('--skip-tests')) {
-  console.log('== unit tests + typecheck');
-  for (const cmd of ['npm run typecheck', 'npm test']) {
+  console.log('== build + unit tests + typecheck');
+  for (const cmd of ['npm run build', 'npm run typecheck', 'npm test']) {
     try {
       execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000 });
       console.log('  ' + cmd + ': ok');

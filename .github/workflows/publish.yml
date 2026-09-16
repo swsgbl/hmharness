@@ -21,7 +21,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: install
         run: npm install
-      - name: publish (ordered set: kernel..cli + codexhost-bridge)
+      - name: 'publish (ordered set, kernel through cli + codexhost-bridge)'
         run: node scripts/publish.cjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

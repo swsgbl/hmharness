@@ -13,10 +13,14 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      # build FIRST: the workspace packages resolve each other through their
+      # package.json main/exports (dist/*.d.ts) — a fresh checkout has no
+      # dist, so typecheck before build fails with TS2307 on every workspace
+      # import (locally dist exists, which is why this ever looked green)
+      - run: npm run build
       - run: npm run typecheck
       - name: unit tests
         run: npm test
-      - run: npm run build
       - name: built CLI smoke (no model needed)
         run: node packages/cli/dist/main.js skills
       - name: npm publish preflight (ordered-set check, never publishes)
