@@ -16,8 +16,9 @@
   },
   "dependencies": {
     "@hmharness/kernel": "0.9.1",
-    "@hmharness/evolution": "0.9.0",
-    "@hmharness/agent": "0.9.0"
+    "@hmharness/evolution": "0.14.8",
+    "@hmharness/agent": "0.14.9",
+    "@hmharness/domain-ops": "0.8.0"
   },
   "files": [
     "dist"
