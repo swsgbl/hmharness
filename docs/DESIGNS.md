@@ -29,7 +29,7 @@
 | T17 | **工具 cell**(B8):工具调用+结果=可折叠 cell,默认一行摘要(W1/T5 精神);**空闲+空输入按 `z`** 展开/折叠最后一条 cell 到完整输出(有草稿时 z 只是输入) | 对标 codex exec/history cell | e011d27 | ✅ 生效 |
 | T18 | **长输出自动 pager**(B9):工具输出超过 ~2 屏自动进 overlay(q/Esc 随时回到流);Ctrl+T 与 /diff 复用同一 overlay 基座 | 对标 codex pager_overlay | e011d27 | ✅ 生效 |
 | T19 | **流式 markdown 着色**(B10):`say` 流按"已完成的行"一次性着色(标题青加粗/围栏列表引用 dim),进行中的尾行保持原样——**已稳定的行绝不重排** | 对标 codex markdown 流式渲染;稳定行不重排约束 | e011d27 | ✅ 生效 |
-| T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 本轮提交 | ✅ 生效 |
+| T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 53042cc | ✅ 生效 |
 
 ## Web(浏览器端)
 
