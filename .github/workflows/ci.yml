@@ -6,7 +6,10 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # windows-latest: the project is Windows-first (hdc/hvigor toolchain,
+    # path semantics in tests) — several tests encode win32 path behavior
+    # (absolute-path detection, case tolerance) that inverts on Linux
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
