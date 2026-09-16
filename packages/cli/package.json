@@ -45,7 +45,7 @@
   "dependencies": {
     "@hmharness/kernel": "0.9.1",
     "@hmharness/observability": "0.7.0",
-    "@hmharness/evolution": "0.14.8",
+    "@hmharness/evolution": "0.14.9",
     "@hmharness/domain-harmony": "0.13.5",
     "@hmharness/domain-ops": "0.8.0",
     "@hmharness/agent": "0.14.9",

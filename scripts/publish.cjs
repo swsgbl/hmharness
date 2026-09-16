@@ -46,6 +46,17 @@ try {
 }
 
 // 2. ordered publish
+async function npmVersion(name) {
+  // the registry packument is the ONLY truth (memory lesson: the old
+  // ALL-PUBLISHED check could false-positive); missing package -> ''
+  try {
+    const r = await fetch('https://registry.npmjs.org/' + name);
+    if (!r.ok) return '';
+    const j = await r.json();
+    return (j['dist-tags'] && j['dist-tags'].latest) || '';
+  } catch { return ''; }
+}
+async function main() {
 for (const name of ONLY ? [ONLY] : ORDER) {
   if (!ORDER.includes(name)) {
     console.error('unknown package: ' + name + ' (expected one of ' + ORDER.join(', ') + ')');
@@ -53,6 +64,14 @@ for (const name of ONLY ? [ONLY] : ORDER) {
   }
   const dir = path.join(ROOT, 'packages', name);
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  // idempotent release: an unchanged package (version already live) is
+  // skipped, so the FULL ordered set can run on every release without
+  // failing on the packages that didn't change
+  const live = await npmVersion(pkg.name);
+  if (live === pkg.version) {
+    console.log('\n--- skip @hmharness/' + name + ' ' + pkg.version + ' (already on npm) ---');
+    continue;
+  }
   const args = ['publish', '--access', 'public', '--registry', REG];
   if (DRY) args.push('--dry-run');
   console.log('\n--- publishing @hmharness/' + name + ' ' + pkg.version + (DRY ? ' (dry-run)' : '') + ' ---');
@@ -65,3 +84,5 @@ for (const name of ONLY ? [ONLY] : ORDER) {
   }
 }
 console.log('\nALL PUBLISHED' + (DRY ? ' (dry-run)' : '') + (ONLY ? ': @hmharness/' + ONLY : ' - verify: npm view @hmharness/cli version'));
+}
+main().catch((err) => { console.error(String(err)); process.exit(1); });
