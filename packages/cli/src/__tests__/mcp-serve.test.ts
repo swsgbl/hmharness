@@ -53,10 +53,13 @@ test('mcp-serve: tools/call round trip (honest output without a device) + unknow
     const bad = await client.callTool('definitely_not_a_tool', {}, 15_000);
     assert.equal(bad.isError, true);
 
-    // every call landed in the observation log (external-agent usage feed)
+    // every call landed in the observation log (external-agent usage feed).
+    // Without hdc (CI runners) the tool answers honestly with isError — still
+    // a successful round trip + log entry; ok:true only on hdc machines.
     const log = await readFile(join(home, 'insights', 'mcp-calls.jsonl'), 'utf8');
     const lines = log.trim().split('\n').map((l) => JSON.parse(l));
-    assert.ok(lines.some((l) => l.tool === 'harmony_devices' && l.ok === true), 'successful call logged');
+    const hdcAbsent = /hdc not found/i.test(r.output);
+    assert.ok(lines.some((l) => l.tool === 'harmony_devices' && (l.ok === true || hdcAbsent)), 'successful call logged');
     assert.ok(lines.some((l) => l.tool === 'definitely_not_a_tool' && l.ok === false), 'failed call logged');
   } finally {
     client.close();

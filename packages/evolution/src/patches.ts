@@ -129,9 +129,13 @@ export async function sandboxBench(
   runCase: (c: import('./bench.ts').BenchCase, skillsPrompt: string) => Promise<string>,
   cases: import('./bench.ts').BenchCase[],
 ): Promise<number> {
-  // rebuild all packages (the patch may affect any layer)
+  // rebuild all packages (the patch may affect any layer). npm on Windows is
+  // a .cmd shim and modern Node refuses to execFile-spawn .cmd without a
+  // shell (CVE-2024-27980) - the sandbox build silently "failed" (and every
+  // patch reverted) on CI runners while looking fine where npm resolved to
+  // an executable. shell:true resolves the shim on win32, no-op elsewhere.
   try {
-    await execCb('npm', ['run', 'build'], { cwd: repoRoot, timeout: 120_000, windowsHide: true });
+    await execCb('npm', ['run', 'build'], { cwd: repoRoot, timeout: 120_000, windowsHide: true, ...(process.platform === 'win32' ? { shell: true } : {}) });
   } catch {
     return -1; // build failed = automatic reject
   }
