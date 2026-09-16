@@ -88,6 +88,8 @@ export interface Strings {
   cmdGoal: string;
   cmdGoalCleared: string;
   cmdUsage: string;
+  cmdStatusline: string;
+  cmdKeymap: string;
   cmdReview: string;
   /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
   cmdModelHint: string;
@@ -232,6 +234,8 @@ const zh: Strings = {
   cmdGoal: '设置/查看/清除会话目标(/goal <text>|clear)',
   cmdGoalCleared: '目标已清除',
   cmdUsage: '本次会话 token 用量与上下文占用',
+  cmdStatusline: '自定义底栏字段(/statusline "{model} · {cwd}")',
+  cmdKeymap: '查看/重映射动作键(/keymap <action>=<key>)',
   cmdReview: '一键发起「审查当前工作树」任务',
   cmdModelHint: '切换 chat 路由: /model <name>',
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
@@ -367,6 +371,8 @@ const en: Strings = {
   cmdGoal: 'set/view/clear the session goal (/goal <text>|clear)',
   cmdGoalCleared: 'goal cleared',
   cmdUsage: 'session token usage and context occupancy',
+  cmdStatusline: 'custom bottom-line fields (/statusline "{model} · {cwd}")',
+  cmdKeymap: 'view/remap action keys (/keymap <action>=<key>)',
   cmdReview: 'one-click "review the current worktree" task',
   cmdModelHint: 'switch chat route: /model <name>',
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',

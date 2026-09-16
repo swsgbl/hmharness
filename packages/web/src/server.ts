@@ -1265,6 +1265,34 @@ export async function startServer(opts: { port: number; host?: string; version?:
         }
         return;
       }
+      // ---- A14: open a workspace path in the OS file manager ----
+      if (req.method === 'POST' && url.pathname === '/api/open') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { path?: unknown };
+        const p = typeof body.path === 'string' ? body.path.trim() : '';
+        if (!p || !insideWs(p)) {
+          json(res, 400, { error: 'path must resolve inside the active workspace' });
+          return;
+        }
+        const abs = resolve(p);
+        try {
+          const { execFile } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const run = promisify(execFile);
+          if (process.platform === 'win32') {
+            const st2 = await stat(abs);
+            if (st2.isDirectory()) await run('explorer', [abs]);
+            else await run('explorer', ['/select,', abs]);
+          } else if (process.platform === 'darwin') {
+            await run('open', ['-R', abs]);
+          } else {
+            await run('xdg-open', [abs]);
+          }
+          json(res, 200, { ok: true, path: abs });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
       json(res, 404, { error: 'not found' });
     } catch (err) {
       json(res, 500, { error: String(err).slice(0, 300) });

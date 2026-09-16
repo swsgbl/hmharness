@@ -102,9 +102,50 @@ export function extractDeliverables(tools: Array<{ name: string; args: Record<st
   return out;
 }
 
+/** Tiny code tokenizer for fenced blocks (keywords/strings/comments/numbers).
+ *  Pure line scanner — no regex back-reference minefields. ES5-ish on purpose
+ *  (the inline-source contract: no arrows, no template literals). */
+var TOK_KW = ' const let var function return if else for while import from export async await class new try catch throw type interface extends static void number string boolean true false null undefined switch case break continue default ';
+function tokLine(line: string): string {
+  var out = '';
+  var i = 0;
+  var N = line.length;
+  while (i < N) {
+    var ch = line.charAt(i);
+    var nxt = i + 1 < N ? line.charAt(i + 1) : '';
+    if (ch === '/' && nxt === '/') {
+      var e = line.indexOf('\n', i); if (e < 0) e = N;
+      out += '<span class="tok-c">' + line.slice(i, e) + '</span>';
+      i = e;
+    } else if (ch === '"' || ch === "'") {
+      var q = ch; var j = i + 1; var body = '';
+      while (j < N) {
+        var c2 = line.charAt(j);
+        if (c2 === '\\') { body += c2 + (line.charAt(j + 1) || ''); j += 2; continue; }
+        if (c2 === q) break;
+        body += c2; j++;
+      }
+      out += '<span class="tok-s">' + q + body + q + '</span>';
+      i = j + 1;
+    } else if (/[A-Za-z_$]/.test(ch)) {
+      var k = i; var word = '';
+      while (k < N && /[A-Za-z0-9_$]/.test(line.charAt(k))) { word += line.charAt(k); k++; }
+      out += TOK_KW.indexOf(' ' + word + ' ') >= 0 ? '<span class="tok-k">' + word + '</span>' : word;
+      i = k;
+    } else if (/[0-9]/.test(ch)) {
+      var m2 = i; var num = '';
+      while (m2 < N && /[0-9._]/.test(line.charAt(m2))) { num += line.charAt(m2); m2++; }
+      out += '<span class="tok-n">' + num + '</span>';
+      i = m2;
+    } else { out += ch; i++; }
+  }
+  return out;
+}
+
 /** Mini-markdown -> HTML (zero deps, page-safe). Handles: fenced code blocks
- *  (with copy button class), headings, bold/italic/inline code, unordered and
- *  ordered lists, pipes tables, links, paragraphs. HTML-escapes first. */
+ *  (with copy button class + token coloring), headings, bold/italic/inline
+ *  code, unordered and ordered lists, pipes tables, links, paragraphs.
+ *  HTML-escapes first. */
 export function renderMarkdown(src: string): string {
   var text = String(src).replace(/\r\n/g, '\n');
   var esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -115,7 +156,8 @@ export function renderMarkdown(src: string): string {
   var m: RegExpExecArray | null;
   while ((m = fenceRe.exec(esc)) !== null) {
     blocks.push(esc.slice(last, m.index));
-    blocks.push('<div class="codeblk"><div class="codebar"><span>' + (m[1] || 'text') + '</span><button type="button" class="copy">copy</button></div><pre>' + m[2] + '</pre></div>');
+    var colored = m[2].split('\n').map(tokLine).join('\n');
+    blocks.push('<div class="codeblk"><div class="codebar"><span>' + (m[1] || 'text') + '</span><button type="button" class="copy">copy</button></div><pre>' + colored + '</pre></div>');
     last = m.index + m[0].length;
   }
   blocks.push(esc.slice(last));

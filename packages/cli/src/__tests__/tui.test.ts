@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { COMMANDS, matchCommands, parseWheel, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx } from '../tui.ts';
+import { COMMANDS, matchCommands, parseWheel, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
 test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
@@ -466,4 +466,28 @@ test('M4 cell: addToolCell folds to one line; toggleLastCell expands to the full
     h.keys('zz');
     assert.equal(h.rt.paletteProbe().input, 'zz');
   } finally { h.restore(); }
+});
+
+/* ---------------- M5: statusline template + keymap ---------------- */
+
+test('renderStatusline: placeholders substitute; unknown tokens stay literal', () => {
+  const ctx = { model: 'deepseek-flash', cwd: 'hmharness', skills: 12, mode: 'ask', queue: 3, version: '0.14.9' };
+  assert.equal(renderStatusline('{model} · {cwd} · {skills}', ctx), 'deepseek-flash · hmharness · 12');
+  assert.equal(renderStatusline('{queue} queued · {mode}', ctx), '3 queued · ask');
+  assert.equal(renderStatusline('{nope} {model}', ctx), '{nope} deepseek-flash', 'unknown token is visible, not dropped');
+  assert.equal(renderStatusline('', ctx), '');
+});
+
+test('parseKeySpec: named specs map to raw bytes; unknown specs are null', () => {
+  assert.equal(parseKeySpec('ctrl+j'), '\x0a');
+  assert.equal(parseKeySpec('ctrl-enter'), '\x0a');
+  assert.equal(parseKeySpec('ctrl+r'), '\x12');
+  assert.equal(parseKeySpec('ctrl+t'), '\x14');
+  assert.equal(parseKeySpec('ctrl+g'), '\x07');
+  assert.equal(parseKeySpec('esc'), '\x1b');
+  assert.equal(parseKeySpec('enter'), '\r');
+  assert.equal(parseKeySpec('tab'), '\t');
+  assert.equal(parseKeySpec('x'), 'x');
+  assert.equal(parseKeySpec('ctrl+zz'), null);
+  assert.equal(parseKeySpec(''), null);
 });

@@ -29,6 +29,7 @@
 | T17 | **工具 cell**(B8):工具调用+结果=可折叠 cell,默认一行摘要(W1/T5 精神);**空闲+空输入按 `z`** 展开/折叠最后一条 cell 到完整输出(有草稿时 z 只是输入) | 对标 codex exec/history cell | e011d27 | ✅ 生效 |
 | T18 | **长输出自动 pager**(B9):工具输出超过 ~2 屏自动进 overlay(q/Esc 随时回到流);Ctrl+T 与 /diff 复用同一 overlay 基座 | 对标 codex pager_overlay | e011d27 | ✅ 生效 |
 | T19 | **流式 markdown 着色**(B10):`say` 流按"已完成的行"一次性着色(标题青加粗/围栏列表引用 dim),进行中的尾行保持原样——**已稳定的行绝不重排** | 对标 codex markdown 流式渲染;稳定行不重排约束 | e011d27 | ✅ 生效 |
+| T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 本轮提交 | ✅ 生效 |
 
 ## Web(浏览器端)
 
@@ -47,6 +48,7 @@
 | W11 | **权限预设卡片(A8)**:mode 下拉旁 ▾ 弹三卡(审批询问/自动批准/YOLO,各带危险性说明,🔥 徽标语义与 TUI 对齐);选择即写 select 并触发现有 change 路径 | 对标 dsh ui-permission-presets;W3 三档语义不变 | c7953a4 | ✅ 生效 |
 | W12 | **交付物 chips(A9)**:edit_file/write_file 的路径在任务结束时渲染为可点击 chips(去重保序,纯函数 extractDeliverables),点击在右栏预览(A5) | 对标 dsh ui-deliverables | c7953a4 | ✅ 生效 |
 | W13 | **消息反馈(A10)+主题(A11)**:每条 AI 回答带 👍/👎,写入 `insights/explicit-feedback.jsonl`(自描述存储,不污染进化 feed 的严格 Insight 联合类型;`POST /api/feedback`);CSS 变量 token 化(dark/light/system 三态,`body[data-theme]`,`POST /api/config` 持久化+SSE 状态回传) | 对标 dsh ui-message-feedback/ui-theme;反馈字段 outcome 语义以独立文件实现 | c7953a4 | ✅ 生效 |
+| W14 | **M5 Web 项**(A13/A14/A15):会话视图=轨迹时间线(工具调用按序计数圆点条)+全文搜索(输入即过滤渲染行);`POST /api/open` 在系统文件管理器打开工作区路径(仅工作区内,insideWs 守卫;win32 explorer /select) | 对标 dsh ui-trajectory/ui-open-in-app + 会话搜索;A12 定时提醒未做(可裁量) | 本轮 | ✅ 生效 |
 
 ## CLI/REPL
 

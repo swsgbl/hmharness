@@ -118,6 +118,8 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/plan', key: 'cmdPlan' },
   { name: '/goal', key: 'cmdGoal' },
   { name: '/usage', key: 'cmdUsage' },
+  { name: '/statusline', key: 'cmdStatusline' },
+  { name: '/keymap', key: 'cmdKeymap' },
   { name: '/review', key: 'cmdReview' },
   { name: '/web', key: 'cmdWeb' },
   { name: '/exit', key: 'cmdExit' },
@@ -184,6 +186,41 @@ export function lastUserIdx(messages: Array<{ role: string }>): number {
   }
   return -1;
 }
+
+/* ---------------- M5: statusline template + keymap (pure, testable) ---------------- */
+
+/** /statusline (B11): render a configurable bottom-line template. Supported
+ *  placeholders: {model} {cwd} {skills} {mode} {queue} {version} — unknown
+ *  tokens stay literal so a typo is visible, never silently dropped. */
+export function renderStatusline(template: string, ctx: { model: string; cwd: string; skills: number; mode: string; queue: number; version: string }): string {
+  const map: Record<string, string> = {
+    model: ctx.model, cwd: ctx.cwd, skills: String(ctx.skills),
+    mode: ctx.mode, queue: String(ctx.queue), version: ctx.version,
+  };
+  return String(template).replace(/\{(\w+)\}/g, (m, k) => (k in map ? map[k] : m));
+}
+
+/** /keymap (B14): parse a human key spec into the raw-mode byte string the
+ *  TUI dispatches on. Returns null for unknown specs. */
+export function parseKeySpec(spec: string): string | null {
+  const s = String(spec ?? '').trim().toLowerCase();
+  const named: Record<string, string> = {
+    'ctrl+j': '\x0a', 'ctrl-enter': '\x0a', 'ctrl+r': '\x12', 'ctrl+t': '\x14',
+    'ctrl+g': '\x07', 'ctrl+p': '\x10', 'ctrl+n': '\x0e', esc: '\x1b', enter: '\r', tab: '\t',
+  };
+  if (named[s]) return named[s];
+  if (/^[a-z0-9]$/.test(s)) return s;
+  return null;
+}
+
+/** The remappable M2/M4 actions and their defaults (B14). */
+export const KEYMAP_DEFAULTS: Record<string, string> = {
+  interrupt: '\x1b',        // T9: stop the running turn
+  inject: '\x0a',           // T10: Ctrl+Enter inject
+  historySearch: '\x12',    // T14: Ctrl+R
+  transcript: '\x14',       // T15: Ctrl+T
+  externalEdit: '\x07',     // B12: Ctrl+G
+};
 
 /**
  * SGR mouse wheel decoding: '\x1b[<64;COL;ROWM' is wheel-up (-1), 65 is
@@ -258,6 +295,10 @@ export class TuiRuntime {
   private interruptFn: (() => void) | null = null;
   private injectFn: ((text: string) => void) | null = null;
   private forkEditFn: (() => void) | null = null;
+  /** M5 B12: Ctrl+G hands the draft to an external editor ($EDITOR/notepad) */
+  private externalEditFn: ((draft: string) => void) | null = null;
+  /** M5 B14: remappable key bindings (config.json tui.keymap) */
+  private keymap: Record<string, string> = { ...KEYMAP_DEFAULTS };
   /** last user-submitted line, for Esc-Esc edit-and-fork (T13) */
   private lastUserMsg = '';
 
@@ -725,6 +766,13 @@ export class TuiRuntime {
   onInterrupt(fn: () => void): void { this.interruptFn = fn; }
   onInject(fn: (text: string) => void): void { this.injectFn = fn; }
   onForkEdit(fn: () => void): void { this.forkEditFn = fn; }
+  onExternalEdit(fn: (draft: string) => void): void { this.externalEditFn = fn; }
+
+  /** M5 B14: apply remapped keys (config.json tui.keymap); unknown actions
+   *  are ignored so a stale config degrades to defaults, never breaks keys */
+  setKeymap(map: Record<string, string>): void {
+    this.keymap = { ...KEYMAP_DEFAULTS, ...map };
+  }
 
   /** Close any open modal (Esc priority: panels close before anything else,
    *  T7/T9 order). Returns true when something was open. */
@@ -991,8 +1039,8 @@ export class TuiRuntime {
     }
     // Ctrl+Enter = inject into the RUNNING task (T10; terminals send it as
     // '\n' in raw mode; consistent with web W7 Ctrl+Enter). Idle it behaves
-    // exactly like Enter (submit).
-    if (data === '\x0a') {
+    // exactly like Enter (submit). Key is remappable (B14).
+    if (data === this.keymap.inject) {
       if (this.busy && this.input.trim()) {
         const text = this.input;
         this.input = ''; this.caret = 0; this.cmdIdx = 0;
@@ -1003,15 +1051,26 @@ export class TuiRuntime {
       }
       return;
     }
-    // Ctrl+R = incremental history search (B4)
-    if (data === '\x12') { this.openHistSearch(); return; }
+    // Ctrl+G = external editor for the draft (B12); key remappable (B14)
+    if (data === this.keymap.externalEdit && !this.busy) {
+      this.externalEditFn?.(this.input);
+      return;
+    }
+    // Ctrl+R = incremental history search (B4); key remappable (B14)
+    if (data === this.keymap.historySearch) { this.openHistSearch(); return; }
     // Ctrl+T = full-transcript overlay (B5): every transcript line PLUS the
-    // full (folded-away) tool outputs, via the driver-registered source
-    if (data === '\x14') {
+    // full (folded-away) tool outputs, via the driver-registered source;
+    // key remappable (B14)
+    if (data === this.keymap.transcript) {
       const lines: string[] = [];
       for (const e of this.entries) lines.push(...e.lines.map(stripAnsi));
       const extra = this.overlaySource();
       this.openOverlay(this.t.tuiTranscript, [...lines, ...extra]);
+      return;
+    }
+    // remapped interrupt key (B14): a non-Esc binding still stops the turn
+    if (data === this.keymap.interrupt && this.keymap.interrupt !== '\x1b' && this.busy) {
+      this.interruptFn?.();
       return;
     }
     if (data === '\x1b') {
@@ -1020,7 +1079,7 @@ export class TuiRuntime {
       // current task; else a non-empty draft is cleared (T7); else (idle +
       // empty) a second Esc within 800ms arms edit-and-fork (T13).
       if (this.closeModal()) return;
-      if (this.busy) { this.interruptFn?.(); return; }
+      if (this.busy && this.keymap.interrupt === '\x1b') { this.interruptFn?.(); return; }
       if (this.input) { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; return; }
       const now = Date.now();
       if (forkArm(this.escAt, now, this.forkArmed)) {
@@ -1522,6 +1581,49 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       rt.addText(DIM('✂ edit and fork — Enter sends as a NEW session from this message'), 'dim');
     }
   });
+  // B12: Ctrl+G hands the draft to an external editor ($EDITOR, notepad on
+  // Windows); the edited text comes back into the input box
+  rt.onExternalEdit(async (draft) => {
+    try {
+      const { mkdir, writeFile, readFile } = await import('node:fs/promises');
+      const { join: j } = await import('node:path');
+      const dir = j(home, 'tmp');
+      await mkdir(dir, { recursive: true });
+      const file = j(dir, `draft-${Date.now()}.txt`);
+      await writeFile(file, draft, 'utf8');
+      const { spawn } = await import('node:child_process');
+      const editor = process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi');
+      await new Promise<void>((resolve) => {
+        const child = spawn(editor, process.platform === 'win32' ? [file] : [file], { windowsHide: false, stdio: 'inherit' });
+        child.on('close', () => resolve());
+      });
+      const edited = await readFile(file, 'utf8');
+      rt.setInput(edited);
+      rt.addText(DIM(`✎ external editor (${editor}) → draft loaded (${edited.length} chars)`), 'dim');
+    } catch (err) {
+      rt.addText(String(err), 'err');
+    }
+  });
+  // B14: remapped keys from config.json tui.keymap (applied at startup)
+  {
+    const km = (cfg as { tui?: { keymap?: Record<string, string> } }).tui?.keymap;
+    if (km && typeof km === 'object') rt.setKeymap(km);
+  }
+  // B11: customizable idle statusline from config.json tui.statusline
+  const applyStatusline = () => {
+    const tpl = (cfg as { tui?: { statusline?: string } }).tui?.statusline ?? '';
+    if (tpl) {
+      rt.setStatus(renderStatusline(tpl, {
+        model: chatModel,
+        cwd: basename(process.cwd()),
+        skills: skills.length,
+        mode: autoApprove ? 'yolo' : cfg.approval === 'auto' ? 'auto' : 'ask',
+        queue: taskQueue.length,
+        version: HMH_VERSION,
+      }));
+    }
+  };
+  applyStatusline();
   // Ctrl+T overlay source: transcript + FULL (folded-away) tool outputs (B5)
   rt.setOverlaySource(() => {
     const out: string[] = [];
@@ -1802,6 +1904,60 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       const chars = transcriptChars(history);
       const budget = adaptiveContextChars(cfg.provider);
       rt.addText(`context: ${chars.toLocaleString()} chars (~${Math.ceil(chars / 4).toLocaleString()} tok) of ${budget.toLocaleString()} budget (${Math.round((chars / budget) * 100)}%)`, 'dim');
+      return;
+    }
+    if (line === '/statusline' || line.startsWith('/statusline ')) {
+      // M5 B11: customize the idle statusline ({model} {cwd} {skills} {mode}
+      // {queue} {version}); persisted under config.json tui.statusline
+      const arg = line.slice(12).trim();
+      const cur = (cfg as { tui?: { statusline?: string } }).tui?.statusline ?? '';
+      if (!arg) {
+        rt.addText(cur ? `statusline: "${cur}"` : '(no custom statusline — /statusline "{model} · {cwd}" to set; placeholders: model cwd skills mode queue version)', 'dim');
+        return;
+      }
+      try {
+        const { patchConfig } = await import('@hmharness/kernel');
+        const merged = { ...((cfg as { tui?: object }).tui ?? {}), statusline: arg };
+        const fresh = await patchConfig({ tui: merged } as never);
+        cfg = fresh as typeof cfg;
+        applyStatusline();
+        rt.addText(GREEN('✓') + ` statusline: "${arg}"`, 'plain');
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      }
+      return;
+    }
+    if (line === '/keymap' || line.startsWith('/keymap ')) {
+      // M5 B14: show / remap the M2/M4 action keys (config.json tui.keymap)
+      const arg = line.slice(8).trim();
+      if (!arg) {
+        const km = (cfg as { tui?: { keymap?: Record<string, string> } }).tui?.keymap ?? {};
+        const rows = Object.entries(KEYMAP_DEFAULTS).map(([a, d]) => {
+          const v = km[a] ?? d;
+          const pretty = v === '\x1b' ? 'esc' : v === '\x0a' ? 'ctrl+enter' : v === '\x12' ? 'ctrl+r' : v === '\x14' ? 'ctrl+t' : v === '\x07' ? 'ctrl+g' : JSON.stringify(v);
+          return `  ${a.padEnd(14)} ${pretty}`;
+        });
+        rt.addText('keymap (defaults in parens):\n' + rows.join('\n') + '\n\n/keymap <action>=<key> — e.g. /keymap inject=ctrl+j', 'dim');
+        return;
+      }
+      const eq = arg.indexOf('=');
+      if (eq <= 0) { rt.addText('usage: /keymap <action>=<key> (actions: ' + Object.keys(KEYMAP_DEFAULTS).join(' ') + ')', 'err'); return; }
+      const action = arg.slice(0, eq).trim();
+      const spec = arg.slice(eq + 1).trim();
+      if (!(action in KEYMAP_DEFAULTS)) { rt.addText(`unknown action "${action}" (actions: ${Object.keys(KEYMAP_DEFAULTS).join(' ')})`, 'err'); return; }
+      const byte = parseKeySpec(spec);
+      if (byte === null) { rt.addText(`unknown key "${spec}" (try: esc, ctrl+r, ctrl+t, ctrl+j, ctrl+g, ctrl+p, ctrl+n, tab, enter, or a single char)`, 'err'); return; }
+      try {
+        const { patchConfig } = await import('@hmharness/kernel');
+        const prev = (cfg as { tui?: { keymap?: Record<string, string> } }).tui?.keymap ?? {};
+        const merged = { ...((cfg as { tui?: object }).tui ?? {}), keymap: { ...prev, [action]: byte } };
+        const fresh = await patchConfig({ tui: merged } as never);
+        cfg = fresh as typeof cfg;
+        rt.setKeymap({ ...prev, [action]: byte });
+        rt.addText(GREEN('✓') + ` ${action} → ${spec}`, 'plain');
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      }
       return;
     }
     if (line === '/review') {

@@ -62,7 +62,7 @@ test('renderMarkdown: headings, bold, inline code, fences, lists, tables, links'
   assert.match(html, /<ul><li>one<\/li><li>two<\/li><\/ul>/);
   assert.match(html, /<table><thead><tr><td>a<\/td><td>b<\/td>/);
   assert.match(html, /<div class="codeblk"><div class="codebar"><span>ts<\/span>/);
-  assert.match(html, /<pre>const x = 1/);
+  assert.match(html, /<pre><span class="tok-k">const<\/span> x = <span class="tok-n">1<\/span>/);
   // escaping: raw <script> must never survive
   assert.ok(!/<\/?script/.test(renderMarkdown('x <script>alert(1)</script> y')));
   // autolink must not double-wrap the URL inside a rendered [label](url)
@@ -88,6 +88,15 @@ test('extractDeliverables: edit_file/write_file paths, deduped, in order', () =>
   ];
   assert.deepEqual(extractDeliverables(tools as never), ['src/a.ts', 'README.md']);
   assert.deepEqual(extractDeliverables([]), []);
+});
+
+test('renderMarkdown: token coloring inside fenced code blocks (A4)', () => {
+  const md = ['```ts', 'const x = 1; // note', 'let s = "hi"', '```'].join('\n');
+  const html = renderMarkdown(md);
+  assert.match(html, /<span class="tok-k">const<\/span>/, 'keywords colored');
+  assert.match(html, /<span class="tok-n">1<\/span>/, 'numbers colored');
+  assert.match(html, /<span class="tok-c">\/\/ note<\/span>/, 'comments colored');
+  assert.match(html, /<span class="tok-s">"hi"<\/span>/, 'strings colored');
 });
 
 test('uiLiteSource: serialized functions are plain ES5 (no arrows, no ${}) for inline injection', () => {

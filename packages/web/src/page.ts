@@ -357,6 +357,7 @@ export const PAGE = `<!doctype html>
   .diffbox .dline.add { background:rgba(63,185,80,.13); color:#a5e6b0; }
   .diffbox .dline.del { background:rgba(248,81,73,.13); color:#f2a9a5; }
   .diffbox .dline.hunk { background:rgba(49,168,255,.08); color:var(--accent); }
+  .diffbox .dline.file { color:var(--dim); }
   /* ---- web_search link cards ---- */
   .linkcard { display:flex; gap:8px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:4px 0; font-size:12.5px; }
   .linkcard a { color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -625,7 +626,7 @@ ${uiLiteSource()}
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
-          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)',
+          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
@@ -654,7 +655,7 @@ ${uiLiteSource()}
            cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
            webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
-          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', goalPh:'session goal (Enter saves / ✕ clears)', approve:'Approve', deny:'Deny',
+          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', goalPh:'session goal (Enter saves / ✕ clears)', sessSearch:'search in session…', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
@@ -809,139 +810,10 @@ ${uiLiteSource()}
     try { document.execCommand('copy'); } catch (e) {}
     ta.remove();
   }
-  function escHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-  /* ---- mini markdown renderer (A4): headings/bold/italic/inline code/lists/
-     tables/links/blockquote + code blocks with a tiny token highlighter.
-     Zero-dependency: hand-rolled line scanner, no regex back-reference minefields. ---- */
-  var KW = ' const let var function return if else for while import from export async await class new try catch throw type interface extends static void number string boolean true false null undefined switch case break continue default ';
-  function tokLine(line) {
-    var out = '';
-    var i = 0;
-    var N = line.length;
-    while (i < N) {
-      var ch = line.charAt(i);
-      var nxt = i + 1 < N ? line.charAt(i + 1) : '';
-      if (ch === '/' && nxt === '/') {
-        var e = line.indexOf('\n', i); if (e < 0) e = N;
-        out += '<span class="tok-c">' + line.slice(i, e) + '</span>';
-        i = e;
-      } else if (ch === '"' || ch === '\u0027') {
-        var q = ch; var j = i + 1; var body = '';
-        while (j < N) {
-          var c2 = line.charAt(j);
-          if (c2 === '\\\\') { body += c2 + (line.charAt(j + 1) || ''); j += 2; continue; }
-          if (c2 === q) break;
-          body += c2; j++;
-        }
-        out += '<span class="tok-s">' + q + body + q + '</span>';
-        i = j + 1;
-      } else if (/[A-Za-z_$]/.test(ch)) {
-        var k = i; var word = '';
-        while (k < N && /[A-Za-z0-9_$]/.test(line.charAt(k))) { word += line.charAt(k); k++; }
-        out += KW.indexOf(' ' + word + ' ') >= 0 ? '<span class="tok-k">' + word + '</span>' : word;
-        i = k;
-      } else if (/[0-9]/.test(ch)) {
-        var m2 = i; var num = '';
-        while (m2 < N && /[0-9._]/.test(line.charAt(m2))) { num += line.charAt(m2); m2++; }
-        out += '<span class="tok-n">' + num + '</span>';
-        i = m2;
-      } else { out += ch; i++; }
-    }
-    return out;
-  }
-  function inlineMd(s) {
-    return String(s)
-      .replace(/\u0060([^\u0060\n]+)\u0060/g, '<code>$1</code>')
-      .replace(/\\*\\*([^*\n]+)\\*\\*/g, '<b>$1</b>')
-      .replace(/(^|[^*\w])\\*([^*\n]+)\\*(?!\\*)/g, '$1<i>$2</i>')
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  }
-  function renderTable(rows) {
-    var out = '<table>';
-    rows.forEach(function (cells, ri) {
-      out += '<tr>';
-      cells.forEach(function (c) { out += ri === 0 ? '<th>' + c + '</th>' : '<td>' + c + '</td>'; });
-      out += '</tr>';
-    });
-    return out + '</table>';
-  }
-  function tableCells(line) {
-    return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(function (c) { return inlineMd(c.trim()); });
-  }
-  function isTableSep(line) { return /^\s*\|[\s:\-|]+\|\s*$/.test(line) && line.indexOf('-') >= 0; }
-  function mdProse(s) {
-    var lines = s.split('\n');
-    var out = '';
-    var para = [];
-    var list = null;
-    var table = null; // { rows: string[][], hasSep: boolean }
-    var quote = [];
-    function flushPara() { if (para.length) { out += '<p>' + inlineMd(para.join(' ')) + '</p>'; para.length = 0; } }
-    function flushList() { if (list) { out += '</' + list + '>'; list = null; } }
-    function flushQuote() { if (quote.length) { out += '<blockquote>' + inlineMd(quote.join(' ')) + '</blockquote>'; quote.length = 0; } }
-    function flushTable() {
-      if (!table) return;
-      if (table.hasSep && table.rows.length >= 2) out += renderTable(table.rows);
-      else out += '<p>' + inlineMd(table.rows.map(function (r) { return r.join(' | '); }).join(' | ')) + '</p>';
-      table = null;
-    }
-    lines.forEach(function (raw) {
-      var line = raw.replace(/\r$/, '');
-      var h = line.match(/^(#{1,4})\s+(.+)$/);
-      var ul = line.match(/^\s*[-*]\s+(.+)$/);
-      var ol = line.match(/^\s*\d+[.)]\s+(.+)$/);
-      var bq = line.match(/^\s*>\s?(.*)$/);
-      if (h) {
-        flushPara(); flushList(); flushQuote(); flushTable();
-        out += '<h' + h[1].length + '>' + inlineMd(h[2]) + '</h' + h[1].length + '>';
-      } else if (isTableSep(line)) {
-        if (table && table.rows.length === 1) { table.hasSep = true; }
-        else { flushQuote(); flushList(); para.push(line.trim()); }
-      } else if (/^\s*\|/.test(line) && line.indexOf('|') > 0) {
-        flushPara(); flushList(); flushQuote();
-        if (!table) table = { rows: [], hasSep: false };
-        table.rows.push(tableCells(line));
-      } else if (ul) {
-        flushPara(); flushQuote(); flushTable();
-        if (list !== 'ul') { flushList(); list = 'ul'; out += '<ul>'; }
-        out += '<li>' + inlineMd(ul[1]) + '</li>';
-      } else if (ol) {
-        flushPara(); flushQuote(); flushTable();
-        if (list !== 'ol') { flushList(); list = 'ol'; out += '<ol>'; }
-        out += '<li>' + inlineMd(ol[1]) + '</li>';
-      } else if (bq && bq[1].trim()) {
-        flushPara(); flushList(); flushTable();
-        quote.push(bq[1].trim());
-      } else if (line.trim() === '') {
-        flushPara(); flushList(); flushQuote(); flushTable();
-      } else {
-        flushList(); flushQuote(); flushTable();
-        para.push(line.trim());
-      }
-    });
-    flushPara(); flushList(); flushQuote(); flushTable();
-    return out;
-  }
-  function mdLite(text) {
-    var esc = escHtml(text);
-    var parts = esc.split(/\u0060\u0060\u0060/);
-    var out = '';
-    for (var i = 0; i < parts.length; i++) {
-      if (i % 2 === 1) {
-        var m = parts[i].match(/^([a-zA-Z0-9_+#-]*)\n([\s\S]*)$/);
-        var lang = (m && m[1]) || '';
-        var body = m ? m[2] : parts[i];
-        var lines = body.split('\n').map(tokLine).join('\n');
-        out += '<div class="codeblk"><div class="codebar"><span>' + (lang || 'text') +
-               '</span><button type="button" class="copy">' + (L ? L.copy : 'copy') + '</button></div><pre>' + lines + '</pre></div>';
-      } else {
-        out += mdProse(parts[i]);
-      }
-    }
-    return out;
-  }
+  /* Markdown/diff/plan/deliverable pure logic lives in uilite.ts and is
+     injected above via uiLiteSource() — renderMarkdown / looksLikeDiff /
+     parseUnifiedDiff / extractPlan / extractDeliverables. Single source of
+     truth, tested by packages/web/src/__tests__/uilite.test.ts. */
   function thinkBlock() {
     clearEmpty();
     var box = document.createElement('div');
@@ -969,7 +841,7 @@ ${uiLiteSource()}
     var txt = '';
     return {
       add: function (c) { txt += c; e.textContent = txt; autoscroll(); },
-      finalize: function () { e.innerHTML = mdLite(txt); lastAssistantText = txt; autoscroll(); },
+      finalize: function () { e.innerHTML = renderMarkdown(txt); lastAssistantText = txt; autoscroll(); },
       discard: function () { if (e.parentNode) e.parentNode.removeChild(e); }
     };
   }
@@ -1701,13 +1573,49 @@ ${uiLiteSource()}
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
       log.innerHTML = '';
       el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---');
+      // A15: session full-text search (filters the rendered previews)
+      var sbox = document.createElement('div');
+      sbox.style.cssText = 'display:flex;gap:6px;margin:4px 16px';
+      var sin = document.createElement('input');
+      sin.placeholder = (L ? L.sessSearch : 'search in session…');
+      sin.style.cssText = 'flex:1;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:12px inherit;outline:none';
+      sbox.appendChild(sin);
+      log.appendChild(sbox);
+      // A13: trajectory timeline — every tool call in order, one dot per call
+      var tools = [];
+      d.messages.forEach(function (m) { (m.tools || []).forEach(function (tn) { tools.push(tn); }); });
+      if (tools.length) {
+        var names = {};
+        tools.forEach(function (tn) { names[tn] = (names[tn] || 0) + 1; });
+        var strip = document.createElement('div');
+        strip.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin:0 16px 6px;font-size:11px;color:var(--dim)';
+        Object.keys(names).forEach(function (tn) {
+          var c = document.createElement('span');
+          c.textContent = '\\u25CF ' + tn + '\\u00D7' + names[tn];
+          c.title = tn + ' called ' + names[tn] + 'x';
+          strip.appendChild(c);
+        });
+        log.appendChild(strip);
+      }
+      var rows = [];
       d.messages.forEach(function (m) {
-        if (m.role === 'user') el('div', 'msg-user', m.text);
-        else if (m.role === 'assistant') el('div', m.tools && m.tools.length ? 'toolrow' : 'say', m.text || ('[calls: ' + (m.tools || []).join(', ') + ']'));
-        else el('div', 'toolres', m.text);
+        if (m.role === 'user') rows.push({ kind: 'msg-user', html: m.text });
+        else if (m.role === 'assistant') rows.push({ kind: m.tools && m.tools.length ? 'toolrow' : 'say', html: m.text || ('[calls: ' + (m.tools || []).join(', ') + ']') });
+        else rows.push({ kind: 'toolres', html: m.text });
       });
-      el('div', 'stats', '--- end ---');
-      log.scrollTop = log.scrollHeight;
+      function renderRows(filter) {
+        var existing = log.querySelectorAll('.msg-user,.toolrow,.say,.toolres');
+        Array.prototype.forEach.call(existing, function (n) { n.remove(); });
+        var q = (filter || '').toLowerCase();
+        rows.forEach(function (r) {
+          if (q && r.html.toLowerCase().indexOf(q) < 0) return;
+          el('div', r.kind, r.html);
+        });
+        el('div', 'stats', '--- end ---');
+        log.scrollTop = log.scrollHeight;
+      }
+      sin.oninput = function () { renderRows(sin.value); };
+      renderRows('');
     });
   }
 
@@ -1861,7 +1769,7 @@ ${uiLiteSource()}
   }
   // clickable file paths inside the chat: a path-looking <code> opens the preview tab
   function maybePath(t) {
-    return /^[A-Za-z0-9_.\\/-]+\.[a-zA-Z0-9]{1,8}$/.test(t) && t.length < 200 && t.indexOf(' ') < 0 && !/^https?:/.test(t);
+    return /^[A-Za-z0-9_.\\/-]+\\.[a-zA-Z0-9]{1,8}$/.test(t) && t.length < 200 && t.indexOf(' ') < 0 && !/^https?:/.test(t);
   }
   log.addEventListener('click', function (ev) {
     var t = ev.target;
@@ -1906,10 +1814,9 @@ ${uiLiteSource()}
     if (th) { th.parentNode.classList.toggle('open'); }
   });
 
-  /* ---- keyed tool-result renderers (A4) ----
+  /* ---- keyed tool-result renderers (A4, pure logic from uilite.ts) ----
      edit_file/write_file 结果含 unified diff → diff 卡片;web_search → 链接卡片;
      其余保持定案 W1:折叠一行可展开,长日志折叠时只显示尾部 50 行。 */
-  function isDiffText(t) { return /^@@ /m.test(t) || (/^\\+\\+\\+ /m.test(t) && /^--- /m.test(t)); }
   function renderDiff(d) {
     var box = document.createElement('div');
     box.className = 'diffbox';
@@ -1923,12 +1830,12 @@ ${uiLiteSource()}
     head.appendChild(t); head.appendChild(cp);
     box.appendChild(head);
     var pre = document.createElement('pre');
-    var lines = (d.full || d.preview || '').split('\n');
-    if (lines.length > 400) lines = lines.slice(0, 400);
-    lines.forEach(function (l) {
+    var segs = parseUnifiedDiff(d.full || d.preview || '');
+    if (segs.length > 400) segs = segs.slice(0, 400);
+    segs.forEach(function (s) {
       var row = document.createElement('div');
-      row.className = 'dline' + (l.charAt(0) === '+' ? ' add' : l.charAt(0) === '-' ? ' del' : l.indexOf('@@') === 0 ? ' hunk' : '');
-      row.textContent = l;
+      row.className = 'dline' + (s.kind === 'add' ? ' add' : s.kind === 'del' ? ' del' : s.kind === 'hunk' ? ' hunk' : s.kind === 'file' ? ' file' : '');
+      row.textContent = s.text;
       pre.appendChild(row);
     });
     box.appendChild(pre);
@@ -1960,7 +1867,7 @@ ${uiLiteSource()}
     fold.className = 'toolfold' + (d.isError ? ' err' : '');
     var tri = document.createElement('span'); tri.className = 'tri'; tri.textContent = '\\u25B8';
     var lab = document.createElement('span');
-    var pv = String(d.preview).replace(/\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
+    var pv = String(d.preview).replace(/\\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
     lab.textContent = pv || '(done)';
     fold.appendChild(tri); fold.appendChild(lab);
     var body = null;
@@ -1970,13 +1877,13 @@ ${uiLiteSource()}
         body = document.createElement('div');
         body.className = d.isError ? 'toolres err' : 'toolres';
         var full = d.full || d.preview || '';
-        var ls = full.split('\n');
+        var ls = full.split('\\n');
         if (ls.length > 60) {
           var cut = document.createElement('div');
           cut.style.color = 'var(--dim)';
           cut.textContent = '\\u22EF ' + (ls.length - 50) + ' lines folded \\u00B7 showing tail 50';
           body.appendChild(cut);
-          full = ls.slice(-50).join('\n');
+          full = ls.slice(-50).join('\\n');
         }
         body.appendChild(document.createTextNode(full));
         fold.after(body);
@@ -2074,7 +1981,7 @@ ${uiLiteSource()}
       if (toolRegistry[k].name === d.name && toolRegistry[k].output === '') { toolRegistry[k].output = d.full || d.preview || ''; break; }
     }
     // keyed views (A4); default keeps W1: fold to one line, click to expand
-    if (!d.isError && (d.name === 'edit_file' || d.name === 'write_file') && isDiffText(d.full || d.preview || '')) {
+    if (!d.isError && (d.name === 'edit_file' || d.name === 'write_file') && looksLikeDiff(d.full || d.preview || '')) {
       renderDiff(d);
       return;
     }
@@ -2267,45 +2174,8 @@ ${uiLiteSource()}
     var stats = log.querySelector('.stats');
     if (stats) log.insertBefore(box, stats);
   }
-  /** A6: pull a checkable step list out of an answer that announces a plan
-   *  (a short heading line with 计划/方案/步骤/plan/steps, then numbered or
-   *  checkbox lines until a blank / non-step line). */
-  function extractPlan(text) {
-    var lines = String(text).split('\n');
-    var idx = -1;
-    for (var i = 0; i < lines.length && i < 40; i++) {
-      var h = lines[i].trim();
-      if (h.length < 40 && /计划|方案|步骤|实施计划|\\bplan\\b|\\bsteps?\\b/i.test(h)) { idx = i + 1; break; }
-    }
-    if (idx < 0) return [];
-    var steps = [];
-    for (var j = idx; j < lines.length && j < idx + 30; j++) {
-      var l = lines[j].trim();
-      if (!l) { if (steps.length) break; else continue; }
-      var num = l.match(/^(?:step\\s*)?(\\d{1,2})[.)、:：]\\s*(.+)$/i);
-      var chk = l.match(/^[-*]\\s*\\[[ x]\\]\\s*(.+)$/);
-      var dash = l.match(/^[-*]\\s+(.+)$/);
-      if (num) steps.push(num[2].slice(0, 80));
-      else if (chk) steps.push(chk[1].slice(0, 80));
-      else if (dash && steps.length) steps.push(dash[1].slice(0, 80));
-      else if (steps.length) break;
-    }
-    return steps.length >= 2 ? steps.slice(0, 12) : [];
-  }
-  /** A9: dedupe touched file paths from edit_file/write_file tool calls. */
-  function extractDeliverables(list) {
-    var seen = {};
-    var out = [];
-    (list || []).forEach(function (d) {
-      var p = d && d.args && typeof d.args.path === 'string' ? d.args.path : null;
-      if (!p) return;
-      var key = p.toLowerCase();
-      if (seen[key]) return;
-      seen[key] = true;
-      out.push(p);
-    });
-    return out.slice(-8);
-  }
+  /** A6/A9: extractPlan and extractDeliverables are the tested uilite
+   *  functions injected above — no page-local copies. */
   es.addEventListener('goal', function (e) {
     var g = JSON.parse(e.data).goal;
     var gc = document.getElementById('goal-chip');
@@ -2348,7 +2218,7 @@ ${uiLiteSource()}
     // never the agent loop
     if (text.charAt(0) === '/') {
       if (text === '/clear') { newSession(); return; }
-      if (text === '/help') { renderCmdResult(WEB_CMD_NAMES.map(function (n) { return n + ' \\u2014 ' + ((L && L.webCmds && L.webCmds[n]) || ''); }).join('\n')); return; }
+      if (text === '/help') { renderCmdResult(WEB_CMD_NAMES.map(function (n) { return n + ' \\u2014 ' + ((L && L.webCmds && L.webCmds[n]) || ''); }).join('\\n')); return; }
       if (text === '/status') {
         renderCmdResult((state ? state.model : '?') + ' · ' + (state ? state.locale : 'zh') + ' · ' + ((state && state.queue && state.queue.length) ? state.queue.length + ' queued' : 'idle'));
         return;
@@ -2451,14 +2321,14 @@ ${uiLiteSource()}
       input.value = it.name + ' ';
     } else if (palMode === 'at') {
       addFileAtt(it);
-      input.value = input.value.replace(/@[\w./\\-]*$/, '');
+      input.value = input.value.replace(/@[\\w./\\-]*$/, '');
     }
     closePal();
     input.focus();
     updateSendBtn();
   }
   function atQuery(v) {
-    var m = String(v).match(/@([\w./\\-]*)$/);
+    var m = String(v).match(/@([\\w./\\-]*)$/);
     return m ? m[1] : null;
   }
   function scheduleAtSearch(q) {
@@ -2580,7 +2450,7 @@ ${uiLiteSource()}
     if (!items) return;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it && it.kind === 'file' && /^image\//.test(it.type)) {
+      if (it && it.kind === 'file' && /^image\\//.test(it.type)) {
         ev.preventDefault();
         var f = it.getAsFile();
         if (!f) continue;
@@ -2597,7 +2467,7 @@ ${uiLiteSource()}
     var files = this.files || [];
     for (var i = 0; i < files.length; i++) {
       (function (f) {
-        if (!f || !/^image\//.test(f.type)) return;
+        if (!f || !/^image\\//.test(f.type)) return;
         if (f.size > 6 * 1024 * 1024) { alert('image too large (max 6MB)'); return; }
         var reader = new FileReader();
         reader.onload = function () { addImage(String(reader.result), f.name || 'image.png'); };
