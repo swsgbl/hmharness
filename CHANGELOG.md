@@ -1,3 +1,38 @@
+## [0.14.9] - 2026-09-17
+
+**双交互界面升级计划 M1–M5 全部落地**(对标 deepseek-harness Web 与 codex CLI,
+DESIGNS.md W5–W14/T9–T20 定案齐备):
+- **Web P0**(A1–A5):设置中心(provider CRUD,apiKey 只回传 hasKey+末4位)、
+  `/` 命令面板、`@` 文件模糊搜索(工作区内/symlink 不跟随)、图片附件、
+  Ctrl+Enter 注入当前轮、markdown/diff/工具 keyed 渲染、右栏 tab(详情/文件/预览)。
+- **TUI P0**(B1–B6):Esc 中断、Ctrl+Enter 注入、`@` 搜索、`!` shell 前缀
+  (走 run_command 同一门禁)、Ctrl+R 历史搜索、Ctrl+T 完整转录回放、Esc Esc 编辑并 fork。
+- **TUI P1**(B7–B10):/compact /diff /new /fork /copy /plan /goal /usage /review
+  命令族(TUI+REPL 全覆盖)、工具 cell(z 展开)、长输出自动 pager、流式 markdown 着色。
+- **Web P1**(A6–A11):goal 栏+计划卡、子代理卡、权限预设卡片、交付物 chips、
+  👍/👎 反馈(insights/explicit-feedback.jsonl)、dark/light/system 主题。
+- **M5 P2**(B11–B14/A13–A15):/statusline 模板、Ctrl+G 外部编辑器、/keymap 重映射、
+  轨迹时间线、会话全文搜索、open-in-app。
+- **stale-daemon 诚实修复**:daemon 自报服务端版本(/api/state.daemonVersion),
+  版本感知比对服务端而非 web.version 文件(文件可被 EADDRINUSE 死掉的 spawn 覆盖)。
+- **readiness 修复**:skills 目录式布局(active/<name>/)被旧 .md 检查误判 →
+  条件 5(version-provenance)解锁,**RL 门 5/6**。
+- 255+2 测试全绿;零运行时依赖新增。
+
+## [0.14.8] - 2026-09-17
+
+- i18n 补 cmdResuming/cmdEvolveHint(TUI /resume 加载横幅与 /evolve 跳过提示);
+- readiness provenance 接受目录式技能布局(修复后 RL 门条件 5 解锁)。
+
+## [0.14.7] - 2026-09-16
+
+- AWM(Agent Workflow Memory)从 fallback-only 改为 ADDITIVE:
+  `workflowProposals` 与 per-mistake 反思提案合并(簇≥5 才追加);
+- 首个晋升工作流 `hmharness-file-read-reply-workflow`(train 68.5%,≥0.6 地板),
+  第二个技能候选晋升金丝雀(harmony-hap-page-registry-build-artifact-crosscheck,
+  holdout 71%);
+- 批跑器持续产轨迹(1013/1000,RL 门条件 1 达成)。
+
 ## [0.14.6] - 2026-09-15
 
 **V3 第四切片:Pipeline Architecture 阶段**(ADR-0009,蓝图 V3 DoD 链
