@@ -13,7 +13,7 @@
 import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
@@ -110,6 +110,15 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/resume', key: 'cmdResume' },
   { name: '/status', key: 'cmdStatus' },
   { name: '/clear', key: 'cmdClear' },
+  { name: '/compact', key: 'cmdCompact' },
+  { name: '/diff', key: 'cmdDiff' },
+  { name: '/new', key: 'cmdNew' },
+  { name: '/fork', key: 'cmdFork' },
+  { name: '/copy', key: 'cmdCopy' },
+  { name: '/plan', key: 'cmdPlan' },
+  { name: '/goal', key: 'cmdGoal' },
+  { name: '/usage', key: 'cmdUsage' },
+  { name: '/review', key: 'cmdReview' },
   { name: '/web', key: 'cmdWeb' },
   { name: '/exit', key: 'cmdExit' },
 ];
@@ -604,7 +613,14 @@ export class TuiRuntime {
       if (kind === 'say') {
         const wrapped = wrapTo(buf, width);
         lines.length = 0;
-        wrapped.forEach((l) => lines.push(l));
+        // B10: completed lines get markdown color ONCE; the in-progress tail
+        // stays raw until it wraps — stable rows never reflow
+        const lastIdx = wrapped.length - 1;
+        for (let i = 0; i < lastIdx; i++) lines.push(TuiRuntime.mdColor(wrapped[i]));
+        if (wrapped.length) {
+          const last = wrapped[lastIdx];
+          lines.push(buf.endsWith('\n') ? TuiRuntime.mdColor(last) : last);
+        }
       } else {
         // thinking stays FOLDED while streaming: one live line (what Claude
         // Code shows), never the raw chain-of-thought - it is model-internal
@@ -749,6 +765,50 @@ export class TuiRuntime {
     const H = Math.max(5, (stdout.rows || 30) - 2);
     this.overlay = { title, lines, top: Math.max(0, lines.length - H) };
     this.dirty = true;
+  }
+
+  /** Public pager/overlay entry (M4 /diff, B9 auto-pager). */
+  showOverlay(title: string, lines: string[]): void {
+    this.openOverlay(title, lines);
+  }
+
+  /* ---------------- M4: tool-result cells (B8) ---------------- */
+  private toolCells: Array<{ entry: Entry; full: string; folded: string; expanded: boolean }> = [];
+
+  /** Tool call + result as a collapsible cell: one folded summary line by
+   *  default (W1/T5 spirit); the `z` key (idle + empty input) expands the
+   *  LAST cell to its full output. */
+  addToolCell(folded: string, full: string): void {
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    const entry: Entry = { lines: wrapTo(folded, width).map((l) => DIM(l)) };
+    this.entries.push(entry);
+    this.toolCells.push({ entry, full, folded, expanded: false });
+    this.scrollFromBottom = 0;
+    this.dirty = true;
+  }
+  toggleLastCell(): boolean {
+    const cell = this.toolCells[this.toolCells.length - 1];
+    if (!cell) return false;
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    cell.expanded = !cell.expanded;
+    cell.entry.lines = cell.expanded
+      ? [...wrapTo(cell.folded, width).map((l) => DIM(l)), ...wrapTo(cell.full, width)]
+      : wrapTo(cell.folded, width).map((l) => DIM(l));
+    this.dirty = true;
+    return true;
+  }
+
+  /* ---------------- M4: streaming markdown colorizer (B10) ---------------- */
+  /** Light zero-dep markdown line color for STREAMED text: headings cyan,
+   *  list markers dim, fences dim, blockquotes dim; everything else plain.
+   *  Applied per completed line so already-stable rows never reflow. */
+  static mdColor(line: string): string {
+    const t = line.trim();
+    if (/^#{1,6}\s/.test(t)) return CYAN(BOLD(line));
+    if (/^```/.test(t)) return DIM(line);
+    if (/^>\s?/.test(t)) return DIM(line);
+    if (/^[-*+]\s/.test(t) || /^\d+[.)]\s/.test(t)) return DIM(line.replace(/^(\s*[-*+]\s|\s*\d+[.)]\s)/, '$1'));
+    return line;
   }
   private overlayKey(data: string): void {
     const ov = this.overlay;
@@ -1073,6 +1133,11 @@ export class TuiRuntime {
     if (data === '\x1b[H') { this.scrollFromBottom = 100000; this.dirty = true; return; }
     if (data === '\x1b[F') { this.scrollFromBottom = 0; this.dirty = true; return; }
     if (data === '\x0c') { this.dirty = true; return; }
+    // M4 B8: `z` with an empty input expands/collapses the LAST tool cell
+    // (folded summary <-> full output); with a draft it is just typing
+    if (data === 'z' && !this.busy && !this.input) {
+      if (this.toggleLastCell()) return;
+    }
     if (data.startsWith('\x1b') || data < ' ') return;
 
     // printable text (CJK / IME preedit arrives as normal chunks)
@@ -1365,6 +1430,12 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   /** set by Esc-Esc edit-and-fork (T13): the next submission forks a new
    *  session from the edited message (kernel forkFrom provenance) */
   let pendingFork = false;
+  /** /fork (M4 B7): fork with the FULL history as resume (no edit point) */
+  let forkAll = false;
+  /** /plan (M4 B7): the next task gets a plan-first system directive */
+  let planMode = false;
+  /** /copy source: the last completed assistant text */
+  let lastAiText = '';
 
   async function runShellBang(cmd: string): Promise<void> {
     // B3: `! command` runs the local shell through the SAME gate as the
@@ -1415,10 +1486,14 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     }
     // Esc-Esc fork (T13): the new thread inherits everything BEFORE the last
     // user message (the edited line replaces it) and records the parent
-    // session id in its rollout meta (kernel forkFrom)
+    // session id in its rollout meta (kernel forkFrom). /fork (M4 B7): the
+    // FULL history is the resume (no edit point).
     const forkFrom = pendingFork ? currentSessionId : undefined;
-    const forkResume = pendingFork ? history.slice(0, lastUserIdx(history)) : undefined;
+    const forkResume = pendingFork
+      ? (forkAll ? history : history.slice(0, lastUserIdx(history)))
+      : undefined;
     pendingFork = false;
+    forkAll = false;
     void executeTaskQueue(line, forkFrom, forkResume);
   });
   rt.onInterrupt(() => {
@@ -1476,7 +1551,11 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     currentAbort = new AbortController();
     const injectCh: { queue: string[]; active: boolean } = { queue: [], active: false };
     currentInject = injectCh;
-    const resumeBase = forkResume ?? history;
+    // /plan (M4 B7): a plan-first system directive rides ahead of the resume
+    const planDirective: ChatMessage[] = planMode
+      ? [{ role: 'system', content: '[plan mode] Before ANY tool use, present a concrete plan (2-5 numbered steps). Then STOP and wait for the user to confirm before executing. Only execute after explicit confirmation.' }]
+      : [];
+    const resumeBase = [...planDirective, ...(forkResume ?? history)];
     let appender: (((c: string) => void) & { drop: () => void }) | null = null;
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
     try {
@@ -1520,7 +1599,14 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
           onToolResult: (name, output, isError) => {
             const dot = isError ? RED('✗') : GREEN('•');
             const first = output.split('\n').find((l) => l.trim()) ?? '';
-            rt.addText(`  ${dot} ${DIM('⎿ ' + first.trim().slice(0, 100))}`);
+            // M4 B8: tool call + result = one collapsible cell (folded summary
+            // by default; `z` with an empty input expands the last one)
+            rt.addToolCell(`  ${dot} ${CYAN(name)} ${DIM('⎿ ' + first.trim().slice(0, 100))}`, output);
+            // M4 B9: outputs far beyond a screen auto-enter the pager overlay
+            // (the user can always q/Esc back to the stream)
+            if (output.split('\n').length > 2 * Math.max(20, (stdout.rows || 30))) {
+              rt.showOverlay(`${name} output (${output.split('\n').length} lines)`, output.split('\n'));
+            }
             // retain the FULL output for the Ctrl+T transcript overlay (B5);
             // the transcript itself keeps only the folded first line
             fullToolLog.push({ name, output: output.slice(0, 4000) });
@@ -1534,8 +1620,11 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       rt.setBusy(false);
       currentSessionId = result.sessionId;
       currentInject = null;
+      lastAiText = result.text || lastAiText;
       rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
-      history = [...resumeBase, { role: 'user', content: line }, ...result.messages.slice(resumeBase.length + 2)];
+      // the plan directive rides in resumeBase but is NOT part of the thread:
+      // history keeps only real messages (the next task re-applies it)
+      history = [...(forkResume ?? history), { role: 'user', content: line }, ...result.messages.slice(resumeBase.length + 2)];
     } catch (err) {
       rt.setBusy(false);
       currentInject = null;
@@ -1609,6 +1698,124 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     // /clear = new thread (codex /new): blank screen, drop the in-memory
     // transcript AND start a fresh rollout on the next task
     if (line === '/clear') { rt.clearScreen(); history = []; currentSessionId = undefined; return; }
+    if (line === '/new') { rt.clearScreen(); history = []; currentSessionId = undefined; pendingFork = false; forkAll = false; rt.addText(DIM(t.cmdNewDone)); return; }
+    if (line === '/compact') {
+      // M4 B7: compact the in-memory resume with the adaptive budget and
+      // report the delta (honest: it affects the NEXT turn's context)
+      const before = transcriptChars(history);
+      const budget = adaptiveContextChars(cfg.provider);
+      history = compactMessages(history, budget);
+      const after = transcriptChars(history);
+      rt.addText(`context: ${before.toLocaleString()} → ${after.toLocaleString()} chars (freed ${(before - after).toLocaleString()}; budget ${budget.toLocaleString()})`, 'dim');
+      return;
+    }
+    if (line === '/diff') {
+      // M4 B7: pager-view the worktree git diff (incl. untracked) via the
+      // B5 overlay base
+      rt.setBusy(true, '/diff');
+      try {
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const run = promisify(execFile);
+        const g = (a: string[], mb: number) => run('git', a, { cwd: process.cwd(), windowsHide: true, maxBuffer: mb }).then((r) => String(r.stdout)).catch(() => '');
+        const [st, df, un] = await Promise.all([
+          g(['status', '--porcelain'], 4 * 1024 * 1024),
+          g(['diff'], 8 * 1024 * 1024),
+          g(['ls-files', '--others', '--exclude-standard'], 4 * 1024 * 1024),
+        ]);
+        const lines = [
+          '── git status ──',
+          ...(st.split('\n').filter(Boolean) || ['(clean)']),
+          '',
+          '── git diff ──',
+          ...(df.split('\n') || ['(no tracked changes)']),
+          '',
+          '── untracked ──',
+          ...(un.split('\n').filter(Boolean).slice(0, 60) || ['(none)']),
+        ];
+        rt.showOverlay(t.cmdDiff, lines);
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      } finally {
+        rt.setBusy(false);
+      }
+      return;
+    }
+    if (line === '/fork') {
+      // M4 B7: fork the CURRENT thread to a new session — the next task
+      // resumes the FULL history and records forkFrom provenance
+      if (!currentSessionId && history.length === 0) { rt.addText('nothing to fork yet', 'dim'); return; }
+      pendingFork = true;
+      forkAll = true;
+      rt.addText(DIM('✂ next task runs as a NEW session (forked' + (currentSessionId ? ' from ' + currentSessionId : '') + ' — full context inherited)'));
+      return;
+    }
+    if (line === '/copy') {
+      // M4 B7: last AI output -> clipboard (Windows clip / mac pbcopy /
+      // linux xclip fallback chain; zero deps, stdin-fed)
+      if (!lastAiText) { rt.addText('(no AI output yet to copy)', 'dim'); return; }
+      try {
+        const { spawn } = await import('node:child_process');
+        const bin = process.platform === 'win32' ? 'clip'
+          : process.platform === 'darwin' ? 'pbcopy'
+          : 'xclip';
+        const args = bin === 'xclip' ? ['-selection', 'clipboard'] : [];
+        const child = spawn(bin, args, { windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'] });
+        child.stdin.write(lastAiText);
+        child.stdin.end();
+        await new Promise((r) => child.on('close', r));
+        rt.addText(GREEN('✓') + ' ' + t.cmdCopied, 'plain');
+      } catch {
+        rt.addText('(clipboard tool unavailable — output follows)\n' + lastAiText.slice(0, 2000), 'dim');
+      }
+      return;
+    }
+    if (line === '/plan' || line.startsWith('/plan ')) {
+      // M4 B7: plan mode toggle (the directive is injected per-task, so the
+      // agent always presents a plan and waits for confirmation first)
+      planMode = !planMode;
+      rt.addText(planMode ? GREEN('🔥') + ' ' + t.cmdPlanOn : t.cmdPlanOff, 'plain');
+      return;
+    }
+    if (line === '/goal' || line.startsWith('/goal ')) {
+      // M4 B7: session goal (shared storage with web A6 — kernel/goal.ts)
+      const arg = line.slice(6).trim();
+      const key = currentSessionId ?? 'web';
+      try {
+        if (!arg) {
+          const g = await getGoal(home, key);
+          rt.addText(g ? `goal: ${g}` : '(no goal set — /goal <text> to set)', 'dim');
+        } else if (arg === 'clear') {
+          await clearGoal(home, key);
+          rt.addText(t.cmdGoalCleared, 'dim');
+        } else {
+          await setGoal(home, key, arg);
+          rt.addText(GREEN('✓') + ` goal set (session ${key.slice(0, 8)}…)`, 'plain');
+        }
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      }
+      return;
+    }
+    if (line === '/usage') {
+      // M4 B7: session context occupancy (the resume the model will see)
+      const chars = transcriptChars(history);
+      const budget = adaptiveContextChars(cfg.provider);
+      rt.addText(`context: ${chars.toLocaleString()} chars (~${Math.ceil(chars / 4).toLocaleString()} tok) of ${budget.toLocaleString()} budget (${Math.round((chars / budget) * 100)}%)`, 'dim');
+      return;
+    }
+    if (line === '/review') {
+      // M4 B7: one-click "review the current worktree" task template
+      const reviewTask = 'Review the current worktree: run git status and inspect the diffs, then identify bugs, risks, regressions, and missing tests. Report findings ordered by severity with file:line references. Do NOT modify any files.';
+      if (taskRunning) {
+        taskQueue.push(reviewTask);
+        rt.setQueued(taskQueue.length);
+        rt.addText(`📋 queued: "review the worktree" (${taskQueue.length} waiting)`, 'dim');
+      } else {
+        void executeTaskQueue(reviewTask);
+      }
+      return;
+    }
     if (line === '/status') { rt.setStatus(t.tuiStatus(cfg.locale ?? 'zh', skills.length, chatModel)); return; }
     if (line === '/tools') {
       for (const tool of reg.list()) rt.addText(`${tool.name}${tool.needsApproval ? YELLOW(' [gated]') : ''} — ${tool.description.split('\n')[0].slice(0, 80)}`);

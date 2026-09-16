@@ -418,3 +418,52 @@ test('M2 wiring: Esc Esc (idle + empty) arms edit-and-fork; Esc with a draft cle
     assert.equal(forkEdits, 1, 'no fork from a non-empty draft');
   } finally { h.restore(); }
 });
+
+/* ---------------- M4: P1 command family + cells + streaming markdown ---------------- */
+
+test('COMMANDS covers the M4 P1 family and every key exists in both locales', async () => {
+  const { strings } = await import('@hmharness/agent');
+  const names = COMMANDS.map((c) => c.name);
+  for (const cmd of ['/compact', '/diff', '/new', '/fork', '/copy', '/plan', '/goal', '/usage', '/review']) {
+    assert.ok(names.includes(cmd), `${cmd} must be in COMMANDS`);
+  }
+  // C1: every command's desc key must resolve in zh AND en (no "undefined")
+  const zh = strings('zh') as unknown as Record<string, unknown>;
+  const en = strings('en') as unknown as Record<string, unknown>;
+  for (const c of COMMANDS) {
+    assert.ok(c.key in zh, `zh missing key ${c.key}`);
+    assert.ok(c.key in en, `en missing key ${c.key}`);
+    assert.notEqual(zh[c.key], undefined);
+    assert.notEqual(en[c.key], undefined);
+  }
+});
+
+test('mdColor: headings cyan-bold, fences/lists/blockquotes dim, prose plain', async () => {
+  const { TuiRuntime } = await import('../tui.ts');
+  assert.match(TuiRuntime.mdColor('# Title'), /\x1b\[36m\x1b\[1m# Title/);
+  assert.match(TuiRuntime.mdColor('```ts'), /\x1b\[2m/);
+  assert.match(TuiRuntime.mdColor('- item'), /\x1b\[2m/);
+  assert.match(TuiRuntime.mdColor('> quote'), /\x1b\[2m/);
+  assert.equal(TuiRuntime.mdColor('plain prose line'), 'plain prose line');
+});
+
+test('M4 cell: addToolCell folds to one line; toggleLastCell expands to the full output; z key drives it', async () => {
+  const h = await makeTui();
+  try {
+    h.rt.addToolCell('  ● tool ⎿ first line', 'line one\nline two\nline three');
+    let p = h.rt.paletteProbe();
+    assert.match(p.transcript, /first line/);
+    assert.ok(!p.transcript.includes('line two'), 'folded: full output hidden');
+    // z with empty input expands the last cell
+    h.keys('z');
+    p = h.rt.paletteProbe();
+    assert.ok(p.transcript.includes('line two') && p.transcript.includes('line three'), 'z expands to full output');
+    // z again collapses back
+    h.keys('z');
+    p = h.rt.paletteProbe();
+    assert.ok(!p.transcript.includes('line two'), 'z toggles back to folded');
+    // with a draft, z is just typing
+    h.keys('zz');
+    assert.equal(h.rt.paletteProbe().input, 'zz');
+  } finally { h.restore(); }
+});

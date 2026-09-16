@@ -74,6 +74,21 @@ export interface Strings {
   overlayHint: string;
   /** M2: Esc-Esc fork-edit armed hint (T13) */
   forkArmed: string;
+  /* --- M4 P1 command family (B7) --- */
+  cmdCompact: string;
+  cmdDiff: string;
+  cmdNew: string;
+  cmdNewDone: string;
+  cmdFork: string;
+  cmdCopy: string;
+  cmdCopied: string;
+  cmdPlan: string;
+  cmdPlanOn: string;
+  cmdPlanOff: string;
+  cmdGoal: string;
+  cmdGoalCleared: string;
+  cmdUsage: string;
+  cmdReview: string;
   /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
   cmdModelHint: string;
   /** palette footer key hint: how to drive the slash/model picker (TUI) */
@@ -204,6 +219,20 @@ const zh: Strings = {
   atPalHint: '↑↓ 选择 · Enter 插入路径 · Esc 取消',
   overlayHint: '↑↓/PgUp/PgDn 滚动 · g/G 首尾 · q/Esc 返回',
   forkArmed: '再按 Esc:编辑上一条并 fork',
+  cmdCompact: '压缩上下文并报告释放量',
+  cmdDiff: '工作区 git diff(含未跟踪文件)的 pager 查看',
+  cmdNew: '新会话(清转录,开新 rollout)',
+  cmdNewDone: '✓ 新会话开始(旧转录可用 Ctrl+T 回看)',
+  cmdFork: 'fork 当前会话为新线程(继承全部上下文)',
+  cmdCopy: '复制最后一条 AI 输出到剪贴板',
+  cmdCopied: '✓ 已复制最后一条 AI 输出',
+  cmdPlan: '计划模式开关(先出计划待确认再执行)',
+  cmdPlanOn: '🔥 计划模式:先出计划,确认后才执行',
+  cmdPlanOff: '计划模式关闭',
+  cmdGoal: '设置/查看/清除会话目标(/goal <text>|clear)',
+  cmdGoalCleared: '目标已清除',
+  cmdUsage: '本次会话 token 用量与上下文占用',
+  cmdReview: '一键发起「审查当前工作树」任务',
   cmdModelHint: '切换 chat 路由: /model <name>',
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
   cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
@@ -325,6 +354,20 @@ const en: Strings = {
   atPalHint: '↑↓ select · Enter insert path · Esc close',
   overlayHint: '↑↓/PgUp/PgDn scroll · g/G top/bottom · q/Esc back',
   forkArmed: 'Esc again: edit last message and fork',
+  cmdCompact: 'compact the context and report freed space',
+  cmdDiff: 'pager-view the worktree git diff (incl. untracked)',
+  cmdNew: 'new session (clear transcript, fresh rollout)',
+  cmdNewDone: '✓ new session (old transcript: Ctrl+T to replay)',
+  cmdFork: 'fork this session to a new thread (inherits full context)',
+  cmdCopy: 'copy the last AI output to the clipboard',
+  cmdCopied: '✓ copied the last AI output',
+  cmdPlan: 'plan mode toggle (plan first, confirm, then execute)',
+  cmdPlanOn: '🔥 plan mode: present a plan, wait for confirmation before executing',
+  cmdPlanOff: 'plan mode off',
+  cmdGoal: 'set/view/clear the session goal (/goal <text>|clear)',
+  cmdGoalCleared: 'goal cleared',
+  cmdUsage: 'session token usage and context occupancy',
+  cmdReview: 'one-click "review the current worktree" task',
   cmdModelHint: 'switch chat route: /model <name>',
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',
   cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,

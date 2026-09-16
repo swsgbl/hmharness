@@ -25,6 +25,10 @@
 | T13 | **Esc Esc 编辑并 fork**:空闲+空输入时两次 Esc(≤800ms)把上一条用户消息载入输入框;发送后开**新会话**(内核 forkFrom 记录父会话 id,新线程 resume=fork 点之前的全部上下文,编辑后的消息取代原消息) | 对标 codex Esc Esc=edit+fork;thread 语义可溯源 | 本轮 | ✅ 生效 |
 | T14 | **Ctrl+R 历史搜索**:增量子串搜索提交历史(最新在前,≤50 条),Enter 采用进输入框,Esc 取消,^P/^N 或方向键移动;^P/^N 原历史行走保留 | 对标 codex Ctrl+R | 本轮 | ✅ 生效 |
 | T15 | **Ctrl+T 完整转录回放 overlay**:全屏展示完整会话(含被折叠的工具输出全文,由驱动侧 fullToolLog 供给),↑↓/PgUp/PgDn/g/G 滚动,q/Esc 返回;实现为通用 overlay 基座,长输出 pager(B9)复用 | 对标 codex transcript overlay | 本轮 | ✅ 生效 |
+| T16 | **M4 命令族**(B7,codex 对齐):`/compact`(内核上下文压缩+报告释放量)/`/diff`(工作区 git diff+未跟踪文件 pager 查看)/`/new`(新会话,同 /clear)/`/fork`(下一任务 fork 新线程,继承全上下文)/`/copy`(最后一条 AI 输出→剪贴板,clip/pbcopy/xclip 降级链)/`/plan`(计划模式:system 指令"先出计划待确认再执行"逐任务注入)/`/goal`(会话目标读写,与 Web A6 共用 kernel goal 存储)/`/usage`(上下文占用)/`/review`(审查工作树任务模板)——**TUI 与 REPL 双端全覆盖(C1)** | 对标 codex 命令族;C1 矩阵纪律 | 本轮 | ✅ 生效 |
+| T17 | **工具 cell**(B8):工具调用+结果=可折叠 cell,默认一行摘要(W1/T5 精神);**空闲+空输入按 `z`** 展开/折叠最后一条 cell 到完整输出(有草稿时 z 只是输入) | 对标 codex exec/history cell | 本轮 | ✅ 生效 |
+| T18 | **长输出自动 pager**(B9):工具输出超过 ~2 屏自动进 overlay(q/Esc 随时回到流);Ctrl+T 与 /diff 复用同一 overlay 基座 | 对标 codex pager_overlay | 本轮 | ✅ 生效 |
+| T19 | **流式 markdown 着色**(B10):`say` 流按"已完成的行"一次性着色(标题青加粗/围栏列表引用 dim),进行中的尾行保持原样——**已稳定的行绝不重排** | 对标 codex markdown 流式渲染;稳定行不重排约束 | 本轮 | ✅ 生效 |
 
 ## Web(浏览器端)
 

@@ -81,6 +81,10 @@ interface TaskOptions {
   resumeMessages?: ChatMessage[];
   /** append to this rollout instead of starting a new one (codex Resume) */
   sessionId?: string;
+  /** M4 B7: fork this run from a session (kernel forkFrom provenance) */
+  forkFrom?: string;
+  /** M4 B7: plan-first system directive rides ahead of the resume */
+  plan?: boolean;
 }
 
 async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ messages: ChatMessage[]; sessionId: string }> {
@@ -107,8 +111,12 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
     registry: reg,
     cfg,
     yes: taskOpts.yes,
-    resumeMessages: taskOpts.resumeMessages,
+    resumeMessages: [
+      ...(taskOpts.plan ? [{ role: 'system' as const, content: '[plan mode] Before ANY tool use, present a concrete plan (2-5 numbered steps). Then STOP and wait for the user to confirm before executing. Only execute after explicit confirmation.' }] : []),
+      ...(taskOpts.resumeMessages ?? []),
+    ],
     sessionId: taskOpts.sessionId,
+    ...(taskOpts.forkFrom ? { forkFrom: taskOpts.forkFrom } : {}),
     events: {
       onLine: (l) => stdout.write(DIM(`  ${l}\n`)),
       onDelta: (kind, chunk) => {
@@ -166,6 +174,11 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
   // one rollout per conversation: the first task creates it, later lines and
   // `hmh resume` sessions append to it (codex thread semantics)
   let currentSessionId: string | undefined = initialSessionId;
+  // M4 B7: /fork queues a fork of the next task; /plan injects a
+  // plan-first directive (kernel forkFrom + system directive ride in runTask)
+  let pendingFork = false;
+  let forkAll = false;
+  let planMode = false;
   try {
     while (true) {
       let line: string;
@@ -262,6 +275,65 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
           stdout.write(DIM(t.cmdClearDone) + '\n');
           continue;
         }
+        if (line === '/new') {
+          // M4 B7: new-session alias of /clear (codex /new)
+          history = [];
+          currentSessionId = undefined;
+          stdout.write(DIM(t.cmdNewDone) + '\n');
+          continue;
+        }
+        if (line === '/compact') {
+          // M4 B7: compact the in-memory resume; report the delta
+          const { transcriptChars, compactMessages, adaptiveContextChars } = await import('@hmharness/kernel');
+          const before = transcriptChars(history);
+          const budget = adaptiveContextChars(cfg.provider);
+          history = compactMessages(history, budget);
+          const after = transcriptChars(history);
+          stdout.write(`context: ${before.toLocaleString()} → ${after.toLocaleString()} chars (freed ${(before - after).toLocaleString()}; budget ${budget.toLocaleString()})\n`);
+          continue;
+        }
+        if (line === '/usage') {
+          const { transcriptChars, adaptiveContextChars } = await import('@hmharness/kernel');
+          const chars = transcriptChars(history);
+          const budget = adaptiveContextChars(cfg.provider);
+          stdout.write(`context: ${chars.toLocaleString()} chars (~${Math.ceil(chars / 4).toLocaleString()} tok) of ${budget.toLocaleString()} budget (${Math.round((chars / budget) * 100)}%)\n`);
+          continue;
+        }
+        if (line === '/goal' || line.startsWith('/goal ')) {
+          const { getGoal, setGoal, clearGoal } = await import('@hmharness/kernel');
+          const arg = line.slice(6).trim();
+          const key = currentSessionId ?? 'web';
+          if (!arg) {
+            const g = await getGoal(home, key);
+            stdout.write((g ? `goal: ${g}` : '(no goal set — /goal <text> to set)') + '\n');
+          } else if (arg === 'clear') {
+            await clearGoal(home, key);
+            stdout.write(DIM(t.cmdGoalCleared) + '\n');
+          } else {
+            await setGoal(home, key, arg);
+            stdout.write(GREEN('✓') + ` goal set (session ${key.slice(0, 8)}…)\n`);
+          }
+          continue;
+        }
+        if (line === '/fork') {
+          // M4 B7: the NEXT task forks a new session inheriting full context
+          // (kernel forkFrom provenance rides in runTask)
+          if (!currentSessionId && history.length === 0) { stdout.write('nothing to fork yet\n'); continue; }
+          pendingFork = true;
+          forkAll = true;
+          stdout.write(DIM('✂ next task runs as a NEW session (forked' + (currentSessionId ? ' from ' + currentSessionId : '') + ')\n'));
+          continue;
+        }
+        if (line === '/plan') {
+          planMode = !planMode;
+          stdout.write((planMode ? GREEN('🔥') + ' ' + t.cmdPlanOn : t.cmdPlanOff) + '\n');
+          continue;
+        }
+        if (line === '/review') {
+          // M4 B7: submit the review-worktree task template
+          line = 'Review the current worktree: run git status and inspect the diffs, then identify bugs, risks, regressions, and missing tests. Report findings ordered by severity with file:line references. Do NOT modify any files.';
+          // fall through to the task runner below
+        }
         if (line === '/status') {
           header();
           continue;
@@ -294,17 +366,34 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
           stdout.write(t.tuiEvolveDone(report.proposals.length, report.insightCount, report.noteCount) + '\n');
           continue;
         }
-        stdout.write(YELLOW(t.unknownCommand(line) + '\n'));
-        continue;
+        if (line === '/review') {
+          // M4 B7: submit the review-worktree task template — falls through
+          // to the task runner below; the else-branch fires only for lines
+          // no command consumed
+          line = 'Review the current worktree: run git status and inspect the diffs, then identify bugs, risks, regressions, and missing tests. Report findings ordered by severity with file:line references. Do NOT modify any files.';
+        } else {
+          stdout.write(YELLOW(t.unknownCommand(line) + '\n'));
+          continue;
+        }
       }
       try {
-        const r = await runTask(line, { yes: autoApprove, sharedRl: rl, registry: reg, clients, resumeMessages: history, sessionId: currentSessionId });
+        const r = await runTask(line, {
+          yes: autoApprove, sharedRl: rl, registry: reg, clients,
+          resumeMessages: history,
+          sessionId: pendingFork && !forkAll ? undefined : currentSessionId,
+          forkFrom: pendingFork ? currentSessionId : undefined,
+          plan: planMode,
+        });
         // working transcript = [system, ...resumeMessages, user, ...new turns];
         // only the NEW turns (past the replayed prefix) extend history.
-        history = [...history, { role: 'user', content: line }, ...r.messages.slice(history.length + 2)];
+        pendingFork = false;
+        forkAll = false;
+        history = [...history, { role: 'user', content: line }, ...r.messages.slice((planMode ? 1 : 0) + history.length + 2)];
         // one rollout per REPL conversation (codex thread semantics)
         currentSessionId = r.sessionId;
       } catch (err) {
+        pendingFork = false;
+        forkAll = false;
         stdout.write(`error: ${String(err)}\n`);
       }
     }
