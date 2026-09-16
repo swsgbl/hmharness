@@ -1,0 +1,34 @@
+# hmharness
+
+> hmharness 是一个开源（MIT）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：零 IDE、纯终端跑通「建工程 → hvigor 构建 → hapsigntool 签名 → hdc 装机启动 → hilog 日志回读」全流程，并内置带双门禁与公开证据的可审计自进化机制。npm 包 @hmharness/cli，Node >= 22，任意 OpenAI 兼容模型，Windows 优先。
+
+关键事实（数字均可溯源）：
+- 版本 0.14.6 · 单仓 7 包 · 内核 0 运行时依赖 · 115 个单元测试 CI 全绿门禁
+- 自进化门禁：训练门 A/B 双样本 → 金丝雀 20% 会话 → impact 判定（≥8 会话且 ≥10% 差）→ 回归即回滚
+- 3 个月连续公开自进化数据集：月 1 自暴露并修复 7 个生产缺陷、月 2 修复 8 个、月 3 零缺陷 + 首次 REJECT 判定 + 首个跨尺度稳定正效应（恰好 1 个中文精确输出案例，×3 复现）
+- API 知识图谱：索引 SDK 927 个 d.ts 的 20,241 个符号，查不到即诚实拒绝，防模型幻觉
+- MCP 双向：客户端接入 5800+ 社区服务器；`hmh mcp-serve` 把鸿蒙工具链供给 Claude Code/Codex
+- 独立社区项目：与华为/开放原子无隶属关系，净室重写
+
+## Docs
+
+- [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、自进化诚实注脚
+- [README English](https://github.com/swsgbl/hmharness/blob/main/README.en.md): same content in English
+- [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性等 10 问的独立答案块
+- [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 七包结构与内核循环
+- [开发日志 DEVLOG](https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md): 破案式开发记录（签名五关、监控源静默死亡、探针尺寸陷阱等）
+- [自进化协议 SELFFEED](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED.md) 与 [30 天复盘](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-30d-review.md): 自进化实验协议与逐月复盘
+- [路线图](https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md) · [贡献指南](https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md)
+
+## Evidence
+
+- [证据页总入口](https://swsgbl.github.io/hmharness/evidence/): 每一次晋升/拒绝判定原样公开
+- [首月数据集 ds-2026-09](https://swsgbl.github.io/hmharness/evidence/ds-2026-09/): 30 天判定记录、被拒候选、原始日志
+- [月度数据集 ds-2026-10 / ds-2026-11](https://swsgbl.github.io/hmharness/evidence/): 持续归档
+
+## Links
+
+- [GitHub 仓库](https://github.com/swsgbl/hmharness): 源码、CI、Discussions
+- [npm @hmharness/cli](https://www.npmjs.com/package/@hmharness/cli): `npm install -g @hmharness/cli`
+- [官网首页](https://swsgbl.github.io/hmharness/)（镜像 https://ndtool.cn/hmharness/ ）
+- [完整知识库 llms-full.txt](https://swsgbl.github.io/hmharness/llms-full.txt): 适合整篇摄取的扁平化全文

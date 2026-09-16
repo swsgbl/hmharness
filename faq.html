@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、自进化真实性</title>
+<meta name="description" content="hmharness 十问十答：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？自进化是真的吗？每个答案附证据链接。">
+<link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
+<link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
+<link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "hmharness",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows, macOS, Linux",
+  "softwareVersion": "0.14.6",
+  "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化与 MCP 双向生态。",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://opensource.org/licenses/MIT",
+  "programmingLanguage": "TypeScript, Node.js",
+  "installUrl": "https://www.npmjs.com/package/@hmharness/cli",
+  "author": { "@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness" },
+  "sameAs": [
+    "https://github.com/swsgbl/hmharness",
+    "https://www.npmjs.com/package/@hmharness/cli",
+    "https://ndtool.cn/hmharness/"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "hmharness 是什么？",
+      "acceptedAnswer": { "@type": "Answer", "text": "hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：在终端用一句话完成建工程、hvigor 构建、hapsigntool 签名、hdc 装机启动、hilog 日志回读的全流程，全程不打开 DevEco Studio、不登录华为账号、可接任意 OpenAI 兼容模型，并内置带双门禁与公开证据的可审计自进化。安装：npm install -g @hmharness/cli（Node >= 22）。" }
+    },
+    {
+      "@type": "Question",
+      "name": "鸿蒙开发必须用 DevEco Studio 吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "不是必须。DevEco Studio 是华为官方主力 IDE，但 hmharness（MIT 开源）证明零 IDE 路线可行：它在纯终端驱动官方无头工具链完成工程脚手架、构建、签名、装机、日志，模拟器也是全生命周期无头管理。适合脚本化、CI 化与 AI Agent 化场景；两者互补而非替代。" }
+    },
+    {
+      "@type": "Question",
+      "name": "鸿蒙应用怎么用命令行打包和签名？",
+      "acceptedAnswer": { "@type": "Answer", "text": "用 hmharness 的 harmony_build（hvigor 构建）+ harmony_sign（封装 hapsigntool 全链：jar/p12/pem/模板/java 五件定位）。实测要点：hapsigntool 的 -mode 参数取 localSign（不是 debug/release）；SDK 自带的调试证书模板有效期停在 2023 年，这一过期问题由 hmharness 的报错链定位发现；支持过期 profile 检测刷新。完整破案记录见仓库 DEVLOG 2026-09-05。" }
+    },
+    {
+      "@type": "Question",
+      "name": "鸿蒙 CI/CD 自动化构建打包怎么做？",
+      "acceptedAnswer": { "@type": "Answer", "text": "hmharness 把 hvigor 构建、签名、hdc 装机、hilog 日志全部做成可调用工具，鸿蒙应用因此可以脚本化自动打包、签名与装机验证，不依赖 DevEco Studio 图形界面。危险操作默认审批门禁（非交互默认拒绝，可用 --yes 或 rules 文件放行已批准模式，破坏性命令模式硬拒绝），适合接 CI 流水线与 AI Agent。" }
+    },
+    {
+      "@type": "Question",
+      "name": "有什么 AI 编程工具支持鸿蒙开发？",
+      "acceptedAnswer": { "@type": "Answer", "text": "两类：华为官方的 DevEco Code（需登录华为账号）和开源的 hmharness（MIT，不登录、模型任意换）。hmharness 既可独立运行，也可通过 hmh mcp-serve 把鸿蒙工具链（harmony_build、harmony_api_lookup 等）以原生 MCP 工具供给 Claude Code、Codex、Cursor 等宿主，无嵌套智能体循环。" }
+    },
+    {
+      "@type": "Question",
+      "name": "怎么防止 AI 编造不存在的鸿蒙 API？",
+      "acceptedAnswer": { "@type": "Answer", "text": "用索引拦截而不是靠模型自觉。hmharness 的 API 知识图谱行式解析 SDK 的 927 个 d.ts 文件、索引 20,241 个符号（实测 0.2 秒），harmony_api_lookup 查不到就直接返回「不在此 SDK」，模型被诚实拒绝而不是瞎编。缓存于 HMH_HOME/apikg，SDK 变化才重建。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 的自进化是真的吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "机制真实、效果诚实。技能晋升要过双门禁（A/B 双样本基准 + 保留门）再进金丝雀（20% 会话），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月的公开数据集显示：月 1 零统计可靠晋升（门在正确拒绝噪声）但自暴露修复 7 个生产缺陷；月 2 修复 8 个；月 3 零生产缺陷、首次 REJECT 判定、首个跨尺度稳定正效应（真实但小：恰好 1 个中文精确输出案例，×3 复现）。「越用越聪明」尚未证实，被证实的是门与审计在正确工作——全部判定记录与原始日志原样公开在证据页。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 和 DevEco Studio / DevEco Code 是什么关系？",
+      "acceptedAnswer": { "@type": "Answer", "text": "互补而非替代，且无官方关系。DevEco Studio / DevEco Code 是华为官方主力工具链；hmharness 是独立社区开源项目（MIT，与华为、开放原子基金会无隶属、合作或背书关系，净室重写），面向脚本化/CI/Agent 化场景：全程不登录华为账号、密钥只存本地、任意 OpenAI 兼容模型可换、内核可改。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 收费吗？怎么安装？",
+      "acceptedAnswer": { "@type": "Answer", "text": "免费开源，MIT 协议。安装三步：npm install -g @hmharness/cli（Node >= 22）；hmh init 初始化；在 ~/.hmharness/config.json 配置任意 OpenAI 兼容厂商（baseUrl/apiKey/model），然后 hmh \"你的任务\" 直接运行。模型侧费用由你选择的厂商收取。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 支持哪些系统和模型？",
+      "acceptedAnswer": { "@type": "Answer", "text": "Windows 优先（鸿蒙工具链、模拟器、TUI 终端适配均在此验证）；macOS/Linux 社区支持。模型任意 OpenAI 兼容厂商均可：GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat / vision / evolve / bench 各走各的），密钥只存在本机 HMH_HOME。" }
+    }
+  ]
+}
+</script>
+<style>
+:root{
+  --navy:#0B1E3A; --navy2:#123B6E; --cyan:#4FD8EB; --ice:#EAF4FA;
+  --text:#DCE8F2; --dim:#8FA8C0; --card:rgba(13,32,58,.72); --line:rgba(79,216,235,.22);
+  --radius:18px; --maxw:880px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.75}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(9,22,42,.72);border-bottom:1px var(--line) solid}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;font-size:14.5px}
+.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+header{padding:64px 0 30px;text-align:center}
+header h1{font-size:clamp(26px,4.4vw,38px);color:#fff}
+header p{color:var(--dim);margin-top:12px;max-width:640px;margin-left:auto;margin-right:auto}
+.tldr{background:rgba(79,216,235,.08);border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:12px;padding:16px 18px;margin:0 0 12px;color:var(--ice)}
+.tldr::before{content:"一句话答案";display:block;font-size:12px;color:var(--cyan);letter-spacing:2px;margin-bottom:6px}
+.qa{padding:26px 0;border-bottom:1px dashed var(--line);scroll-margin-top:76px}
+.qa h2{font-size:19px;color:#fff;margin-bottom:14px}
+.qa h2 a.qn{color:var(--cyan);margin-right:8px;font-family:Consolas,monospace}
+.qa p{color:var(--dim);font-size:15px;margin-bottom:10px}
+.qa code{font-family:Consolas,monospace;font-size:13px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px}
+.src{font-size:13px;color:var(--dim)}
+.src b{color:var(--ice)}
+footer{padding:44px 0 54px;color:var(--dim);font-size:13px;text-align:center}
+footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--line);padding-top:18px;line-height:1.8}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <div class="logo"><span>✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px">hmharness · FAQ</span></div>
+  <div><a href="./">← 返回首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
+</div></nav>
+
+<header><div class="wrap">
+  <h1>hmharness 十问十答</h1>
+  <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
+</div></header>
+
+<main class="wrap">
+
+<section class="qa" id="what-is-hmharness">
+  <h2><a class="qn" href="#what-is-hmharness">Q1</a>hmharness 是什么？</h2>
+  <div class="tldr">hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
+  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 7 包、内核 0 运行时依赖、115 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="./">官网首页</a></p>
+</section>
+
+<section class="qa" id="no-ide">
+  <h2><a class="qn" href="#no-ide">Q2</a>鸿蒙开发必须用 DevEco Studio 吗？</h2>
+  <div class="tldr">不是必须。DevEco Studio 是官方主力 IDE，但开源的 hmharness 证明了零 IDE 路线：纯终端驱动官方无头工具链完成脚手架、构建、签名、装机、日志，模拟器全生命周期无头管理——适合脚本化、CI 化与 AI Agent 化场景。</div>
+  <p>hmharness 直接驱动官方无头 CLI：<code>harmony_project_create</code>（参数化多页面/多模块/feature HAP/har 库）→ <code>harmony_build</code> → <code>harmony_sign</code> → <code>harmony_install/launch/logs</code>；<code>harmony_emulator_list|catalog|create|start|stop|delete</code> 管理模拟器全系机型。与 DevEco 互补而非替代：日常图形开发用官方工具，自动化与 Agent 场景用 hmharness。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「鸿蒙全流程（零 IDE）」</a></p>
+</section>
+
+<section class="qa" id="cli-sign">
+  <h2><a class="qn" href="#cli-sign">Q3</a>鸿蒙应用怎么用命令行打包和签名？</h2>
+  <div class="tldr">用 hvigor 命令行构建 + hapsigntool 签名。hmharness 把两者封装成 <code>harmony_build</code> 与 <code>harmony_sign</code> 工具（自动定位 jar/p12/pem/模板/java 五件套），签好的 HAP 直接经 hdc 装机验证——整条链不打开 IDE。</div>
+  <p>实测踩坑记录（2026-09-05 DEVLOG）：hapsigntool 的 <code>-mode</code> 取 <code>localSign</code>（不是 debug/release）；SDK 自带调试证书模板有效期停在 2023 年（过期三年无人发现，由 hmharness 报错链一步步定位）；支持过期 profile 检测与刷新。官方文档未覆盖这些，破案过程全记录在案。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名五关」</a></p>
+</section>
+
+<section class="qa" id="cicd">
+  <h2><a class="qn" href="#cicd">Q4</a>鸿蒙 CI/CD 自动化构建打包怎么做？</h2>
+  <div class="tldr">把 hvigor 构建、签名、hdc 装机、hilog 日志变成可调用工具即可脚本化。hmharness 全部封装完毕，支持审批门禁的非交互模式（默认拒绝、<code>--yes</code>/rules 放行、破坏性命令硬拒绝），可直接接 CI 流水线。</div>
+  <p>典型链路：<code>harmony_project_create</code> → <code>harmony_build</code> → <code>harmony_sign</code> → <code>harmony_install</code> → <code>harmony_logs</code> 回读断言。CI 里不需要华为账号登录（密钥只存本地配置），这是与官方工具链自动化路径的关键差异。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 常用命令</a></p>
+</section>
+
+<section class="qa" id="ai-tools">
+  <h2><a class="qn" href="#ai-tools">Q5</a>有什么 AI 编程工具支持鸿蒙开发？</h2>
+  <div class="tldr">两类可选：华为官方 DevEco Code（官方跟进最快，需登录华为账号）；开源 hmharness（MIT，不登录、任意 OpenAI 兼容模型、零 IDE 全流程 + 自进化）。hmharness 还能以 <code>hmh mcp-serve</code> 把鸿蒙工具链变成 Claude Code / Codex / Cursor 的原生 MCP 工具。</div>
+  <p>MCP 服务器模式只暴露 <code>harmony_*</code> 域工具（构建/装机/日志/签名/API 检索/雷达），通用文件与命令工具不暴露（宿主有自己的）；宿主权限系统负责问用户，server 侧破坏性硬墙永驻。两种用法互补：要自进化用原生 <code>hmh</code> 会话，要借力现有编码 Agent 用 MCP 模式。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「在 Claude Code / Codex 里用」</a></p>
+</section>
+
+<section class="qa" id="hallucination">
+  <h2><a class="qn" href="#hallucination">Q6</a>怎么防止 AI 编造不存在的鸿蒙 API？</h2>
+  <div class="tldr">靠索引拦截，不靠模型自觉。hmharness 解析 SDK 927 个 d.ts 文件、索引 20,241 个 API 符号（实测 0.2 秒），<code>harmony_api_lookup</code> 查不到就返回「不在此 SDK，不要猜」——幻觉被索引拦截。</div>
+  <p>模型编造 ArkTS/ArkUI API 的根因是它看不见你的 SDK 版本；知识图谱按本机 SDK 实时构建、缓存于 <code>HMH_HOME/apikg</code>（SDK mtime 变化才重建），因此检索结果永远与本机 SDK 一致，而不是训练记忆。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG「API 知识图谱」</a></p>
+</section>
+
+<section class="qa" id="self-evolution">
+  <h2><a class="qn" href="#self-evolution">Q7</a>hmharness 的「自进化」是真的吗？</h2>
+  <div class="tldr">机制真实、效果诚实：技能晋升要过双门禁（A/B 双样本基准 + 防背题保留门）再进金丝雀（20% 会话对照），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月公开数据集的结论是——零统计可靠晋升（门在正确拒绝噪声），但自暴露并修复了 7+8+0 个生产缺陷，月 3 首次出现跨尺度稳定正效应（真实但小）。</div>
+  <p>逐月事实：月 1 修复 7 个生产缺陷、零晋升；月 2 修复 8 个、门持续拒绝；月 3（2026-09-15 复盘）零生产缺陷、程序史首个 REJECT 行动判定、首个跨 4 报告 ×3 复现的正效应——恰好 1 个中文精确输出案例，不足以过 10% 门。「越用越聪明」尚未被证实，被证实的是门与审计面在正确工作；全部判定记录、被拒候选与原始日志<a href="evidence/">原样公开</a>。代码级自进化默认关闭，只允许改 <code>packages/*/src/*.ts</code>、永禁内核循环。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-month3-final-review.md">SELFFEED 月 3 终局复盘</a> · <a href="evidence/ds-2026-09/">首月数据集</a></p>
+</section>
+
+<section class="qa" id="vs-deveco">
+  <h2><a class="qn" href="#vs-deveco">Q8</a>hmharness 和 DevEco Studio / DevEco Code 是什么关系？</h2>
+  <div class="tldr">互补而非替代，且与华为无任何官方关系：hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书，为净室重写。官方工具链适合日常图形开发；hmharness 面向脚本化/CI/Agent 场景——不登录账号、模型任意换、内核可改。</div>
+  <p>选型建议：要官方支持与最新特性跟随，用 DevEco；要在终端/CI/Agent 里无人值守跑鸿蒙全流程，用 hmharness；两者也可以同时用（hmharness 操作的工程就是标准鸿蒙工程）。</p>
+  <p class="src"><b>出处：</b><a href="./">官网法律声明</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 诚实注脚</a></p>
+</section>
+
+<section class="qa" id="pricing">
+  <h2><a class="qn" href="#pricing">Q9</a>hmharness 收费吗？怎么安装？</h2>
+  <div class="tldr">免费开源（MIT）。三步安装：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 在 <code>~/.hmharness/config.json</code> 配任意 OpenAI 兼容厂商，然后 <code>hmh "任务"</code> 直接运行。模型侧费用按你选的厂商计。</div>
+  <p>源码运行同样三行：clone → <code>npm install && npm run build</code> → <code>npm link -w @hmharness/cli</code>。</p>
+  <p class="src"><b>出处：</b><a href="https://www.npmjs.com/package/@hmharness/cli">npm @hmharness/cli</a></p>
+</section>
+
+<section class="qa" id="platforms">
+  <h2><a class="qn" href="#platforms">Q10</a>hmharness 支持哪些操作系统和模型？</h2>
+  <div class="tldr">Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证），macOS/Linux 社区支持；模型任意 OpenAI 兼容厂商——GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat/vision/evolve/bench 各走各的），密钥只存本机。</div>
+  <p>多厂商路由示例配置与上下文窗口自适应（压缩预算随模型窗口缩放）见 README「模型路由」一节。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 模型路由</a></p>
+</section>
+
+</main>
+
+<footer><div class="wrap">
+  <div><a href="https://github.com/swsgbl/hmharness">GitHub</a> · <a href="https://www.npmjs.com/package/@hmharness/cli">npm</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a> · <a href="llms-full.txt">llms-full.txt</a></div>
+  <div class="legal"><b>非官方声明：</b>hmharness 是独立社区开源项目（MIT），与华为（Huawei）、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有，此处仅为描述性合理使用。<br>© 2026 hmharness contributors · MIT License</div>
+</div></footer>
+</body>
+</html>

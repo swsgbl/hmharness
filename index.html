@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>hmharness — 自进化的鸿蒙开发智能体框架</title>
 <meta name="description" content="零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。">
+<link rel="canonical" href="https://swsgbl.github.io/hmharness/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"hmharness","url":"https://swsgbl.github.io/hmharness/","description":"自进化的鸿蒙开发智能体框架(开源 MIT)","inLanguage":"zh-CN"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"hmharness","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","softwareVersion":"0.14.6","description":"开源鸿蒙开发智能体框架:零 IDE 终端跑通建工程、构建、签名、装机、日志全流程,带双门禁可审计自进化与 MCP 双向生态。","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","programmingLanguage":"TypeScript, Node.js","installUrl":"https://www.npmjs.com/package/@hmharness/cli","author":{"@type":"Organization","name":"hmharness contributors","url":"https://github.com/swsgbl/hmharness"},"sameAs":["https://github.com/swsgbl/hmharness","https://www.npmjs.com/package/@hmharness/cli","https://ndtool.cn/hmharness/"]}
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
 <style>
 :root{
@@ -89,6 +96,7 @@ footer li{list-style:none;margin:6px 0}
     <a href="#evo" data-i18n="nav_evo">自进化</a>
     <a href="#models" data-i18n="nav_models">模型路由</a>
     <a href="evidence/" data-i18n="nav_evidence">证据</a>
+    <a href="faq.html" data-i18n="nav_faq">FAQ</a>
     <button class="lang" id="langBtn" onclick="toggleLang()">EN</button>
     <a class="btn btn-primary" href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener">GitHub</a>
   </div>
@@ -195,6 +203,8 @@ hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.md" target="_blank" rel="noopener">README(中文)</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.en.md" target="_blank" rel="noopener">README(English)</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="f_contrib">参与贡献</a></li>
+      <li><a href="faq.html" data-i18n="f_faq">常见问题 FAQ</a></li>
+      <li><a href="llms.txt">llms.txt</a></li>
     </ul></div>
   </div>
   <div class="legal" data-i18n="legal">
@@ -274,7 +284,7 @@ const I18N = {
   zh: {
     _title: 'hmharness — 自进化的鸿蒙开发智能体框架',
     _desc: '零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。',
-    nav_features: '特性', nav_install: '快速开始', nav_evo: '自进化', nav_models: '模型路由', nav_evidence: '证据',
+    nav_features: '特性', nav_install: '快速开始', nav_evo: '自进化', nav_models: '模型路由', nav_evidence: '证据', nav_faq: 'FAQ',
     hero_tag: '自 进 化 · 零 依 赖',
     hero_sub: '为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架 —— 零依赖内核 + 自进化一等公民 + MCP 生态借力。一句话创建工程、构建、装机、跑模拟器;每一步进化都有基准门禁与回滚。',
     cta_github: '⭐ GitHub 开源', cta_start: '四步上手',
@@ -306,14 +316,14 @@ const I18N = {
     mod_title: '模型无关 · 按用途路由',
     mod_desc: '任意 OpenAI 兼容厂商:GLM / DeepSeek / 通义 / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio……chat、vision、evolve、bench 各走各的,密钥只存在本机 HMH_HOME。',
     f_repo: 'GitHub 仓库', f_arch: '架构设计', f_road: '路线图',
-    f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献',
+    f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献', f_faq: '常见问题 FAQ',
     legal: '<b>非官方声明:</b>hmharness 是独立社区开源项目(MIT),与华为(Huawei)、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有,此处仅为描述性合理使用。本项目为净室(clean-room)重写,不继承任何上游运行时能力;自进化机制参考 Darwin Gödel Machine、GDPevo、Penguin Harness 等公开研究思想(无代码复制)。<br>© 2026 hmharness contributors · MIT License',
     _langBtn: 'EN'
   },
   en: {
     _title: 'hmharness — self-evolving agent framework for HarmonyOS development',
     _desc: 'Zero-dependency kernel + first-class self-evolution + MCP ecosystem. Scaffold, build, install and run HarmonyOS apps in one sentence; every evolution step is gated and reversible.',
-    nav_features: 'Features', nav_install: 'Quick Start', nav_evo: 'Self-Evolving', nav_models: 'Model Routing', nav_evidence: 'Evidence',
+    nav_features: 'Features', nav_install: 'Quick Start', nav_evo: 'Self-Evolving', nav_models: 'Model Routing', nav_evidence: 'Evidence', nav_faq: 'FAQ',
     hero_tag: 'S E L F - E V O L V I N G · Z E R O - D E P',
     hero_sub: 'A self-evolving agent framework for the full HarmonyOS development lifecycle — a zero-dependency kernel, evolution as a first-class citizen, and the MCP ecosystem on tap. Scaffold, build, install and run in one sentence; every evolution step is benchmark-gated and reversible.',
     cta_github: '⭐ Star on GitHub', cta_start: 'Quick Start',
@@ -345,7 +355,7 @@ const I18N = {
     mod_title: 'Model-Agnostic, Routed by Purpose',
     mod_desc: 'Any OpenAI-compatible provider: GLM / DeepSeek / Qwen / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio… chat, vision, evolve and bench each take their own route; keys never leave HMH_HOME on your machine.',
     f_repo: 'GitHub Repository', f_arch: 'Architecture', f_road: 'Roadmap',
-    f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing',
+    f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing', f_faq: 'FAQ',
     legal: '<b>Non-affiliation notice:</b> hmharness is an independent community open-source project (MIT). It is not affiliated with, endorsed by, or cooperating with Huawei or the OpenAtom Foundation. "HarmonyOS", "OpenHarmony", "DevEco Studio" and related names and marks belong to their respective owners; used here descriptively under fair use. This project is a clean-room rewrite that inherits no upstream runtime capability; self-evolution mechanisms reference public research ideas from Darwin Gödel Machine, GDPevo and Penguin Harness (no code copied).<br>© 2026 hmharness contributors · MIT License',
     _langBtn: '中文'
   }
