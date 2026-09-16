@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource } from '../uilite.ts';
+import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables } from '../uilite.ts';
 
 test('fuzzyMatchScore: subsequence rank, prefix/boundary bonuses, -1 on miss', () => {
   assert.ok(fuzzyMatchScore('st', 'settings.ts') >= 0, 's-t is a subsequence');
@@ -67,6 +67,27 @@ test('renderMarkdown: headings, bold, inline code, fences, lists, tables, links'
   assert.ok(!/<\/?script/.test(renderMarkdown('x <script>alert(1)</script> y')));
   // autolink must not double-wrap the URL inside a rendered [label](url)
   assert.equal((html.match(/<a href="https:\/\/example\.com"/g) || []).length, 1, 'exactly one anchor for the linked URL');
+});
+
+test('extractPlan: numbered-step runs >=2 become a plan; prose-only yields []', () => {
+  const md = ['Let me fix this.', '1. Read the schema', '2. Update main_pages', '3. Rebuild and verify', 'Done.'].join('\n');
+  const steps = extractPlan(md);
+  assert.deepEqual(steps, ['Read the schema', 'Update main_pages', 'Rebuild and verify']);
+  assert.deepEqual(extractPlan('no numbered steps here\njust prose'), []);
+  assert.deepEqual(extractPlan('1. only one step'), [], 'single step is not a plan');
+  assert.deepEqual(extractPlan(''), []);
+});
+
+test('extractDeliverables: edit_file/write_file paths, deduped, in order', () => {
+  const tools = [
+    { name: 'list_dir', args: { path: 'src' } },
+    { name: 'edit_file', args: { path: 'src/a.ts' } },
+    { name: 'write_file', args: { path: 'README.md' } },
+    { name: 'edit_file', args: { path: 'src/a.ts' } }, // duplicate
+    { name: 'run_command', args: { command: 'x' } },
+  ];
+  assert.deepEqual(extractDeliverables(tools as never), ['src/a.ts', 'README.md']);
+  assert.deepEqual(extractDeliverables([]), []);
 });
 
 test('uiLiteSource: serialized functions are plain ES5 (no arrows, no ${}) for inline injection', () => {

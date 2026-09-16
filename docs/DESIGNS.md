@@ -43,6 +43,10 @@
 | W7 | **运行中注入**=Ctrl+Enter(输入非空且运行中):文本经 `POST /api/inject` 进内核 injections.poll,在轮边界注入为 user 消息;Enter 保持排队语义(不改);inject 只作用于当前轮,任务结束的迟到推送自然落入下一任务队列 | 对标 codex Enter-inject;与 TUI B1 共用内核注入机制 | 本轮 | ✅ 生效 |
 | W8 | **右栏 tab 体系**(详情/文件/预览):详情=原工具详情;文件=工作区只读树(`GET /api/fs/read` 64KB 上限+8KB NUL/控制字节嗅探+UTF-8 fatal 解码兜底,二进制给占位);预览=点击回答中的路径引用在右栏打开;可折叠+宽度拖拽 300-600px localStorage 记忆 | 对标 dsh ui-sidebar-right;路径引用点击经 maybePath 防误触 | 本轮 | ✅ 生效 |
 | W9 | **工具 keyed 渲染**:edit_file/write_file 结果按 unified diff 渲染(+绿/-红/@@灰/文件行 dim,`looksLikeDiff` 门);web_search 结果渲染为链接卡片;harmony 类长日志折叠尾部;代码块 token 着色(关键字/字符串/注释/数字)+复制键 | 对标 dsh ui-tool/ui-renderer;W1 折叠一行默认保留 | 本轮 | ✅ 生效 |
+| W10 | **会话目标栏(A6)**:顶栏 🎯 chip 显示当前 goal(stateObject 下发,与 TUI /goal 共用 kernel goal 存储);点击展开内联输入行,✓ 保存 ✕ 清除(`POST /api/goal`);计划卡=回答中的编号步骤(≥2,纯函数 extractPlan)以可勾选清单固定在对话顶部 | 对标 dsh ui-goal/ui-plan;与 TUI T16 /goal 同源 | 本轮 | ✅ 生效 |
+| W11 | **权限预设卡片(A8)**:mode 下拉旁 ▾ 弹三卡(审批询问/自动批准/YOLO,各带危险性说明,🔥 徽标语义与 TUI 对齐);选择即写 select 并触发现有 change 路径 | 对标 dsh ui-permission-presets;W3 三档语义不变 | 本轮 | ✅ 生效 |
+| W12 | **交付物 chips(A9)**:edit_file/write_file 的路径在任务结束时渲染为可点击 chips(去重保序,纯函数 extractDeliverables),点击在右栏预览(A5) | 对标 dsh ui-deliverables | 本轮 | ✅ 生效 |
+| W13 | **消息反馈(A10)+主题(A11)**:每条 AI 回答带 👍/👎,写入 `insights/explicit-feedback.jsonl`(自描述存储,不污染进化 feed 的严格 Insight 联合类型;`POST /api/feedback`);CSS 变量 token 化(dark/light/system 三态,`body[data-theme]`,`POST /api/config` 持久化+SSE 状态回传) | 对标 dsh ui-message-feedback/ui-theme;反馈字段 outcome 语义以独立文件实现 | 本轮 | ✅ 生效 |
 
 ## CLI/REPL
 

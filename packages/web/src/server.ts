@@ -482,6 +482,19 @@ export async function startServer(opts: { port: number; host?: string; version?:
           .filter((e) => e.isDirectory() || e.isSymbolicLink())
           .map((e) => ({ name: e.name, path: join(target, e.name) }))
           .sort((a, b) => a.name.localeCompare(b.name));
+        // ?files=1 (right-column file tree): also list regular files, capped,
+        // each with a workspace-root-relative path for the preview tab
+        const withFiles = url.searchParams.get('files') === '1';
+        const files = withFiles
+          ? entries
+              .filter((e) => e.isFile())
+              .slice(0, 200)
+              .map((e) => {
+                const abs = join(target, e.name);
+                return { name: e.name, path: abs, rel: toRel(wsRoot(), abs) };
+              })
+              .sort((a, b) => a.name.localeCompare(b.name))
+          : undefined;
         // breadcrumb segments, e.g. C: > Users > hongfu
         const segments: Array<{ name: string; path: string }> = [];
         if (process.platform === 'win32') {
@@ -501,7 +514,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
           }
         }
         const parent = dirname(target) === target ? '' : dirname(target);
-        json(res, 200, { path: target, segments, parent, dirs });
+        json(res, 200, { path: target, segments, parent, dirs, ...(files !== undefined ? { files } : {}) });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/sessions') {
@@ -1222,6 +1235,34 @@ export async function startServer(opts: { port: number; host?: string; version?:
           return;
         }
         json(res, 404, { error: 'unknown command' });
+        return;
+      }
+      // ---- A10: explicit message feedback (👍/👎) -> insights dir ----
+      if (req.method === 'POST' && url.pathname === '/api/feedback') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { sessionId?: unknown; thumbs?: unknown; text?: unknown };
+        const thumbs = body.thumbs === 'up' || body.thumbs === 'down' ? body.thumbs : null;
+        if (!thumbs) {
+          json(res, 400, { error: 'thumbs must be up|down' });
+          return;
+        }
+        // a SELF-DESCRIBING store next to the evolve feed: the strict Insight
+        // outcome union is not widened, so explicit feedback never pollutes
+        // the "what worked / what failed" stream (it is a separate signal)
+        try {
+          const { appendFile, mkdir } = await import('node:fs/promises');
+          const dir = join(home, 'insights');
+          await mkdir(dir, { recursive: true });
+          const rec = {
+            time: new Date().toISOString(),
+            session: typeof body.sessionId === 'string' ? body.sessionId : '',
+            thumbs,
+            text: String(body.text ?? '').slice(0, 400),
+          };
+          await appendFile(join(dir, 'explicit-feedback.jsonl'), JSON.stringify(rec) + '\n', 'utf8');
+          json(res, 200, { ok: true });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
         return;
       }
       json(res, 404, { error: 'not found' });

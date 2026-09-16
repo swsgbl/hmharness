@@ -73,6 +73,35 @@ export function looksLikeDiff(text: string): boolean {
   return /^(--- |\+\+\+ |diff --git )/m.test(String(text)) && /^@@[^@]*@@/m.test(String(text));
 }
 
+/** Extract a numbered-step plan from an answer (A6 plan card): consecutive
+ *  lines matching /^\s*\d+[.)]\s+/ that start a run of >=2 steps. Returns the
+ *  step texts (markdown-stripped, trimmed) or [] when there is no plan. */
+export function extractPlan(text: string): string[] {
+  const lines = String(text).split(/\r?\n/);
+  const steps: string[] = [];
+  for (const raw of lines) {
+    const m = /^\s*\d+[.)]\s+(.*)$/.exec(raw);
+    if (m) {
+      steps.push(m[1].trim());
+    } else if (steps.length > 0 && raw.trim() !== '') {
+      break; // a non-step line after the run ends the plan block
+    }
+  }
+  return steps.length >= 2 ? steps : [];
+}
+
+/** Deliverables (A9): the file paths edit_file/write_file touched, in order,
+ *  deduped, workspace-relative when possible. Input rows: {name, args}. */
+export function extractDeliverables(tools: Array<{ name: string; args: Record<string, unknown> }>): string[] {
+  const out: string[] = [];
+  for (const t of tools) {
+    if (t.name !== 'edit_file' && t.name !== 'write_file') continue;
+    const p = typeof t.args.path === 'string' ? t.args.path.trim() : '';
+    if (p && !out.includes(p)) out.push(p);
+  }
+  return out;
+}
+
 /** Mini-markdown -> HTML (zero deps, page-safe). Handles: fenced code blocks
  *  (with copy button class), headings, bold/italic/inline code, unordered and
  *  ordered lists, pipes tables, links, paragraphs. HTML-escapes first. */
@@ -199,5 +228,6 @@ function inlineMd(s: string): string {
 /** Serialized source for the single-file page: the pure functions above are
  *  injected verbatim into page.ts's <script> (single source of truth). */
 export function uiLiteSource(): string {
-  return [fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown].map(function (f) { return f.toString(); }).join('\n');
+  return [fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables]
+    .map(function (f) { return f.toString(); }).join('\n');
 }

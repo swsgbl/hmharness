@@ -7,7 +7,10 @@
  * tool call: args + full output). Vanilla JS, no build step.
  * Template-literal rules: no raw backticks in the page body (use \u0060),
  * regex backslashes doubled, no ${} inside the page JS (string concat only).
+ * The uilite pure helpers are inlined via ONE template hole: ${uiLiteSource()}.
  */
+import { uiLiteSource } from './uilite.ts';
+
 export const PAGE = `<!doctype html>
 <html lang="zh">
 <head>
@@ -17,6 +20,42 @@ export const PAGE = `<!doctype html>
 <style>
   :root { --bg:#101418; --panel:#171d24; --panel2:#1c242e; --line:#242c36; --text:#dbe4ee; --dim:#7d8b9c;
           --accent:#31a8ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149; --mono:ui-monospace,Consolas,monospace; }
+  /* A11 theme: light + system modes override the semantic tokens; the page
+     only ever reads var(--*) so one switch flips everything */
+  body[data-theme="light"] { --bg:#f5f7fa; --panel:#ffffff; --panel2:#eef1f5; --line:#dde3ea; --text:#1c2733; --dim:#5b6b7c;
+          --accent:#0a7fd4; --ok:#1a7f37; --warn:#9a6700; --err:#cf222e; }
+  @media (prefers-color-scheme: dark) {
+    body[data-theme="system"] { --bg:#101418; --panel:#171d24; --panel2:#1c242e; --line:#242c36; --text:#dbe4ee; --dim:#7d8b9c;
+          --accent:#31a8ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149; }
+  }
+  @media (prefers-color-scheme: light) {
+    body[data-theme="system"] { --bg:#f5f7fa; --panel:#ffffff; --panel2:#eef1f5; --line:#dde3ea; --text:#1c2733; --dim:#5b6b7c;
+          --accent:#0a7fd4; --ok:#1a7f37; --warn:#9a6700; --err:#cf222e; }
+  }
+  /* A6 plan card: pinned checklist at the top of the conversation */
+  #plancard { margin:8px 16px 0; padding:8px 12px; background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--warn); border-radius:8px; font-size:12.5px; }
+  #plancard .phead { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--warn); cursor:pointer; }
+  #plancard .psteps { margin-top:6px; }
+  #plancard .pstep { display:flex; gap:7px; align-items:flex-start; padding:2px 0; }
+  #plancard .pstep input { margin-top:3px; }
+  #plancard .pstep.done { color:var(--dim); text-decoration:line-through; }
+  /* A7 subagent call: distinct nested card */
+  .toolrow.subagent { border-left:3px solid var(--accent); }
+  .toolrow.subagent .nm { color:var(--accent); font-weight:600; }
+  /* A9 deliverables chips */
+  #deliv { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 4px; }
+  #deliv .deliv { font-size:11px; font-family:var(--mono); color:var(--accent); background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 7px; cursor:pointer; }
+  #deliv .deliv:hover { border-color:var(--accent); }
+  /* A8 permission preset popover */
+  #presetpop { display:none; position:absolute; bottom:calc(100% + 6px); right:0; z-index:60; width:270px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; }
+  #presetpop.on { display:block; }
+  #presetpop .preset { display:block; width:100%; text-align:left; background:none; border:0; color:var(--text); padding:7px 9px; border-radius:7px; cursor:pointer; font:12.5px inherit; }
+  #presetpop .preset:hover { background:var(--panel2); }
+  #presetpop .preset .pt { font-weight:600; }
+  #presetpop .preset .pd { color:var(--dim); font-size:11px; margin-top:1px; }
+  /* A10 feedback buttons */
+  .acts .fb { font-size:13px; }
+  .acts .fb.on { color:var(--ok); }
   * { box-sizing:border-box; }
   html, body { height:100%; }
   body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,"Segoe UI",sans-serif; overflow:hidden; }
@@ -402,10 +441,14 @@ export const PAGE = `<!doctype html>
       <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
       <span class="chip" id="locale-chip">zh</span>
+      <span class="chip" id="goal-chip" title="会话目标" style="display:none;cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button id="theme-chip" class="ghost sm" title="theme">🌓</button>
       <span id="topspacer" style="margin-left:auto"></span>
       <button id="clear" class="ghost sm">clear</button>
     </div>
     <div id="view-chat" class="vwrap on">
+      <div id="goalrow" style="display:none;margin:8px 16px 0;display:none;gap:6px;align-items:center;max-width:640px"><input id="goal-input" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:12px inherit;outline:none" placeholder=""><button id="goal-set" type="button" class="ghost sm">✓</button><button id="goal-clear" type="button" class="ghost sm">✕</button></div>
+      <div id="plancard" style="display:none"><div class="phead"><span>▦</span><span id="plancard-title"></span><span style="margin-left:auto;color:var(--dim)">▲</span></div><div class="psteps" id="plancard-steps"></div></div>
       <div id="log"><div id="empty"><div style="font-size:30px">⚙️</div><div id="empty-title" style="margin:8px 0 4px;font-size:16px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px"></div><div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div><div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div></div>
       <button id="tobot" class="ghost sm">↓</button>
       <div id="composer">
@@ -423,11 +466,19 @@ export const PAGE = `<!doctype html>
           <textarea id="input" placeholder="给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)"></textarea>
           <div id="tools-row">
           <button id="attach" type="button" title="粘贴或选择图片附件">📎</button>
+          <div style="position:relative">
           <select id="mode" title="approval mode">
             <option value="ask">🔒 审批询问</option>
             <option value="auto">⚡ 自动批准</option>
             <option value="yolo">🔥 YOLO</option>
           </select>
+          <button id="preset-btn" type="button" title="权限预设">▾</button>
+          <div id="presetpop">
+            <button type="button" class="preset" data-mode="ask"><span class="pt">🔒 审批询问</span><div class="pd">每步危险操作都弹审批,逐步确认</div></button>
+            <button type="button" class="preset" data-mode="auto"><span class="pt">⚡ 自动批准</span><div class="pd">常规操作自动放行,破坏性命令仍硬拒</div></button>
+            <button type="button" class="preset" data-mode="yolo"><span class="pt">🔥 YOLO</span><div class="pd">完全无人值守,危险命令仍硬拒</div></button>
+          </div>
+          </div>
             <span id="tokchip"></span>
             <button id="send" class="primary">运行</button>
           </div>
@@ -520,6 +571,7 @@ export const PAGE = `<!doctype html>
 </style>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script>
+${uiLiteSource()}
 (function () {
   /* ---- motion layer (GSAP via CDN; everything degrades to no-animation
      when the CDN is unreachable or the user prefers reduced motion) ---- */
@@ -573,6 +625,7 @@ export const PAGE = `<!doctype html>
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
+          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
@@ -600,7 +653,8 @@ export const PAGE = `<!doctype html>
            slashHint:'↑↓ 选择 · Enter 插入 · Esc 关闭', atHint:'↑↓ 选择 · Enter 插入路径 · Esc 关闭', injHint:'运行中: Enter=排队 · Ctrl+Enter=注入当前轮', injected:'已注入当前轮', queueNone:'(空)',
            cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
            webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
-    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task', approve:'Approve', deny:'Deny',
+    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
+          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', goalPh:'session goal (Enter saves / ✕ clears)', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
@@ -954,6 +1008,11 @@ export const PAGE = `<!doctype html>
     var hp = s.workspace && s.workspace.path ? s.workspace.path : s.home;
     document.getElementById('home').textContent = hp;
     document.getElementById('home').title = hp;
+    // A11 theme + A6 goal from the persisted state
+    applyTheme((s.settings && s.settings.theme) || 'dark');
+    var gc = document.getElementById('goal-chip');
+    if (s.goal) { gc.style.display = ''; gc.textContent = '🎯 ' + s.goal; gc.title = s.goal; }
+    else { gc.style.display = 'none'; }
     if (s.workspace) {
       curWs = s.workspace;
       var n = document.getElementById('wscur-name');
@@ -1976,6 +2035,13 @@ export const PAGE = `<!doctype html>
     var ar = document.createElement('span'); ar.className = 'dim2'; ar.style.color = 'var(--dim)';
     ar.textContent = ' ' + JSON.stringify(d.args).slice(0, 110);
     row.appendChild(st); row.appendChild(nm); row.appendChild(ar);
+    // A7: spawn_agent renders as a distinct nested card (accent border + name)
+    if (d.name === 'spawn_agent') row.classList.add('subagent');
+    // A9: remember touched files for the deliverables chips at 'final'
+    if (d.name === 'edit_file' || d.name === 'write_file') {
+      var p0 = d.args && d.args.path;
+      if (typeof p0 === 'string' && p0) deliverables.push({ name: d.name, args: { path: p0 } });
+    }
     var s = seq;
     row.onclick = function () { showDetails(s); };
     parCount++;
@@ -2034,6 +2100,9 @@ export const PAGE = `<!doctype html>
   es.addEventListener('final', function (e) {
     flushStream();
     var d = JSON.parse(e.data);
+    // A6 plan card + A9 deliverables + A10 feedback ride the final event
+    if (lastAssistantText) renderPlanCard(lastAssistantText);
+    renderDeliverables();
     var tok = (d.usage && (d.usage.promptTokens + d.usage.completionTokens) > 0) ? ' \\u00B7 \\u2191' + d.usage.promptTokens + ' \\u2193' + d.usage.completionTokens + ' tok' : '';
     el('div', 'stats', d.turns + ' turns \\u00B7 ' + d.toolUses + ' tool uses' + tok + ' \\u00B7 session ' + d.sessionId.slice(11));
     if (tok) document.getElementById('tokchip').textContent = tok.replace(' \\u00B7 ', '');
@@ -2043,6 +2112,20 @@ export const PAGE = `<!doctype html>
       bc.onclick = function () { copyText(lastAssistantText); bc.textContent = '\\u2713'; setTimeout(function () { bc.textContent = '\\u29C9 ' + L.copy; }, 1200); };
       var br = document.createElement('button'); br.type = 'button'; br.textContent = '\\u27F3 ' + L.regen;
       br.onclick = function () { sendTask(lastTask); };
+      var sessionId = d.sessionId;
+      var fbUp = document.createElement('button'); fbUp.type = 'button'; fbUp.className = 'fb'; fbUp.textContent = '\\uD83D\\uDC4D';
+      fbUp.title = L ? L.fbUp : 'helpful';
+      fbUp.onclick = function () {
+        fbUp.classList.add('on'); fbDown.classList.remove('on');
+        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'up', text: lastAssistantText.slice(0, 200) }) });
+      };
+      var fbDown = document.createElement('button'); fbDown.type = 'button'; fbDown.className = 'fb'; fbDown.textContent = '\\uD83D\\uDC4E';
+      fbDown.title = L ? L.fbDown : 'not helpful';
+      fbDown.onclick = function () {
+        fbDown.classList.add('on'); fbUp.classList.remove('on');
+        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'down', text: lastAssistantText.slice(0, 200) }) });
+      };
+      acts.appendChild(fbUp); acts.appendChild(fbDown);
       acts.appendChild(bc); acts.appendChild(br);
       log.appendChild(acts);
       autoscroll();
@@ -2079,6 +2162,157 @@ export const PAGE = `<!doctype html>
       body: JSON.stringify({ locale: next })
     });
   };
+
+  // ---- A11 theme (dark/light/system; CSS tokens only, persisted) ----
+  function applyTheme(mode) {
+    document.body.setAttribute('data-theme', mode || 'dark');
+    var chip = document.getElementById('theme-chip');
+    chip.textContent = mode === 'light' ? '☀' : mode === 'system' ? '◐' : '🌓';
+  }
+  document.getElementById('theme-chip').onclick = function () {
+    var cur = (state && state.settings && state.settings.theme) || 'dark';
+    var next = cur === 'dark' ? 'light' : cur === 'light' ? 'system' : 'dark';
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: next })
+    });
+    applyTheme(next);
+  };
+
+  // ---- A8 permission presets (ask/auto/yolo cards with danger notes) ----
+  var presetBtn = document.getElementById('preset-btn');
+  var presetPop = document.getElementById('presetpop');
+  presetBtn.onclick = function (ev) { ev.stopPropagation(); presetPop.classList.toggle('on'); };
+  Array.prototype.forEach.call(presetPop.querySelectorAll('.preset'), function (b) {
+    b.onclick = function () {
+      var modeSel = document.getElementById('mode');
+      modeSel.value = b.getAttribute('data-mode');
+      presetPop.classList.remove('on');
+      if (modeSel.onchange) modeSel.onchange();
+    };
+  });
+  document.addEventListener('click', function () { presetPop.classList.remove('on'); });
+
+  // ---- A6 session goal (chip toggles the goal row; shared kernel store) ----
+  var goalChip = document.getElementById('goal-chip');
+  var goalRow = document.getElementById('goalrow');
+  goalChip.onclick = function () {
+    goalRow.style.display = goalRow.style.display === 'none' ? 'flex' : 'none';
+    if (goalRow.style.display === 'flex') {
+      var inp = document.getElementById('goal-input');
+      inp.placeholder = L ? L.goalPh : '会话目标';
+      inp.value = goalChip.textContent === '' ? '' : goalChip.textContent;
+      inp.focus();
+    }
+  };
+  document.getElementById('goal-set').onclick = function () {
+    var v = document.getElementById('goal-input').value.trim();
+    fetch('/api/goal', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: v })
+    });
+    goalRow.style.display = 'none';
+  };
+  document.getElementById('goal-clear').onclick = function () {
+    fetch('/api/goal', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: '' })
+    });
+    goalRow.style.display = 'none';
+  };
+
+  // ---- A6 plan card (checkable numbered-step list pinned at the top) ----
+  function renderPlanCard(text) {
+    var steps = extractPlan(text);
+    var card = document.getElementById('plancard');
+    if (steps.length === 0) { card.style.display = 'none'; return; }
+    var title = document.getElementById('plancard-title');
+    title.textContent = (L ? L.planCard : '计划') + ' (' + steps.length + ')';
+    var box = document.getElementById('plancard-steps');
+    box.innerHTML = '';
+    steps.forEach(function (st) {
+      var row = document.createElement('label'); row.className = 'pstep';
+      var cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.onchange = function () { row.classList.toggle('done', cb.checked); };
+      var sp = document.createElement('span'); sp.textContent = st;
+      row.appendChild(cb); row.appendChild(sp);
+      box.appendChild(row);
+    });
+    card.style.display = 'block';
+    var logBox = document.getElementById('log');
+    if (card.parentNode !== logBox) logBox.parentNode.insertBefore(card, logBox);
+  }
+
+  // ---- A9 deliverables chips (edit_file/write_file paths -> preview) ----
+  var deliverables = [];
+  function renderDeliverables() {
+    var box = document.getElementById('deliv');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'deliv';
+      log.appendChild(box);
+    }
+    var paths = extractDeliverables(deliverables);
+    if (paths.length === 0) return;
+    box.innerHTML = '';
+    paths.forEach(function (p) {
+      var chip = document.createElement('span');
+      chip.className = 'deliv';
+      chip.textContent = p.split(/[\\\\/]/).pop();
+      chip.title = p;
+      chip.onclick = function () { openPreview(p); };
+      box.appendChild(chip);
+    });
+    var stats = log.querySelector('.stats');
+    if (stats) log.insertBefore(box, stats);
+  }
+  /** A6: pull a checkable step list out of an answer that announces a plan
+   *  (a short heading line with 计划/方案/步骤/plan/steps, then numbered or
+   *  checkbox lines until a blank / non-step line). */
+  function extractPlan(text) {
+    var lines = String(text).split('\n');
+    var idx = -1;
+    for (var i = 0; i < lines.length && i < 40; i++) {
+      var h = lines[i].trim();
+      if (h.length < 40 && /计划|方案|步骤|实施计划|\\bplan\\b|\\bsteps?\\b/i.test(h)) { idx = i + 1; break; }
+    }
+    if (idx < 0) return [];
+    var steps = [];
+    for (var j = idx; j < lines.length && j < idx + 30; j++) {
+      var l = lines[j].trim();
+      if (!l) { if (steps.length) break; else continue; }
+      var num = l.match(/^(?:step\\s*)?(\\d{1,2})[.)、:：]\\s*(.+)$/i);
+      var chk = l.match(/^[-*]\\s*\\[[ x]\\]\\s*(.+)$/);
+      var dash = l.match(/^[-*]\\s+(.+)$/);
+      if (num) steps.push(num[2].slice(0, 80));
+      else if (chk) steps.push(chk[1].slice(0, 80));
+      else if (dash && steps.length) steps.push(dash[1].slice(0, 80));
+      else if (steps.length) break;
+    }
+    return steps.length >= 2 ? steps.slice(0, 12) : [];
+  }
+  /** A9: dedupe touched file paths from edit_file/write_file tool calls. */
+  function extractDeliverables(list) {
+    var seen = {};
+    var out = [];
+    (list || []).forEach(function (d) {
+      var p = d && d.args && typeof d.args.path === 'string' ? d.args.path : null;
+      if (!p) return;
+      var key = p.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(p);
+    });
+    return out.slice(-8);
+  }
+  es.addEventListener('goal', function (e) {
+    var g = JSON.parse(e.data).goal;
+    var gc = document.getElementById('goal-chip');
+    if (g) { gc.style.display = ''; gc.textContent = '\\uD83C\\uDFAF ' + g; gc.title = g; }
+    else { gc.style.display = 'none'; }
+    if (state) state.goal = g || null;
+  });
 
   // ---- composer ----
   // Codex-style single button: it is a SEND button when there is text to
@@ -2238,7 +2472,8 @@ export const PAGE = `<!doctype html>
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         if (token !== atToken || palMode !== 'at') return;
-        palItems = (res.ok ? (res.d.items || []) : []).map(function (it) { return { name: it.rel, desc: '', path: it.path }; });
+        var hits = (res.ok ? (res.d.results || res.d.items || []) : []);
+        palItems = hits.map(function (it) { return { name: it.rel, desc: '', path: it.path }; });
         palSel = 0;
         renderPal();
       })
