@@ -229,13 +229,17 @@ export async function runEvolution(opts: {
     proposals = opts.presetProposals;
   } else {
     proposals = await proposeSkills(provider, signals, say, ancestor ?? undefined, mergeWith ?? undefined);
-    if (proposals.length === 0) {
-      try {
-        const { workflowProposals } = await import('./workflows.ts');
-        proposals = await workflowProposals(provider, home, say);
-      } catch (err) {
-        say(`  awm skipped: ${String(err).slice(0, 80)}`);
-      }
+    // AWM is ADDITIVE, not fallback-only (design intent: "higher abstraction
+    // than per-mistake reflection"). With batch-produced task archetypes
+    // repeating 100+ times/day, the workflow path must get its turn even
+    // when the meta-model also proposes - the -workflow naming + gate still
+    // decides promotion. Guard: only append when clusters are real (>=5).
+    try {
+      const { workflowProposals } = await import('./workflows.ts');
+      const wf = await workflowProposals(provider, home, say);
+      proposals = [...proposals, ...wf];
+    } catch (err) {
+      say(`  awm skipped: ${String(err).slice(0, 80)}`);
     }
   }
   report.proposals = proposals;
