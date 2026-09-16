@@ -81,6 +81,10 @@ export interface Strings {
   cmdResumeNone: string;
   cmdResumeNotFound: (p: string) => string;
   cmdResumeLoaded: (n: number) => string;
+  /** banner shown when /resume actually loads a transcript into the TUI */
+  cmdResuming: (id: string, total: number, hidden: number) => string;
+  /** why tools-required cases are skipped inside /evolve (TUI runs a lite loop) */
+  cmdEvolveHint: string;
   /** Codex-style resume picker (v0.8.2 transplant) */
   pickerTitle: string;
   pickerHint1: string;
@@ -196,6 +200,9 @@ const zh: Strings = {
   cmdResumeNone: '还没有历史会话',
   cmdResumeNotFound: (p) => `没有匹配 "${p}" 的会话`,
   cmdResumeLoaded: (n) => `已恢复会话(${n} 条消息),直接输入内容继续对话`,
+  cmdResuming: (id, total, hidden) => '--- 已恢复会话 ' + id + ' · ' + total + ' 条消息'
+    + (hidden > 0 ? '(前 ' + hidden + ' 条保留在上下文中,未显示)' : '') + ' ---',
+  cmdEvolveHint: '(TUI 内跳过;运行 hmh evolve 执行完整循环)',
   pickerTitle: '恢复会话',
   pickerHint1: 'Enter 恢复 · ↑↓ 浏览 · Tab 切筛选/排序 · ←→ 调整',
   pickerHint2: 'Esc 关闭 · 输入即过滤(标题/id/目录/分支)',
@@ -307,6 +314,9 @@ const en: Strings = {
   cmdResumeNone: 'no past sessions yet',
   cmdResumeNotFound: (p) => `no session matches "${p}"`,
   cmdResumeLoaded: (n) => `session resumed (${n} messages) - just type to continue`,
+  cmdResuming: (id, total, hidden) => '--- resumed ' + id + ' · ' + total + ' messages'
+    + (hidden > 0 ? ' (' + hidden + ' earlier kept in context, not shown)' : '') + ' ---',
+  cmdEvolveHint: '(skipped in tui; run hmh evolve)',
   pickerTitle: 'Resume session',
   pickerHint1: 'Enter resume · ↑↓ browse · Tab filter/sort · ←→ change',
   pickerHint2: 'Esc close · type to filter (title/id/dir/branch)',

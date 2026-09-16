@@ -1127,12 +1127,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     const MAX_RENDER = 80;
     const msgs = tr.messages;
     const skipped = Math.max(0, msgs.length - MAX_RENDER);
-    rt.addText(
-      '--- resumed ' + tr.id + ' · ' + msgs.length + ' messages'
-      + (skipped > 0 ? ' (' + skipped + ' earlier kept in context, not shown)' : '')
-      + ' ---',
-      'dim',
-    );
+    rt.addText(t.cmdResuming(tr.id, msgs.length, skipped), 'dim');
     for (const m of (skipped > 0 ? msgs.slice(skipped) : msgs)) {
       const text = typeof m.content === 'string' ? m.content : '';
       if (m.role === 'user') {
@@ -1339,7 +1334,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
           home,
           provider: cfg.provider,
           runCase: async (c) => {
-            if (c.tools) return '(skipped in tui; run hmh evolve)';
+            if (c.tools) return t.cmdEvolveHint;
             const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
             return r.message.content ?? '';
           },

@@ -17,3 +17,17 @@ test('default locale is zh; functions render', () => {
   const en = strings('en');
   assert.match(en.idle, /idle/i);
 });
+
+test('cmdResuming renders id/total and the hidden-tail note only when nonzero', () => {
+  const zh = strings('zh');
+  assert.match(zh.cmdResuming('abc123', 42, 0), /^--- 已恢复会话 abc123 · 42 条消息 ---$/);
+  assert.match(zh.cmdResuming('abc123', 120, 40), /前 40 条保留在上下文中/);
+  const en = strings('en');
+  assert.equal(en.cmdResuming('abc123', 42, 0), '--- resumed abc123 · 42 messages ---');
+  assert.match(en.cmdResuming('abc123', 120, 40), /40 earlier kept in context/);
+});
+
+test('cmdEvolveHint exists in both locales and points at the full command', () => {
+  assert.match(strings('zh').cmdEvolveHint, /hmh evolve/);
+  assert.match(strings('en').cmdEvolveHint, /hmh evolve/);
+});
