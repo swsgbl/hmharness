@@ -128,6 +128,54 @@ export function nextLocale(current: string, arg: string): 'zh' | 'en' {
   return current === 'en' ? 'zh' : 'en';
 }
 
+/* ---------------- M2 runtime-steering helpers (pure, testable) ---------------- */
+
+/** The trailing `@<query>` token of a task line, or null. Drives the @-file
+ *  palette (codex/dsh @ reference): typing '@' opens it, the following
+ *  path-ish chars extend the query, Enter inserts the picked path. */
+export function atToken(input: string): string | null {
+  if (input.startsWith('/')) return null; // slash commands never @-reference
+  const m = /@([\w./\\-]*)$/.exec(input);
+  return m ? m[1] : null;
+}
+
+/** Substring history search (Ctrl+R): indices of entries containing the
+ *  query (case-insensitive), NEWEST first, capped at 50. Empty query lists
+ *  the most recent 50. */
+export function histMatches(history: string[], query: string): number[] {
+  const q = query.trim().toLowerCase();
+  const out: number[] = [];
+  for (let i = history.length - 1; i >= 0 && out.length < 50; i--) {
+    if (!q || history[i].toLowerCase().includes(q)) out.push(i);
+  }
+  return out;
+}
+
+/** `!` line prefix → the shell command to run (B3), or null. Empty `!` is
+ *  not a command. */
+export function shellBang(line: string): string | null {
+  if (!line.startsWith('!')) return null;
+  const cmd = line.slice(1).trim();
+  return cmd || null;
+}
+
+/** Double-Esc fork-edit arming (B6): a bare Esc when idle+empty returns true
+ *  only if the previous Esc was within `windowMs` and the arm is set. Pure
+ *  timing decision; the runtime keeps escAt/armed state. */
+export function forkArm(prevAt: number, now: number, armed: boolean, windowMs = 800): boolean {
+  return armed && now - prevAt < windowMs;
+}
+
+/** Index of the LAST user-role message — the fork point (T13): a fork keeps
+ *  everything BEFORE it as the new thread's resume and replaces it with the
+ *  edited message. -1 when there is none. */
+export function lastUserIdx(messages: Array<{ role: string }>): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return i;
+  }
+  return -1;
+}
+
 /**
  * SGR mouse wheel decoding: '\x1b[<64;COL;ROWM' is wheel-up (-1), 65 is
  * wheel-down (+1), anything else (clicks, drags, plain keys) is 0.
@@ -186,6 +234,23 @@ export class TuiRuntime {
   /** screen row of each visible palette item (SGR click hit-testing); the
    *  render loop records row = frame.length (1-based) as it pushes rows */
   private paletteClickRows: Array<{ row: number; idx: number }> = [];
+
+  /* ---------------- M2: runtime steering modals (codex parity) ---------------- */
+  /** Ctrl+R incremental history search: { query, matches (history indices), sel } */
+  private histSearch: { query: string; matches: number[]; sel: number } | null = null;
+  /** Ctrl+T full-transcript overlay (also the pager base for B9): title + lines + viewport top */
+  private overlay: { title: string; lines: string[]; top: number } | null = null;
+  /** @-file palette (codex @ fuzzy reference): trailing @token query + ranked hits */
+  private atPal: { query: string; results: Array<{ rel: string; path: string }>; sel: number; token: number; timer: NodeJS.Timeout | null } | null = null;
+  /** double-Esc fork-edit arming (T13): timestamp of the first bare Esc */
+  private escAt = 0;
+  private forkArmed = false;
+  /** driver callbacks for the running-interaction trio (T9/T10) */
+  private interruptFn: (() => void) | null = null;
+  private injectFn: ((text: string) => void) | null = null;
+  private forkEditFn: (() => void) | null = null;
+  /** last user-submitted line, for Esc-Esc edit-and-fork (T13) */
+  private lastUserMsg = '';
 
   constructor() {
     // ?1l forces DECCKM OFF so arrow keys arrive as CSI (\x1b[A) even if a
@@ -320,6 +385,65 @@ export class TuiRuntime {
     const pos = vis.length ? st.selected + 1 : 0;
     const posLine = t.pickerPos(pos, vis.length, vis.length ? String(Math.round((pos / vis.length) * 100)) : '0');
     frame.push(' '.repeat(Math.max(0, W - posLine.length - 1)) + DIM(posLine));
+  }
+
+  /** Ctrl+R history-search modal (B4): query line + matching entries,
+   *  newest first; Enter adopts, Esc closes, ^P/^N or arrows move. */
+  private renderHistSearch(frame: string[], W: number, H: number): void {
+    const hs = this.histSearch!;
+    const t = this.t;
+    frame.push(truncateTo(BOLD(' ⌕ ' + t.histSearchTitle) + DIM(`  ${hs.matches.length}`), W));
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(truncateTo(' ' + (hs.query || DIM(t.histSearchNone)), W - 1));
+    frame.push(DIM('─'.repeat(W)));
+    const listH = Math.max(3, H - 5);
+    const vis = hs.matches;
+    for (let i = 0; i < listH && i < vis.length; i++) {
+      const sel = i === hs.sel;
+      const line = this.history[vis[i]] ?? '';
+      const plain = truncateTo((i + 1) + '. ' + line, W - 1);
+      frame.push(sel ? '\x1b[7m' + plain + ' '.repeat(Math.max(0, W - 1 - strWidth(plain))) + '\x1b[27m' : ' ' + plain);
+    }
+    if (vis.length === 0) frame.push(DIM('  ' + t.histSearchNone));
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(DIM(truncateTo('  ' + t.histSearchHint, W - 1)));
+  }
+
+  /** Ctrl+T full-transcript overlay (B5): title + scrollable lines; also the
+   *  pager base for long outputs (B9). q/Esc closes, ↑↓/PgUp/PgDn/g/G scroll. */
+  private renderOverlay(frame: string[], W: number, H: number): void {
+    const ov = this.overlay!;
+    const t = this.t;
+    const listH = Math.max(5, H - 3);
+    frame.push(truncateTo(BOLD(' ' + ov.title) + DIM(`  ${ov.lines.length}`), W));
+    frame.push(DIM('─'.repeat(W)));
+    if (ov.lines.length === 0) frame.push(DIM('  (empty)'));
+    for (let i = 0; i < listH && ov.top + i < ov.lines.length; i++) {
+      frame.push(truncateTo(ov.lines[ov.top + i] || ' ', W - 1));
+    }
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(DIM(truncateTo('  ' + t.overlayHint, W - 1)));
+  }
+
+  /** @-file palette (B2): ranked workspace hits for the trailing @token.
+   *  Enter inserts the path; Esc closes; arrows move. */
+  private renderAtPal(frame: string[], W: number, H: number): void {
+    const pal = this.atPal!;
+    const t = this.t;
+    const title = BOLD(' @ ') + DIM('/' + pal.query + (pal.results.length ? ` · ${pal.results.length}` : ''));
+    frame.push(truncateTo(title, W));
+    frame.push(DIM('─'.repeat(W)));
+    const listH = Math.min(8, Math.max(3, H - 6));
+    if (pal.results.length === 0) {
+      frame.push(DIM('  ' + t.histSearchNone));
+    }
+    for (let i = 0; i < listH && i < pal.results.length; i++) {
+      const sel = i === pal.sel;
+      const plain = truncateTo('  ' + pal.results[i].rel, W - 1);
+      frame.push(sel ? '\x1b[7m' + plain + ' '.repeat(Math.max(0, W - 1 - strWidth(plain))) + '\x1b[27m' : plain);
+    }
+    frame.push(DIM('─'.repeat(W)));
+    frame.push(DIM(truncateTo('  ' + t.atPalHint, W - 1)));
   }
 
   /** Run the highlighted palette row (shared by Enter and palette clicks);
@@ -560,8 +684,161 @@ export class TuiRuntime {
     return line;
   }
 
+  setInput(text: string): void {
+    this.input = text;
+    this.caret = text.length;
+    this.cmdIdx = 0;
+    this.dirty = true;
+  }
+
+  setLastUserText(s: string): void {
+    this.lastUserMsg = s;
+  }
+
+  /** Last user-submitted line (Esc-Esc edit-and-fork source, T13). */
+  getLastUserText(): string {
+    return this.lastUserMsg;
+  }
+
   onSubmit(fn: () => void): void {
     this.driver = fn;
+  }
+
+  /* ---------------- M2 runtime steering API (driver wiring) ---------------- */
+
+  onInterrupt(fn: () => void): void { this.interruptFn = fn; }
+  onInject(fn: (text: string) => void): void { this.injectFn = fn; }
+  onForkEdit(fn: () => void): void { this.forkEditFn = fn; }
+
+  /** Close any open modal (Esc priority: panels close before anything else,
+   *  T7/T9 order). Returns true when something was open. */
+  private closeModal(): boolean {
+    if (this.histSearch) { this.histSearch = null; this.dirty = true; return true; }
+    if (this.overlay) { this.overlay = null; this.dirty = true; return true; }
+    if (this.atPal) { this.atPal = null; this.dirty = true; return true; }
+    return false;
+  }
+
+  /** Ctrl+R: incremental history search modal (B4). Enter adopts the match
+   *  into the input; Esc closes; ^P/^N or arrows move. */
+  private openHistSearch(): void {
+    if (!this.history.length) return;
+    this.histSearch = { query: '', matches: histMatches(this.history, ''), sel: 0 };
+    this.dirty = true;
+  }
+  private histKey(data: string): void {
+    const hs = this.histSearch;
+    if (!hs) return;
+    if (data === '\x1b') { this.histSearch = null; this.dirty = true; return; }
+    if (data === '\r') {
+      const line = this.history[hs.matches[hs.sel]];
+      if (line !== undefined) { this.histSearch = null; this.setInput(line); }
+      return;
+    }
+    if (data === '\x1b[A' || data === '\x10') { hs.sel = Math.max(0, hs.sel - 1); this.dirty = true; return; }
+    if (data === '\x1b[B' || data === '\x0e') { hs.sel = Math.min(hs.matches.length - 1, hs.sel + 1); this.dirty = true; return; }
+    if (data === '\x7f' || data === '\b') { hs.query = hs.query.slice(0, -1); hs.matches = histMatches(this.history, hs.query); hs.sel = 0; this.dirty = true; return; }
+    if (data.length === 1 && data >= ' ') { hs.query += data; hs.matches = histMatches(this.history, hs.query); hs.sel = 0; this.dirty = true; }
+  }
+
+  /** Ctrl+T: full-transcript overlay (B5), also the pager base for long
+   *  outputs (B9). ↑↓/PgUp/PgDn/g/G scroll, Esc/q closes. */
+  private overlaySource: () => string[] = () => [];
+  setOverlaySource(fn: () => string[]): void { this.overlaySource = fn; }
+  private openOverlay(title: string, lines: string[]): void {
+    const H = Math.max(5, (stdout.rows || 30) - 2);
+    this.overlay = { title, lines, top: Math.max(0, lines.length - H) };
+    this.dirty = true;
+  }
+  private overlayKey(data: string): void {
+    const ov = this.overlay;
+    if (!ov) return;
+    const H = Math.max(5, (stdout.rows || 30) - 2);
+    const maxTop = Math.max(0, ov.lines.length - H);
+    if (data === '\x1b' || data === '\x03' || data === 'q' || data === 'Q') { this.overlay = null; this.dirty = true; return; }
+    if (data === '\x1b[A' || data === '\x1b[5~' || data === 'k') { ov.top = Math.max(0, ov.top - 1); this.dirty = true; return; }
+    if (data === '\x1b[B' || data === '\x1b[6~' || data === 'j') { ov.top = Math.min(maxTop, ov.top + 1); this.dirty = true; return; }
+    if (data === '\x1b[H' || data === 'g') { ov.top = 0; this.dirty = true; return; }
+    if (data === '\x1b[F' || data === 'G') { ov.top = maxTop; this.dirty = true; return; }
+  }
+
+  /** @-file palette (B2): opens/refreshes from the input's trailing @token. */
+  private refreshAtPal(): void {
+    const token = atToken(this.input);
+    if (token === null) { if (this.atPal) { this.atPal = null; this.dirty = true; } return; }
+    if (!this.atPal) this.atPal = { query: token, results: [], sel: 0, token: 0, timer: null };
+    this.atPal.query = token;
+    if (this.atPal.timer) clearTimeout(this.atPal.timer);
+    const tk = ++this.atPal.token;
+    this.atPal.timer = setTimeout(() => void this.runAtSearch(tk), 120);
+  }
+  private async runAtSearch(tk: number): Promise<void> {
+    const pal = this.atPal;
+    if (!pal || pal.token !== tk) return;
+    try {
+      const { fuzzyScore, SKIP_DIRS, MAX_SEARCH_DEPTH, MAX_SEARCH_ENTRIES, MAX_SEARCH_RESULTS } = await import('@hmharness/web');
+      const { readdir } = await import('node:fs/promises');
+      const { join: j } = await import('node:path');
+      const q = pal.query;
+      const root = process.cwd();
+      const hits: Array<{ rel: string; path: string; score: number }> = [];
+      let visited = 0;
+      const walk = async (dir: string, depth: number): Promise<void> => {
+        if (depth > MAX_SEARCH_DEPTH || visited >= MAX_SEARCH_ENTRIES) return;
+        let entries;
+        try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          if (visited >= MAX_SEARCH_ENTRIES) return;
+          visited++;
+          if (e.isSymbolicLink()) continue;
+          const abs = j(dir, e.name);
+          if (e.isDirectory()) {
+            if (SKIP_DIRS.has(e.name)) continue;
+            await walk(abs, depth + 1);
+            continue;
+          }
+          if (!e.isFile()) continue;
+          const rel = abs.slice(root.length + 1).replace(/\\/g, '/');
+          const score = fuzzyScore(q, rel);
+          if (score >= 0) hits.push({ rel, path: abs, score });
+        }
+      };
+      await walk(root, 0);
+      hits.sort((a, b) => b.score - a.score || a.rel.localeCompare(b.rel));
+      if (!this.atPal || this.atPal.token !== tk) return;
+      this.atPal.results = hits.slice(0, MAX_SEARCH_RESULTS).map(({ rel, path }) => ({ rel, path }));
+      this.atPal.sel = 0;
+      this.dirty = true;
+    } catch { /* search is best-effort; the palette just shows nothing */ }
+  }
+  private atPalKey(data: string): void {
+    const pal = this.atPal;
+    if (!pal) return;
+    if (data === '\x1b') { this.atPal = null; this.dirty = true; return; }
+    if (data === '\r') {
+      const pick = pal.results[pal.sel];
+      if (pick) {
+        this.input = this.input.replace(/@[\w./\\-]*$/, '@' + pick.rel);
+        this.caret = this.input.length;
+      }
+      this.atPal = null;
+      this.dirty = true;
+      return;
+    }
+    if (data === '\x1b[A') { pal.sel = Math.max(0, pal.sel - 1); this.dirty = true; return; }
+    if (data === '\x1b[B') { pal.sel = Math.min(pal.results.length - 1, pal.sel + 1); this.dirty = true; return; }
+    // printable/backspace edits the input line itself; the palette re-filters
+    if (data === '\x7f' || data === '\b') {
+      if (this.caret > 0) { this.input = this.input.slice(0, this.caret - 1) + this.input.slice(this.caret); this.caret--; }
+      this.refreshAtPal();
+      return;
+    }
+    if (data.length === 1 && data >= ' ') {
+      this.input = this.input.slice(0, this.caret) + data + this.input.slice(this.caret);
+      this.caret += data.length;
+      this.refreshAtPal();
+      return;
+    }
   }
 
   /* ---------------- keyboard ---------------- */
@@ -592,6 +869,11 @@ export class TuiRuntime {
       if (key !== null) this.pickerInput(key);
       return;
     }
+    // M2 modals own the keys while open (history search, transcript overlay,
+    // @-file palette) — each closes on its own Esc
+    if (this.histSearch) { this.histKey(data); return; }
+    if (this.overlay) { this.overlayKey(data); return; }
+    if (this.atPal) { this.atPalKey(data); return; }
     // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. With
     // button-event mode (1002) everything else - click, drag, release,
     // motion - still belongs to the terminal's native selection.
@@ -647,10 +929,48 @@ export class TuiRuntime {
       this.dirty = true;
       return;
     }
+    // Ctrl+Enter = inject into the RUNNING task (T10; terminals send it as
+    // '\n' in raw mode; consistent with web W7 Ctrl+Enter). Idle it behaves
+    // exactly like Enter (submit).
+    if (data === '\x0a') {
+      if (this.busy && this.input.trim()) {
+        const text = this.input;
+        this.input = ''; this.caret = 0; this.cmdIdx = 0;
+        this.dirty = true;
+        this.injectFn?.(text);
+      } else {
+        this.pickHighlighted();
+      }
+      return;
+    }
+    // Ctrl+R = incremental history search (B4)
+    if (data === '\x12') { this.openHistSearch(); return; }
+    // Ctrl+T = full-transcript overlay (B5): every transcript line PLUS the
+    // full (folded-away) tool outputs, via the driver-registered source
+    if (data === '\x14') {
+      const lines: string[] = [];
+      for (const e of this.entries) lines.push(...e.lines.map(stripAnsi));
+      const extra = this.overlaySource();
+      this.openOverlay(this.t.tuiTranscript, [...lines, ...extra]);
+      return;
+    }
     if (data === '\x1b') {
-      // Esc closes an open palette / discards the draft. Exact-match only:
-      // arrow sequences arrive as one chunk ('\x1b[A') and never match.
-      if (this.input) { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; }
+      // Exact Esc only (arrow sequences arrive as '\x1b[A' and never match).
+      // T9 order: an open modal closes FIRST; else running -> interrupt the
+      // current task; else a non-empty draft is cleared (T7); else (idle +
+      // empty) a second Esc within 800ms arms edit-and-fork (T13).
+      if (this.closeModal()) return;
+      if (this.busy) { this.interruptFn?.(); return; }
+      if (this.input) { this.input = ''; this.caret = 0; this.cmdIdx = 0; this.dirty = true; return; }
+      const now = Date.now();
+      if (forkArm(this.escAt, now, this.forkArmed)) {
+        this.forkArmed = false; this.escAt = 0;
+        if (this.lastUserMsg) this.forkEditFn?.();
+      } else {
+        this.forkArmed = true; this.escAt = now;
+        this.status = this.t.forkArmed;
+        this.dirty = true;
+      }
       return;
     }
     if (data === '\r') {
@@ -760,6 +1080,8 @@ export class TuiRuntime {
     this.caret += data.length;
     this.cmdIdx = 0;
     this.dirty = true;
+    // '@' opens the file palette (B2); refreshAtPal() is a no-op otherwise
+    this.refreshAtPal();
   }
 
   /* ---------------- rendering ---------------- */
@@ -772,6 +1094,21 @@ export class TuiRuntime {
     const frame: string[] = [];
     if (this.resumeModal) {
       this.renderResumePicker(frame, W, H);
+      this.flushFrame(frame, H);
+      return;
+    }
+    if (this.histSearch) {
+      this.renderHistSearch(frame, W, H);
+      this.flushFrame(frame, H);
+      return;
+    }
+    if (this.overlay) {
+      this.renderOverlay(frame, W, H);
+      this.flushFrame(frame, H);
+      return;
+    }
+    if (this.atPal) {
+      this.renderAtPal(frame, W, H);
       this.flushFrame(frame, H);
       return;
     }
@@ -1011,43 +1348,121 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   // Task queue: new submissions during a running task are queued (not
   // rejected, not run concurrently — sequential execution preserves history
   // integrity). Slash commands still run immediately (they're quick).
-  // Codex-style interaction: ONE key does both jobs — Enter sends when there
-  // is text and STOPS the running task when the line is empty (the TUI
-  // equivalent of the send button that becomes a stop button). No `!` prefix,
-  // no /queue skip: the queue is visible in the busy hints line.
+  // M2 running-interaction trio (T9/T10, codex parity):
+  //   Enter (text)   = queue for the NEXT turn
+  //   Ctrl+Enter     = INJECT into the running turn (web W7-consistent)
+  //   Esc (running)  = interrupt the current turn (was: empty Enter = stop —
+  //                     reversed by 复案 2026-09-17, see DESIGNS.md)
   const taskQueue: string[] = [];
   let taskRunning = false;
   let currentAbort: AbortController | null = null;
+  /** live steering channel: Ctrl+Enter pushes here; runAgentTask drains it
+   *  into the running loop (InjectChannel shape) */
+  let currentInject: { queue: string[]; active: boolean } | null = null;
+  /** full tool outputs retained for the Ctrl+T transcript overlay (B5) —
+   *  the transcript itself folds them to one line (W1/T5 spirit) */
+  const fullToolLog: Array<{ name: string; output: string }> = [];
+  /** set by Esc-Esc edit-and-fork (T13): the next submission forks a new
+   *  session from the edited message (kernel forkFrom provenance) */
+  let pendingFork = false;
+
+  async function runShellBang(cmd: string): Promise<void> {
+    // B3: `! command` runs the local shell through the SAME gate as the
+    // agent's run_command tool — DENY_PATTERNS hard-refuse destructive
+    // one-liners inside the tool; the TUI approval dialog stands in for the
+    // loop's ask() (never a bypass; hard constraint #5).
+    rt.addUser('!' + cmd);
+    const tool = reg.get('run_command');
+    if (!tool) { rt.addText('run_command tool missing', 'err'); return; }
+    const args = { command: cmd };
+    // the tool's own gate decides (DENY_PATTERNS + shellgate live INSIDE
+    // run_command.execute); the TUI dialog stands in for the loop's ask(),
+    // except in YOLO/auto mode where approval is pre-granted
+    if (tool.needsApproval?.(args, { cwd: process.cwd(), home }) && !autoApprove) {
+      const ok = await rt.requestApproval('run_command', args);
+      if (!ok) { rt.addText(DIM('denied')); return; }
+    }
+    const r = await tool.execute(args, { cwd: process.cwd(), home });
+    const first = String(r.output).split('\n').find((l) => l.trim()) ?? '';
+    rt.addText(`  ${r.isError ? RED('✗') : GREEN('•')} ${DIM('⎿ ' + first.trim().slice(0, 120))}`, r.isError ? 'err' : 'dim');
+    const rest = String(r.output).split('\n').slice(1).join('\n').trim();
+    if (rest) rt.addText(rest.slice(0, 2000), 'dim');
+    fullToolLog.push({ name: 'shell', output: String(r.output).slice(0, 4000) });
+  }
 
   rt.onSubmit(() => {
     const line = rt.consumeInput().trim();
     if (!line) {
-      // empty Enter while running = stop (interrupts the current task;
-      // queued tasks still run — clear them first with /queue clear if not)
-      if (taskRunning) {
-        currentAbort?.abort();
-        rt.addText('⏹ interrupting current task (in-flight tool calls finish first; queued tasks still run)', 'dim');
-      }
+      // 复案 (T10): empty Enter no longer stops the running task. Stopping
+      // is now an explicit Esc (T9). An empty Enter while running is a nudge.
+      if (taskRunning) rt.addText(DIM('(empty — Esc stops · type + Enter queues · Ctrl+Enter injects)'));
       return;
     }
     if (line.startsWith('/')) {
       void handleLine(line);
       return;
     }
+    if (shellBang(line) !== null) {
+      void runShellBang(shellBang(line)!);
+      return;
+    }
+    rt.setLastUserText(line);
     if (taskRunning) {
       taskQueue.push(line);
       rt.setQueued(taskQueue.length);
       rt.addText(`📋 queued: "${line.slice(0, 60)}${line.length > 60 ? '…' : ''}" (${taskQueue.length} waiting)`, 'dim');
       return;
     }
-    void executeTaskQueue(line);
+    // Esc-Esc fork (T13): the new thread inherits everything BEFORE the last
+    // user message (the edited line replaces it) and records the parent
+    // session id in its rollout meta (kernel forkFrom)
+    const forkFrom = pendingFork ? currentSessionId : undefined;
+    const forkResume = pendingFork ? history.slice(0, lastUserIdx(history)) : undefined;
+    pendingFork = false;
+    void executeTaskQueue(line, forkFrom, forkResume);
+  });
+  rt.onInterrupt(() => {
+    // T9: Esc while running interrupts the current turn. In-flight tool calls
+    // finish first; queued tasks still run (clear with /queue clear).
+    if (taskRunning && currentAbort) {
+      currentAbort.abort();
+      rt.addText('⏹ interrupting current task (in-flight tool calls finish first; queued tasks still run)', 'dim');
+    }
+  });
+  rt.onInject((text) => {
+    // T10: Ctrl+Enter injects into the RUNNING task (no-op when idle — the
+    // key submits normally in that case)
+    if (currentInject?.active) {
+      currentInject.queue.push(text);
+      rt.addText(`⤷ injected into running task: "${text.slice(0, 80)}"`, 'dim');
+    }
+  });
+  rt.onForkEdit(() => {
+    // T13: Esc Esc (idle + empty) loads the last user message for editing;
+    // the next submit forks a new session from it
+    const last = rt.getLastUserText();
+    if (last) {
+      pendingFork = true;
+      rt.setInput(last);
+      rt.addText(DIM('✂ edit and fork — Enter sends as a NEW session from this message'), 'dim');
+    }
+  });
+  // Ctrl+T overlay source: transcript + FULL (folded-away) tool outputs (B5)
+  rt.setOverlaySource(() => {
+    const out: string[] = [];
+    for (const t of fullToolLog) {
+      out.push('', `── ${t.name} ──`, t.output);
+    }
+    return out;
   });
 
-  async function executeTaskQueue(firstTask: string): Promise<void> {
+  async function executeTaskQueue(firstTask: string, forkFrom?: string, forkResume?: ChatMessage[]): Promise<void> {
     taskRunning = true;
     let task: string | undefined = firstTask;
+    let first = true;
     while (task) {
-      await runSingleTask(task);
+      await runSingleTask(task, first ? forkFrom : undefined, first ? forkResume : undefined);
+      first = false;
       task = taskQueue.shift();
       rt.setQueued(taskQueue.length);
       if (task) rt.addText(`▶ next queued: "${task.slice(0, 60)}${task.length > 60 ? '…' : ''}"`, 'dim');
@@ -1055,10 +1470,13 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     taskRunning = false;
   }
 
-  async function runSingleTask(line: string): Promise<void> {
+  async function runSingleTask(line: string, forkFrom?: string, forkResume?: ChatMessage[]): Promise<void> {
     rt.addUser(line);
     rt.setBusy(true, t.running);
     currentAbort = new AbortController();
+    const injectCh: { queue: string[]; active: boolean } = { queue: [], active: false };
+    currentInject = injectCh;
+    const resumeBase = forkResume ?? history;
     let appender: (((c: string) => void) & { drop: () => void }) | null = null;
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
     try {
@@ -1067,9 +1485,14 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
         registry: reg,
         cfg,
         yes: autoApprove,
-        resumeMessages: history,
-        sessionId: currentSessionId,
+        resumeMessages: resumeBase,
+        sessionId: forkResume !== undefined ? undefined : currentSessionId,
         signal: currentAbort.signal,
+        // M2 runtime steering: Ctrl+Enter pushes here; the runner drains it
+        // between tool batches and the injected text lands as a user message
+        inject: injectCh,
+        // Esc-Esc fork (T13): the new rollout records the parent session id
+        ...(forkFrom ? { forkFrom } : {}),
         approvalAsk: (name, args) => rt.requestApproval(name, args),
         events: {
           onLine: (l) => { if (kind === 'reasoning') rt.foldThinking(); appender = null; kind = null; rt.addText(l, 'dim'); },
@@ -1098,15 +1521,24 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
             const dot = isError ? RED('✗') : GREEN('•');
             const first = output.split('\n').find((l) => l.trim()) ?? '';
             rt.addText(`  ${dot} ${DIM('⎿ ' + first.trim().slice(0, 100))}`);
+            // retain the FULL output for the Ctrl+T transcript overlay (B5);
+            // the transcript itself keeps only the folded first line
+            fullToolLog.push({ name, output: output.slice(0, 4000) });
+            if (fullToolLog.length > 100) fullToolLog.splice(0, fullToolLog.length - 100);
+          },
+          onInjected: (message) => {
+            rt.addText(`⤷ injected: "${message.slice(0, 80)}"`, 'dim');
           },
         },
       });
       rt.setBusy(false);
       currentSessionId = result.sessionId;
+      currentInject = null;
       rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
-      history = [...history, { role: 'user', content: line }, ...result.messages.slice(history.length + 2)];
+      history = [...resumeBase, { role: 'user', content: line }, ...result.messages.slice(resumeBase.length + 2)];
     } catch (err) {
       rt.setBusy(false);
+      currentInject = null;
       rt.addText(String(err), 'err');
     } finally {
       currentAbort = null;
@@ -1167,7 +1599,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       const queueList = taskQueue.length > 0
         ? taskQueue.map((task, i) => '  ' + (i + 1) + '. ' + task.slice(0, 70)).join('\n')
         : '  (empty)';
-      rt.addText('queue: ' + status + ' | ' + taskQueue.length + ' waiting\n' + queueList + '\n\nempty Enter = stop current · typed Enter = queue · /queue clear = drop all', 'dim');
+      rt.addText('queue: ' + status + ' | ' + taskQueue.length + ' waiting\n' + queueList + '\n\nEsc = stop current · type+Enter = queue · Ctrl+Enter = inject · /queue clear = drop all', 'dim');
       return;
     }
     if (line === '?' || line === '/help') {
@@ -1206,7 +1638,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       // cwd filter, sort toolbar, lazy pages). It is a modal: it cannot share
       // the screen with a running task's streaming output.
       if (!arg) {
-        if (taskRunning) { rt.addText('task running - stop it first (empty Enter), then /resume', 'dim'); return; }
+        if (taskRunning) { rt.addText('task running - Esc to stop, then /resume', 'dim'); return; }
         const pick = await rt.openResumePicker();
         if (!pick || pick.kind !== 'resume') return;
         await resumeInto(pick.row.file);

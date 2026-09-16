@@ -62,6 +62,18 @@ export interface Strings {
   thought: string;
   /** busy spinner text, shown in the input-box status line (TUI) */
   tuiRunning: string;
+  /** M2: Ctrl+T full-transcript overlay title (B5) */
+  tuiTranscript: string;
+  /** M2: Ctrl+R history-search modal (B4) */
+  histSearchTitle: string;
+  histSearchNone: string;
+  histSearchHint: string;
+  /** M2: @-file palette hint (B2) */
+  atPalHint: string;
+  /** M2: transcript-overlay / pager footer hint (B5/B9) */
+  overlayHint: string;
+  /** M2: Esc-Esc fork-edit armed hint (T13) */
+  forkArmed: string;
   /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
   cmdModelHint: string;
   /** palette footer key hint: how to drive the slash/model picker (TUI) */
@@ -180,11 +192,18 @@ const zh: Strings = {
   tuiApprove: '批准',
   tuiDeny: '拒绝',
   tuiApprovalHint: 'enter/y 批准 · esc/n 拒绝',
-  tuiHints: 'enter 发送 · 滚轮/↑↓ 翻页 · ^P/^N 历史 · esc 清空 · 拖选复制 · ^C 退出 · /help',
-  tuiBusyHints: (queued) => `运行中 · 空行回车=停止 · 新输入=排队(${queued}) · esc 清空 · /help`,
+  tuiHints: 'enter 发送 · Esc 中断/清空 · Ctrl+Enter 注入 · Ctrl+R 历史搜索 · Ctrl+T 转录 · ^P/^N 历史 · esc 清空 · ^C 退出 · /help',
+  tuiBusyHints: (queued) => `运行中 · Esc=停止 · 输入=排队(${queued}) · Ctrl+Enter=注入 · /help`,
   thinking: '思考中',
   thought: '已完成思考',
   tuiRunning: '运行中…',
+  tuiTranscript: '完整转录(含工具输出)',
+  histSearchTitle: '历史搜索',
+  histSearchNone: '(无匹配)',
+  histSearchHint: '↑↓ 选择 · Enter 采用 · Esc 取消',
+  atPalHint: '↑↓ 选择 · Enter 插入路径 · Esc 取消',
+  overlayHint: '↑↓/PgUp/PgDn 滚动 · g/G 首尾 · q/Esc 返回',
+  forkArmed: '再按 Esc:编辑上一条并 fork',
   cmdModelHint: '切换 chat 路由: /model <name>',
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
   cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
@@ -294,11 +313,18 @@ const en: Strings = {
   tuiApprove: 'Approve',
   tuiDeny: 'Deny',
   tuiApprovalHint: 'enter/y approve · esc/n deny',
-  tuiHints: 'enter send · wheel/arrows scroll · ^P/^N history · esc clear · drag to copy · ^C quit · /help',
-  tuiBusyHints: (queued) => `running · Enter on empty line = stop · typing queues (${queued}) · esc clear · /help`,
+  tuiHints: 'enter send · Esc interrupt/clear · Ctrl+Enter inject · Ctrl+R history · Ctrl+T transcript · ^P/^N history · esc clear · ^C quit · /help',
+  tuiBusyHints: (queued) => `running · Esc=stop · typing queues (${queued}) · Ctrl+Enter=inject · /help`,
   thinking: 'thinking',
   thought: 'thought (done)',
   tuiRunning: 'running…',
+  tuiTranscript: 'full transcript (incl. tool outputs)',
+  histSearchTitle: 'history search',
+  histSearchNone: '(no match)',
+  histSearchHint: '↑↓ select · Enter adopt · Esc close',
+  atPalHint: '↑↓ select · Enter insert path · Esc close',
+  overlayHint: '↑↓/PgUp/PgDn scroll · g/G top/bottom · q/Esc back',
+  forkArmed: 'Esc again: edit last message and fork',
   cmdModelHint: 'switch chat route: /model <name>',
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',
   cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { COMMANDS, matchCommands, parseWheel, nextLocale } from '../tui.ts';
+import { COMMANDS, matchCommands, parseWheel, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
 test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
@@ -329,5 +329,92 @@ test('slash palette unchanged: /m + Enter runs the highlighted command', async (
     // first row in COMMANDS order wins ('/model' is listed before '/mcp');
     // with the new flow, submitting bare '/model' routes into the picker
     assert.deepEqual(h.submitted, [matchCommands('/m')[0].name]);
+  } finally { h.restore(); }
+});
+
+/* ---------------- M2: runtime-steering helpers + wiring ---------------- */
+
+test('atToken: trailing @query only, never inside slash commands', () => {
+  assert.equal(atToken(''), null);
+  assert.equal(atToken('read src/main'), null);
+  assert.equal(atToken('look at @'), '');
+  assert.equal(atToken('look at @ser'), 'ser');
+  assert.equal(atToken('@packages/web/src/page.ts'), 'packages/web/src/page.ts');
+  assert.equal(atToken('two @tokens @x'), 'x', 'only the trailing token counts');
+  assert.equal(atToken('/resume @foo'), null, 'slash commands never @-reference');
+});
+
+test('histMatches: substring, case-insensitive, newest first, capped at 50', () => {
+  const h = ['a one', 'b two', 'c one two', 'd THREE'];
+  assert.deepEqual(histMatches(h, 'one'), [2, 0]);
+  assert.deepEqual(histMatches(h, 'THREE'), [3]);
+  assert.deepEqual(histMatches(h, ''), [3, 2, 1, 0], 'empty query = most recent 50');
+  assert.deepEqual(histMatches(h, 'zzz'), []);
+  const big = Array.from({ length: 80 }, (_, i) => 'task ' + i);
+  assert.equal(histMatches(big, '').length, 50, 'cap at 50');
+  assert.equal(histMatches(big, '')![0], 79, 'newest first');
+});
+
+test('shellBang: ! prefix extraction, empty ! is not a command', () => {
+  assert.equal(shellBang('!dir /b'), 'dir /b');
+  assert.equal(shellBang('  !  x'), null, 'trimmed line must START with !');
+  assert.equal(shellBang('!'), null, 'bare ! has no command');
+  assert.equal(shellBang('!  '), null);
+  assert.equal(shellBang('echo hi'), null, 'no ! -> not a shell command');
+});
+
+test('forkArm: double-Esc within window arms, stale arm does not fire', () => {
+  assert.equal(forkArm(1000, 1300, true), true, 'within 800ms');
+  assert.equal(forkArm(1000, 1900, true), false, 'over 800ms');
+  assert.equal(forkArm(1000, 1200, false), false, 'not armed');
+});
+
+test('lastUserIdx: finds the LAST user message (the fork point)', () => {
+  const msgs = [
+    { role: 'system' }, { role: 'user' }, { role: 'assistant' }, { role: 'tool' }, { role: 'user' }, { role: 'assistant' },
+  ];
+  assert.equal(lastUserIdx(msgs), 4);
+  assert.equal(lastUserIdx([{ role: 'assistant' }]), -1);
+});
+
+test('M2 wiring: Esc while running interrupts; Ctrl+Enter while running injects', async () => {
+  const h = await makeTui();
+  try {
+    let interrupted = 0;
+    let injected: string[] = [];
+    h.rt.onInterrupt(() => { interrupted++; });
+    h.rt.onInject((text) => { injected.push(text); });
+    // running: Esc interrupts (T9)
+    h.rt.setBusy(true, 'running');
+    h.keys('\x1b');
+    assert.equal(interrupted, 1);
+    // running + typed text: Ctrl+Enter injects (T10)
+    for (const ch of 'update the readme') h.keys(ch);
+    h.keys('\x0a');
+    assert.deepEqual(injected, ['update the readme']);
+    assert.equal(h.submitted.length, 0, 'inject must NOT go through the submit path');
+    // idle: Ctrl+Enter behaves like Enter (submit)
+    h.rt.setBusy(false);
+    h.keys('a plain task');
+    h.keys('\x0a');
+    assert.deepEqual(h.submitted, ['a plain task']);
+  } finally { h.restore(); }
+});
+
+test('M2 wiring: Esc Esc (idle + empty) arms edit-and-fork; Esc with a draft clears it', async () => {
+  const h = await makeTui();
+  try {
+    let forkEdits = 0;
+    h.rt.onForkEdit(() => { forkEdits++; });
+    h.rt.setLastUserText('the last task');
+    // first Esc (idle + empty) arms; second within 800ms fires fork-edit
+    h.keys('\x1b');
+    h.keys('\x1b');
+    assert.equal(forkEdits, 1);
+    // a draft is cleared by Esc, NOT forked (T7)
+    for (const ch of 'draft text') h.keys(ch);
+    h.keys('\x1b');
+    assert.equal(h.rt.paletteProbe().input, '', 'Esc clears the draft');
+    assert.equal(forkEdits, 1, 'no fork from a non-empty draft');
   } finally { h.restore(); }
 });
