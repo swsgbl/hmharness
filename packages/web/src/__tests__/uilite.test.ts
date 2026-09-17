@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables } from '../uilite.ts';
+import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables, zhTask } from '../uilite.ts';
 
 test('fuzzyMatchScore: subsequence rank, prefix/boundary bonuses, -1 on miss', () => {
   assert.ok(fuzzyMatchScore('st', 'settings.ts') >= 0, 's-t is a subsequence');
@@ -97,6 +97,21 @@ test('renderMarkdown: token coloring inside fenced code blocks (A4)', () => {
   assert.match(html, /<span class="tok-n">1<\/span>/, 'numbers colored');
   assert.match(html, /<span class="tok-c">\/\/ note<\/span>/, 'comments colored');
   assert.match(html, /<span class="tok-s">"hi"<\/span>/, 'strings colored');
+});
+
+test('zhTask: translates bench templates (full AND truncated forms) to Chinese actions', () => {
+  const full = 'Read C:/Users/hongfu/.hmharness/bench/cases/behave-target6.txt with read_file, then reply ONLY the line count as a digit.';
+  assert.equal(zhTask(full), '读取文件，回答行数（数字）');
+  // the SAME task truncated at 90 chars (labelableSessions slice) — the
+  // variant phrase is gone, must fall back to the generic read action
+  const truncated = full.slice(0, 90);
+  assert.match(zhTask(truncated), /^读取文件 behave-target6\.txt/);
+  const mod = 'Read G:/x/SelfFeedN/entry/src/main/module.json5 with read_file, then reply ONLY the mainElement value.';
+  assert.match(zhTask(mod), /mainElement/);
+  const modTrunc = mod.slice(0, 90);
+  assert.match(zhTask(modTrunc), /^读取模块配置/);
+  assert.match(zhTask('List the directory C:/x/cases with list_dir, then reply ONLY the number of files'), /文件数量/);
+  assert.equal(zhTask('直接回复两个字:ok'), '直接回复两个字:ok', 'real Chinese tasks pass through');
 });
 
 test('uiLiteSource: serialized functions are plain ES5 (no arrows, no ${}) for inline injection', () => {

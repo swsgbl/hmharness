@@ -328,7 +328,20 @@ export async function findSessionFile(home: string, prefix: string): Promise<str
   if (!prefix) return null;
   const { list } = await collectCandidates(home, 'created');
   const hit = list.find((c) => c.id === prefix) ?? list.find((c) => c.id.startsWith(prefix));
-  return hit?.file ?? null;
+  if (hit) return hit.file;
+  // READ fallback: archived and trashed sessions stay readable (view/label/
+  // resume-by-id) — only the LISTINGS hide them (W4: trash is recoverable,
+  // audit files are never destroyed). Active wins when the same id exists
+  // in both places.
+  for (const sub of ['archive', 'trash']) {
+    const dir = join(home, 'sessions', sub);
+    const entries = await safeReaddir(dir);
+    const exact = entries.find((f) => f === prefix + '.jsonl');
+    if (exact) return join(dir, exact);
+    const pfx = entries.find((f) => f.startsWith(prefix) && f.endsWith('.jsonl'));
+    if (pfx) return join(dir, pfx);
+  }
+  return null;
 }
 
 /** Find the newest session file under home/sessions matching an id prefix. */

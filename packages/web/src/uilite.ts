@@ -267,9 +267,39 @@ function inlineMd(s: string): string {
   return s;
 }
 
+/** Label-queue display: bench tasks are English templates and the list
+ *  often truncates them mid-sentence - translate by matching BOTH the full
+ *  form and the truncated prefix, falling back to a generic action.
+ *  Non-template (real user) tasks pass through untouched. */
+export function zhTask(t: string): string {
+  const x = String(t || '');
+  const base = function (p: string): string {
+    const b = p.replace(/\\/g, '/').split('/').pop() || '';
+    return b.length > 20 ? b.slice(0, 17) + '\u2026' : b;
+  };
+  if (/module\.json5 with read_file/i.test(x)) {
+    if (/list_dir/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\u5E76\u5217\u51FA\u76EE\u5F55\uFF0C\u56DE\u7B54\u884C\u6570';
+    if (/mainElement/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\uFF0C\u56DE\u7B54 mainElement \u7684\u503C';
+    return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E module.json5';
+  }
+  if (/with read_file/i.test(x)) {
+    if (/sum of their line counts/i.test(x)) return '\u8BFB\u53D6\u4E24\u4E2A\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570\u603B\u548C';
+    if (/last word on the last line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u672B\u884C\u672B\u8BCD';
+    if (/first word of the first line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u9996\u884C\u9996\u8BCD';
+    if (/line count as a digit/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570\uFF08\u6570\u5B57\uFF09';
+    if (/FOUND|MISSING/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u5224\u65AD\u662F\u5426\u5305\u542B\u6307\u5B9A\u8BCD';
+    const m = /Read\s+([^\s,]+\.txt)/i.exec(x);
+    const name = m ? base(m[1]) : '';
+    return '\u8BFB\u53D6\u6587\u4EF6 ' + (name || '') + '\uFF0C\u6309\u6307\u4EE4\u7CBE\u786E\u56DE\u7B54';
+  }
+  if (/List the directory/i.test(x) || /list_dir/i.test(x)) return '\u5217\u51FA\u76EE\u5F55\uFF0C\u56DE\u7B54\u6587\u4EF6\u6570\u91CF';
+  if (/read_file/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u6309\u6307\u4EE4\u7CBE\u786E\u56DE\u7B54';
+  return x;
+}
+
 /** Serialized source for the single-file page: the pure functions above are
  *  injected verbatim into page.ts's <script> (single source of truth). */
 export function uiLiteSource(): string {
-  return [fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables]
+  return [fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask]
     .map(function (f) { return f.toString(); }).join('\n');
 }

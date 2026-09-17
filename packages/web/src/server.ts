@@ -1299,9 +1299,24 @@ export async function startServer(opts: { port: number; host?: string; version?:
       if (req.method === 'GET' && url.pathname === '/api/label/list') {
         try {
           // labelableSessions prepends recently-LABELED sessions (task
-          // '(labeled)') for re-inspection; the labeling QUEUE is the rest
+          // '(labeled)') for re-inspection; the labeling QUEUE is the rest.
+          // The task text is re-read from the session head's FIRST USER
+          // message (full text) — insights store only 120 chars, which
+          // truncated the bench templates mid-instruction.
           const all = await labelableSessions(home, 40);
-          const sessions = all.filter((s) => !s.label).slice(0, 24);
+          const { readSessionHead } = await import('@hmharness/kernel');
+          const sessions = [] as Array<{ session: string; task: string }>;
+          for (const s of all.filter((x) => !x.label).slice(0, 24)) {
+            let task = s.task;
+            try {
+              const file = await findSessionFile(home, s.session);
+              if (file) {
+                const head = await readSessionHead(file);
+                if (head && head.firstUser) task = head.firstUser;
+              }
+            } catch { /* keep the insight task */ }
+            sessions.push({ session: s.session, task: task.slice(0, 300) });
+          }
           const labeled = (await readLabels(home)).length;
           json(res, 200, { sessions, labeled, goal: 100 });
         } catch (err) {
