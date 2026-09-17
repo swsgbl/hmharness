@@ -17,7 +17,7 @@ import {
   saveProvider, deleteProvider, patchConfig, getGoal, setGoal,
   findSessionFile, listSessions, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
 } from '@hmharness/kernel';
-import { listDrafts, listSkills, readInsights } from '@hmharness/evolution';
+import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
 import {
@@ -1290,6 +1290,41 @@ export async function startServer(opts: { port: number; host?: string; version?:
             else await run('xdg-open', [abs]);
           }
           json(res, 200, { ok: true, path: abs });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      // ---- RL gate condition 3: human reward labeling (star clicks) ----
+      if (req.method === 'GET' && url.pathname === '/api/label/list') {
+        try {
+          // labelableSessions prepends recently-LABELED sessions (task
+          // '(labeled)') for re-inspection; the labeling QUEUE is the rest
+          const all = await labelableSessions(home, 40);
+          const sessions = all.filter((s) => !s.label).slice(0, 24);
+          const labeled = (await readLabels(home)).length;
+          json(res, 200, { sessions, labeled, goal: 100 });
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/label') {
+        const body = JSON.parse((await readBody(req)) || '{}') as { session?: unknown; score?: unknown; note?: unknown };
+        const session = typeof body.session === 'string' ? body.session : '';
+        const score = Number(body.score);
+        if (!session || !Number.isInteger(score) || score < 1 || score > 5) {
+          json(res, 400, { error: 'session and score (1-5) required' });
+          return;
+        }
+        try {
+          const r = await labelSession(home, session, score, typeof body.note === 'string' && body.note ? body.note.slice(0, 200) : undefined);
+          const labeled = (await readLabels(home)).length;
+          if (!r.ok) {
+            json(res, 400, { error: r.reason ?? 'label rejected', labeled, goal: 100 });
+            return;
+          }
+          json(res, 200, { ok: true, labeled, goal: 100 });
         } catch (err) {
           json(res, 400, { error: String(err).slice(0, 200) });
         }

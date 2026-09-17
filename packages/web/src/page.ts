@@ -423,6 +423,7 @@ export const PAGE = `<!doctype html>
       <button class="nav" data-view="ssh"><span class="ico">🖧</span><span class="txt minhide">SSH</span></button>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
       <button class="nav" data-view="settings"><span class="ico">⚙️</span><span class="txt minhide">设置</span></button>
+      <button class="nav" data-view="label"><span class="ico">⭐</span><span class="txt minhide">RL 标注</span></button>
     </nav>
     <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="添加工作区">＋</button></span></div>
     <div id="wsbox" class="minhide">
@@ -522,6 +523,12 @@ export const PAGE = `<!doctype html>
         <div class="setrow"><span id="set-patch-label">代码级自进化 evolution.autoPatch（危险）</span><input id="set-patch" type="checkbox"></div>
         <div style="margin-top:10px"><button id="set-save" class="primary sm">保存</button><span id="set-msg"></span></div>
       </div>
+    </div>
+    <div id="view-label" class="view">
+      <div class="vhead"><h2 id="label-title">RL 标注</h2></div>
+      <div id="label-prog" style="margin:0 0 10px;font-size:12.5px;color:var(--dim)"></div>
+      <div id="label-hint" style="margin:0 0 12px;font-size:12px;color:var(--dim)"></div>
+      <div id="label-body"></div>
     </div>
   </div>
   <div id="rightbar">
@@ -644,7 +651,7 @@ ${uiLiteSource()}
           wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
-           navSet:'设置', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
+           navSet:'设置', navLabel:'RL 标注', labelTitle:'RL 奖励标注', labelHint:'给每个会话的表现打 1-5 星(5=非常好)。这些人工评分用于校准奖励信号与模型自评的相关性——RL 就绪门的最后一个条件(需要 100 条)。', labelDone:'✓ 已达 100 条,RL 门最后一格解锁!', labelEmpty:'(没有待标注的会话了——先跑几个任务再回来)', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
            setLocaleLabel:'语言 locale', setApprovalLabel:'默认审批模式', setEvolveLabel:'自动进化间隔 autoEvolveEvery（0=关闭）', setPatchLabel:'代码级自进化 autoPatch（危险，默认关）', setSave:'保存', setSaved:'已保存 ✓', setFailed:'保存失败',
            provAdd:'＋ 新增 provider', provEdit:'编辑', provDelete:'删除', provSave:'保存', provCancel:'取消', provApiKeySet:'密钥已设置', provApiKeyNone:'未设置密钥', provAddPreset:'添加',
            provName:'名称', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader(可选)', provSupportsVision:'支持视觉', provKeyPhNew:'新 provider 需要填写 apiKey', provKeyPhEdit:'留空=保持原密钥；输入空格再清空=删除密钥',
@@ -674,7 +681,7 @@ ${uiLiteSource()}
           wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
-           navSet:'Settings', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
+           navSet:'Settings', navLabel:'RL Labels', labelTitle:'RL Reward Labels', labelHint:'Rate each session 1-5 stars (5 = excellent). These human scores calibrate the reward signal against the model self-eval - the last RL readiness gate condition (100 needed).', labelDone:'\u2713 100 reached - the last RL gate slot unlocks!', labelEmpty:'(no sessions to label - run a few tasks first)', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
            setLocaleLabel:'locale', setApprovalLabel:'default approval mode', setEvolveLabel:'auto-evolve every N insights (0=off)', setPatchLabel:'code-level self-evolution autoPatch (dangerous, off by default)', setSave:'Save', setSaved:'Saved ✓', setFailed:'Save failed',
            provAdd:'＋ add provider', provEdit:'Edit', provDelete:'Delete', provSave:'Save', provCancel:'Cancel', provApiKeySet:'api key set', provApiKeyNone:'no api key', provAddPreset:'Add',
            provName:'name', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader (optional)', provSupportsVision:'supports vision', provKeyPhNew:'a new provider needs its apiKey', provKeyPhEdit:'blank = keep the existing key; type a space then clear = remove it',
@@ -721,7 +728,7 @@ ${uiLiteSource()}
     document.getElementById('wsp-ok').textContent = L.wsOk;
     document.getElementById('ws-new').title = L.pickTitle;
     document.getElementById('wscur').title = L.wsSwitch;
-    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet };
+    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
       if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
@@ -755,7 +762,7 @@ ${uiLiteSource()}
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       n.classList.toggle('on', n.getAttribute('data-view') === v);
     });
-    ['chat', 'board', 'devices', 'ssh', 'skills', 'settings'].forEach(function (k) {
+    ['chat', 'board', 'devices', 'ssh', 'skills', 'settings', 'label'].forEach(function (k) {
       var elv = document.getElementById('view-' + k);
       if (elv) elv.classList.toggle('on', k === v);
     });
@@ -770,6 +777,7 @@ ${uiLiteSource()}
     if (v === 'ssh') renderSsh();
     if (v === 'skills') renderSkills();
     if (v === 'settings') renderSettings();
+    if (v === 'label') renderLabels();
   }
   Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
     n.onclick = function () { switchView(n.getAttribute('data-view')); };
@@ -1339,6 +1347,73 @@ ${uiLiteSource()}
     document.getElementById('set-approval').value = s.approval || 'ask';
     document.getElementById('set-evolve').value = String(s.autoEvolveEvery === undefined ? 3 : s.autoEvolveEvery);
     document.getElementById('set-patch').checked = s.autoPatch === true;
+  }
+
+  /* ---- RL reward labeling view (gate condition 3: 100 human scores) ---- */
+  function labelProgress(n, goal) {
+    var el = document.getElementById('label-prog');
+    if (!el) return;
+    el.textContent = (L ? '' : '') + n + ' / ' + goal + (n >= goal ? ' \u2014 ' + (L ? L.labelDone : '') : '');
+  }
+  function renderLabels() {
+    var box = document.getElementById('label-body');
+    if (!box) return;
+    var hint = document.getElementById('label-hint');
+    if (hint) hint.textContent = L ? L.labelHint : '';
+    fetch('/api/label/list').then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { box.textContent = d.error; return; }
+      labelProgress(d.labeled || 0, d.goal || 100);
+      box.innerHTML = '';
+      var list = d.sessions || [];
+      if (!list.length) {
+        var e0 = document.createElement('div');
+        e0.className = 'hint';
+        e0.textContent = L ? L.labelEmpty : '(empty)';
+        box.appendChild(e0);
+        return;
+      }
+      list.forEach(function (it) {
+        var card = document.createElement('div');
+        card.className = 'setrow';
+        card.style.cssText = 'align-items:flex-start;gap:10px';
+        var txt = document.createElement('div');
+        txt.style.flex = '1';
+        var t1 = document.createElement('div');
+        t1.style.cssText = 'font-size:12.5px;color:var(--text)';
+        t1.textContent = it.task || it.session;
+        var t2 = document.createElement('div');
+        t2.style.cssText = 'font-size:10.5px;color:var(--dim);font-family:var(--mono)';
+        t2.textContent = it.session.slice(0, 18);
+        txt.appendChild(t1); txt.appendChild(t2);
+        card.appendChild(txt);
+        for (var sc = 1; sc <= 5; sc++) {
+          (function (score) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ghost sm';
+            b.textContent = '\u2605' + score;
+            b.title = score + '/5';
+            b.onclick = function () {
+              b.disabled = true;
+              fetch('/api/label', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session: it.session, score: score })
+              }).then(function (r) { return r.json(); }).then(function (d2) {
+                if (d2.error) { b.disabled = false; return; }
+                card.style.transition = 'opacity .3s';
+                card.style.opacity = '0';
+                setTimeout(function () { card.remove(); }, 300);
+                labelProgress(d2.labeled || 0, d2.goal || 100);
+                if (!(d.sessions || []).some(function (x) { return x.session !== it.session; })) renderLabels();
+              });
+            };
+            card.appendChild(b);
+          })(sc);
+        }
+        box.appendChild(card);
+      });
+    });
   }
   function provField(lbl, id, val, type, ph) {
     var wrap = document.createElement('div');
