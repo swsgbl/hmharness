@@ -633,7 +633,7 @@ ${uiLiteSource()}
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
-          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…',
+          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', labelAnswer:'回答: ', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
@@ -651,7 +651,7 @@ ${uiLiteSource()}
           wsAdd:'＋ 添加工作区', wsOpen:'在文件管理器中打开工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
-           navSet:'设置', navLabel:'RL 标注', labelTitle:'RL 奖励标注', labelHint:'给每个会话的表现打 1-5 星(5=非常好)。这些人工评分用于校准奖励信号与模型自评的相关性——RL 就绪门的最后一个条件(需要 100 条)。', labelDone:'✓ 已达 100 条,RL 门最后一格解锁!', labelEmpty:'(没有待标注的会话了——先跑几个任务再回来)', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
+           navSet:'设置', navLabel:'RL 标注', labelTitle:'RL 奖励标注', labelHint:'对照每张卡片的【任务】与【回答】打分：★5=回答完全正确完成；★3=部分正确或不确定；★1=错误/没做/答非所问。人工评分用于校准奖励信号——RL 就绪门最后一个条件(需 100 条)。', labelDone:'✓ 已达 100 条,RL 门最后一格解锁!', labelEmpty:'(没有待标注的会话了——先跑几个任务再回来)', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
            setLocaleLabel:'语言 locale', setApprovalLabel:'默认审批模式', setEvolveLabel:'自动进化间隔 autoEvolveEvery（0=关闭）', setPatchLabel:'代码级自进化 autoPatch（危险，默认关）', setSave:'保存', setSaved:'已保存 ✓', setFailed:'保存失败',
            provAdd:'＋ 新增 provider', provEdit:'编辑', provDelete:'删除', provSave:'保存', provCancel:'取消', provApiKeySet:'密钥已设置', provApiKeyNone:'未设置密钥', provAddPreset:'添加',
            provName:'名称', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader(可选)', provSupportsVision:'支持视觉', provKeyPhNew:'新 provider 需要填写 apiKey', provKeyPhEdit:'留空=保持原密钥；输入空格再清空=删除密钥',
@@ -662,7 +662,7 @@ ${uiLiteSource()}
            cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
            webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
-          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', goalPh:'session goal (Enter saves / ✕ clears)', sessSearch:'search in session…', approve:'Approve', deny:'Deny',
+          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', labelAnswer:'Answer: ', goalPh:'session goal (Enter saves / ✕ clears)', sessSearch:'search in session…', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
@@ -681,7 +681,7 @@ ${uiLiteSource()}
           wsAdd:'＋ add workspace', wsOpen:'open the workspace in the file manager', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
-           navSet:'Settings', navLabel:'RL Labels', labelTitle:'RL Reward Labels', labelHint:'Rate each session 1-5 stars (5 = excellent). These human scores calibrate the reward signal against the model self-eval - the last RL readiness gate condition (100 needed).', labelDone:'\u2713 100 reached - the last RL gate slot unlocks!', labelEmpty:'(no sessions to label - run a few tasks first)', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
+           navSet:'Settings', navLabel:'RL Labels', labelTitle:'RL Reward Labels', labelHint:'Judge each card by TASK vs ANSWER: ★5 = correct and complete; ★3 = partial or unsure; ★1 = wrong, missing, off-topic. Human scores calibrate the reward signal - the last RL readiness gate condition (100 needed).', labelDone:'\u2713 100 reached - the last RL gate slot unlocks!', labelEmpty:'(no sessions to label - run a few tasks first)', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
            setLocaleLabel:'locale', setApprovalLabel:'default approval mode', setEvolveLabel:'auto-evolve every N insights (0=off)', setPatchLabel:'code-level self-evolution autoPatch (dangerous, off by default)', setSave:'Save', setSaved:'Saved ✓', setFailed:'Save failed',
            provAdd:'＋ add provider', provEdit:'Edit', provDelete:'Delete', provSave:'Save', provCancel:'Cancel', provApiKeySet:'api key set', provApiKeyNone:'no api key', provAddPreset:'Add',
            provName:'name', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader (optional)', provSupportsVision:'supports vision', provKeyPhNew:'a new provider needs its apiKey', provKeyPhEdit:'blank = keep the existing key; type a space then clear = remove it',
@@ -1356,21 +1356,7 @@ ${uiLiteSource()}
     if (!el) return;
     el.textContent = (L ? '' : '') + n + ' / ' + goal + (n >= goal ? ' \u2014 ' + (L ? L.labelDone : '') : '');
   }
-    /* label queue display: the bench tasks are English templates - show a
-     Chinese action summary instead (user request), original in the dim line */
-  function zhTask(t) {
-    var x = String(t || '');
-    if (/sum of their line counts/i.test(x)) return '\u8BFB\u53D6\u4E24\u4E2A\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570\u4E4B\u548C';
-    if (/line count of module/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\u5E76\u5217\u76EE\u5F55\uFF0C\u56DE\u7B54\u884C\u6570';
-    if (/mainElement/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\uFF0C\u56DE\u7B54 mainElement \u7684\u503C';
-    if (/last word on the last line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u672B\u884C\u672B\u8BCD';
-    if (/first word of the first line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u9996\u884C\u9996\u8BCD';
-    if (/line count as a digit/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570';
-    if (/FOUND if|MISSING/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u5224\u65AD\u662F\u5426\u5305\u542B\u6307\u5B9A\u8BCD';
-    if (/number of files/i.test(x)) return '\u5217\u51FA\u76EE\u5F55\uFF0C\u56DE\u7B54\u6587\u4EF6\u6570\u91CF';
-    return x;
-  }
-  function renderLabels() {
+    function renderLabels() {
     var box = document.getElementById('label-body');
     if (!box) return;
     var hint = document.getElementById('label-hint');
@@ -1396,10 +1382,18 @@ ${uiLiteSource()}
         var t1 = document.createElement('div');
         t1.style.cssText = 'font-size:12.5px;color:var(--text)';
         t1.textContent = zhTask(it.task);
+        txt.appendChild(t1);
+        if (it.answer) {
+          var ta = document.createElement('div');
+          ta.style.cssText = 'font-size:11.5px;color:var(--dim);font-family:var(--mono);white-space:pre-wrap;word-break:break-all;max-height:110px;overflow:hidden;margin-top:2px';
+          ta.textContent = (L ? L.labelAnswer : '\u56DE\u7B54: ') + it.answer;
+          ta.title = it.answer;
+          txt.appendChild(ta);
+        }
         var t2 = document.createElement('div');
         t2.style.cssText = 'font-size:10.5px;color:var(--dim);font-family:var(--mono)';
-        t2.textContent = it.session.slice(0, 18) + (it.task ? ' \u00B7 ' + it.task.slice(0, 40) : '');
-        txt.appendChild(t1); txt.appendChild(t2);
+        t2.textContent = it.session.slice(0, 18) + (it.outcome ? ' \u00B7 ' + it.outcome : '') + (it.toolUses ? ' \u00B7 ' + it.toolUses + ' tools' : '');
+        txt.appendChild(t2);
         card.appendChild(txt);
         for (var sc = 1; sc <= 5; sc++) {
           (function (score) {

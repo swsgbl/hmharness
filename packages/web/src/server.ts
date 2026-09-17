@@ -1300,22 +1300,43 @@ export async function startServer(opts: { port: number; host?: string; version?:
         try {
           // labelableSessions prepends recently-LABELED sessions (task
           // '(labeled)') for re-inspection; the labeling QUEUE is the rest.
-          // The task text is re-read from the session head's FIRST USER
-          // message (full text) — insights store only 120 chars, which
-          // truncated the bench templates mid-instruction.
+          // The card shows THREE things so a human can actually judge:
+          //   task   = the first user message (full, from the session head)
+          //   answer = the agent's LAST assistant text (what it replied)
+          //   outcome/toolUses = success + tool-call counts (from insights)
           const all = await labelableSessions(home, 40);
-          const { readSessionHead } = await import('@hmharness/kernel');
-          const sessions = [] as Array<{ session: string; task: string }>;
+          const { readSessionHead, loadTranscript } = await import('@hmharness/kernel');
+          const insights = await readInsights(home, 400);
+          const byIns = new Map(insights.map((i) => [i.session, i]));
+          const sessions = [] as Array<{ session: string; task: string; answer: string; outcome: string; toolUses: number }>;
           for (const s of all.filter((x) => !x.label).slice(0, 24)) {
             let task = s.task;
+            let answer = '';
             try {
               const file = await findSessionFile(home, s.session);
               if (file) {
                 const head = await readSessionHead(file);
                 if (head && head.firstUser) task = head.firstUser;
+                const tr = await loadTranscript(file);
+                if (tr) {
+                  for (let i2 = tr.messages.length - 1; i2 >= 0; i2--) {
+                    const m = tr.messages[i2];
+                    if (m.role === 'assistant' && typeof m.content === 'string' && m.content.trim()) {
+                      answer = m.content;
+                      break;
+                    }
+                  }
+                }
               }
             } catch { /* keep the insight task */ }
-            sessions.push({ session: s.session, task: task.slice(0, 300) });
+            const ins = byIns.get(s.session);
+            sessions.push({
+              session: s.session,
+              task: task.slice(0, 300),
+              answer: answer.slice(0, 400),
+              outcome: ins?.outcome ?? '',
+              toolUses: ins?.toolUses ?? 0,
+            });
           }
           const labeled = (await readLabels(home)).length;
           json(res, 200, { sessions, labeled, goal: 100 });
