@@ -37,7 +37,7 @@ if (!process.argv.includes('--skip-tests')) {
       execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000 });
       console.log('  ' + cmd + ': ok');
     } catch (e) {
-      fail(cmd + ' failed - refusing to publish a broken build:\n' + String(e.stdout || e.stderr || '').slice(-800));
+      fail(cmd + ' failed - refusing to publish a broken build:\n' + String(e.stdout || e.stderr || '').slice(-3000));
     }
   }
 }

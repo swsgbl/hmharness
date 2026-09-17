@@ -48,7 +48,10 @@ test('parallel tool execution: 4 slow calls cost ~1x, not 4x', async () => {
   const ms = Date.now() - t0;
   assert.equal(r.text, 'ok');
   assert.equal(r.toolUses, 4);
-  assert.ok(ms < 420, `expected ~150-300ms, got ${ms}ms (sequential would be 600+)`);
+  // budget: parallel ~150-300ms; serial would be 600+. 550 keeps the
+  // distinction while tolerating a warm/loaded CI runner (a 420ms cap
+  // flaked in the preflight rerun right after a full build+test cycle)
+  assert.ok(ms < 550, `expected ~150-300ms, got ${ms}ms (sequential would be 600+)`);
 });
 
 test('approval gate stays sequential and denials short-circuit', async () => {
