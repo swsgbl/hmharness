@@ -425,7 +425,7 @@ export const PAGE = `<!doctype html>
       <button class="nav" data-view="settings"><span class="ico">⚙️</span><span class="txt minhide">设置</span></button>
       <button class="nav" data-view="label"><span class="ico">⭐</span><span class="txt minhide">RL 标注</span></button>
     </nav>
-    <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-new" title="添加工作区">＋</button></span></div>
+    <div class="wshead"><span class="minhide" id="ws-label">工作区</span><span class="wsacts minhide"><button id="ws-refresh" title="刷新会话列表">↻</button><button id="ws-open" title="在文件管理器中打开工作区">📂</button><button id="ws-new" title="添加工作区">＋</button></span></div>
     <div id="wsbox" class="minhide">
       <button id="wscur" type="button" title="切换工作区"><span class="tri">▾</span><span id="wscur-name">…</span></button>
       <div id="wslist">
@@ -648,7 +648,7 @@ ${uiLiteSource()}
           modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
           navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'未配置 SSH 主机 — 在 config.json 添加 sshHosts 后刷新', sshRun:'运行', sshApproveFirst:'该命令需要审批 — 点击「批准并运行」', sshApprovedRun:'批准并运行', sshPh:'远程命令, 回车运行 (ls / df -h / uptime …)',
           sesRename:'重命名', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
-          wsAdd:'＋ 添加工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
+          wsAdd:'＋ 添加工作区', wsOpen:'在文件管理器中打开工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
            navSet:'设置', navLabel:'RL 标注', labelTitle:'RL 奖励标注', labelHint:'给每个会话的表现打 1-5 星(5=非常好)。这些人工评分用于校准奖励信号与模型自评的相关性——RL 就绪门的最后一个条件(需要 100 条)。', labelDone:'✓ 已达 100 条,RL 门最后一格解锁!', labelEmpty:'(没有待标注的会话了——先跑几个任务再回来)', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
@@ -678,7 +678,7 @@ ${uiLiteSource()}
           modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
           navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'No SSH hosts configured - add sshHosts to config.json, then refresh', sshRun:'Run', sshApproveFirst:'This command needs approval - click approve-and-run', sshApprovedRun:'Approve & run', sshPh:'remote command, Enter to run (ls / df -h / uptime ...)',
           sesRename:'Rename', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
-          wsAdd:'＋ add workspace', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
+          wsAdd:'＋ add workspace', wsOpen:'open the workspace in the file manager', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
            navSet:'Settings', navLabel:'RL Labels', labelTitle:'RL Reward Labels', labelHint:'Rate each session 1-5 stars (5 = excellent). These human scores calibrate the reward signal against the model self-eval - the last RL readiness gate condition (100 needed).', labelDone:'\u2713 100 reached - the last RL gate slot unlocks!', labelEmpty:'(no sessions to label - run a few tasks first)', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
@@ -727,6 +727,7 @@ ${uiLiteSource()}
     document.getElementById('wsp-cancel').textContent = L.cancel;
     document.getElementById('wsp-ok').textContent = L.wsOk;
     document.getElementById('ws-new').title = L.pickTitle;
+    document.getElementById('ws-open').title = L.wsOpen;
     document.getElementById('wscur').title = L.wsSwitch;
     var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
@@ -2601,6 +2602,15 @@ ${uiLiteSource()}
   document.getElementById('ws-new').onclick = openPick;
   document.getElementById('clear').onclick = newSession;
   document.getElementById('ws-refresh').onclick = loadSessions;
+  // settled design W14: 📂 opens the active workspace in the system file
+  // manager — POST /api/open (insideWs guard server-side; explorer /select)
+  document.getElementById('ws-open').onclick = function () {
+    if (!curWs.path) return;
+    fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: curWs.path }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d2) { if (d2 && d2.error) alert(d2.error); })
+      .catch(function (err) { alert(String(err)); });
+  };
   document.getElementById('board-refresh').onclick = loadBoard;
   document.getElementById('dev-refresh').onclick = loadDevices;
   document.getElementById('search').oninput = function () { renderSessions(this.value); };
