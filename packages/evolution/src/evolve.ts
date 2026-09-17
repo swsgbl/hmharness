@@ -523,6 +523,7 @@ async function proposeSkills(
     'Your job: read session signals and decide whether any repeatable procedure is worth crystallizing into a skill.',
     'A skill is a markdown how-to document the agent reads on demand. Topics must be limited to: HarmonyOS toolchain usage (hdc/hvigorw/ohpm/DevEco), this framework\'s tools (list_dir/read_file/write_file/run_command/remember/harmony_*), and reusable task workflows observed in the signals.',
     'Rules: name is kebab-case; description is one line; skill_md is at most 60 lines with concrete steps and example commands; do NOT propose skills about security config, approval policy, or anything outside the topics; if nothing is genuinely reusable, return an empty array.',
+    'COST GATE (learned from repeated rejections): every candidate runs against an output-cost cap - a skill whose text makes the agent MORE verbose on exact-output cases (it restates, adds preambles, or explains around the answer) is auto-rejected even when correctness improves. Write TERSE imperative steps (target under 25 lines): checklists and example commands only; never instruct the agent to add explanations, context, or restatements; the skill itself must teach doing LESS talking, not more.',
     'Respond with ONLY a JSON array: [{"name":"...","description":"...","skill_md":"..."}] - no prose, no code fences.',
   ].join('\n');
   // GEPA ancestor context: vary around a past rejection (its reason is the
