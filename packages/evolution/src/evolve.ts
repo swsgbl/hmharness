@@ -292,13 +292,9 @@ export async function runEvolution(opts: {
       const regression = baseResults.some((b) => b.pass && !candResults.find((c) => c.name === b.name)?.pass);
       // dual-metric veto: a passing case that costs > cost-cap x its
       // baseline counts as a cost regression (the candidate passed by
-      // rambling) - only enforced where the case declares a cost-cap
-      const costRegressions = train.filter((c) => {
-        const cap = c.costCap ?? 1.3; // default 1.3x for all cases
-        const base = baseCost[c.name] ?? 0;
-        const cand = candCost[c.name] ?? 0;
-        return base > 0 && cand > base * cap;
-      }).map((c) => c.name);
+      // rambling); isCostRegression carries the absolute-slack floor that
+      // keeps microscopic-output cases from hair-triggering
+      const costRegressions = costRegressionNames(train, baseCost, candCost);
       const summary = (rs: Array<{ name: string; pass: boolean }>) => rs.map((r) => `${r.name}:${r.pass ? 'pass' : 'FAIL'}`).join(' ');
       if (regression || candRate < baseRate) {
         await deleteDraft(home, p.name);
@@ -575,6 +571,31 @@ async function distillMemory(provider: ProviderConfig, recentNotes: string[], sa
   } catch {
     return null;
   }
+}
+
+/** Cost-regression veto (pass-by-rambling detector). Multiplicative cap
+ *  alone is a HAIR TRIGGER on microscopic outputs: a case whose expected
+ *  answer is ~4 tokens (cjk-ex-9: 等待中……) allows ~1 token of slack at
+ *  1.3x, so ANY skill that perturbs output by one character vetoes the
+ *  candidate — ten consecutive candidates died exactly there. An absolute
+ *  slack floor (+8 tokens) keeps the intent (real rambling is 2-10x) while
+ *  letting tiny-output cases tolerate needle-scale perturbation. */
+export function isCostRegression(base: number, cand: number, cap = 1.3): boolean {
+  if (base <= 0) return false;
+  return cand > Math.max(base * cap, base + 8);
+}
+
+/** Dual-metric veto helper: names of cases where the candidate passed but
+ *  cost more than its baseline cap (rambling). Pure - unit-tested. */
+export function costRegressionNames(
+  train: Array<{ name: string; costCap?: number }>,
+  baseCost: Record<string, number>,
+  candCost: Record<string, number>,
+): string[] {
+  return train.filter((c) => {
+    const cap = c.costCap ?? 1.3;
+    return isCostRegression(baseCost[c.name] ?? 0, candCost[c.name] ?? 0, cap);
+  }).map((c) => c.name);
 }
 
 /** First balanced JSON array in the text; tolerates fences and prose around it. */

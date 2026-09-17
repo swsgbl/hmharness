@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { matchCase, listCases } from '../bench.ts';
 import { latestRadarBrief } from '../radar.ts';
-import { estTokens } from '../evolve.ts';
+import { estTokens, isCostRegression, costRegressionNames } from '../evolve.ts';
 
 /* -------- cost metric: language-aware token estimate -------- */
 
@@ -18,6 +18,36 @@ test('estTokens: CJK counts ~1 token/char, ASCII ~1/4 - the cost cap cannot be d
   // mixed text: both families bucketed independently
   const mixed = 'a'.repeat(200) + '鸿蒙开发'.repeat(50);   // 200 ascii + 200 cjk
   assert.equal(estTokens(mixed), 50 + 200);
+});
+
+/* -------- cost-regression veto: hair-trigger fix on microscopic outputs -------- */
+
+test('isCostRegression: 1.3x alone hair-triggers tiny outputs; +8 absolute slack fixes it', () => {
+  // cjk-ex-9's exact shape: baseline ~4 tokens; ONE extra character = 6
+  // tokens = 1.5x — under the old pure-multiplier cap this vetoed EVERY
+  // candidate (ten consecutive rejections in the wild)
+  assert.equal(isCostRegression(4, 6), false, 'needle-scale perturbation on a tiny output is NOT rambling');
+  assert.equal(isCostRegression(4, 12), false, 'still within the absolute slack floor');
+  assert.equal(isCostRegression(4, 20), true, '5x on a tiny output IS rambling');
+  // normal-size outputs: the multiplicative cap stays in charge
+  assert.equal(isCostRegression(100, 120), false, 'within 1.3x');
+  assert.equal(isCostRegression(100, 140), true, 'beyond 1.3x (and +8 floor is moot)');
+  assert.equal(isCostRegression(0, 500), false, 'no baseline -> no veto');
+  // per-case cap override still honored (10 on base 4 = 2.5x: within an
+  // explicit 3x cap, beyond the default — 20 = 5x rambles under any cap)
+  assert.equal(isCostRegression(4, 10, 3), false, 'explicit 3x cap widens tolerance');
+  assert.equal(isCostRegression(4, 20, 3), true, '5x rambling exceeds even a 3x cap');
+});
+
+test('costRegressionNames: maps the veto across the train set with per-case caps', () => {
+  const train = [
+    { name: 'tiny' },               // base 4, cand 6 -> pass (slack floor)
+    { name: 'normal' },             // base 100, cand 150 -> regression
+    { name: 'loose', costCap: 2 },  // base 100, cand 150 -> within 2x
+    { name: 'zero' },               // base 0 -> never
+  ];
+  const out = costRegressionNames(train, { tiny: 4, normal: 100, loose: 100, zero: 0 }, { tiny: 6, normal: 150, loose: 150, zero: 999 });
+  assert.deepEqual(out, ['normal']);
 });
 
 /* -------- structured assertions (gate methodology upgrade) -------- */
