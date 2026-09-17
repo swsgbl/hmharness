@@ -468,6 +468,33 @@ test('M4 cell: addToolCell folds to one line; toggleLastCell expands to the full
   } finally { h.restore(); }
 });
 
+test('B5/B9 wiring: Ctrl+T opens the transcript overlay (with folded-away full outputs); q/Esc closes; showOverlay is the pager base', async () => {
+  const h = await makeTui();
+  try {
+    h.rt.addToolCell('  ● tool ⎿ summary line', 'FULL-OUTPUT-ONE\nFULL-OUTPUT-TWO');
+    // the driver registers the folded-away FULL tool logs as the overlay
+    // source (production contract, tui.ts driver wiring) - entries only
+    // contribute their (folded) transcript lines
+    h.rt.setOverlaySource(() => ['FULL-OUTPUT-ONE', 'FULL-OUTPUT-TWO']);
+    // Ctrl+T opens the overlay: transcript + full tool outputs (B5)
+    h.keys('\x14');
+    let p = h.rt.paletteProbe();
+    assert.match(p.frameText, /FULL-OUTPUT-ONE/, 'overlay shows the driver-registered full outputs');
+    assert.match(p.frameText, /summary line/, 'overlay includes the folded cell summary line');
+    // overlay keys scroll without closing; q closes (B5)
+    h.keys('j');
+    h.keys('k');
+    assert.match(h.rt.paletteProbe().frameText, /FULL-OUTPUT-ONE/, 'j/k scroll but keep the overlay open');
+    h.keys('q');
+    assert.ok(!h.rt.paletteProbe().frameText.includes('FULL-OUTPUT-ONE'), 'q closes the overlay');
+    // showOverlay: public pager entry (B9 auto-pager, M4 /diff reuse); Esc closes too
+    h.rt.showOverlay('GIT DIFF', ['+ added line', '- removed line']);
+    assert.match(h.rt.paletteProbe().frameText, /\+ added line/, 'pager base renders provided lines');
+    h.keys('\x1b');
+    assert.ok(!h.rt.paletteProbe().frameText.includes('+ added line'), 'Esc closes the pager');
+  } finally { h.restore(); }
+});
+
 /* ---------------- M5: statusline template + keymap ---------------- */
 
 test('renderStatusline: placeholders substitute; unknown tokens stay literal', () => {
