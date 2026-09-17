@@ -1356,6 +1356,20 @@ ${uiLiteSource()}
     if (!el) return;
     el.textContent = (L ? '' : '') + n + ' / ' + goal + (n >= goal ? ' \u2014 ' + (L ? L.labelDone : '') : '');
   }
+    /* label queue display: the bench tasks are English templates - show a
+     Chinese action summary instead (user request), original in the dim line */
+  function zhTask(t) {
+    var x = String(t || '');
+    if (/sum of their line counts/i.test(x)) return '\u8BFB\u53D6\u4E24\u4E2A\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570\u4E4B\u548C';
+    if (/line count of module/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\u5E76\u5217\u76EE\u5F55\uFF0C\u56DE\u7B54\u884C\u6570';
+    if (/mainElement/i.test(x)) return '\u8BFB\u53D6\u6A21\u5757\u914D\u7F6E\uFF0C\u56DE\u7B54 mainElement \u7684\u503C';
+    if (/last word on the last line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u672B\u884C\u672B\u8BCD';
+    if (/first word of the first line/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u9996\u884C\u9996\u8BCD';
+    if (/line count as a digit/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u56DE\u7B54\u884C\u6570';
+    if (/FOUND if|MISSING/i.test(x)) return '\u8BFB\u53D6\u6587\u4EF6\uFF0C\u5224\u65AD\u662F\u5426\u5305\u542B\u6307\u5B9A\u8BCD';
+    if (/number of files/i.test(x)) return '\u5217\u51FA\u76EE\u5F55\uFF0C\u56DE\u7B54\u6587\u4EF6\u6570\u91CF';
+    return x;
+  }
   function renderLabels() {
     var box = document.getElementById('label-body');
     if (!box) return;
@@ -1381,10 +1395,10 @@ ${uiLiteSource()}
         txt.style.flex = '1';
         var t1 = document.createElement('div');
         t1.style.cssText = 'font-size:12.5px;color:var(--text)';
-        t1.textContent = it.task || it.session;
+        t1.textContent = zhTask(it.task);
         var t2 = document.createElement('div');
         t2.style.cssText = 'font-size:10.5px;color:var(--dim);font-family:var(--mono)';
-        t2.textContent = it.session.slice(0, 18);
+        t2.textContent = it.session.slice(0, 18) + (it.task ? ' \u00B7 ' + it.task.slice(0, 40) : '');
         txt.appendChild(t1); txt.appendChild(t2);
         card.appendChild(txt);
         for (var sc = 1; sc <= 5; sc++) {
