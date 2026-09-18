@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { COMMANDS, matchCommands, parseWheel, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
+import { COMMANDS, matchCommands, parseWheel, splitMouseReport, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
 test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
@@ -175,15 +175,39 @@ test('picker: SS3 application-mode arrows (\x1bOA/\x1bOB) still navigate', async
   } finally { h.restore(); }
 });
 
-test('picker: mouse reporting on while open, off after close (modal)', async () => {
+test('mouse reporting is always on - the wheel works on every terminal, not just palette opens', async () => {
+  // cross-terminal wheel support: only some terminals translate the wheel
+  // to arrows on the alt screen, so reporting must never turn off
+  const h = await makeTui();
+  try {
+    assert.equal(h.rt.paletteProbe().mouse, true);      // on from startup
+    h.rt.openModelPicker();
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, true);      // stays on
+    h.keys('\x1b');                                     // Esc closes
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, true);      // still on after close
+  } finally { h.restore(); }
+});
+
+test('splitMouseReport stashes a report fragmented across stdin chunks', () => {
+  assert.deepEqual(splitMouseReport('abc'), { data: 'abc', pending: '' });
+  assert.deepEqual(splitMouseReport('\x1b[<64;12;4M'), { data: '\x1b[<64;12;4M', pending: '' });
+  assert.deepEqual(splitMouseReport('\x1b[<64;12;4m'), { data: '\x1b[<64;12;4m', pending: '' });
+  assert.deepEqual(splitMouseReport('ab\x1b[<64;12'), { data: 'ab', pending: '\x1b[<64;12' });
+  assert.deepEqual(splitMouseReport('\x1b[<64;12;4M\x1b[<65;8'), { data: '\x1b[<64;12;4M', pending: '\x1b[<65;8' });
+  assert.deepEqual(splitMouseReport('\x1b[<64'), { data: '', pending: '\x1b[<64' });
+});
+
+test('a wheel event split across chunks still drives the palette (no lost bursts)', async () => {
   const h = await makeTui();
   try {
     h.rt.openModelPicker();
-    h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, true);   // modal capture active
-    h.keys('\x1b');                                   // Esc closes
-    h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, false);  // native selection back
+    h.keys('\x1b[<65;10;');   // fragment one: header only
+    h.keys('3M');             // fragment two: rest of the report
+    assert.equal(h.rt.paletteProbe().selected, 1);  // wheel-down arrived whole
+    h.keys('\x1b[<64;10;3M'); // intact report still works after reassembly
+    assert.equal(h.rt.paletteProbe().selected, 0);
   } finally { h.restore(); }
 });
 

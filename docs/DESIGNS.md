@@ -30,6 +30,7 @@
 | T18 | **长输出自动 pager**(B9):工具输出超过 ~2 屏自动进 overlay(q/Esc 随时回到流);Ctrl+T 与 /diff 复用同一 overlay 基座 | 对标 codex pager_overlay | e011d27 | ✅ 生效 |
 | T19 | **流式 markdown 着色**(B10):`say` 流按"已完成的行"一次性着色(标题青加粗/围栏列表引用 dim),进行中的尾行保持原样——**已稳定的行绝不重排** | 对标 codex markdown 流式渲染;稳定行不重排约束 | e011d27 | ✅ 生效 |
 | T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 53042cc | ✅ 生效 |
+| T21 | **鼠标滚轮全终端直通**:SGR 鼠标上报(?1000h+?1006h)自启动常开——滚轮驱动转录滚动(面板打开时驱动选行),点击仅在面板开时选行,其余报文吞掉;SGR 报文跨 stdin 分片重组(splitMouseReport 纯函数);原生划选复制走 Shift+click 旁路 | 多系统实测:仅部分终端在备用屏把滚轮译成方向键(Windows Terminal 译,conhost/部分 Linux 终端/KaihongOS 终端不译)——模态式上报在面板关闭时滚轮全失效 | 本轮 | ✅ 生效 |
 
 ## Web(浏览器端)
 
@@ -63,6 +64,7 @@
 |------|--------|--------|------|------|
 | 2026-09-04 | T1-v1(0df4ba7:头部保留"○空闲"+🔥) | **T1-v2:头部删除一切状态字样,🔥并到左侧身份条** | 用户推翻:"既然更换了位置,就应该把旧位置的删除"——迁位不删旧位=孤儿状态位=包袱;我此前两轮(18210e1 改轮换、af09228 恢复空闲字样)都没理解到"删除"才是原意 | 50f45a9 |
 | 2026-09-17 | T7 运行中空 Enter=停止当前任务(0.6.0 起的"发送键=停止键"语义) | **运行中空 Enter 不再停止**;停止=显式 **Esc**(T9) | 对标 codex:Esc=interrupt_turn、Enter=inject/queue 的语义更清晰,停止与排队/注入不再挤在同一把键上;空 Enter 只提示(Esc 停止/输入排队/Ctrl+Enter 注入) | 50f45a9 |
+| 2026-09-19 | (tui.ts 代码注释内嵌定案)鼠标上报仅面板打开时开启,关闭即关——依赖终端把备用屏滚轮译为方向键 | **T21:SGR 上报自启动常开** | 用户多系统实测:除 Win11(Windows Terminal)外,其余系统终端滚轮均无效——"滚轮→方向键"翻译非普适,模态方案等于在多数终端上禁用了滚轮 | 本轮 |
 
 ## 维护规则
 

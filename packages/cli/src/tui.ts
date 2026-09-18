@@ -235,6 +235,21 @@ export function parseWheel(data: string): number {
   return 0;
 }
 
+/**
+ * SGR reports can split across stdin chunks (fast wheel bursts fragment in
+ * some terminals). If the buffer ends inside a report - a trailing
+ * '\x1b[<...' with no terminating M/m yet - slice it off as `pending` for
+ * the next chunk and hand back only the complete part.
+ */
+export function splitMouseReport(data: string): { data: string; pending: string } {
+  const cut = data.lastIndexOf('\x1b[<');
+  if (cut === -1) return { data, pending: '' };
+  const tail = data.slice(cut);
+  return /^\x1b\[<\d+(;\d+)*[Mm]$/.test(tail)
+    ? { data, pending: '' }
+    : { data: data.slice(0, cut), pending: tail };
+}
+
 export class TuiRuntime {
   private entries: Entry[] = [];
   private dirty = true;
@@ -268,15 +283,19 @@ export class TuiRuntime {
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** Wheel/click handling: NO mouse reporting by default - select/copy
-   *  always works and terminals translate the wheel to arrow keys on the
-   *  alternate screen. Reporting turns on ONLY while a palette is open
-   *  (modal: clicks choose rows, the wheel drives the selection) and turns
-   *  off the moment it closes. (A permanent /mouse toggle existed for
-   *  terminals without alt-screen wheel mapping; removed - it cost native
-   *  selection full-time to fix a case this Windows/HarmonyOS-first tool
-   *  does not target.) */
-  private mouseReported = false;
+  /** Wheel/click handling: SGR mouse reporting is ALWAYS on (enabled with
+   *  ?1000h+?1006h at startup). Cross-terminal wheel support has to come
+   *  from explicit reports: only some terminals translate the wheel to
+   *  arrow keys on the alternate screen, so the wheel would silently do
+   *  nothing on the others (conhost, several Linux terminals, the
+   *  KaihongOS terminal). The wheel drives the transcript (or the open
+   *  palette's selection); clicks only pick rows while a palette is open.
+   *  Native select/copy stays available via Shift+click, the standard
+   *  bypass in mainstream terminals. */
+  private mouseReported = true;
+  /** tail of an SGR mouse report split across stdin chunks (fast wheel
+   *  bursts); prepended to the next chunk so parseWheel sees the sequence */
+  private mousePending = '';
   /** screen row of each visible palette item (SGR click hit-testing); the
    *  render loop records row = frame.length (1-based) as it pushes rows */
   private paletteClickRows: Array<{ row: number; idx: number }> = [];
@@ -305,8 +324,10 @@ export class TuiRuntime {
   constructor() {
     // ?1l forces DECCKM OFF so arrow keys arrive as CSI (\x1b[A) even if a
     // previous program left the terminal in application cursor mode - in
-    // that mode arrows arrive as SS3 (\x1bOA) and would be silently dropped
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l');
+    // that mode arrows arrive as SS3 (\x1bOA) and would be silently dropped.
+    // SGR mouse reporting on from the first frame: the wheel must scroll on
+    // every terminal, not only the ones that map wheel->arrows themselves.
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1000h\x1b[?1006h');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -556,16 +577,6 @@ export class TuiRuntime {
   setModeTag(tag: string): void {
     this.modeTag = tag;
     this.dirty = true;
-  }
-
-  /** Reporting is on ONLY while a palette is open. The palette is a modal:
-   *  while it shows, clicks choose its rows and the wheel drives its
-   *  selection; drag-select resumes the moment it closes. */
-  private syncMouseReporting(): void {
-    const want = this.panelItems(this.input).length > 0;
-    if (want === this.mouseReported) return;
-    this.mouseReported = want;
-    stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
   }
 
   /** The palette data source: `/model ` opens the model picker, otherwise
@@ -965,6 +976,16 @@ export class TuiRuntime {
   }
 
   private onKey(data: string): void {
+    // reassemble an SGR mouse report that arrived split across stdin chunks
+    // (fast wheel bursts fragment in some terminals) before anything parses
+    if (this.mousePending) {
+      data = this.mousePending + data;
+      this.mousePending = '';
+    }
+    const split = splitMouseReport(data);
+    if (split.pending) this.mousePending = split.pending;
+    if (!split.data) return;
+    data = split.data;
     // SS3 application-mode arrows (\x1bOA…H): terminals left in DECCKM by a
     // previous program send these; normalize to the CSI forms this UI
     // matches so navigation never silently dies
@@ -982,9 +1003,10 @@ export class TuiRuntime {
     if (this.histSearch) { this.histKey(data); return; }
     if (this.overlay) { this.overlayKey(data); return; }
     if (this.atPal) { this.atPalKey(data); return; }
-    // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. With
-    // button-event mode (1002) everything else - click, drag, release,
-    // motion - still belongs to the terminal's native selection.
+    // wheel-only mouse routing: 64 = wheel-up, 65 = wheel-down. Reporting
+    // is always on, so every other report - click, drag, release - is just
+    // swallowed below; the terminal's Shift+click native selection bypasses
+    // the app entirely and keeps working.
     const wheel = parseWheel(data);
     if (wheel !== 0) {
       // an open palette takes the wheel: it moves the selection (the list
@@ -1236,9 +1258,8 @@ export class TuiRuntime {
       this.flushFrame(frame, H);
       return;
     }
-    // modal mouse reporting follows the palette (see syncMouseReporting);
     // click rows are re-recorded every frame because screen positions move
-    this.syncMouseReporting();
+    // (mouse reporting is always on - see the mouseReported field note)
     this.paletteClickRows.length = 0;
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
