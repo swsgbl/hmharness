@@ -413,6 +413,7 @@ export const harmonyUninstall: Tool = {
   },
 };
 
+import { vmTools } from './vmenv.ts';
 export const harmonyTools: Tool[] = [
   harmonyDevices,
   harmonyToolchainCheck,
@@ -433,6 +434,7 @@ export const harmonyTools: Tool[] = [
   harmonyApiLookup,
   harmonyUiRegression,
   ...emulatorTools,
+  ...vmTools,
 ];
 
 export { harmonyProjectCreate, scaffoldProject, solidPng, sdkVersion } from './project.ts';
