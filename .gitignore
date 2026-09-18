@@ -14,3 +14,4 @@ Thumbs.db
 # staging dir for the ACL-locked website/evidence (content lands via git plumbing)
 website/evidence-new/
 *.pre-redact
+.kos-tmp/
