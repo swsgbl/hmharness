@@ -29,7 +29,9 @@ test('parseVmrunList: vmx lines only, trimmed, case-insensitive match', () => {
 test('resolveQemu/resolveVmrun: defaults + config overrides', () => {
   const d = resolveQemu();
   assert.equal(d.dir, VM_DEFAULTS.qemuDir);
-  assert.equal(d.hdcPort, 15565);
+  // default = the LIVE channel (15566 -> guest hdcd 10178, per the .lnk
+  // launch variant); the vnc cmd's 15565 is an alternate script
+  assert.equal(d.hdcPort, 15566);
   const c = resolveQemu({ dir: 'X:/q', hdcPort: 1234 });
   assert.equal(c.launchPath, 'X:\\q\\launch_qemu_vnc.cmd');
   assert.equal(c.hdcPort, 1234);

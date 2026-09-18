@@ -5,7 +5,7 @@
  *
  *  1. KaihongOS 5.0 QEMU image (D:\OHOS-QEMU\KaihongOS): OpenHarmony-family
  *     guest booted via qemu-system-x86_64 with user-mode networking that
- *     forwards host 127.0.0.1:15565 -> guest hdcd :5555, so it becomes a
+ *     forwards host 127.0.0.1:15566 -> guest hdcd (10178), so it becomes a
  *     normal `hdc tconn 127.0.0.1:15565` target - same pipeline as the
  *     DevEco emulator. QMP(22472)/HMP(22471)/serial(22473) are there for
  *     lifecycle + diagnostics.
@@ -47,10 +47,13 @@ export interface VmQemuConfig { dir?: string; launch?: string; hdcPort?: number;
 export interface VmVmwareConfig { vmrun?: string; vmDirs?: string[] }
 export interface VmConfig { qemu?: VmQemuConfig; vmware?: VmVmwareConfig }
 
+/** extra hdc resolver candidate: the 5.0.2 SDK shipped beside the image */
+export const QEMU_SDK_HDC = 'D:/OHOS-QEMU/sdk-5.0.2/14/toolchains/hdc.exe';
+
 export const VM_DEFAULTS = {
   qemuDir: 'D:/OHOS-QEMU/KaihongOS',
   qemuLaunch: 'launch_qemu_vnc.cmd',
-  qemuHdcPort: 15565,
+  qemuHdcPort: 15566,
   qemuVncDisplay: 5,
   vmrun: 'C:/Program Files/VMware/VMware Workstation/vmrun.exe',
   vmDirs: ['D:/VMs'],
@@ -110,7 +113,8 @@ export const harmonyVmQemuTool: Tool = {
         await execCb('hdc', ['--version'], { timeout: 8000, windowsHide: true });
         return 'hdc';
       } catch { /* not on PATH */ }
-      return existsSync(toolchainsHdc) ? toolchainsHdc : '';
+      if (existsSync(toolchainsHdc)) return toolchainsHdc;
+      return existsSync(QEMU_SDK_HDC) ? QEMU_SDK_HDC : '';
     };
     const hdc = await findHdcLocal();
     const target = `127.0.0.1:${q.hdcPort}`;
@@ -228,6 +232,7 @@ export const vmwareVmsTool: Tool = {
       action: { type: 'string', description: 'list | start | stop | suspend | ip | guest-run' },
       vm: { type: 'string', description: 'VM name or absolute .vmx path (list under D:/VMs)' },
       guestCmd: { type: 'string', description: 'for guest-run: command line to run inside the guest (requires VMware Tools)' },
+      sshKey: { type: 'string', description: 'for check: path to the SSH key (default ~/.ssh/vm_maintenance_ed25519)' },
     },
     required: [],
   },
@@ -283,6 +288,40 @@ export const vmwareVmsTool: Tool = {
         for (const p of registered) lines.push(`  ${running.some((r) => r.toLowerCase() === p.toLowerCase()) ? '[running]' : '[off]     '} ${p}`);
         return { output: lines.join('\n') };
       }
+      if (action === 'check') {
+        // per-OS dev-environment readiness over SSH (BatchMode + maintenance
+        // key). Read-only probes; unreachable VMs are reported, not errors.
+        const key = String(args?.sshKey ?? join(process.env.USERPROFILE ?? '', '.ssh', 'vm_maintenance_ed25519'));
+        const vms: Array<{ name: string; host: string; user: string }> = [
+          { name: 'Ubuntu 26.04', host: '192.168.161.128', user: 'hongfu' },
+          { name: 'Kali 2026.2', host: '192.168.161.129', user: 'kali' },
+          { name: 'Win10 Fresh', host: '192.168.161.133', user: 'hongfu2' },
+          { name: 'Win11 Fresh', host: '192.168.161.132', user: 'hongfu1' },
+          { name: 'Omarchy 4.0.4', host: '192.168.161.136', user: 'hongfu' },
+        ];
+        const probe = 'uname -a 2>/dev/null || ver; echo ---; node -v 2>/dev/null || echo no-node; python3 --version 2>/dev/null || echo no-python3; which hdc ohpm hvigorw 2>/dev/null || echo no-hmony-tools';
+        const lines: string[] = ['VM dev-environment check (SSH BatchMode, key ' + key + '):'];
+        for (const vm of vms) {
+          let out: string;
+          try {
+            const r = await execCb('ssh', [
+              '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=accept-new',
+              '-i', key, vm.user + '@' + vm.host, probe,
+            ], { timeout: 25000, windowsHide: true, maxBuffer: 1024 * 1024 });
+            out = String(r.stdout).trim();
+          } catch (e) {
+            const err = String((e as { stdout?: string; stderr?: string; message?: string }).stdout || (e as { stderr?: string }).stderr || (e as { message?: string }).message || '');
+            lines.push('  [' + vm.name + '] ' + vm.user + '@' + vm.host + ' — UNREACHABLE (' + err.split('\n')[0].slice(0, 60) + ')');
+            continue;
+          }
+          const os = out.split('---')[0]?.split('\n')[0]?.trim() || '?';
+          const parts = out.split('---')[1]?.trim().split('\n').filter(Boolean) ?? [];
+          lines.push('  [' + vm.name + '] ' + vm.user + '@' + vm.host + ' — OK');
+          lines.push('    os: ' + os.slice(0, 90));
+          for (const p of parts) lines.push('    ' + p.trim().slice(0, 90));
+        }
+        return { output: lines.join('\n') };
+      }
       if (!args?.vm) return { output: 'vm required (name or .vmx path)', isError: true };
       const vmx = await resolveVmx(String(args.vm));
       if (action === 'start') {
@@ -306,7 +345,7 @@ export const vmwareVmsTool: Tool = {
         const out = await runVm(['-T', 'ws', '-gu', 'ubuntu', '-gp', '123456', 'runProgramInGuest', vmx, String(args.guestCmd)]);
         return { output: out };
       }
-      return { output: 'action must be list | start | stop | suspend | ip | guest-run', isError: true };
+      return { output: 'action must be list | start | stop | suspend | ip | guest-run | check', isError: true };
     } catch (e) {
       return { output: String(e).slice(0, 300), isError: true };
     }
