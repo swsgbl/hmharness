@@ -23,6 +23,7 @@
  */
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid } from './web-daemon.ts';
 import {
@@ -976,6 +977,79 @@ flags:
     } finally {
       for (const c of preClients) c.close();
     }
+    return;
+  }
+  if (cmd === 'reward') {
+    // V3 RL phase (ADR-0010): learned reward model over the human labels
+    await initHome();
+    const home = homeDir();
+    const E = await import('@hmharness/evolution');
+    const sub = rest[0] ?? 'report';
+    const readJsonl = async (f: string): Promise<unknown[]> => {
+      try {
+        return (await readFile(f, 'utf8')).trim().split('\n').filter(Boolean).map((l: string) => JSON.parse(l));
+      } catch {
+        return [];
+      }
+    };
+    const labels = (await readJsonl(join(home, 'evolution', 'reward-human-labels.jsonl'))) as Array<{ session: string; score: number; note?: string; time: string }>;
+    const insights = (await readJsonl(join(home, 'insights', 'insights.jsonl'))) as Array<{ session: string; outcome: string; turns?: number; toolUses?: number }>;
+    if (sub === 'fit') {
+      if (labels.length < 10) { stdout.write('need >=10 human labels to fit (have ' + labels.length + ')\n'); return; }
+      const m = E.fitRewardModel(labels, insights);
+      await E.saveRewardModel(home, m);
+      stdout.write('reward model fitted on ' + m.nSamples + ' joined labels\n');
+      stdout.write('  weights[outcome, failRate, turns, tools, bias] = ' + m.w.map((v: number) => v.toFixed(3)).join(', ') + '\n');
+      stdout.write('  train RMSE ' + m.trainRmse + (m.holdoutRmse !== undefined ? ' · holdout RMSE ' + m.holdoutRmse : ' · (no holdout yet)') + '\n');
+      stdout.write('  saved: ' + join(home, 'evolution', 'reward-model.json') + '\n');
+      return;
+    }
+    if (sub === 'report') {
+      const m = await E.loadRewardModel(home);
+      if (!m) { stdout.write('no fitted reward model - run: hmh reward fit\n'); return; }
+      stdout.write('reward model @ ' + m.trainedAt + '\n');
+      stdout.write('  samples ' + m.nSamples + ' · train RMSE ' + m.trainRmse + (m.holdoutRmse !== undefined ? ' · holdout RMSE ' + m.holdoutRmse : '') + '\n');
+      stdout.write('  weights [outcome, failRate, turns, tools, bias] = ' + m.w.map((v: number) => v.toFixed(3)).join(', ') + '\n');
+      return;
+    }
+    if (sub === 'export-dpo') {
+      const { findSessionFile, readSessionHead, loadTranscript } = await import('@hmharness/kernel');
+      const taskOf = async (session: string): Promise<string> => {
+        try {
+          const f = await findSessionFile(home, session);
+          if (!f) return '';
+          const h = await readSessionHead(f);
+          return h?.firstUser ?? '';
+        } catch { return ''; }
+      };
+      const answerOf = async (session: string): Promise<string> => {
+        try {
+          const f = await findSessionFile(home, session);
+          if (!f) return '';
+          const tr = await loadTranscript(f);
+          if (!tr) return '';
+          for (let i = tr.messages.length - 1; i >= 0; i--) {
+            const m = tr.messages[i];
+            if (m.role === 'assistant' && typeof m.content === 'string' && m.content.trim()) return m.content;
+          }
+          return '';
+        } catch { return ''; }
+      }
+      const sessions = [...new Set(labels.map((l) => l.session))];
+      const tasks = new Map<string, string>();
+      const answers = new Map<string, string>();
+      for (const s2 of sessions) {
+        tasks.set(s2, await taskOf(s2));
+        answers.set(s2, await answerOf(s2));
+      }
+      const pairs = E.exportDpoPairs(labels, insights, (x2: string) => tasks.get(x2) ?? '', (x2: string) => answers.get(x2) ?? '');
+      const out = join(home, 'evolution', 'dpo-pairs.jsonl');
+      const { writeFile: wf } = await import('node:fs/promises');
+      await wf(out, pairs.map((p) => JSON.stringify(p)).join('\n') + (pairs.length ? '\n' : ''), 'utf8');
+      stdout.write('DPO pairs: ' + pairs.length + ' -> ' + out + '\n');
+      return;
+    }
+    stdout.write('usage: hmh reward fit | report | export-dpo\n');
     return;
   }
   if (cmd === 'dataset') {

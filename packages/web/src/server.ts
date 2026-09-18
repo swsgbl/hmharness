@@ -1308,8 +1308,24 @@ export async function startServer(opts: { port: number; host?: string; version?:
           const { readSessionHead, loadTranscript } = await import('@hmharness/kernel');
           const insights = await readInsights(home, 400);
           const byIns = new Map(insights.map((i) => [i.session, i]));
+          const picked = all.filter((x) => !x.label).slice(0, 24);
+          // degraded sessions first: labelableSessions only sees the newest
+          // 200 insight lines (ok batch runs dominate 10:1), so dig deeper -
+          // low-star labels on turn-budget runs are the DPO pair material
+          const labeledIds = new Set((await readLabels(home)).map((l) => l.session));
+          const seenIds = new Set(picked.map((p) => p.session));
+          const degradedPool: typeof picked = [];
+          for (let idx = insights.length - 1; idx >= 0 && degradedPool.length < 12; idx--) {
+            const i = insights[idx];
+            if (i.outcome === 'ok' || labeledIds.has(i.session) || seenIds.has(i.session)) continue;
+            seenIds.add(i.session);
+            degradedPool.push({ session: i.session, task: i.task.slice(0, 90) });
+          }
+          const degraded = degradedPool.slice(0, 6);
+          const good = picked.filter((x) => !degraded.some((d2) => d2.session === x.session));
+          const ordered = [...degraded, ...good];
           const sessions = [] as Array<{ session: string; task: string; answer: string; outcome: string; toolUses: number }>;
-          for (const s of all.filter((x) => !x.label).slice(0, 24)) {
+          for (const s of ordered) {
             let task = s.task;
             let answer = '';
             try {

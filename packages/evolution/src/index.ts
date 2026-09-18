@@ -5,6 +5,7 @@ export * from './skillpayload.ts';
 export * from './dataset.ts';
 export * from './readiness.ts';
 export * from './labels.ts';
+export * from './reward-model.ts';
 export * from './insights.ts';
 export * from './skills.ts';
 export * from './bench.ts';
