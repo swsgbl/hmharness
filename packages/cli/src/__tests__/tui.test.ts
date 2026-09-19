@@ -175,18 +175,26 @@ test('picker: SS3 application-mode arrows (\x1bOA/\x1bOB) still navigate', async
   } finally { h.restore(); }
 });
 
-test('mouse reporting is always on - the wheel works on every terminal, not just palette opens', async () => {
-  // cross-terminal wheel support: only some terminals translate the wheel
-  // to arrows on the alt screen, so reporting must never turn off
+test('mouse capture OFF by default - native selection stays native; palette/force opt in (T23)', async () => {
+  // always-on capture (T21) took click-drag selection away on EVERY system;
+  // default is now no capture + ?1007 wheel translation, with capture only
+  // while a palette is open or the user forces it via /mouse
   const h = await makeTui();
   try {
-    assert.equal(h.rt.paletteProbe().mouse, true);      // on from startup
+    assert.equal(h.rt.paletteProbe().mouse, false);     // at rest: no capture
     h.rt.openModelPicker();
     h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, true);      // stays on
+    assert.equal(h.rt.paletteProbe().mouse, true);      // palette modal captures
     h.keys('\x1b');                                     // Esc closes
     h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, true);      // still on after close
+    assert.equal(h.rt.paletteProbe().mouse, false);     // released on close
+    h.rt.setMouseForced(true);                          // /mouse force
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, true);
+    assert.equal(h.rt.isMouseForced(), true);
+    h.rt.setMouseForced(false);
+    h.rt.render();
+    assert.equal(h.rt.paletteProbe().mouse, false);     // and back off
   } finally { h.restore(); }
 });
 

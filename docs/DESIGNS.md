@@ -30,7 +30,7 @@
 | T18 | **长输出自动 pager**(B9):工具输出超过 ~2 屏自动进 overlay(q/Esc 随时回到流);Ctrl+T 与 /diff 复用同一 overlay 基座 | 对标 codex pager_overlay | e011d27 | ✅ 生效 |
 | T19 | **流式 markdown 着色**(B10):`say` 流按"已完成的行"一次性着色(标题青加粗/围栏列表引用 dim),进行中的尾行保持原样——**已稳定的行绝不重排** | 对标 codex markdown 流式渲染;稳定行不重排约束 | e011d27 | ✅ 生效 |
 | T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 53042cc | ✅ 生效 |
-| T21 | **鼠标滚轮全终端直通**:SGR 鼠标上报(?1000h+?1006h)自启动常开——滚轮驱动转录滚动(面板打开时驱动选行),点击仅在面板开时选行,其余报文吞掉;SGR 报文跨 stdin 分片重组(splitMouseReport 纯函数);原生划选复制走 Shift+click 旁路 | 多系统实测:仅部分终端在备用屏把滚轮译成方向键(Windows Terminal 译,conhost/部分 Linux 终端/KaihongOS 终端不译)——模态式上报在面板关闭时滚轮全失效 | 本轮 | ✅ 生效 |
+| T21 | **鼠标滚轮全终端直通**(0.14.10,**已被 T23 复案推翻**):SGR 鼠标上报自启动常开 | ~~多系统实测滚轮失效~~ 常开捕获同时杀死了所有终端的原生划选复制 | 17cf0d4 | ⛔ 复案 |
 | T22 | **括号粘贴模式**:?2004h 自启动常开——多行粘贴经 sanitizePaste(剥 200~/201~ 标记与转义序列,换行折叠为空格,262144 字符上限)作为**一条可审输入**插入光标处,绝不逐行自动提交;粘贴体跨 stdin 分片累积(pasteBuf);带外字节(标记前/后)走正常按键路径 | 终端粘贴多行时原始 \r 会逐行触发提交=误执行多任务;各主流终端(Windows Terminal/VTE/Konsole/xterm)均支持 ?2004h | 本轮 | ✅ 生效 |
 
 ## Web(浏览器端)
@@ -67,6 +67,7 @@
 | 2026-09-17 | T7 运行中空 Enter=停止当前任务(0.6.0 起的"发送键=停止键"语义) | **运行中空 Enter 不再停止**;停止=显式 **Esc**(T9) | 对标 codex:Esc=interrupt_turn、Enter=inject/queue 的语义更清晰,停止与排队/注入不再挤在同一把键上;空 Enter 只提示(Esc 停止/输入排队/Ctrl+Enter 注入) | 50f45a9 |
 | 2026-09-19 | (tui.ts 代码注释内嵌定案)鼠标上报仅面板打开时开启,关闭即关——依赖终端把备用屏滚轮译为方向键 | **T21:SGR 上报自启动常开** | 用户多系统实测:除 Win11(Windows Terminal)外,其余系统终端滚轮均无效——"滚轮→方向键"翻译非普适,模态方案等于在多数终端上禁用了滚轮 | 本轮 |
 | 2026-09-19 | T16 中 /copy 的剪贴板链=win32 clip/darwin pbcopy/linux 硬编码 xclip | **/copy 改走 clipboardCandidates 候选链**:Wayland 会话优先 wl-copy,X11 依次 xclip→xsel,逐个尝试直到 spawn 成功 | 硬编码 xclip 在纯 Wayland 会话(Omarchy)必然失败;用户要求全系统核查复制/粘贴功能 | 本轮 |
+| 2026-09-19 | T21:SGR 鼠标上报自启动常开(滚轮全终端直通) | **T23:捕获默认关+?1007 备用屏滚动**:常开 ?1000h/?1006h 把点击/拖拽也捕获=所有终端失去原生划选复制(宿主机原有能力也回归丢失,用户实测打回);默认改为 ?1007(终端自行把滚轮译为方向键,零点击捕获,方向键路径本就滚动转录);捕获仅在面板打开时临时开启(旧行为恢复)或用户 /mouse 显式强制(持久化 tui.mouse,面向既不翻译滚轮也不认 ?1007 的终端如老 conhost) | 选中/复制是不可牺牲的原生能力;滚轮必须靠不碰点击的机制实现 | 本轮 |
 
 ## 维护规则
 

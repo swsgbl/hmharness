@@ -81,6 +81,9 @@ export interface Strings {
   cmdNewDone: string;
   cmdFork: string;
   cmdCopy: string;
+  cmdMouse: string;
+  cmdMouseOn: string;
+  cmdMouseOff: string;
   cmdCopied: string;
   cmdPlan: string;
   cmdPlanOn: string;
@@ -227,6 +230,9 @@ const zh: Strings = {
   cmdNewDone: '✓ 新会话开始(旧转录可用 Ctrl+T 回看)',
   cmdFork: 'fork 当前会话为新线程(继承全部上下文)',
   cmdCopy: '复制最后一条 AI 输出到剪贴板',
+  cmdMouse: '切换全时鼠标捕获（仅无滚轮翻译的终端需要；默认 ?1007 已覆盖大多数终端）',
+  cmdMouseOn: '🖱 全时鼠标捕获已开启（滚轮直读；原生划选复制请按住 Shift 再拖动）',
+  cmdMouseOff: '🖱 全时鼠标捕获已关闭（滚轮走终端方向键翻译；划选复制恢复原生）',
   cmdCopied: '✓ 已复制最后一条 AI 输出',
   cmdPlan: '计划模式开关(先出计划待确认再执行)',
   cmdPlanOn: '🔥 计划模式:先出计划,确认后才执行',
@@ -364,6 +370,9 @@ const en: Strings = {
   cmdNewDone: '✓ new session (old transcript: Ctrl+T to replay)',
   cmdFork: 'fork this session to a new thread (inherits full context)',
   cmdCopy: 'copy the last AI output to the clipboard',
+  cmdMouse: 'toggle full-time mouse capture (only for terminals without wheel translation; ?1007 covers most)',
+  cmdMouseOn: '🖱 full-time mouse capture ON (direct wheel; hold Shift to select natively)',
+  cmdMouseOff: '🖱 full-time mouse capture OFF (wheel via terminal translation; native selection restored)',
   cmdCopied: '✓ copied the last AI output',
   cmdPlan: 'plan mode toggle (plan first, confirm, then execute)',
   cmdPlanOn: '🔥 plan mode: present a plan, wait for confirmation before executing',

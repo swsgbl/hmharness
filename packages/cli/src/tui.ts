@@ -115,6 +115,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/new', key: 'cmdNew' },
   { name: '/fork', key: 'cmdFork' },
   { name: '/copy', key: 'cmdCopy' },
+  { name: '/mouse', key: 'cmdMouse' },
   { name: '/plan', key: 'cmdPlan' },
   { name: '/goal', key: 'cmdGoal' },
   { name: '/usage', key: 'cmdUsage' },
@@ -319,16 +320,20 @@ export class TuiRuntime {
   private modeTag = '';
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
-  /** Wheel/click handling: SGR mouse reporting is ALWAYS on (enabled with
-   *  ?1000h+?1006h at startup). Cross-terminal wheel support has to come
-   *  from explicit reports: only some terminals translate the wheel to
-   *  arrow keys on the alternate screen, so the wheel would silently do
-   *  nothing on the others (conhost, several Linux terminals, the
-   *  KaihongOS terminal). The wheel drives the transcript (or the open
-   *  palette's selection); clicks only pick rows while a palette is open.
-   *  Native select/copy stays available via Shift+click, the standard
-   *  bypass in mainstream terminals. */
-  private mouseReported = true;
+  /** Wheel/click handling (T23, settled design): capture (?1000h+?1006h)
+   *  is OFF by default - click-drag must stay the terminal's NATIVE
+   *  selection, always-on capture took that away on every system. The
+   *  wheel is covered by ?1007 (alternate scroll, enabled at startup):
+   *  the terminal itself translates wheel -> arrow keys without touching
+   *  clicks, and the existing arrow path scrolls the transcript. Capture
+   * turns on only while a palette is open (clicks choose rows, wheel
+   * drives selection) or when the user forces it with /mouse for
+   * terminals that honour neither wheel translation nor ?1007 (legacy
+   * conhost); Shift+drag still selects on mainstream terminals then. */
+  private mouseReported = false;
+  /** /mouse force flag (persisted as config.json tui.mouse): full-time
+   *  capture for terminals without any wheel translation */
+  private forceMouse = false;
   /** tail of an SGR mouse report split across stdin chunks (fast wheel
    *  bursts); prepended to the next chunk so parseWheel sees the sequence */
   private mousePending = '';
@@ -364,11 +369,11 @@ export class TuiRuntime {
     // ?1l forces DECCKM OFF so arrow keys arrive as CSI (\x1b[A) even if a
     // previous program left the terminal in application cursor mode - in
     // that mode arrows arrive as SS3 (\x1bOA) and would be silently dropped.
-    // SGR mouse reporting on from the first frame: the wheel must scroll on
-    // every terminal, not only the ones that map wheel->arrows themselves.
+    // ?1007 alternate scroll: the terminal translates the wheel to arrow
+    // keys itself - no click capture, native selection stays native.
     // Bracketed paste (?2004h): multi-line pastes arrive delimited and
     // insert as one reviewable input instead of auto-submitting per line.
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1000h\x1b[?1006h\x1b[?2004h');
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1007h\x1b[?2004h');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -620,6 +625,29 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
+  /** Capture is on ONLY while a palette is open or /mouse forced it -
+   *  native selection must stay native everywhere else; ?1007 covers
+   *  the wheel without any capture (T23). */
+  private syncMouseReporting(): void {
+    const want = this.forceMouse || this.panelItems(this.input).length > 0;
+    if (want === this.mouseReported) return;
+    this.mouseReported = want;
+    stdout.write(want ? '\x1b[?1000h\x1b[?1006h' : '\x1b[?1000l\x1b[?1006l');
+  }
+
+  /** /mouse (T23): force full-time capture for terminals that honour
+   *  neither wheel->arrow translation nor ?1007. While forced, Shift+drag
+   *  is the mainstream-terminal escape hatch back to selection. */
+  setMouseForced(on: boolean): void {
+    this.forceMouse = on;
+    this.syncMouseReporting();
+    this.dirty = true;
+  }
+
+  isMouseForced(): boolean {
+    return this.forceMouse;
+  }
+
   /** The palette data source: `/model ` opens the model picker, otherwise
    *  slash commands. (/resume submits straight through to the driver, which
    *  opens the Codex-style full-frame picker - resume-picker.ts.) Rows are
@@ -651,7 +679,7 @@ export class TuiRuntime {
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
     // ?1l restores default CSI cursor keys; reporting off whatever the
     // modal state was
-    stdout.write((this.mouseReported ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?2004l' + '\x1b[?1l\x1b[?25h\x1b[?1049l');
+    stdout.write((this.mouseReported ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?2004l\x1b[?1007l' + '\x1b[?1l\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -1343,8 +1371,9 @@ export class TuiRuntime {
       this.flushFrame(frame, H);
       return;
     }
+    // capture follows palette/force state (see syncMouseReporting, T23);
     // click rows are re-recorded every frame because screen positions move
-    // (mouse reporting is always on - see the mouseReported field note)
+    this.syncMouseReporting();
     this.paletteClickRows.length = 0;
 
     const spin = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[this.spinnerFrame] ?? ' ';
@@ -1730,6 +1759,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     }
   };
   applyStatusline();
+  // T23: persisted /mouse force (config.json tui.mouse) - for terminals
+  // that honour neither wheel->arrow translation nor ?1007
+  if ((cfg as { tui?: { mouse?: boolean } }).tui?.mouse) rt.setMouseForced(true);
   // Ctrl+T overlay source: transcript + FULL (folded-away) tool outputs (B5)
   rt.setOverlaySource(() => {
     const out: string[] = [];
@@ -1979,6 +2011,20 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       }
       if (copied) rt.addText(GREEN('✓') + ' ' + t.cmdCopied, 'plain');
       else rt.addText('(clipboard tool unavailable — output follows)\n' + lastAiText.slice(0, 2000), 'dim');
+      return;
+    }
+    if (line === '/mouse') {
+      // T23: full-time capture toggle for terminals without wheel
+      // translation (?1007 already covers the wheel on mainstream ones);
+      // while forced, Shift+drag is the selection escape hatch
+      const next = !rt.isMouseForced();
+      rt.setMouseForced(next);
+      try {
+        const { patchConfig } = await import('@hmharness/kernel');
+        const merged = { ...((cfg as { tui?: object }).tui ?? {}), mouse: next };
+        cfg = await patchConfig({ tui: merged } as never) as typeof cfg;
+      } catch { /* runtime toggle applied even when persisting fails */ }
+      rt.addText(next ? t.cmdMouseOn : t.cmdMouseOff, 'plain');
       return;
     }
     if (line === '/plan' || line.startsWith('/plan ')) {
