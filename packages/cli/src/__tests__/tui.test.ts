@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { COMMANDS, matchCommands, parseWheel, splitMouseReport, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
+import { COMMANDS, matchCommands, parseWheel, splitMouseReport, sanitizePaste, clipboardCandidates, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
 test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
@@ -209,6 +209,50 @@ test('a wheel event split across chunks still drives the palette (no lost bursts
     h.keys('\x1b[<64;10;3M'); // intact report still works after reassembly
     assert.equal(h.rt.paletteProbe().selected, 0);
   } finally { h.restore(); }
+});
+
+test('bracketed paste: multi-line text becomes ONE input, never auto-submits', async () => {
+  const h = await makeTui();
+  try {
+    h.keys('\x1b[200~line one\nline two\r\nline three\x1b[201~');
+    const p = h.rt.paletteProbe();
+    assert.equal(p.input, 'line one line two line three'); // newlines collapsed
+    assert.equal(h.submitted.length, 0);                   // nothing auto-ran
+    h.keys('\r');                                          // explicit submit
+    assert.deepEqual(h.submitted, ['line one line two line three']);
+  } finally { h.restore(); }
+});
+
+test('bracketed paste split across chunks still lands whole (no lost pastes)', async () => {
+  const h = await makeTui();
+  try {
+    h.keys('abc');
+    h.keys('\x1b[200~first');    // chunk 1: start marker + partial body
+    h.keys(' part');             // chunk 2: more body
+    h.keys('\x1b[201~');         // chunk 3: end marker
+    h.keys('def');
+    const p = h.rt.paletteProbe();
+    assert.equal(p.input, 'abcfirst partdef');
+    assert.equal(h.submitted.length, 0);
+  } finally { h.restore(); }
+});
+
+test('sanitizePaste strips markers, escapes and collapses newlines', () => {
+  assert.equal(sanitizePaste('\x1b[200~plain\x1b[201~'), 'plain');
+  assert.equal(sanitizePaste('a\r\nb\rc\nd'), 'a b c d');
+  assert.equal(sanitizePaste('bad\x1b[2Kescape\x1b[Agone'), 'badescapegone');
+  assert.equal(sanitizePaste('trailing \n'), 'trailing');
+  assert.equal(sanitizePaste('x'.repeat(300000)).length, 262144); // runaway cap
+});
+
+test('clipboardCandidates: win32/darwin/wl-first/x11-fallback/none', () => {
+  assert.deepEqual(clipboardCandidates('win32', {}), [{ bin: 'clip', args: [] }]);
+  assert.deepEqual(clipboardCandidates('darwin', {}), [{ bin: 'pbcopy', args: [] }]);
+  assert.deepEqual(clipboardCandidates('linux', { WAYLAND_DISPLAY: 'wayland-0' }),
+    [{ bin: 'wl-copy', args: [] }]);
+  assert.deepEqual(clipboardCandidates('linux', { DISPLAY: ':0' }),
+    [{ bin: 'xclip', args: ['-selection', 'clipboard'] }, { bin: 'xsel', args: ['--clipboard', '--input'] }]);
+  assert.deepEqual(clipboardCandidates('linux', {}), []);
 });
 
 test('picker: clicking a row selects and confirms it', async () => {

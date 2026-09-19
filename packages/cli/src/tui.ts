@@ -250,6 +250,42 @@ export function splitMouseReport(data: string): { data: string; pending: string 
     : { data: data.slice(0, cut), pending: tail };
 }
 
+/**
+ * Bracketed-paste body cleanup: strip the 200~/201~ markers and any escape
+ * sequences (pasted terminal controls must not leak into the input line),
+ * and collapse newlines to single spaces - a multi-line paste becomes ONE
+ * reviewable input instead of auto-submitting each line as its own command.
+ * Capped so a runaway paste cannot balloon the input field.
+ */
+export function sanitizePaste(raw: string): string {
+  return raw
+    .replace(/\x1b\[[0-9;?]*[a-zA-Z~]/g, '')
+    .replace(/\x1b/g, '')
+    .replace(/\r\n|\r|\n/g, ' ')
+    .replace(/[ \t]+$/, '')
+    .slice(0, 262144);
+}
+
+/**
+ * /copy clipboard candidates for the platform/session: Wayland first when
+ * WAYLAND_DISPLAY is set (xclip does not exist on a pure wl session), then
+ * X11's xclip with xsel as fallback. Empty when nothing plausible applies.
+ * The caller tries them in order until one spawns; the final "output
+ * follows" degrade stays for systems with no clipboard utility at all
+ * (e.g. the KaihongOS guest terminal).
+ */
+export function clipboardCandidates(platform: string, env: { WAYLAND_DISPLAY?: string; DISPLAY?: string }): Array<{ bin: string; args: string[] }> {
+  if (platform === 'win32') return [{ bin: 'clip', args: [] }];
+  if (platform === 'darwin') return [{ bin: 'pbcopy', args: [] }];
+  const out: Array<{ bin: string; args: string[] }> = [];
+  if (env.WAYLAND_DISPLAY) out.push({ bin: 'wl-copy', args: [] });
+  if (env.DISPLAY) {
+    out.push({ bin: 'xclip', args: ['-selection', 'clipboard'] });
+    out.push({ bin: 'xsel', args: ['--clipboard', '--input'] });
+  }
+  return out;
+}
+
 export class TuiRuntime {
   private entries: Entry[] = [];
   private dirty = true;
@@ -296,6 +332,9 @@ export class TuiRuntime {
   /** tail of an SGR mouse report split across stdin chunks (fast wheel
    *  bursts); prepended to the next chunk so parseWheel sees the sequence */
   private mousePending = '';
+  /** bracketed-paste accumulator: non-null while the 201~ end marker has
+   *  not arrived yet; everything buffered is literal insert-on-completion */
+  private pasteBuf: string | null = null;
   /** screen row of each visible palette item (SGR click hit-testing); the
    *  render loop records row = frame.length (1-based) as it pushes rows */
   private paletteClickRows: Array<{ row: number; idx: number }> = [];
@@ -327,7 +366,9 @@ export class TuiRuntime {
     // that mode arrows arrive as SS3 (\x1bOA) and would be silently dropped.
     // SGR mouse reporting on from the first frame: the wheel must scroll on
     // every terminal, not only the ones that map wheel->arrows themselves.
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1000h\x1b[?1006h');
+    // Bracketed paste (?2004h): multi-line pastes arrive delimited and
+    // insert as one reviewable input instead of auto-submitting per line.
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1000h\x1b[?1006h\x1b[?2004h');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -610,7 +651,7 @@ export class TuiRuntime {
     if (this.spinnerTimer) clearInterval(this.spinnerTimer);
     // ?1l restores default CSI cursor keys; reporting off whatever the
     // modal state was
-    stdout.write((this.mouseReported ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?1l\x1b[?25h\x1b[?1049l');
+    stdout.write((this.mouseReported ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[?2004l' + '\x1b[?1l\x1b[?25h\x1b[?1049l');
     stdin.setRawMode?.(false);
     stdin.pause();
   }
@@ -986,6 +1027,39 @@ export class TuiRuntime {
     if (split.pending) this.mousePending = split.pending;
     if (!split.data) return;
     data = split.data;
+    // bracketed paste (T22): buffer until the 201~ end marker, then insert
+    // the sanitized body at the caret; keys/bytes outside the markers keep
+    // flowing through the normal path (recursion depth stays 1: indexOf
+    // anchors on the FIRST 200~ so the outer chunk cannot contain another)
+    if (this.pasteBuf !== null) {
+      this.pasteBuf += data;
+      const end = this.pasteBuf.indexOf('\x1b[201~');
+      if (end !== -1) {
+        const done = this.pasteBuf;
+        this.pasteBuf = null;
+        this.insertText(sanitizePaste(done));
+        const after = done.slice(end + 6);
+        if (after) this.onKey(after);
+      } else if (this.pasteBuf.length > 1048576) {
+        this.pasteBuf = null; // runaway paste: drop, never balloon the input
+      }
+      return;
+    }
+    const ps = data.indexOf('\x1b[200~');
+    if (ps !== -1) {
+      const before = data.slice(0, ps);
+      if (before) this.onKey(before);
+      this.pasteBuf = data.slice(ps + 6);
+      const end = this.pasteBuf.indexOf('\x1b[201~');
+      if (end !== -1) {
+        const done = this.pasteBuf;
+        this.pasteBuf = null;
+        this.insertText(sanitizePaste(done));
+        const after = done.slice(end + 6);
+        if (after) this.onKey(after);
+      }
+      return;
+    }
     // SS3 application-mode arrows (\x1bOA…H): terminals left in DECCKM by a
     // previous program send these; normalize to the CSI forms this UI
     // matches so navigation never silently dies
@@ -1227,6 +1301,17 @@ export class TuiRuntime {
     this.cmdIdx = 0;
     this.dirty = true;
     // '@' opens the file palette (B2); refreshAtPal() is a no-op otherwise
+    this.refreshAtPal();
+  }
+
+  /** insert literal (sanitized paste) text at the caret - the same path
+   *  printable typing takes, so caret/history/palette side-effects match */
+  private insertText(text: string): void {
+    if (!text) return;
+    this.input = this.input.slice(0, this.caret) + text + this.input.slice(this.caret);
+    this.caret += text.length;
+    this.cmdIdx = 0;
+    this.dirty = true;
     this.refreshAtPal();
   }
 
@@ -1877,20 +1962,23 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       // M4 B7: last AI output -> clipboard (Windows clip / mac pbcopy /
       // linux xclip fallback chain; zero deps, stdin-fed)
       if (!lastAiText) { rt.addText('(no AI output yet to copy)', 'dim'); return; }
-      try {
-        const { spawn } = await import('node:child_process');
-        const bin = process.platform === 'win32' ? 'clip'
-          : process.platform === 'darwin' ? 'pbcopy'
-          : 'xclip';
-        const args = bin === 'xclip' ? ['-selection', 'clipboard'] : [];
+      const { spawn } = await import('node:child_process');
+      const tryBin = (bin: string, args: string[]) => new Promise<boolean>((res) => {
         const child = spawn(bin, args, { windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'] });
+        child.on('error', () => res(false));
+        child.stdin.on('error', () => { /* EPIPE when the bin vanished mid-run */ });
         child.stdin.write(lastAiText);
         child.stdin.end();
-        await new Promise((r) => child.on('close', r));
-        rt.addText(GREEN('✓') + ' ' + t.cmdCopied, 'plain');
-      } catch {
-        rt.addText('(clipboard tool unavailable — output follows)\n' + lastAiText.slice(0, 2000), 'dim');
+        child.on('close', (code) => res(code === 0));
+      });
+      // candidate chain (T16 复案): Wayland wl-copy before X11 xclip/xsel -
+      // a single hard-coded xclip is dead on a pure wl session (Omarchy)
+      let copied = false;
+      for (const c of clipboardCandidates(process.platform, process.env)) {
+        if (await tryBin(c.bin, c.args)) { copied = true; break; }
       }
+      if (copied) rt.addText(GREEN('✓') + ' ' + t.cmdCopied, 'plain');
+      else rt.addText('(clipboard tool unavailable — output follows)\n' + lastAiText.slice(0, 2000), 'dim');
       return;
     }
     if (line === '/plan' || line.startsWith('/plan ')) {
