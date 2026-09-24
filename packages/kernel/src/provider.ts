@@ -1,0 +1,330 @@
+/**
+ * @hmharness/kernel - provider
+ * OpenAI-compatible chat adapter. Works with any /v1/chat/completions
+ * endpoint: zhipu GLM, OpenAI, OpenRouter, NVIDIA NIM, vLLM, Ollama, ...
+ * Streaming (SSE) activates when onDelta is provided; reasoning deltas are
+ * surfaced separately so frontends can show the model thinking. One retry on
+ * transient 429/5xx before the stream starts; mid-stream failures surface.
+ */
+import type { ChatMessage, ProviderConfig } from './types.ts';
+
+export interface ChatResponse {
+  message: ChatMessage;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+export type DeltaKind = 'text' | 'reasoning' | 'reset';
+
+/** Transient failures worth retrying. `terminated` is undici's TypeError for
+ *  a socket cut mid-body (gateway dropped a long stream, proxy reset, server
+ *  restart) - the case that used to kill the whole task with a raw
+ *  `TypeError: terminated` because it matched none of the old patterns. */
+const TRANSIENT_RE = /abort|terminated|fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|ETIMEDOUT|timeout|socket hang up|other side closed|premature close|UND_ERR|EPIPE|no response body/i;
+
+/** Human hint for the failure classes users actually hit. */
+function transientHint(msg: string): string {
+  if (/terminated|socket hang up|other side closed|premature close/i.test(msg)) {
+    return ' - the connection was cut mid-response (gateway dropped a long stream or a proxy reset it)';
+  }
+  if (/abort|timeout/i.test(msg)) return ' - the provider stopped sending data (idle/timeout)';
+  if (/fetch failed|ECONN|EAI_AGAIN|ENOTFOUND|UND_ERR/i.test(msg)) return ' - the provider endpoint was unreachable (network/DNS)';
+  return '';
+}
+
+/** Parse a Retry-After header into a delay in ms (MDN: exactly two legal
+ *  forms - delta-seconds or HTTP-date), clamped to [0, 120s]. Returns 0 when
+ *  absent/illegal (caller falls back to exponential backoff). Deliberately
+ *  does NOT read x-ratelimit-reset: that header is an epoch timestamp in the
+ *  wild, which naive Number() parsing turned into a ~1.7e12 ms setTimeout
+ *  that overflowed and fired immediately - a retry storm. */
+export function parseRetryAfterMs(raw: string | null | undefined, maxMs = 120_000): number {
+  if (!raw) return 0;
+  const v = raw.trim();
+  if (/^\d{1,10}$/.test(v)) return Math.min(maxMs, Number(v) * 1000);
+  const at = Date.parse(v);
+  if (!Number.isNaN(at)) return Math.min(maxMs, Math.max(0, at - Date.now()));
+  return 0;
+}
+
+export interface ChatOptions {
+  timeoutMs?: number;
+  /** Streaming callback; presence switches the request to stream:true.
+   *  kind 'reset' carries an empty chunk and means: the previous attempt died
+   *  mid-stream and is being retried - discard what you streamed for it. */
+  onDelta?(kind: DeltaKind, chunk: string): void;
+  /** Retry policy for transient failures. Defaults: 6 attempts, 3s base with
+   *  exponential backoff and jitter, capped at 60s per wait. */
+  retry?: { attempts?: number; baseMs?: number };
+}
+
+export async function chat(
+  cfg: ProviderConfig,
+  messages: ChatMessage[],
+  tools?: unknown[],
+  opts: ChatOptions = {},
+): Promise<ChatResponse> {
+  const streaming = typeof opts.onDelta === 'function';
+  const body: Record<string, unknown> = { model: cfg.model, messages };
+  if (tools && tools.length > 0) body.tools = tools;
+  if (streaming) {
+    body.stream = true;
+    body.stream_options = { include_usage: true };
+  }
+
+  // auth scheme: standard Bearer, or a custom header (some gateways such as
+  // freellmapi only accept X-Api-Key). If Bearer gets a 401 we silently
+  // renegotiate once with X-Api-Key - misconfigured gateways then just work.
+  const mkHeaders = (scheme: 'bearer' | 'xapikey' | string) =>
+    scheme === 'bearer'
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
+      : { 'Content-Type': 'application/json', [typeof scheme === 'string' ? scheme : 'X-Api-Key']: cfg.apiKey };
+  let authScheme: string = cfg.authHeader ?? 'bearer';
+
+  let lastError = '';
+  // Resilient retry: exponential backoff with jitter, up to 6 attempts
+  // (Codex-style fire-and-forget: network hiccups, 429s, provider restarts,
+  // and mid-stream socket cuts should NEVER kill a long-running task).
+  const MAX_RETRIES = opts.retry?.attempts ?? 6;
+  const BASE_MS = opts.retry?.baseMs ?? 3000;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
+    // Did this attempt stream anything to the UI before dying? A mid-stream
+    // cut leaves partial deltas on screen; retrying would duplicate them, so
+    // clients are told to drop the partial block first (DeltaKind 'reset').
+    let emitted = false;
+    const emit: typeof opts.onDelta = streaming
+      ? (kind, chunk) => { if (kind !== 'reset') emitted = true; opts.onDelta!(kind, chunk); }
+      : undefined;
+    try {
+      const res = await fetch(endpoint(cfg.baseUrl), {
+        method: 'POST',
+        headers: mkHeaders(authScheme),
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (res.status === 429) {
+        // Retry-After per RFC/MDN has two legal forms: delta-seconds ("120")
+        // or HTTP-date ("Wed, 21 Oct 2015 07:28:00 GMT"). See
+        // parseRetryAfterMs for why x-ratelimit-reset is deliberately ignored.
+        const delay = parseRetryAfterMs(res.headers.get('retry-after')) || Math.min(30_000, 2000 * Math.pow(2, attempt));
+        lastError = `HTTP 429 (rate limited): ${(await res.text()).slice(0, 200)}`;
+        await sleep(delay + Math.random() * 1000); // jitter
+        continue;
+      }
+      if (res.status >= 500) {
+        const delay = Math.min(30_000, 2000 * Math.pow(2, attempt));
+        lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
+        await sleep(delay + Math.random() * 1000);
+        continue;
+      }
+      if (res.status === 401 && !cfg.authHeader && authScheme === 'bearer' && cfg.apiKey) {
+        authScheme = 'X-Api-Key';
+        lastError = 'renegotiating auth: Bearer rejected, retrying with X-Api-Key';
+        continue;
+      }
+      if (!res.ok) {
+        throw new Error(`provider: HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      }
+      if (streaming) {
+        clearTimeout(timer);
+        return await consumeStream(res, emit!);
+      }
+      const data = (await res.json()) as any;
+      const choice = data.choices?.[0];
+      if (!choice) throw new Error('provider: response had no choices');
+      return {
+        message: {
+          role: 'assistant',
+          content: choice.message?.content ?? null,
+          ...(choice.message?.tool_calls ? { tool_calls: choice.message.tool_calls } : {}),
+        },
+        usage: data.usage,
+      };
+    } catch (err) {
+      lastError = String(err);
+      // transient (network, timeout, connection reset, mid-stream cut): retry
+      if (TRANSIENT_RE.test(lastError)) {
+        // the attempt already painted partial text: tell clients to drop it so
+        // the retry does not append a second copy of the same answer
+        if (emitted) opts.onDelta?.('reset', '');
+        const delay = Math.min(60_000, BASE_MS * Math.pow(2, attempt));
+        await sleep(delay + Math.random() * Math.min(2000, BASE_MS));
+        continue;
+      }
+      throw err; // permanent error (bad JSON, logic error): don't retry
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(`provider: failed after ${MAX_RETRIES} attempts (${cfg.baseUrl}): ${lastError}${transientHint(lastError)}`);
+}
+
+/** Assemble a ChatResponse from an SSE stream, emitting deltas as they land. */
+async function consumeStream(
+  res: Response,
+  onDelta: (kind: DeltaKind, chunk: string) => void,
+): Promise<ChatResponse> {
+  if (!res.body) throw new TypeError('provider: no response body (streaming requested)');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let text = '';
+  let reasoning = '';
+  let usage: ChatResponse['usage'];
+  // tool_calls accumulate across deltas, keyed by their index in the stream.
+  const calls = new Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }>();
+  // Idle guard rather than a total cap: generation length is unbounded.
+  const idleCtrl = new AbortController();
+  let idleTimer = setTimeout(() => idleCtrl.abort(), 180_000);
+  const bumpIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => idleCtrl.abort(), 180_000);
+  };
+  const idlePromise = new Promise<never>((_, reject) => {
+    idleCtrl.signal.addEventListener('abort', () => reject(new Error('provider: stream idle timeout')), { once: true });
+  });
+  const pump = async (): Promise<void> => {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), idlePromise]);
+      if (done) return;
+      bumpIdle();
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        let chunk: any;
+        try {
+          chunk = JSON.parse(data);
+        } catch {
+          continue; // keep-alive comment or malformed line
+        }
+        if (chunk.usage) usage = chunk.usage;
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) continue;
+        if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
+          reasoning += delta.reasoning_content;
+          onDelta('reasoning', delta.reasoning_content);
+        } else if (typeof delta.reasoning === 'string' && delta.reasoning) {
+          reasoning += delta.reasoning;
+          onDelta('reasoning', delta.reasoning);
+        }
+        if (typeof delta.content === 'string' && delta.content) {
+          text += delta.content;
+          onDelta('text', delta.content);
+        }
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            const cur = calls.get(idx) ?? { id: '', type: 'function' as const, function: { name: '', arguments: '' } };
+            if (tc.id) cur.id = tc.id;
+            if (tc.function?.name) cur.function.name += tc.function.name;
+            if (tc.function?.arguments) cur.function.arguments += tc.function.arguments;
+            calls.set(idx, cur);
+          }
+        }
+      }
+    }
+  };
+  try {
+    await pump();
+  } finally {
+    clearTimeout(idleTimer);
+    // Cancel the body rather than releaseLock(): when the idle guard won the
+    // race, reader.read() is still outstanding and releaseLock() throws
+    // "Cannot release a readable stream reader..." - which would REPLACE the
+    // real error (a mid-stream cut / idle timeout) with a meaningless one.
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const ordered = [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);
+  return {
+    message: {
+      role: 'assistant',
+      content: text || null,
+      ...(ordered.length > 0 ? { tool_calls: ordered } : {}),
+    },
+    usage,
+  };
+}
+
+/** Accept bases with any /vN suffix (v1 OpenAI convention, v4 zhipu coding
+ *  plan: open.bigmodel.cn/api/coding/paas/v4) or none at all. */
+export function endpoint(baseUrl: string): string {
+  const b = baseUrl.replace(/\/+$/, '');
+  return /\/v\d+$/.test(b) ? `${b}/chat/completions` : `${b}/v1/chat/completions`;
+}
+
+/**
+ * Single multimodal call: text prompt + one image (data URL). Used by the
+ * see_image tool; deliberately separate from chat() so the streaming path
+ * stays boring. Non-streaming, one retry, hard timeout.
+ */
+export async function chatVision(
+  cfg: ProviderConfig,
+  prompt: string,
+  imageDataUrl: string,
+  opts: { timeoutMs?: number; maxTokens?: number } = {},
+): Promise<string> {
+  const body = {
+    model: cfg.model,
+    max_tokens: opts.maxTokens ?? 800,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+  };
+  let lastError = '';
+  // same auth negotiation as chat(): explicit header, Bearer, then X-Api-Key
+  let vAuth: string = cfg.authHeader ?? 'bearer';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
+    try {
+      const vHeaders = vAuth === 'bearer'
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
+        : { 'Content-Type': 'application/json', [vAuth]: cfg.apiKey };
+      const res = await fetch(endpoint(cfg.baseUrl), {
+        method: 'POST',
+        headers: vHeaders,
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (res.status === 401 && !cfg.authHeader && vAuth === 'bearer' && cfg.apiKey) {
+        vAuth = 'X-Api-Key';
+        attempt--;
+        continue;
+      }
+      if (res.status === 429 || res.status >= 500) {
+        lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
+        await sleep(1500 * (attempt + 1));
+        continue;
+      }
+      if (!res.ok) throw new Error(`provider: HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      const data = (await res.json()) as any;
+      const text = data.choices?.[0]?.message?.content;
+      if (typeof text !== 'string') throw new Error('provider: vision response had no content');
+      return text;
+    } catch (err) {
+      lastError = String(err);
+      if (!/abort|fetch failed|ECONN|timeout/i.test(lastError)) throw err;
+      await sleep(1500 * (attempt + 1));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(`provider: vision call failed after retry (${cfg.baseUrl}): ${lastError}`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}

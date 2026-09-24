@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+*.log
+# ACL-locked remnants from elevated builds (delete manually with an elevated shell)
+*.bad*
+
+.v2bak-trash/
+
+*.v2bak
+.v2bak-trash/
+# staging dir for the ACL-locked website/evidence (content lands via git plumbing)
+website/evidence-new/
+*.pre-redact
+.kos-tmp/
+*.opsbak
+
+# Permanent sensitive-file guards (never remove)
+.zcode/plans/
+*.opsbak
+dist.v2bak/
+*密钥*
+*个人文档*
+*界面升级改造*
+audit-doc.txt
+.audit-tmp/

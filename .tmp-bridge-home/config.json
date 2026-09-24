@@ -1,0 +1,1 @@
+{"provider":{"baseUrl":"http://default","apiKey":"secret","model":"default-model"},"providers":{"alt":{"baseUrl":"http://alt","apiKey":"alt-secret","model":"alt-model"}}}

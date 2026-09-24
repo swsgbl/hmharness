@@ -1,0 +1,945 @@
+# hmharness 开发日志(DEVLOG)
+
+以轮次记录重大演进。每轮:动机 → 关键决策 → 实测证据 → 教训。
+
+---
+
+## 2026-09-10 · 外部评审六项落地:打破自指适应度景观(126/126)
+
+**动机**:评审指出最深的问题是"进化系统正在一个自己人造的适应度景观上优化"——
+任务池作者写、bench 用例同源、评估同一元模型,DGM 的 objective hacking 在协议层
+已有空间。六项核实全部属实,同日全部落地。
+
+**六项修复(按评审 30 天档排序)**:
+1. **evidence 页标注外推性**:黄色声明条"当前数据全部来自自设任务,外推性未验证,
+   待第一批外部用户数据验证"——零成本但把最大的局限性透明化;
+2. **approved-rules 改结构化匹配**:旧实现 `JSON.stringify(args).startsWith(prefix)`
+   存在路径穿越风险(`node scripts/` 前缀被 `../../evil.js` 命中)。新实现解析规则
+   为结构化 args,逐 key 匹配,字符串值前缀匹配但扩展部分检查 `..` 穿越。附回归
+   测试锁死(路径穿越被阻/合法扩展通过/不同工具不匹配);
+3. **系统提示词 token 计数**:每次任务启动输出 `[prompt] system: N chars (~M tokens)
+   · AGENTS.md: yes/no`——实测全注入 ~16K chars(~4K tokens),"悄悄变胖"从不可见
+   变为每次可见;
+4. **预设契约冒烟测试**(scripts/preset-smoke.cjs):每厂商最小 API 调用验证
+   endpoint 可达+auth 接受+模型响应,退出码 1 为 CI 门;修复 /vN bug "单测全绿
+   但预设不可用"的盲区(数据层错误只有真实调用才能暴露);
+5. **雷达源新鲜度自检**:扫描时检查每个源最新数据日期,>90 天标 `STALE: newest
+   data YYYY-MM-DD is Nd old` 为 FAIL——修复"HTTP 200 ≠ 数据在更新"的盲区
+   (哨兵的哨兵);
+6. **任务池外部信号注入器**(scripts/tasks-from-radar.cjs):解析雷达"值得关注"
+   条目→生成验证任务→追加到 selffeed-tasks-ext.jsonl 外部池——把外部生态变更
+   转化为进化系统的任务,打破"只优化已知问题"的自指循环。
+
+**评审的元判断记档**:"它正在优化的那个世界,目前只有自己画的那一小部分"——
+这和 DGM 的 objective hacking 同构:进化系统在人造适应度景观上优化,门禁再多
+也只是在同一景观里画格子。第⑥项(外部信号进任务池)是第一个真正的外部锚点;
+90 天档的"外部用户带着未知任务来"才是最终解。
+
+---
+
+## 2026-09-10 · /ops 雷达修复:功能不是摆设,源是死的
+
+**用户质疑**:"全面检查 /ops、/ops scan 是不是成了摆设。"
+
+**诊断(三层检查)**:
+1. 代码层:工具定义/CLI 命令/TUI 命令/runner 注册全链完好,不是没接线;
+2. 数据层:ops-log.jsonl 有 19 次扫描记录,briefs/ 有 10 份文件,功能一直在跑;
+3. **源层(根因)**:四个雷达源(gitee releases + github tags)全部陈旧——oh-docs
+   停在 2020 年(OpenHarmony-1.0),三个 GitHub tags 源停在 2024-01(weekly_20240115)。
+   OpenHarmony 仓库已不通过 releases/tags 发版,走的是 commit + milestone。所以扫描
+   永远返回 "0 new items",简报永远写"本期无变更"——**不是摆设,是哨兵站在了
+   死的岗哨上**。
+
+**修复**:源类型从 gitee-releases/github-tags 切换到 **github-commits**(GitHub
+commits API,per_page=5,按 commit SHA 前缀做 item ID)。探测验证:四个仓库的
+最新 commit 都在 2026-09(今天!),diff 立刻活了起来。
+
+**实测**:清旧快照重做基线(commit SHA 代替旧 tag 名)→第二次扫描检出 **16 条
+真实新增**,模型简报捕捉到 **OpenHarmony v7.0 Release/Beta1 标签**这个真实信号。
+
+**教训**:
+①**监控系统的最大风险不是"坏了"而是"安静地无效"**——工具正常运行、日志正常
+记录、简报正常生成,唯独数据源早已死了;必须定期验证源的"新鲜度"而不只是
+"可达性"(HTTP 200 ≠ 数据在更新);
+②探测脚本必须直连原始 API 检查数据日期,不能只看自家工具的输出(自家输出
+全绿恰恰是最大的麻痹)。
+
+---
+
+## 2026-09-09 · Codex/DeepSeek 智能体工程升级:三方调研+九项落地(124/124)
+
+**动机**:用户令"参考 Codex 开源和 DeepSeek Harness 的内核提示词来优化 hmharness"。
+三方并行调研(Codex Rust 源码五个模型专属提示词+update_plan/AGENTS.md/审批持久化/
+沙箱全链;DeepSeek Harness 事件溯源会话/三阶段工具执行/工具溢出文件/80%压缩压力;
+hmharness prompt.ts 完整重审)后比对出 15 项具体缺口,按影响/工作量排三批九项落地。
+
+**第一批·提示词重写+新工具(prompt.ts+tools.ts)**:
+- prompt.ts 新增 9 段指令(来源+作用):
+  ①[Codex]持久执行——"Persist until handled end-to-end"
+  ②[Codex]规划协议——非trivial 任务先 outline 2-4步,逐步确认
+  ③[Codex]并行优先——框架已支持 Promise.all,提示词首次告知模型
+  ④[Codex]Git 工作区纪律——不回退他人变更,发现意外改停问
+  ⑤[Codex]代码审查模式——findings first by severity with file:line
+  ⑥[DeepSeek]分段执行——先搜→再规划→最后执行
+  ⑦[DeepSeek]合理质疑——风险+替代方案主动提出
+  ⑧[融合]编辑纪律——配合 edit_file 工具,优先搜索替换
+  ⑨[新增]AGENTS.md 发现——向上遍历到工作区根(codex/claude/cursorrules 三文件名)
+- **edit_file 工具**(Codex apply_patch 哲学):搜索替换替代 write_file 全量覆盖;
+  old_string 唯一性校验→不唯一报偏移量拒绝;不 needsApproval(爆破范围限于
+  声明子串);注册进 baseTools 排在 write_file 之前。
+- AGENTS.md 被动发现:contextPack 前自动扫描,命中即注入 system prompt
+  "Project-level instructions"段(不注册为工具)。
+
+**第二批·循环增强(loop.ts+runner.ts)**:
+- **预算收口信号**(Codex token_budget_context + DeepSeek 80% pressure):上下文
+  使用量超80%注入system "wrap up"——不是截断,是收口信号。
+- **审批持久化**(Codex .rules):批准模式写入 approved-rules.json(工具名+参数前缀);
+  后续同类自动放行;硬拒绝永远覆盖。
+
+**第三批·测试(11 新用例,总计 124/124)**:
+prompt 4 个(edit_file/AGENTS.md 关键词存在性)+edit-file 5 个(唯一/非唯一/未找到/
+相同/空)+loop-budget 1 个(glm窗口真实预算下80%触发)+修正2处(review引号/预算下限)。
+
+---
+
+## 2026-09-08 · 上下文工程收尾:工作区记忆隔离 + embedding 混合检索(五项全齐)
+
+**动机**:前三项(窗口登记表/预算自适应/rolling digest)落地后,用户令继续
+推进剩余两项。设计约束:零新依赖(红线)、零数据迁移、未知配置行为不变。
+
+**工作区记忆隔离(标签制)**:不拆文件不迁移——workspaces.json 最长路径
+前缀解析(sep/大小写容忍,`G:\A` 与 `g:/a/b` 等价;前缀无分隔符不算匹配);
+新笔记追加 `[ws:名]` 后缀(remember 工具/self-note/lesson 三写入点全接);
+检索打分本区×2.5/他区×0.3/无标签×1——**隔离而不割裂**(项目事实在本项目
+置顶,全局教训仍可达,他区笔记降权不消失)。旧记忆全部无标签=行为零变化。
+
+**embedding 混合检索(可选)**:OpenAI 兼容 /embeddings(手写余弦,零依赖);
+向量缓存 memory/embeddings.json 按内容哈希键——笔记只嵌入一次,二次检索
+只嵌 query(测试断言网络调用数);混合分=50%词法归一+50%余弦;**routing
+显式配 embedding 才启用**(继承 chat 路由会每任务白挨一次 /embeddings
+404);端点挂了回退纯词法,升级永不成为依赖。
+
+**顺修真 bug**:retrieveMemory 的 `newest: 0` 意图是"不注入最新",但
+`notes.slice(-0)` 在 JS 里= slice(0)=**全部注入**——embedding 测试当场
+抓出(embedding 调试脚本看到 topK:1 却输出两条)。教训:负零边界与"0=关"
+语义必须显式分支。
+
+**验证**:memory.test 7/7(前缀解析四态/标签提升抑制序/嵌入混合排序/缓存
+命中网络数/降级);全套 **111/111**;七包构建。
+
+---
+
+## 2026-09-08 · 模型感知上下文工程·前三项落地:窗口登记表 + 预算自适应 + rolling summary
+
+**动机**:用户灵魂拷问"没做超长上下文记忆工程/没做模型自适应"——盘点属实,
+排期当天落地前三项(后两项 embedding/工作区隔离涉及外部依赖与数据迁移,
+如实留待)。
+
+**实现**:
+- **window.ts 登记表**:三层解析(ProviderConfig.contextWindow 显式 > 保守
+  登记表 > 未知 null);登记值一律保守(报低损失一点上下文,报高损失整次
+  运行):claude 200K/gpt-4.1 1M/glm 131K/deepseek 128K/gemini 1M…
+- **预算自适应**:预算=窗口×2.5 字符/token×50% 历史占比(另一半留给系统
+  提示词/记忆注入/工具 schema/回复),clamp 40K~1M。**关键连续性设计:
+  128K 窗口×1.25=160K 字符=旧默认——未知模型行为逐字节不变**,已知模型
+  从此随窗口伸缩。
+- **rolling summary(context.ts compactWithDigest)**:压缩逐出的工具输出
+  先经摘要器蒸馏成持久 digest 系统注(插在首个 user 之后=受保护头部,
+  永不被剪),下轮与新逐出内容合并(不是追加是替换);**摘要器故障静默
+  降级为原墓碑剪枝**——最坏情况=旧行为,永不变差。runner 用 chat 路由
+  模型做蒸馏(120 词以内事实密度提示词:保留做了什么/路径/版本/决策/错误
+  与修复,丢弃原始列表与废话)。
+
+**测试方法论一条**:digest 合并测试初版直接复用第一趟压缩结果当第二趟
+输入——**零逐出提前返回**,断言 undefined 崩。真实场景是"压缩后继续生长",
+测试必须重建生长后的转录(教训:有状态管线的测试要模拟时间推进,不能拿
+快照当续集)。
+
+**验证**:context.test 11/11(登记表三层/预算五断言/digest 创建-位置-合并-
+降级-零调用/runLoop 集成:glm 预算下模型真收到 digest 注);全套 **107/107**;
+七包构建。
+
+---
+
+## 2026-09-08 · 0.3.0:GLM Coding Plan 404 破案(endpoint /vN 后缀 bug)+ 用户会话评估与上下文工程拷问
+
+**破案两层**:用户 TUI 配好 Coding Plan 地址仍 404——①配置层:glm baseUrl 被
+写成 api.z.ai/api/coding/paas(错域名缺 /v4);②**代码层真 bug:endpoint() 只认
+/v1 后缀**,以 /v4 结尾的基地址(智谱 Coding Plan /api/coding/paas/v4、火山
+方舟 /api/v3)会被再拼 /v1/chat/completions→404。修复:正则 /\/v\d+$/ 任意
+版本后缀直接追加;导出 endpoint 补五形态单测;glm 预设改 Coding Plan 地址+
+glm-5.3。**该 bug 从 0.1.0 起就存在,glm/volc-ark 预设从未真正可用过**。
+
+**用户会话评估(诚实)**:用户贴的 TUI 实录里,agent 配置流程纪律良好(备份→
+写入→remember→验证读回→摘要表),但**改完即报成功,没有做一次真实调用实证**——
+配置 404 到半小时后才被发现。结论已排期 ROADMAP:"改完必须实证"从日志铁律
+升级为工具层硬执行(配置变更后强制最小回环验证)。
+
+**上下文工程拷问的诚实回答**:现有=检索式记忆+字符预算压缩+会话恢复+蒸馏,
+**但全部一刀切、不感知模型**(固定字符预算不看窗口;长会话只剪工具输出不摘要
+对话;词法检索非语义)。缺口清单已排期 ROADMAP 60 天档:contextWindow 登记表/
+预算随窗口自适应/rolling summary/embedding 检索/工作区记忆隔离。
+
+**发布 0.3.0**:endpoint 修复+更新提醒+ops stats;期间对全局 0.2.0 先热补 dist
+(用户 TUI 立即恢复),发布后全局升级 0.3.0 覆盖热补。GLM-5.3 全链实测通
+(源码/热补/发布版三次)。**教训:热补已安装 dist 是"源码修复未发布"窗口期
+的止血标准动作(定位:cli/node_modules/@hmharness/kernel 嵌套路径)**。
+
+---
+
+## 2026-09-08 · 分发反馈闭环:更新提醒 + `hmh ops stats`(用户问"怎么知道下载量/怎么通知更新")
+
+**动机**:用户问两问——多少人下载使用?更新如何触达用户?核实机制:npm 是拉取式
+无推送;下载数有公开 API(api.npmjs.org/downloads);"更新提醒"的正解是客户端
+启动时对比 registry latest。当场拉了真实数据(cli 周 208)讲清口径(下载≠用户,
+镜像/扫描器计入,npmmirror 用户不计),然后实现缺的两块。
+
+**实现**:
+- **update-check.ts**:REPL/TUI 启动时异步查 dist-tags(3s 超时,结果缓存
+  24h 于 HMH_HOME/update-check.json,离线静默);旧版本打一行提示(zh/en 双语,
+  i18n 键 updateHint;TUI 经 rt.addText 帧安全);cmpSemver 逐分量 parseInt
+  ('1-beta'→1,Number() 会 NaN 归零——单测当场抓住)。
+- **npm-stats.ts + `hmh ops stats`**:七包日/周/月下载量表(公开 API 并行拉取,
+  失败列 '-'),表下常驻口径脚注"downloads, not users..."(诚实优先:不让人
+  误读数字)。
+
+**验证**:新增 3 用例(cmpSemver 排序含 0.2<0.10 数值序/缓存命中零网络/
+离线不崩/渲染对齐);全套 **99/99**;真机:0.1.0 触发提示→latest 0.2.0、
+0.2.0 正确不提示、ops stats 实时表。**npm 更新触达三层**:手动 npm update/
+MCP 模式 npx -y 每次解析 latest(自动最新)/CLI 内置提醒(本轮补齐)。
+
+---
+
+## 2026-09-07 · MCP server 模式落地:hmharness 成为 Claude Code/Codex 的原生鸿蒙工具箱
+
+**动机**:外部评估(用户转述)指出"最干净的集成方式还没被官方提供"——hmh 只有
+MCP 客户端,没有 server 模式;并问"有没有更优方案"。评估结论:有必要做且无更优
+解(CLI JSON 模式 schema 不进宿主上下文;skill 文件是免费互补非替代;HTTP MCP
+现阶段过度设计)。该分析低估了可行性:**仓库里早有一个能跑的 MCP 服务器**
+(scripts/test-mcp-server.mjs,65 行全握手),协议自家双端验证过,生产化只剩接线。
+
+**实现(packages/cli/src/mcp-server.ts,~160 行)**:
+- `hmh mcp-serve`:行式 JSON-RPC 2.0 over stdio(initialize/ping/tools/list/
+  tools/call);**console.log 劫持到 stderr**(stdio 协议通道绝不容杂物);
+- **暴露面白名单默认 `/^harmony_/`**(域工具统一前缀先行核实;run_command/
+  write_file/desktop_* 等通用工具不暴露——宿主有自己的);`HMH_MCP_TOOLS`
+  环境变量按名/前缀收窄;
+- **审批分工(对评估的修正)**:宿主权限系统负责逐工具问用户(优于我们 headless
+  下的非交互即拒);工具内部破坏性硬墙永驻 server 侧;tool 级 needsApproval
+  在 server 模式有意不咨询;
+- **观测不进门禁**:每次 tools/call 落 `insights/mcp-calls.jsonl`(工具/成败/
+  毫秒)——外部智能体的鸿蒙工具使用进入雷达观测面;技能门禁仍专属原生会话
+  (自进化挂在自己的循环上,MCP 模式=工具出口,双模式互补)。
+
+**验证**:回环测试 3 用例**一次全过**——自家 McpClient spawn 自家 mcp-serve
+(HMH_HOME 隔离到 tmp),握手→tools/list(≥10 个全 harmony_ 前缀,危险工具
+不在列)→tools/call(无 hdc 诚实输出+未知工具 isError)→调用日志落盘→
+HMH_MCP_TOOLS 收窄生效。全套 96/96;七包构建。
+
+**文档**:README 双语"在 Claude Code/Codex 里用"章节(宿主配置样例+安全分工
+说明);ROADMAP 60 天档该项提前勾销。
+
+---
+
+## 2026-09-07 · SELFFEED 第 1 天:首次真实自喂养循环跑通 + 慢推理超时破案
+
+**循环实录**(全部真实数据,已进 evidence 页:11 轮/2 canary/15 判例):
+任务池 #1(脚手架 SelfFeed1 双页面+schema 校验,真实工具 3 轮 2 用)→ evolve
+完整跑通(提案 mcp-http-endpoint-config→双样本门禁全过→**晋升 canary**;
+记忆蒸馏出 findstr 无匹配返回非零的真实教训)→ export-evidence→推送→
+state backup(8 项)。
+
+**破案:provider 超时对慢推理模型不足**。evolve 稳定 AbortError,同请求
+带 120s 探针 3.9s 成功→**真实尺寸请求(带血缘/Pareto 注入的长提示词)
+实测 84.5s**才返回(免费档慢推理,reasoning_content 先想一大段)。
+修复:ProviderConfig 增加 `timeoutMs` 配置(per-provider,z-ai 已设 240000),
+provider.ts 两处 `opts.timeoutMs ?? cfg.timeoutMs ?? 120_000`。93/93 复验。
+
+**环境事实(当日)**:freellmapi 网关 3002 端口活着但 FreeRide 后台无可
+用 key(HTTP 503 "Add provider API keys");tokenrouter 免费档 8 req/min
+限流+出海需代理+sing-box 当日两次自死(重启即活)。evolve/bench/vision
+路由临时切 omnifusion(chat 同款本地路由,当日唯一稳定),原配置备份在
+config.json.bak-selffeed。**git push 遇代理死:重启 vpn-manager 再推即过。**
+
+**Awesome-Self-Evolving-Agents 投稿(PR #21)**:fork→Autonomous Software
+Engineering 表尾插入 hmharness 行(8 列格式对齐)→gh pr create 在本机
+cmd 环境下 git 调用损坏('merge' 不是命令),**绕道 REST API
+`gh api -X POST .../pulls --input` 成功**:
+https://github.com/XMUDeepLIT/Awesome-Self-Evolving-Agents/pull/21
+
+---
+
+## 2026-09-06 · 外部评审采纳:证据工程落地(30 天档)+ 纵深提前项
+
+**动机**:外部评审(逐条核对 DEVLOG 后)结论:蓝图执行完毕且质量超预期,但
+瓶颈已从"机制不够"转为"证据不够、纵深不够、人手不够"。其五项技术论断经代码
+核实**全部属实**(chars/4 对 CJK 失准/无 state backup/MCP 按服务器豁免/
+knowledge 无哈希链/impact 固定阈值)。采纳其 30/60/90 节奏,本轮落地 30 天档
+全部代码侧+两项 60 天纵深提前。
+
+**证据工程(评审所言"ROI 最高,没有之一")**:
+- `scripts/export-evidence.cjs`:数字只来自文件(缺席标 absent,永不静默补零),
+  产出 `website/evidence/index.html`(概览卡片/每日轮次/技能判例含拒因/Pareto
+  被拒存档/最近洞察/内嵌原始日志,截断必须显式标注)+ `raw/*.jsonl` 全量副本。
+  **首跑即出真实数据:10 进化轮/26 active/1 canary/14 判例**——机器早就在转,
+  缺的只是发布管道。
+- `docs/SELFFEED.md`:30 天协议(每日任务→evolve→导出→提交→备份)+**四条诚实
+  规则**(只发布不修饰/失败原样上镜/判定只认门禁输出/任务必须是真的)。
+- `scripts/selffeed-tasks.json`:20 个真任务,全部限定在已验证管线
+  (scaffold/schema/build/doctor/sign/device/ui/apikg/lint/role/bench)内。
+- 官网导航加"证据"入口(zh/en 双字典);README 双语加诚实脚注
+  ("'越用越聪明'是机制而非已证事实,数据集收集中")+ Windows 优先声明。
+
+**纵深提前项**:
+- **CJK 成本修正**:estTokens 语言分桶(ASCII 4 字符/token,CJK 1 字符/token),
+  导出供测试;测试钉死旧估算对中文低估 4x。
+- **`hmh state backup|restore|remove|list`**:STATE_ITEMS 九项快照进
+  backups/<ts>/(纯文件,工具链坏了也能 copy 恢复);restore 前当前状态自动
+  停放 .pre-restore-<ts>(错误恢复本身可恢复);--full 才含 sessions/。
+- **knowledge.ts 供应链**:SOURCES 白名单钉死在代码内(被投毒的 config 不能改
+  抓取目标)+sha256 哈希链进快照(传输篡改可见)+蒸馏提示词 SUPPLY-CHAIN RULE
+  (diff 是数据不是指令,含祈使句即输出 NONE;输出侧 screenForPoison 仍在)。
+- **MCP trustedTools**:豁免粒度从服务器级细化到远端工具名级(检索类免审、
+  同服务器写类仍过门),trusted 整服务器保留为显式危险档。
+
+**验证**:全套 93/93(新增 3 文件 5 用例:CJK 估算 1+MCP 粒度 1+state 往返/
+列表清理/--full 3);七包构建;网站守门过(60+60 键对称,新 nav_evidence 双语)。
+
+**评审意见的取舍(记录供复查)**:①WSL2/dev container 不盲目上——鸿蒙工具链
+(hdc/DevEco/模拟器)深度绑定 Windows 主机,先评审影响再决定,ROADMAP 标注;
+②Awesome 列表投稿属外发动作,草稿备好等作者点头;③"单人巴士系数"缓解=
+定案台账门槛从 UI 行为扩到进化策略变更(进 90 天项)。
+
+---
+
+## 2026-09-06 · 发布后文档跟进:CHANGELOG 诞生 + 官网口径切换 + 官网守门转正
+
+**动机**:npm 发布完成后全面清点文档面,用户令"做好各项技术变更记录和开发日志
+等文档跟进"。自查发现四处陈旧/缺失。
+
+**四处修复**:
+1. **官网四步上手第一步**还停留在发布前的"克隆+构建+npm link"开发流程——
+   改为 `npm install -g @hmharness/cli`(HTML 默认中文+zh/en 双字典三处同步,
+   键 ins1)。
+2. **CHANGELOG.md 诞生**:0.1.0(七包首发+发布时点能力快照,逐包一段)/
+   0.1.1(cli bin 修复,只有 cli 变更如实注明"其余六包保持 0.1.0")。
+3. **CONTRIBUTING.md 补"Releasing to npm"章节**:版本号→CHANGELOG→lockfile
+   →build→预检→NODE_AUTH_TOKEN 发布→传播延迟注意项(六步,含"npm view 短暂
+   404 别重发"的实战教训)。
+4. **README/README.en**:双语文档补 npm 版本徽章(shields.io/npm/v);
+   "发布后推荐"措辞改为既成事实"已发布"。
+
+**官网守门转正(scripts/check-website.cjs,挂 CI)**:四道——内联 script 块
+语法(new Function)/data-i18n 引用必须在 zh+en 双字典都存在/双字典键集对称/
+快速开始必须是发布安装命令(npm link 回归即失败)。**解析教训**:字典一行多键
+(`nav_a: '…', nav_b: '…'`),行首正则每行只抓一个键(29 个假阴性);字符串值
+内含冒号,宽松正则又抓出 8 个假阳性——**最终解:平衡花括号截取对象字面量+
+eval 求值,格式免疫**。这正是此前 web 应用守门(LABELS 键 diff)的官网版补课。
+
+**验证**:check-website 2 脚本块语法 OK/57 引用/zh 60=en 60 对称/安装命令在位;
+CI 顺序追加守门步骤;全仓 @hmh/ 残留 0。
+
+---
+
+## 2026-09-05 · npm 正式发布:七包上线 @hmharness scope(桌面自动化破局)
+
+**动机**:预检全绿后正式发布。此前 5 个 token 连续失败(E403→EOTP→E404),
+根因层层揭开,最终用桌面自动化(computer-use 无障碍树)一次破局。
+
+**破案链(每个错误码都推进了一步)**:
+1. E401 → `~/.npmrc` 里硬编码了一个已失效旧 token,且没有
+   `${NODE_AUTH_TOKEN}` 引用(npm 不自动读该环境变量,那是 CI 的 .npmrc
+   约定)——改为 `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`,
+   token 永不落盘。
+2. 新 granular token(All packages + Read and write + Bypass 2FA)仍 E404
+   → **真正根因:@hmh scope 已被他人占用**,scoped 包只能发布到自己拥有的
+   org 下。网页端创建 org `hmh` 失败(name not available),遂创建
+   **@hmharness**(与仓库名一致,Free 套餐无限公开包)。
+3. **仓库整体重命名 @hmh/* → @hmharness/**:66 个文件(package.json
+   名字/依赖、全部 TS import、tsconfig paths、脚本、README/docs),8 个
+   文件因 NTFS ACL(Users 只读)node 写入 EPERM,ZCode 编辑器通道绕过。
+   `npm install` 重建 workspace 链接 → 七包重建 → **88/88 测试全绿**。
+4. 七包 0.1.0 有序发布全部 201 OK;npm 网页 org 页 7 包可见。
+5. cli 的 `bin` 被 npm 发布时静默移除(警告:"bin[hmh] script name
+   ./dist/main.js was invalid")——**根因是 `./` 前缀**,`npm pkg fix`
+   规范化为 `dist/main.js` 后升 0.1.1 重发,警告消失。bin 名 `hmh` 保留。
+6. 发布后 `npm view`/tarball 立刻查仍 404——npm **新包安全审查管道**:
+   网页后台即时可见,registry CDN 延迟数分钟。教训:验证发布状态要看
+   网页 org 包列表,npm view 404 ≠ 发布失败。
+
+**桌面自动化方法论(本场主角)**:Chrome 的**无障碍树**(get_app_state)
+能完整读出 npm 表单(单选框/复选框/Summary 区),AXPress/AXSetValue 后台
+安全点击填充——**不需要视觉、不需要坐标、不需要焦点 hack**。Summary 区
+("Provide read and write access to all packages")是表单状态的权威实时
+回读,填一项验一项。生成 token 的 secret 直接出现在 AX 树文本里,零 OCR。
+
+**安全收尾**:旧受限 token(个人的/fh8h)已删;仅存 hmh-publish-all
+(7 天 TTL,2026-09-13 过期);用户密码曾在聊天中出现,已提醒修改。
+
+---
+
+## 2026-09-05 · GitHub 中文门面 + npm 预检 + 视觉回归 + 镜像诚实检查(收尾批)
+
+**动机**:用户令"继续全部,逐个推进"+附 GitHub 主页截图指出缺中文介绍。
+ROADMAP 剩余四项一次推进。
+
+**GitHub 中文门面**:仓库 description 改为**中文优先双语**(中文定位+
+英文关键词共存,两语搜索都命中);topics 上限 20——移除弱泛化(testing/
+devtools/cli/nodejs)换精准中文生态词(ohos/arkui/cangjie/self-evolving-
+agent)。README 本已是中文,无需动。
+
+**npm 发布预检(scripts/publish-preflight.cjs)**:发布是七包**有序集**
+(kernel→evolution→domain-harmony→domain-ops→agent→web→cli),预检五道:
+dist 新于 src/shebang/dist 中 @hmharness/* 导入必须在 package.json 声明/
+npm pack --dry-run/dist 密钥扫描。**当场抓出 11 处真问题**:两个包 dist
+stale(提交后忘重建)+九处 @hmharness/* 导入未声明(发布后用户 install 必炸的
+坑)+cli 漏声明 @hmharness/web——全部补齐后 PREFLIGHT OK;已挂 CI(只检不发)。
+首发指令固化在脚本输出里。
+
+**视觉 UI 回归(uiregress.ts,quality 三件套其二)**:launch→hdc
+snapshot_display 截屏→vision 描述→**关键词断言**;每个判定**引用模型原话**
+(可审计,永不"看起来不错"盲过);语义存在性检查而非像素 diff(像素 diff
+被模拟器 GPU 字体渲染差异打穿)。**真机验收**:截屏 79KB 真 JPEG,vision
+在截屏上读出 **"Hello HarmonyOS"**(脚手架 Index 页面真渲染);首跑遇
+HTTP 429 为本地网关瞬态限流,重试即过(教训:外部服务状态先重试再定性)。
+
+**镜像下载诚实检查(harmony_image_check)**:华为只经 DevEco 账号绑定
+组件管理器发镜像,无公开 URL 通道——不写死代码假装能下载;探测工具
+报告**已装镜像(API 6.1.1-B1/phone_all_x86)+已装类型实例全自动+未装
+类型的唯一人工步骤指路**。真机验收:正确列出 installed 与"phone"未装
+的诚实报告。
+
+**实测**:全套 88/88;preflight OK;dist 六项验证;GitHub API 双操作
+(description/topics)即时生效。
+
+**教训**:㉚发布多包必须预检"有序集"——单包看不去的缺声明,`npm pack
+--dry-run` 不查依赖可解析性,预检脚本是唯一防线;㉙瞬态外部故障(429)
+先重试再定性,验收输出里保留完整错误串方便分辨"代码 bug"与"服务状态"。
+
+---
+
+## 2026-09-05 · API 知识图谱 + 消息通道(旧线最后两项落地)
+
+**动机**:用户令"继续推进"。旧线五缺口剩余 api_kg 与 channel 可落地项
+(cybernetics 维持实验排期)。
+
+**API 知识图谱(apikg.ts,旧线 api_kg 缺口)**:
+- **动机的根**:agent 猜鸿蒙 API 因为它**看不见 SDK**——而 927 个 d.ts
+  声明文件就在磁盘上。索引一次,查证每个符号:声明片段+file:line 证据+
+  kit 归属;"查不到"=本 SDK 无此符号,**幻觉被索引拦截**
+- **索引器**:行式宽松解析 d.ts(export default class/declare namespace/
+  interface/enum/成员方法属性含 `?` 可选/const/静态),提取 @kit 标签;
+  **实证 20,241 符号/0.2s**,缓存于 HMH_HOME/apikg(SDK mtime 变化才重建,
+  重载 44ms)
+- **harmony_api_lookup 工具**:符号直查(支持 hilog.info 层级形式),返回
+  精确命中+相似候选;**假符号诚实拒**("not in this SDK - do not guess")
+- 解析器四轮测试驱动修正:`Want`(export default 形态)/`hilog`(namespace
+  形态)初始全漏——d.ts 声明形态比想的多样;正则的 `\(?:` 转义错误逐字符
+  debug(execute 层字符类错吃整组)
+
+**消息通道(channel.ts,旧线 channel 缺口,诚实最小版)**:
+- **ops_notify** 工具:飞书(HMAC-SHA256 timestamp 签名)/钉钉(签名 URL
+  query)/通用 JSON webhook 三型;配置在 HMH_HOME config.json 的
+  channels{}——**webhook URL 是准密钥,不进仓库**;未配置=友好提示带
+  配置样例;出站消息挂审批门
+- 用途:任务完成/构建结果/设备测试判定推送到群——"模拟器装完了告诉我"
+
+**红线保持**:索引只读 SDK、缓存只写 HMH_HOME;webhook 走审批门。
+
+**实测**:apikg.test.ts 3 用例(解析器全形态/lookup 精确+模糊+假符号/
+channel 未配置提示+本地 stub 服务器真实 POST 往返);真 SDK 烟测
+(UIAbility/Want/hilog/HashMap 命中带 kit 与行号,NonExistentFake 拒);
+全套 **88/88**;七包构建+dist 四项验证。
+
+**教训**:㉘"看不见的知识"先建索引再谈提示词——agent 猜 API 不是模型
+笨,是证据链缺失;索引+file:line 证据让错误在写码前暴露;㉙正则 debug
+用最小复现行逐字符过,别盯着整段代码猜;㉘复训:e2e(真 SDK 20k 符号)
+再次抓出单测(合成样本)漏掉的声明形态多样性。
+
+---
+
+## 2026-09-05 · 签名封装+设备测试:hapsigntool 全链破案(设备实证)
+
+**动机**:继续推进 ROADMAP 域缺口最后两项:hapsigntool 签名封装+onDeviceTest。
+模拟器在线,一切可实证。
+
+**破案过程(五关,全部设备实证)**:
+1. **mode 词汇**:hapsigntool 的 -mode 要 `localSign`(不是 debug/release)
+2. **过期模板**:SDK 的 UnsgnedDebugProfileTemplate.json 自带 2021-2023
+   validity——**今天已过期**(verify-profile 实锤 not-after=1705127532)。
+   解:克隆模板刷新为 now..+30y(换 uuid)→ ensureDebugProfile 自动生成
+3. **别名谜题**:p12 有 8 个别名(keytool -storetype PKCS12 列出);经组合
+   穷举实证:**sign-app 的 keyAlias 是 `openharmony application profile
+   debug`**(不是直觉的 application release——那张是自签证书,链验不过)
+4. **证书链**:appCertFile 用 OpenHarmonyProfileDebug.pem(内含 3 张证书
+   的三级链,OpenHarmony.p12/Profile pem 本就是 profile 链不是 app 链)
+5. **hdc 路径坑**:hdc install 只吃反斜杠 Windows 路径,正斜杠被当相对拼接
+
+**设备实证**:签名后的 hap(54404b)在模拟器 install→launch→hilog 回读
+`EntryAbility onCreate`——**自己签的应用真的跑起来了**。
+
+**落地**:
+- **signing.ts**(重写):hapsignToolPaths(jar/p12/pem/template/java 五件
+  定位)/resolveSigningIdentity(explicit 覆盖>SDK 身份,诚实注明
+  ~/.ohos/config 是句柄非文件,不走假路径)/ensureDebugProfile(自动刷新
+  过期模板+sign-profile)/signHap(实证组合)/harmony_sign 工具(默认
+  全自动:找最新 unsigned hap→生成 profile→签出 -signed.hap)
+- **ondevice.ts**:runDeviceTest 四步判定回路(install→launch→hilog
+  轮询断言生命周期标记≤6s→cleanup uninstall,install 失败短路;
+  **runImpl 注入缝**=测试确定性,顺修 .cmd shim EINVAL 老坑的绕行)/
+  harmony_device_test 工具(自动寻最新 signed hap+bundle 从 AppScope 读)
+
+**最终验收(全自动化,清空 tmp 从零跑)**:harmony_build OK→harmony_sign
+(profile 自动生成+签名 OK)→harmony_device_test 四步全 PASS
+("the app really installed, launched and logged on device")。
+
+**实测**:signing.test.ts 5 用例(身份解析优先级+SDK 回退+四步判定+
+install 失败短路+marker 缺失诚实 FAIL);全套 **85/85**;七包构建。
+
+**教训**:㉕文档之外的唯一裁判是工具自己的报错——hapsigntool 每一步
+(mode/别名/链/过期)都是被它的错误消息逐级教育出来的,-h 帮助+错误
+码是第一手资料,二手教程全都过时;㉖过期证书类"玄学失败"先 verify-profile
+拿 not-before/after 数字再说话;㉗组合穷举是破签名矩阵的正路(2×3 组合
+就出了唯一解),别在单一组合上反复撞墙。
+
+---
+
+## 2026-09-05 · 设备回路打通(模拟器)+ 编译-修复闭环 + 项目画像
+
+**动机**:用户问"真机回路 blocked 是指链接手机吗?模拟器可以吗?模拟器已开,
+其他项继续"——正确!e2e 走 hdc 通道,模拟器(127.0.0.1:5555)对 hdc 就是普通
+设备,block 当年只是"无任何设备在线"。模拟器已开=blocked 解除。
+
+**设备回路全链实证(一次过)**:升级 scripts/e2e-device.mts(补 schema_check
+前置门+uninstall 清理步),对模拟器跑完整生命周期:
+scaffold(19 文件)→schema_check(3 配置全过)→harmony_build(BUILD
+SUCCESSFUL)→install(bundle installed)→launch(start ability
+successfully)→**logs 真实回读到应用自己的 `EntryAbility onCreate`**(应用
+确实在模拟器上活了)→uninstall(clean)。**全链零人工介入**。
+
+**编译-修复闭环(builddoctor.ts,旧线 icf 缺口)**:
+- **harmony_build_doctor**:hvigor 失败日志→七类已知签名分类(sdk-home/
+  signing/ohpm-deps/hvigor-env/arkts-source/config/network)→每类给**具体
+  修复动作**(不是"去搜报错");未知签名**不隐藏**——原样透传尾部+首错块,
+  反复出现的模式该进签名表;首 ERROR 块单独提取(file:line:pos)
+- 测试 3 用例:七类全命中+未知返回 null+首错块提取;profile 画像准确性
+
+**项目画像(profile.ts,旧线质量三件套基座)**:
+- **harmony_project_profile** 一次调用回答"这是个什么项目":模块清单
+  (type/pages/abilities/deviceTypes)、entry 的 har 依赖边、资源与源码
+  计数、bundle/SDK、配置健康(对接 schema_check 的 issue 计数)——
+  改动规划与工作量估计的起手式
+- 旧线五缺口处置:icf(编译修复)✅ 本轮;quality(画像)✅ 基座本轮
+  (回归+评分待视觉/真机配合);api_kg(知识图谱)/channel(消息通道)/
+  cybernetics(控制论)维持排期
+
+**坑(教训㉔三次重演,升级为铁律)**:脚本(node fs.writeFile)改
+src/index.ts 又被 ACL **静默吞写**(输出"成功"但文件未变+残留半截拼接行)——
+**此类文件一律改用编辑器工具直写**,shell 脚本改文件在本机此文件上已三次
+失败,不再尝试。
+
+**实测**:doctor.test.ts 3/3(含 profile 对真实 scaffold 的模块/页面/依赖
+断言;顺修 countFiles 深度 3→6 的目录遍历 bug);全套 **80/80**;七包构建
++dist 四项验证;dist 冒烟:profile 输出完整画像(2 模块/2 页面/4 源码/
+deps 边/健康 OK),doctor 对合成失败日志输出 kind+evidence+fix。
+
+---
+
+## 2026-09-05 · 域缺口补齐:项目 schema 校验 + API 能力矩阵
+
+**动机**:用户令"继续"。ROADMAP 域缺口里最可落地的两项:schema 校验
+(module.json5/build-profile.json5 结构验证——工具链失败前的第一道网)与
+API-level SemVer 矩阵(26.0.0 起版本改版适配)。
+
+**落地(domain-harmony)**:
+- **schema.ts**:宽松 JSON5 解析(行/块注释+尾逗号+单引号,字符串感知——
+  闭环号单引号曾漏转义,测试当场抓住)+module.json5 结构校验(name/type
+  枚举 entry/feature/har/shared/entry 的 mainElement+deviceTypes 必填)
+  +build-profile 校验(root: app.products[].compatibleSdkVersion+modules;
+  module: apiType=stageMode+targets);**新工具 harmony_schema_check**
+  (只读,构建前跑,把 3 分钟的 hvigor 深层失败换成毫秒级"精确字段名"报告);
+  模块目录判定=有 src/main/module.json5 或 build-profile 才查,AppScope
+  等非模块目录静默跳过(e2e 冒烟抓到的真 bug:缺失文件被当解析错误误报)
+- **apimatrix.ts**:双形态版本解析("6.1.1(24)" 遗留式 vs "26.0.0"+ 纯
+  SemVer——26 起 major 即 API level,改版适配只在此一处)+compareSdk+
+  能力矩阵(shared-module/2in1/semver-numbering 等条目,可扩展)+
+  **scaffold 接入**:坏 HM_SDK_VERSION 在脚手架入口即报错(带期望格式),
+  不再留给 hvigor 报天书
+
+**实测**:schema.test.ts 6 用例(JSON5 容错+坏 JSON 报错/entry 必填三态/
+root+module 校验/整项目扫描:合法过+损坏精确捕获/双形态版本+垃圾抛错/
+排序+矩阵跨 26 开关门控);**e2e dist 冒烟 4/4**(真 scaffold→schema_check
+通过→故意损坏 module.type→输出精确点名→apimatrix 导出往返);全套 77/77;
+七包构建+dist 三项验证。
+
+**教训**:㉔脚本改关键文件必须回读验证——本轮 src/index.ts 的接线脚本
+"成功"输出但写入被 ACL 静默吞掉,靠 dist 字节验证才暴露(与 index.ts.bad2
+同源);**写完就 console 回读**应成为脚本改文件的固定动作;㉑复训:e2e 冒烟
+再次证明其价值——单元测试 6/6 全绿的情况下,真脚手架扫描仍抓出
+"缺失文件≠解析错误"的分类 bug。
+
+---
+
+## 2026-09-04 · 门禁方法学升级 + 雷达信号接入(ROADMAP 收官批)
+
+**动机**:用户令"继续推进计划"。自进化蓝图 P0-P3 落地后,ROADMAP 上最顺承
+的两项:门禁方法学(bench 断言升级+成本双指标)与进化循环接入雷达信号源。
+
+**门禁方法学(bench.ts+evolve.ts)**:
+- **结构化断言四模式**:`expect-exact:`(精确等值,容忍首尾空白但不容忍任何
+  多余字符) / `expect-regex:`(正则匹配;**坏正则=判例错误而非通过**,防自欺
+  门禁) / `expect-none:`(失败标记禁词——"OHM OK (error ignored)"这类
+  啰嗦但错误的输出被否决) / `expect-any:`(至少一个候选命中);旧 `expect:`
+  子串语义完全不变(向后兼容,旧用例零改动)。matchCase 单一入口逐模式校验
+- **成本双指标门**:runAndAssert 收集每用例输出成本(粗估 tokens=chars/4),
+  候选任一用例成本 > 基线×cap(**默认 1.3x**,用例可用 `cost-cap:` 行自定义)
+  → 拒绝并记"cost regression"入 Pareto 存档——"靠啰嗦通过"的候选从此过不了
+  门;成本仅做否决不做唯一判据(pass-rate 门仍主导)
+
+**雷达信号源接入(evolution/radar.ts)**:
+- latestRadarBrief:读 ops 保管员的最新生态简报(≤14 天新鲜度,1200 字截断,
+  过期/缺失=null)
+- 进化 signals 增 `ecosystemNews` 字段;提议提示词加引导("若简报提及近期
+  OpenHarmony 发布,优先提议顾及它们的方案,不要给过时的工具链建议")
+- **只读不触发**:进化永不自己跑扫描(`hmh ops scan` 有自己的预算),只消费
+  保管员已发布的简报——职责与预算边界清晰
+
+**实测**:gate.test.ts 7 用例(exact 三态/regex 匹配+坏正则报错/none 禁词否决
+/any 二选一/legacy 子串兼容/新旧行解析含 cost-cap/雷达简报缺失-过期-新鲜三
+态);全套 **71/71**;七包构建+dist 六项字节验证(matchCase/expectExact/
+costCap/成本否决/ecosystemNews/radar.js 全在)。
+
+**教训**:㉑门禁质量=进化质量上限:子串匹配会放行"包含关键词但整体错误"的
+输出,exact/none 模式是防"聪明作弊"的最低配置;㉒成本必须是第二判据而非
+唯一判据——只用成本门会否决合理长输出,只用 pass 门会放行啰嗦作弊,双指标
+各管一半;㉓跨模块信号接入要"只读消费,不越预算"——evolution 读 ops 的
+产物但不触发 ops 的工作,否则预算闸门形同虚设。
+
+---
+
+## 2026-09-04 · P2 推理时进化 + P3 拓扑最小版(蓝图收官)
+
+**动机**:用户令"继续推进计划"——P0/P1 已落地(6ea9007),按验证蓝图执行
+P2(推理时进化+静态知识刷新)与 P3(拓扑最小版),自进化升级四段全部收官。
+
+**P2 落地**:
+- **高代价命令预检**(commandPreflight,tools.ts):hvigorw/hdc/ohpm/npm 等构建
+  类命令执行前先验"相对脚本是否存在于 cwd"(hvigorw.bat 不在=毫秒级报错,
+  而非烧 3 分钟构建才发现)——Self-Refine 验证教训:验证器要校验"修法对
+  不对"而非"改没改"(61% 失败是修法错)
+- **CRITIC 结构化反思**(run_command 第 2 次失败):失败输出追加诊断要求——
+  ①LOCATE 精确定位失败阶段 ②HYPOTHESIZE 一句根因 ③才允许换策略重试;
+  第 3 次仍短路。Reflexion 信号放大:低带宽失败信号必须升格为结构化语言
+  经验才跨轮迁移(94% 反思失败源于坏反馈:33% 定位错+61% 修法错)
+- **静态知识刷新**(evolution/knowledge.ts):鸿蒙官方 release-notes 索引
+  快照→词级 diff→元模型蒸馏"知识补丁"技能草案→防投毒→writeDraft,**走
+  既有 draft→双门→canary→impact 管线,零新口子**;离线=干净 no-op
+  (best-effort 永不成为用户要处理的失败)
+
+**P3 落地(spawn_agent 角色锦标赛,诚实最小版)**:
+- spawn_agent 增 `role` 参数(explorer/reviewer/build-fixer…);每次带角色的
+  委派记录 ok 率(turn 预算内+零工具错误)到 evolution/spawn-roles.jsonl
+- 下次带角色委派时,父模型在子代理系统提示词里看到排行榜(≥3 样本才入榜)
+  "explorer 67% (3x), prefer high ok-rates"——模型自己学会不再把任务派
+  给垫底角色。无 MARL、无辩论,单 Agent 产品里的多智能体协同进化=可读的
+  角色战绩榜
+
+**红线**:全部不变(进化写域/永禁 kernel 四件/评估细节不可见);预检与 CRITIC
+都在**工具层**硬执行(教训①重申:提示词防线对模型习惯行为不够)。
+
+**实测**:p2runtime.test.ts 5 用例(预检:便宜命令直通/缺失脚本拦截/存在
+放行/PATH 命令不预检;CRITIC:一次失败裸错/二次失败带 LOCATE+HYPOTHESIZE/
+三次短路不执行;knowledge:快照持久化+diff 路径+离线 no-op;P3:角色记录/
+聚合/≥3 样本门槛+排行线);全套 **64/64**;七包构建+dist 五项字节验证
+(knowledge.js/commandPreflight/CRITIC 文案/spawn-roles/index 导出全在)。
+
+**教训**:⑲推理时进化的正确位置是工具层而非循环层——run_command 的
+失败计数器已经是事实上的"推理时状态机",把 CRITIC/预检挂在那里零新协议、
+零 kernel 改动、测试直接可断;⑳"最小诚实版"原则再验证:角色排行榜比
+MARL 适合单人 CLI 框架(可解释/零新依赖/可关闭),不追论文豪华版。
+
+---
+
+## 2026-09-04 · 自进化生产化轮(P0 可观测+P1 种群化,论文验证驱动)
+
+**动机**:用户令用 XMUDeepLIT/Awesome-Self-Evolving-Agents 综述做差距分析+生产
+级升级蓝图,"搜索全网验证补全,最后根据结果来执行全面升级"。
+
+**调研(12 篇论文原文逐篇验证,两个并行 agent)**:综述六维分类法逐条核对
+(Model-Centric Inference/Training;Environment-Centric Static/Dynamic/Modular/
+Topology;Co-Evolution)。**验证推翻了初版蓝图三处转述失真**:①GEPA 不是
+"k 候选并行采样选优"——原文是 Pareto 前沿**单祖先单变异稳态遗传循环**;
+②DGM 死因不是"漂移"(v1/v3 全文 drift 0 命中)——是 **objective hacking**
+(node 114 绕过评估函数,类比 reward hacking+Goodhart);③ACE 无"bench 门控
+版本化"——真实机制是 embedding 去重+上下文长度触发修剪。**Voyager 教训反转**:
+"技能库膨胀"论文当卖点(ever-growing 缓解遗忘),全文无任何生命周期管理——
+膨胀是真实但被论文忽视的缺口,做 merge/decay 是补课不是复现。**新成立教训**:
+Self-Refine 94% 失败源于反馈质量(33% 定位错+61% 修法错);Misevolve 实证
+memory 进化→safety alignment decay+部署期 reward hacking,缓解="references
+not rules";AWM 工作流归纳+选择性注入完全属实;Agent KB 分层检索(workflow 级
+规划+execution 级纠错)+分歧门控。验证后蓝图:**docs/research/self-evolution-upgrade.md**。
+
+**P0 落地(可观测性——一切算法的前提)**:
+- **血缘账本**:ProposalOutcome.lineage{parentInsights,scores,metaModel,
+  decidedAt}三落点;Insight.skillsInjected 注入键;evidence/report 不可审计→可审计
+- **金丝雀晋升**:promote 默认目标=**canary 态**(过双门只赚实验位,不直接
+  全量);~20% 会话确定性采样注入(session hash 稳定归因)+Misevolve 水印
+  "references not rules";`hmh bench --impact`:暴露组 vs 对照组 ≥8 会话且
+  成功率差 ≥10% 才 promote/retire,数据薄=诚实 insufficient-data——**objective
+  hacking 的结构性防线:不信进化系统自己能看到的指标,信对照组**
+- **进化预算闸门**:config.evolutionBudget{maxCyclesPerDay,maxTokensPerCycle},
+  当日超限 skip 并记 budget 行(AZR"safety alarms"教训:无界自进化失稳)
+- **技能算子**:pin(用户钉住永不被进化动)/promoteCanary/retireCanary(退回
+  draft 不删,只增不删红线)/decay(30 天零注入→dormant 出注入集,Voyager
+  补课)
+
+**P1 落地(GEPA 化,忠实原文机制)**:
+- **Pareto 候选池**:被拒候选持久化 evolution/pareto/entries.jsonl(带拒因+
+  skillMd 快照)——GEPA/DGM 共同支柱:多样性存档防局部最优
+- **单祖先变异**:每轮从池中随机采 ONE 祖先喂 proposeSkills("learn from why
+  it failed, propose a VARIATION"),互补拒因 30% 概率 Merge 交叉——原文
+  Algorithm 1 机制,非 k-候选锦标赛
+- **AWM 工作流归纳**(workflows.ts):洞察按任务原型聚类(归一化前缀),同型
+  ≥3 次→元模型归纳 {{参数化}} 工作流模板(带触发条件)→走**既有** draft→
+  防投毒→双门管线(不开新口子);常规 propose 空转时才触发(预算友好)
+
+**红线全部保留**:进化写域仍限 skills/+memory/+已批补丁;kernel
+loop/provider/config/security 永不可触;评估细节(bench 用例)永不进进化元
+模型提示词(objective hacking 防线)。
+
+**实测**:新 impact.test.ts 9 用例(canary 采样确定性+~20% 分布/预算读数/
+Pareto 存取+祖先+Merge/draft→canary→promote→active 全链/retire 不删/promote
+判定 ≥10% 边界/insufficient-data 下限/pin 豁免 decay+30 天安静/AWM 聚类);
+skills.test.ts 更新为 canary 协议(顺带修真 bug:re-promote 占用 canary 目录
+EPERM→canary 前任也入 archive);全套 **59/59**;七包构建+dist 六项字节验证
+(impact.js/workflows.js/lineage/canary/skillsInjected/--impact 全在);空 home
+`bench --impact` 冒烟"no canary skills under evaluation"诚实输出。
+
+**教训**:⑯引用论文教训前必须回原文核对——本批 5 处主张 2 失真 1 反转,
+未核对的"文献驱动开发"等于传闻驱动;⑰P0 可观测先于一切算法:没有归因
+闭环,GEPA/金丝雀的效果与运气不可分;⑱机制升级要顺着既有门禁管线开
+(AWM 走 draft→gate 而非另开口子),新能力=新风险面。
+
+---
+
+## 2026-09-04 · TUI /model 选择器交互修复轮
+
+**动机**:用户实测反馈"tui 界面的 /model 列出来的模型列表,上下键无法选择,用鼠标
+也选中不了"。截图取证(输入框为空、模型列表是转录区普通文本)定位真相:代码逻辑
+无 bug(无头 5/5 PASS),用户走进的是**裸 `/model` 命令打印的静态列表死路**——该列表
+纯文本、无可选项;活面板只在输入含 `/model…` 时存在,命令跑完输入清空,面板就没了。
+另有暗雷:输入 `/model` 直接回车会**静默切到第一个模型**(Enter 语义过急)。
+
+**落地**(tui.ts / i18n.ts,对标 Claude Code 两段式选择器):
+- 裸 `/model`+Enter **打开交互选择器**而非打印死列表(转录留记录+聚焦活面板,
+  openModelPicker);`/model <name>` 手输路径不变
+- Enter 语义分层:输入恰为 `/model` → 开面板不执行;`/model `(已进面板)或带过滤
+  词 → 选中高亮行并执行。第一记 Enter 不再误切模型
+- **Esc 关闭面板**(清草稿;精确匹配 `\x1b`,箭头序列不受扰;顺手删除了 onKey 尾部
+  重复的旧 Esc 分支)
+- **滚轮优先驱动面板**:面板开着时 SGR 滚轮事件移动选择(此前滚轮只滚转录,面板
+  视若无睹);面板关着仍滚转录
+- 面板底部常驻 **i18n 提示行** `panelHint`(↑↓/滚轮选择·Enter 确认·Esc 关闭,
+  zh/en 双语),选择器从此无需看文档即可上手;cmdModel 描述同步改写
+- 布局账本:提示行计入 cmdRows(+1),viewH 同步,转录不被挤爆
+
+**实测**(tui.test.ts 新增 5 个 runtime 级用例,真 stdin data 接线喂键,非 mock):
+裸 /model+Enter 不触发命令且聚焦面板 ✓;↓↓+第二记 Enter 提交
+`/model nvidia-vision` ✓;SGR 滚轮上下移动选择 ✓;Esc 清空 ✓;斜杠命令面板
+`/m`+Enter 仍取 COMMANDS 序首项(实测序为 /model,顺带发现其提交即路由进选择器,
+行为自洽)✓。全仓 43/43 绿,typecheck+七包构建+dist 冒烟(skills/no-TTY 双语)过。
+
+**教训**:①"代码正确"≠"用户可达"——活面板逻辑全对,但一条静态列表死路就把用户
+挡在门外;交互入口必须收敛到单一活物;②Windows ACL 坑:某次提权进程构建出的
+dist/patches.* 带 Users:RX-only 继承 ACE,普通 shell 下 rename 可行而 delete/open-write
+EPERM——绕行(改名让路+重建),根因留 elevated 清理;③npm 在本机 shell 偶发
+"Invalid abbreviated flag"启动失败,直跑 tsc/`node --import tsx --test` 稳定。
+
+**第二轮(同日,用户复测后)**:用户仍报"上下键选不了、鼠标也选不了",且点名
+**TUI 没有语言切换命令**。两个真因+一个缺口:
+- **SS3 光标键**:上个程序可能把终端留在 DECCKM(应用光标模式),方向键以
+  `\x1bOA/B` 而非 `\x1b[A/B` 到达——原代码只匹配 CSI,SS3 被末尾的
+  `data.startsWith('\x1b')` 静默吞掉,症状恰是"按了没反应"。修复:启动/退出均写
+  `\x1b[?1l` 强制 CSI;onKey 顶部 `\x1bO[A-H]`→`\x1b[A-H]` 归一化(双保险)
+- **conhost QuickEdit**:用户点列表想"选中"→终端进入文本选择模式,方向键被终端
+  吃掉移光标选文本,应用收不到。修复:**面板=模态**——面板开着时自动开
+  SGR 鼠标上报(1000+1006),**点击=选中并确认**(render 记录每行的屏幕行号,
+  SGR row 1:1 命中)、滚轮驱动选择;面板关闭(Enter/Esc/清空)立即关上报,
+  原生拖选复制即时恢复。/mouse 全局开关与模态上报合并成单一
+  syncMouseReporting 状态机
+- **缺口:/lang 命令**——此前 TUI/REPL 无界面语言入口(只有 --locale/HMH_LOCALE/
+  Web 芯片)。新增 `/lang [zh|en]`(省略则中英切换):kernel setLocale 持久化
+  (setChatRoute 同款读改写)+ TUI 运行时全量刷新(rt.configure+strings 重绑)+
+  REPL 同步获得;nextLocale 纯函数可测
+
+**实测**:TUI 测试 12/12(SS3 上下键导航/模态上报开-关/点击第 3 行提交
+`/model nvidia-vision`/nextLocale 边界);全套 48/48;dist 字节级验证(?\1l、SS3
+归一化、点击正则、syncMouseReporting、/lang 全在);setLocale 经 dist kernel
+隔离 HMH_HOME 往返持久化实证;REPL /lang 交互节奏冒烟(spawn+延时写入模拟真人)
+——切换行+切换后 /help 以英文渲染(证明运行时刷新而非仅落盘)。管道整块喂入的
+"多行丢失"是 readline 行交付竞态(历史坑),交互终端不存在。
+
+**教训**:④"无头通过"只覆盖程序一半,终端是另一半——终端模式残留(DECCKM/
+QuickEdit)能把正确的键处理整个短路;对键盘/鼠标类交互,要么真终端实测,
+要么把终端的两态(CSI/SS3、上报开/关)都纳入无头矩阵;⑤多行管道冒烟必加
+逐行延时,await 间隙里的行会被 readline 丢掉,交互终端不存在。
+
+**第三轮(同日,/mouse 移除)**:用户质问"/mouse 存在的意义是什么""你想给自己
+留历史代码包袱吗"。盘点:模态上报+终端滚轮转换已覆盖 conhost/WT/VS Code 全部
+目标环境,/mouse 唯一受益者是 tmux/个别 Linux 终端用户——而本项目定位
+Windows/HarmonyOS 开发机,受益者集合为空。保留=为不存在的用户维护开关+
+i18n 键+文档心智负担。**删除**:COMMANDS 项、handleLine 分支、toggleMouse、
+mouse 字段、状态行 /mouse 提示尾巴、i18n 六键(mouseOff/cmdMouseOn/Off/
+cmdMouse,zh/en+接口)——syncMouseReporting 简化为纯模态(面板开→上报,
+面板关→还原,零用户可动开关)。**教训**:⑥兜底开关不是免费品——每个开关
+都是文档、i18n、测试和用户心智的永久负债;兜底只在"目标用户里真有人踩"
+时才值得留,否则就是历史包袱。
+
+**第四轮(同日,双菜单根除+全量扫描)**:用户截图抓到裸 /model 输出**两个模型
+菜单**——一个可选中(活面板)一个不能(静态列表)。根因:上一轮修 /model 时
+只改了键盘路径(输入框直敲回车),**没改驱动路径**(/斜杠面板选中 /model 命令
+进入同一 handleLine,却仍打印静态列表+开活面板)——"修症状不修路径"的复发。
+用户令"全量扫描整个工具确保无同类问题",建立三道脚本化扫描:A 硬编码
+UI 文案(addText/stdout.write 含中文且无 t.) B COMMANDS×REPL/TUI 处理器
+矩阵 C dist 双菜单残留。**修复**:①裸 /model 不再打印静态列表,活面板是
+唯一菜单(transcript 断言钉死:无 `z-ai — ` 静态行;键盘/面板两入口同一
+openModelPicker);②扫描抓出三处漏网硬编码(/providers scan 成功文案、
+/providers 列表尾巴、REPL [thinking] 标签)全接 i18n(复用 cmdProvidersAdded,
+新增 cmdProvidersScanHint/thinkingLabel);③REPL 两缺口补齐(/providers [scan]
+TUI 有而 REPL 报 unknown command、/clear 同缺)——COMMANDS×处理器矩阵全绿。
+**实测**:TUI 13/13(新增面板路由单一菜单断言);全套 49/49;REPL spawn+延时
+实证 /clear//providers 生效+无 unknown command;三道扫描 ALL CLEAN。
+**教训**:⑦同一动作的多条入口路径必须收敛到同一出口——修交互 bug 时要枚举
+"用户到达这里的所有路径",只修自己想到的那条=给用户留另一条坏路;⑧扫描
+要脚本化且可重跑(人眼审一遍会漏,正则矩阵不会)。
+
+**第五轮(同日,头部状态诚实化)**:用户问"右上角的空闲是不是历史包袱?"。判定:
+**标签该留,但它在说谎**——头部右侧永远显示"○ 空闲",任务运行中也不变(状态行
+虽在输入框上方给出运行中,但右上角的"空闲"是睁眼说瞎话);标签的真实价值=
+YOLO🔥 模式徽标的挂载点+与 Web 顶栏同构。**修复**:头部状态随 busy 轮换——
+空闲=绿色"○ 空闲",忙碌=黄色"运行中…",模式徽标两种状态都保留。
+paletteProbe 增加 frameText(捕获真渲染帧,按 CUP 行序列拆行+剥 ANSI——
+期间测试抓到并修正:①拆行正则首版把整帧吃空;②setModeTag 后须重新探测,
+旧帧不含新徽标)。**实测**:TUI 14/14(新增头部诚实测试:空闲↔运行中轮换、
+忙碌时无"空闲"残留、🔥 两态可见);全套 50/50;dist 字节验证(忙碌轮换在,
+空闲态保留)。**教训**:⑨状态指示器的唯一职责是真话——宁可没有指示器,
+不能有会说谎的指示器;"运行中"只在状态行、头部却写"空闲"=同一状态两处
+两种说法,必错一处。
+
+**第六轮(同日,回滚 18210e1+定案台账)**:用户严正指出——"之前就让你更改位置的,
+怎么现在又恢复了""每次更改你都不做日志管理吗,不更新技术清单文档吗?为什么
+出现这种牛头不对马嘴的低级错误?"。**事实**:0df4ba7(2026-09-03)已定案
+"状态行迁输入框上方,头部右侧**永远**只显示 ○空闲+🔥";18210e1(本轮"空闲
+是不是包袱")未查任何决策记录,凭单轮判断把头部改回运行轮换=**回退已定案
+设计**。**根因(三重失守)**:①设计决策只散落在 git 注释/DEVLOG 正文,无
+"当前有效"单一事实源,跨会话上下文压缩后不可靠;②面对"是不是包袱"类
+质疑,我的默认动作是"动手改",而非"先查有没有定案";③改动未执行
+"先查文档再动代码"流程。**止损**:①回滚头部行为至定案(测试断言同步改回:
+头部静止+状态行唯一运行指示);②**新建 docs/DESIGNS.md 定案台账**——
+TUI 8 条/Web 4 条/CLI 2 条已生效决策+提交号+复案登记规则(推翻定案必须先
+登记理由);③顺带修 frameText 探针真 bug(按 ESC 前缀过滤行会丢弃所有带
+颜色样式的行——恰好是最需要断言的行;改按 CUP 分隔奇偶取行再剥 ANSI)。
+**实测**:TUI 14/14(新断言:头部忙碌时仍○空闲+状态行"运行中…"在+🔥两态
+可见+空闲时状态行隐藏);全套 50/50。**教训**:⑩已交付的交互=已签署的
+契约,任何"改进"冲动先过定案台账;文档不是事后补写,是改代码的**前置**
+步骤;⑪对"X 是不是包袱"类问题的正确流程:查台账→有定案则回答"是定案,
+理由如下"→无定案才进入提案;⑫单一事实源原则——决策散落多处=没有决策。
+
+**第七轮(同日,T1-v2 用户定案)**:用户第三次澄清原意:"我的意思是这两处状态
+是**重叠的**——状态已经更改到输入框上面了,**右上角的状态功能应该删除**,
+否则是包袱。既然更换了位置,就应该把旧位置的删除,这不是常识吗?"——
+至此真相完整:0df4ba7 迁位时**没删旧位**,右上角留下一个永远"空闲"的孤儿
+状态位;18210e1(改成轮换)和 af09228(恢复空闲字样)两轮都在错误的问题域里
+打转,我甚至用"定案"为孤儿位辩护。**执行**:①右上角状态字样全删(tuiIdle
+键从 i18n 三处移除,零引用即删);②🔥 徽标并入头部左侧身份条(技能数之后);
+③头部=纯身份条(logo/模型/cwd/技能+🔥),测试断言:帧内无"空闲/idle"字样、
+状态行为唯一运行指示、🔥 持续可见;④DESIGNS.md 按复案规则登记 T1-v2。
+**教训⑬**:迁移功能时,"删旧位"是迁移的组成部分,不删=留孤儿=下一轮一定
+被用户抓;⑭理解需求要确认到"哪个具体对象删除/保留",三轮才到位——每轮
+都该先复述一遍理解再动手;⑮为既有实现辩护前,先问"它的存在本身对不对",
+而不是"它是否忠于历史"。
+
+---
+
+## 2026-09-03 · 代码级自进化轮(DGM 桥)
+
+**动机**:用户深度质问"自进化是各 agent 互相改底层代码,还是仅在提示词层面做文章?"
+诚实盘点结论:此前进化=纯提示词层(技能 markdown 注入系统提示词,记忆检索注入),
+**永远不改代码**。这不是 DGM 意义上的自进化。
+
+**落地**(patches.ts,evolve.ts 步骤 6.5):
+- proposePatches:元模型读会话信号+最热工具源码,提 ≤1 个 find/replace 补丁
+- isPatchableFile 硬守卫:只允许 `packages/.../src/*.ts`;**永禁 kernel loop/provider**
+  (自举悖论:改坏循环=智能体永久瘫痪)/config/security
+- 沙箱周期:创建隔离 git 分支 → **补丁在分支上提交**(实测抓到的真 bug:不提交则
+  checkout main 时未提交改动会漂移) → 全链 build + 双样本 bench → 过门合并/回归回滚
+  (checkout main + hard reset + 删分支,零残留)
+- 红线更新(CONTRIBUTING):进化写 skills/+memory/+可提代码补丁,四条件同时满足
+
+**实测**(sandbox-e2e.test.ts):临时 git 仓跑完整周期,merge 路径(补丁落 main+分支删)
+与 revert 路径(main 完好+树净+零残留)全部实证。
+
+**教训**:用户问"所有修改你都验证过了吗"——诚实回答暴露了端到端缺口;写测试当场
+抓到"补丁未提交"真 bug。**门禁绿 ≠ 行为对;新功能收工前必问:这条代码路径真的
+从头到尾跑过一次吗。**
+
+---
+
+## 2026-09-02~03 · 智能体内核成熟轮(三轮实战审计)
+
+**动机**:用户提供三份完整运行记录(freellmapi 配置 25 轮 71 万 token / 工具安装 /
+新闻查询),逐份审计,证据驱动修根因。
+
+### 第一轮:环境事实与反馈通道
+- 根因①:模型不知道宿主是 cmd.exe——40+ 次 grep/head/wmic 失败。修复:系统提示词
+  注入宿主事实(平台/shell 身份/等价命令速查/探测优先/禁全盘扫/失败两次换策略)
+- 根因②:工具失败模式随会话丢失。修复:失败模式自动入长期记忆
+- freellmapi 拒 Bearer 只认 X-Api-Key(实测同 key 两头对照)→ chat()/chatVision() 401
+  自动重协商 + authHeader 字段
+
+### 第二轮:提示词不够,硬墙来补
+- 模型重复同一失败 curl 10 次(Unix 管道 6 次)——提示词已告但惯性无视 → 工具层硬墙:
+  unixPipeOnWindows 预检(只查宿主段首词,容器内 Unix 词不误拦)+ 重复失败第 3 次短路
+- DENY 误报:单文件 del 被硬拒 → 精度分级(单文件放行/递归删只拒盘根+系统目录+家目录)
+- `npx skills add` 断头路(装别的 agent 格式)→ `hmh skills add`(三种布局,实测装 8 个 gsap 技能)
+
+### 第三轮:结构化能力补全(用户批"只是修修补补,不是底层重构")
+- Web 跨任务连续对话记忆(此前 Web 每任务失忆,REPL/TUI 却有)
+- web_search(零 key DuckDuckGo)+ web_fetch(URL→可读文本)
+- 输出人本化:工具流折叠一行可展开,AI 回答为主体(Claude Code 信噪分离)
+- 内核并行工具执行:审批串行保序+执行并发(4×150ms 慢工具 ~1x 而非 4x,计时单测)
+- **三层即时反馈**(用户批"8 轮才洞察太滞后"):Tier1 系统级错阈值 2→1 即记 /
+  Tier2 每出错任务完成即一次小模型反思入记忆(下任务即受益)/ Tier3 进化轮 8→3
+- 审批根因修复(用户实测抓到:自动模式仍弹窗——远程审批钩子无条件挂载覆盖 yes 标志)
+- YOLO 三端(web 三档+TUI/REPL /yolo+CLI --yolo);状态行迁输入框上方带模式徽标
+- 桌面自动化三件套 desktop_screenshot/click/type(看→动→验,PS here-string 在
+  -Command 内联会炸的坑:改 Add-Type -MemberDefinition)
+- 浏览器自动化:Windows 无头输出全空(平台限制,4 种参数组合实测)→ 诚实路线
+  browser_open 可见浏览器+桌面三件套(实测 281KB 真实渲染)
+- 会话管理:重命名(titles 映射,审计 jsonl 不可变)/归档/删除(trash 可恢复)
+- i18n 守门:页面 L.引用 vs zh/en **双字典分别**校验;TUI COMMANDS 对称检查
+  (undefined 事件的根治:缺键=构建失败)
+
+**教训**:①提示词防线对模型习惯性行为不够,关键约束必须工具层硬执行;
+②e2e 实测要选"可见范围"内的目标(列表截断 50 条,最老的在 API 视野外);
+③JSDoc 里 `packages/*/src/` 的 `*/` 会提前终结块注释;
+④`.cmd` shim 在现代 Node execFile 直 spawn 会 EINVAL。
+
+---
+
+## 2026-09-01~02 · 双前端对标与官网轮
+
+- Web 三栏(deepseek-harness 式)+ 工作区实体(切换=服务端 chdir+会话按 cwd 分组)
+  + 目录选择器(盘符/面包屑)+ /model 运行时路由切换 + providers 探测(env+opencode+本地网关)
+- hmh tui 全屏重写(Claude Code 式:备用屏/斜杠面板 ↑↓ 选择/宽度感知输入框换行)
+  ;原生拖选复制与滚轮共存(默认零鼠标上报,滚轮经终端转 ↑↓)
+- YOLO/审批/状态行;GSAP 全站动画(CDN 守卫降级);官网双语上线 ndtool.cn/hmharness/
+  (旧路径 301)
+- 旧线退役:codelin/harmony-harness 资产甄别归档→本地+远程清除;实战 insights 并入长期记忆
+
+---
+
+## 2026-08-28 之前 · Phase 0-3 + 加固 + 模拟器自治
+
+见 docs/ROADMAP.md 各 Phase 节与 docs/ARCHITECTURE.md(四包起步→七包、MCP、
+进化循环、参数化脚手架、模拟器无头全生命周期、CI、多厂商路由)。

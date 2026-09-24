@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    # windows-latest: the project is Windows-first (hdc/hvigor toolchain,
+    # path semantics in tests) — several tests encode win32 path behavior
+    # (absolute-path detection, case tolerance) that inverts on Linux
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      # build FIRST: the workspace packages resolve each other through their
+      # package.json main/exports (dist/*.d.ts) — a fresh checkout has no
+      # dist, so typecheck before build fails with TS2307 on every workspace
+      # import (locally dist exists, which is why this ever looked green)
+      - run: npm run build
+      - run: npm run typecheck
+      - name: unit tests
+        run: npm test
+      - name: built CLI smoke (no model needed)
+        run: node packages/cli/dist/main.js skills
+      - name: npm publish preflight (ordered-set check, never publishes)
+        run: node scripts/publish-preflight.cjs
+      - name: website guard (inline JS syntax + zh/en i18n symmetry + install cmd)
+        run: node scripts/check-website.cjs

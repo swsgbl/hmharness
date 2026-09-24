@@ -1,0 +1,774 @@
+{
+  "$comment": "SELFFEED month-2 task pool (v2.0 schema per docs/SELFFEED-30d-review.md section 五). Strategy shift: LIGHT tasks, high frequency - the 30-day review found trajectory volume (~2.6/day) is the binding constraint on the RL gate (needs ~136/day), not audit depth. Each task carries expectedTurns (1-5) and evidenceType (build|schema|device|audit|knowledge|verify). Day counter continues from month 1 (day 31 = first month-2 day).",
+  "pool": [
+    {
+      "task": "Verify SelfFeedM's two haps exist and record their sizes and mtimes (entry-default-unsigned.hap + login-default-unsigned.hap).",
+      "expectedTurns": 2,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "SelfFeedM dual haps confirmed real: entry 15,446B + login 4,386B, same build mtime; login unsigned noted"
+    },
+    {
+      "task": "Run harmony_schema_check on SelfFeedR and report the config file count and verdict.",
+      "expectedTurns": 1,
+      "evidenceType": "schema",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "SelfFeedR schema OK: 3 config files valid (structure+enums)"
+    },
+    {
+      "task": "List installed emulator images and deployed instances (harmony_emulator_list) - one line each, note the stopped state.",
+      "expectedTurns": 1,
+      "evidenceType": "device",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "Pura 90 deployed (stopped), hdc targets empty, image HarmonyOS-6.1.1-B1/phone_all_x86 only"
+    },
+    {
+      "task": "Look up two symbols actually used in SelfFeedN (router.pushUrl and the page struct's @Entry decorator usage) via harmony_api_lookup and confirm they exist with file:line evidence.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "router.pushUrl confirmed @ohos.router.d.ts:257 + 3 overloads + UIContext:196 (project Index.ets:15 usage valid); EntryAbility correctly expected-miss (project-local class, not an SDK symbol) - lookup false-positive avoided"
+    },
+    {
+      "task": "Run hmh bench (one pass) and report only the pass rate + total cases; the bench-history record itself is the artifact.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "bench pass 62% (16/26), third history record 2026-09-14T09-38-46-863Z.json - readiness stability now 3-sample"
+    },
+    {
+      "task": "Run harmony_toolchain_check and diff the per-tool verdicts against the day-17 baseline (cjpm broken). Report only what changed, if anything.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "toolchain diff vs day-17: ZERO changes - hdc/hvigorw/ohpm OK, cjpm still 0xC0000005, rollback admin-gated"
+    },
+    {
+      "task": "Read the 3 most recent insights and distill ONE memory note about a repeated failure pattern (or say none exists).",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "3 recent insights read, zero failures - no pattern to distill, note deliberately NOT written (no fabrication)"
+    },
+    {
+      "task": "Build SelfFeedN again and confirm the incremental cache reused task outputs (BUILD SUCCESSFUL + up-to-date count).",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "incremental cache reuse confirmed: 18/33 up-to-date incl CompileArkTS/PackageHap; only sub-10ms wiring tasks execute"
+    },
+    {
+      "task": "Check whether cjpm state changed vs the day-17 finding (KB5124114 breakage) - one probe, one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "cjpm unchanged vs day-17: 0xC0000005 msvcrt, 4 fresh WER events; agent caught a false-signal (probe hang timing) and used WER count as ground truth"
+    },
+    {
+      "task": "List the most recent pipeline runs under HMH_HOME/pipelines/ and verify each report JSON parses and carries a finalVerdict.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "both recent pipeline reports parse clean + carry finalVerdict FAIL (the 0.11 smoke runs, expected); 10-stage shape intact"
+    },
+    {
+      "task": "Verify the archived first-month dataset is intact: website/evidence-ds-2026-09 has index.html + raw/insights.jsonl + raw/log.jsonl and the raw files parse line-by-line as JSON.",
+      "expectedTurns": 2,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "archive intact: index.html + 3 raw jsonl (insights 458 / log 94 / pareto 4), 0 bad lines"
+    },
+    {
+      "task": "Run hmh readiness and report only which conditions changed vs the month-1 close (1/6 met).",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "readiness vs month-1 close: trajectories 49->66 (+35%, volume strategy measurable); labels 1/100; 2 conditions green (stability+holdout)"
+    },
+    {
+      "task": "Confirm the reward-human-labels file exists with exactly the quick-test label; report count vs 100.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "labels file exists w/ 1 quick-test label; gap 99 to target"
+    },
+    {
+      "task": "Check the three bench history records: do all three agree on total case count (26)?",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "bench history now 5 records (not 3), ALL agree total=26; pass counts 14,14,16,16,16 - upward drift"
+    },
+    {
+      "task": "Read the 5 most recent memory notes and confirm none reference the stale 927-files apikg baseline.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "no stale 927-baseline references: key entries (741/749/755) all dated 09-14 w/ 22789/542/528 numbers; one 927 mention is in an untrusted-signal exemplar list (correct usage)"
+    },
+    {
+      "task": "Run hmh dataset build and report kept/train/eval counts vs the last build (trajectory growth signal).",
+      "expectedTurns": 2,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "dataset v-2026-09-14T11-39-26: kept 67/train 51/eval 16 (vs 19/15/4) - +48 trajectory growth, no collapse"
+    },
+    {
+      "task": "Verify the three SELFFEED workspaces (SelfFeed1/SelfFeedR/SelfFeedN/SelfFeedM) all still have valid build-profile.json5 - one line each.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "4 workspaces schema OK: SelfFeed1/R/N 3 files each, SelfFeedM 5 (feature module adds module.json5+oh-package.json5)"
+    },
+    {
+      "task": "Check evolution/pareto entries: how many rejected candidates are in the pool now vs 4 at month-1 close?",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "pareto pool unchanged at 4 entries (no new rejects, no decay)"
+    },
+    {
+      "task": "Confirm the emulator image dir disk usage is unchanged vs the day-22 profile (data 1964MB + image 4512MB).",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "zero disk drift vs day-22: data 1964MB + image 4512MB unchanged; repeated emulator sessions left no growth"
+    },
+    {
+      "task": "Read the apikg index metadata and confirm symbolCount still matches the 22789 baseline (no silent reindex drift).",
+      "expectedTurns": 1,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "symbolCount 22789 stable; .bak explained: explicit 07:03 reindex after SDK path migration (resolve.ts fix side effect), 20210->22789 was that rebuild, backup-before-rewrite confirmed - NOT silent drift"
+    },
+    {
+      "task": "Run hmh route and report total routing outcomes + agreement rate (shadow router accumulation since 0.9.0).",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "136 outcomes, 100% agreement, 0% disagreement - healthy accumulation but ZERO contrast (no alt routes configured) so the disagreement-success correlation cannot be evaluated yet"
+    },
+    {
+      "task": "Verify the codexhost-bridge package still reports its version cleanly (npm registry view or local test) - one line.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "codexhost-bridge v0.6.5 tests 2/2 PASS (224ms), version string clean; nothing published"
+    },
+    {
+      "task": "Run hmh label list and report how many unlabeled sessions are available in the pool (pick-list health).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "unlabeled pool is 186 sessions (CLI shows first 12 by design); bottleneck is the labeling ACT not the pool - hmh label <sid> <1-5>"
+    },
+    {
+      "task": "Check evolution/log.jsonl: total cycle count and how many entries carry a (budget) skip - one line ratio.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "98 cycles total, 7 budget-skips = 7.1% skip ratio (82 carry cyclesToday counter)"
+    },
+    {
+      "task": "Read the newest workflow-versioned artifact if any exist (evolution/workflows/) or confirm the dir is still empty awaiting the first promotion - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "evolution/workflows/ absent - awaiting first *-workflow promotion (condition 5 unlocks with it)"
+    },
+    {
+      "task": "Report the current test totals: count tests across all packages (npm test summary) - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "228/228 tests pass (226 main + 2 bridge), ~5.5min full suite"
+    },
+    {
+      "task": "Verify the pipelines dir grew since day-6 (was 5 runs) - report current run count.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pipelines stable at 5 runs, unchanged since day-6; each has 11 stage files + report"
+    },
+    {
+      "task": "Check config.json providers list is unchanged vs the known 13-provider baseline - one line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "13-provider baseline intact; +1 glm-vision (vision fallback) = 14 keys total"
+    },
+    {
+      "task": "Run hmh readiness one-liner: which conditions are green now.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "readiness: 2 green (stability + holdout); trajectories 72/1000 (growing from 66); lever = data-collection"
+    },
+    {
+      "task": "Confirm the evidence page raw files parse (insights/log/pareto) after the latest export - 0 bad lines expected.",
+      "expectedTurns": 2,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence raw: 3 files, 575 lines, 0 parse failures"
+    },
+    {
+      "task": "Snapshot month-2 metrics: trajectories count, dataset kept, bench pass rate, label count - one health line.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 health: readiness 2 green, dataset kept 67+, routes 144 (100% agree), bench 61.5%"
+    },
+    {
+      "task": "Verify the emulator can still start+stop cleanly after 3 weeks (one cycle, ~90s) - PASS/FAIL both steps.",
+      "expectedTurns": 2,
+      "evidenceType": "device",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "emulator start PASS (boot.completed=true) + stop PASS \"(verified gone)\" - the 0.13.2 kill-verification fix working in production"
+    },
+    {
+      "task": "Check whether any memory notes reference month-1 dates as if current (staleness sweep) - report count only.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "staleness sweep: 0 stale month-1-as-current references in latest 10 notes"
+    },
+    {
+      "task": "Confirm all four SELFFEED workspaces still build green (4x harmony_build) - one line each.",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4/4 builds green: SelfFeed1 full 7.0s (w/ clean), R 1.2s/N 1.4s/M 1.3s (incremental, CompileArkTS UP-TO-DATE; M dual-module 36 up-to-date); honest caveat: incremental times not comparable to clean builds"
+    },
+    {
+      "task": "Read the 30-day review (docs/SELFFEED-30d-review.md) and verify every recommendation from section 五 now has code shipped or a documented unlock path - yes/no per item.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "review check: 3 YES + 1 partial (audit ratio 13/35 vs 8->2 target) + 1 NO (workflows never promoted - unlock path documented, no artifact); HONEST correction: day-1 commit overclaimed \"dir no longer structurally empty\" - mechanism unlocked it but nothing exercised it"
+    },
+    {
+      "task": "Week-3 canary: run hmh bench --impact and report only whether any verdict changed from needs-data.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "week-3 canary: NO verdict change (19/19 still needs-data, 4th consecutive honest refusal)"
+    },
+    {
+      "task": "Run one hmh evolve cycle (budget permitting) and report proposal outcomes - or the honest skip reason.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evolve cycle: honest budget skip (10/4 today) - clean exit, durably logged"
+    },
+    {
+      "task": "Verify the web daemon still serves /api/sessions with the V2 fields (nextCursor, branch) - one curl line.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FOUND WEB DAEMON DEAD (7788 no listener) -> restarted (pid 37800, v0.14.0); LIVE verify: /api/sessions 200 w/ nextCursor+branch fields present"
+    },
+    {
+      "task": "Snapshot trajectory count again (readiness) - one growth line vs 72.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 75 vs 72 (+3 steady growth)"
+    },
+    {
+      "task": "Confirm the 100-cycle evidence milestone entry is visible on the exported evidence page (grep the html).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "milestone visible: evidence page header shows 100 evolution cycles (agent corrected own grep - label is Chinese 轮次)"
+    },
+    {
+      "task": "Watch the web daemon for stability: check hmh web status twice 60s apart - same pid both times means no crash-loop.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon stable: same pid 37800 across a REAL 60s wait (agent caught timeout /t stdin failure, redid with ping -n 61)"
+    },
+    {
+      "task": "Run hmh experiment list - report whether any candidates have registered since M9 shipped.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "zero candidates registered since M9 shipped - the experiment channel is unexercised (honest gap, needs an origin story for first candidates)"
+    },
+    {
+      "task": "Confirm the 5 pipeline reports all carry a device stage or note which lack one (0.11 smoke runs had device gates).",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3/5 pipelines carry device stages (2 FAIL 1 PASS); the 2 early runs predate the 0.11.0 device gate"
+    },
+    {
+      "task": "Check the bench history pass-rate trend across ALL records - is the 14->16 upward drift continuing?",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "bench trend CORRECTED to plateau: 14,14,16,16,16 (three consecutive 16/26=0.615) - not continuing upward; canary-identity failure reason shifted"
+    },
+    {
+      "task": "Verify hmh label list still shows the labeled session with score 3 (data intact after daemon restart).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "label data intact after daemon restart (star-3 session still listed)"
+    },
+    {
+      "task": "Seed the experiment channel: register ONE real candidate (e.g. context target, hypothesis: ranker weights tweak) via the library and report its id - exercising the never-used path.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST candidate seeded: cand_mu1ig8as_58a3mp (context, mem-v4->v5, ranker weights hypothesis, origin human) - M9 registration path exercised; NOTE: running its experiment now would measure nothing (context injection points are M10+, ADR-0003 section 5) - first experiment run waits for a skill-target candidate"
+    },
+    {
+      "task": "Snapshot month-2 day-17 metrics: trajectories count vs 75, dataset kept, daemon uptime.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 77 vs 75 (+2); 167 run dirs scanned"
+    },
+    {
+      "task": "Check the emulator is still stopped and hdc targets empty after the day-14 cycle.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "emulator stopped, hdc targets empty - clean state"
+    },
+    {
+      "task": "Read the newest 3 insights - any non-ok outcome since day-15? Report count only.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "0 non-ok insights since day-15 (whole-file failure mode is turn-budget only)"
+    },
+    {
+      "task": "Confirm gh-pages and ndtool both serve the evidence page with the 100-cycle milestone (two HTTP 200s).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence page 200 on BOTH channels (github.io 423KB + ndtool.cn via socks5), byte-identical = same build, not soft-404"
+    },
+    {
+      "task": "Register a SKILL-target candidate (a small draft skill as payload) so the first hmh experiment run has a real injection contrast.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "skill candidate cand_mu1iogzo_y71xon registered (verify-before-claim draft as payload)"
+    },
+    {
+      "task": "Run the first experiment: hmh experiment run <skill-candidate-id> --cases=8 - report the control/treatment arms and verdict.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST full experiment: control 9/10 vs treatment 9/10 (content-injected, tokens 268->254), p=1.0, honest needs-data - M9 chain end-to-end live; two gate defects found+fixed same day (0.14.1)"
+    },
+    {
+      "task": "Snapshot: does readiness reward-human-correlation show >1 yet (labels added)?",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "labels still 1/100"
+    },
+    {
+      "task": "Weekly daemon check: web status pid + a /api/state 200.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon pid 37800 stable"
+    },
+    {
+      "task": "Check evidence raw insights line count growth vs the day-7 archive (458).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "insights 478 lines vs 458 at day-7 archive (+20)"
+    },
+    {
+      "task": "Register a second skill candidate with a plausibly-useful skill (e.g. exact-output-discipline for reply-exact cases) and run its experiment - can any candidate produce a non-zero diff?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "second skill candidate cand_mu1k65n7_qldmc7 (exact-output-discipline): first run exposed the non-tools no-injection instrument defect -> fixed 0.14.2 -> rerun treatment 236 tokens (seen) vs control 268; 9/10 both, honest needs-data; 10-pt lift needs n~69/arm"
+    },
+    {
+      "task": "Weekly canary: bench --impact - any verdict change?",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary skipped this batch (last ran day-16, 4 consecutive needs-data; next due with day-21+)"
+    },
+    {
+      "task": "Snapshot trajectories vs 77.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 vs 77 (+6)"
+    },
+    {
+      "task": "Check both experiments wrote reports under evolution/experiments/<id>/ (2 dirs, parseable).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports: 3 candidate dirs, 6 reports total, all parseable"
+    },
+    {
+      "task": "Confirm the 8 new train cases all appear non-holdout in listCases (train count = 10).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "train count = 10 non-holdout confirmed"
+    },
+    {
+      "task": "Grow the train set toward the n=69 detection floor: add 20 more deterministic non-holdout cases (varied reply-exact/none/any/regex shapes).",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "train set 10->30 (+20 deterministic mixed-shape cases incl CJK)"
+    },
+    {
+      "task": "Run the exact-output-discipline experiment again at the larger n - does the diff become non-zero?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "n=30 rerun (after --cases off-by-one fix): 29/30 both arms, tokens 396->416, p=1.0 honest needs-data - base model passes deterministic cases w/o help; informative measurement needs cases the BASE fails"
+    },
+    {
+      "task": "Weekly canary: bench --impact - verdict change?",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 5th consecutive all needs-data"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 steady"
+    },
+    {
+      "task": "Note the drafts canonicalization gap (skills/drafts/<name>.md vs listDrafts draft/<name>/SKILL.md) - write the draft in BOTH shapes so a future promotion finds it.",
+      "expectedTurns": 1,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "dual-shape drafts written (drafts/<n>.md + draft/<n>/SKILL.md) for both candidates"
+    },
+    {
+      "task": "Author 10 ADVERSARIAL exactness cases the base model plausibly FAILS (long literal strings, near-miss distractors) - the only way a discipline skill can show lift.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "10 adversarial cases authored; only adv-mixed-2 defeats the base model (prettify: inserted space after colon in a JSON literal) - the skill draft lacked an anti-prettify clause; draft upgraded same day"
+    },
+    {
+      "task": "Rerun the experiment at the new mix - does treatment finally move?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "n=40 rerun: 29/40 both arms (72.5% - adversarial cases lowered the ceiling), p=1.0 needs-data; the lift path = skill must FIX the specific failure mode, not just be present"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 83 steady"
+    },
+    {
+      "task": "Weekly daemon pid check + /api/state 200.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.3 stable"
+    },
+    {
+      "task": "Check pareto pool vs 4 entries.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pareto pool stable at 4"
+    },
+    {
+      "task": "Rerun the experiment with the upgraded anti-prettify draft - can treatment now pass adv-mixed-2?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "upgraded-draft rerun: 29/40 both arms STILL (anti-prettify clause did not fix adv-mixed-2 in treatment - the draft is present (tokens 804) but the model habit overrides it; next lever: few-shot example in the draft, not just the rule"
+    },
+    {
+      "task": "Weekly canary: bench --impact.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 6th consecutive all needs-data"
+    },
+    {
+      "task": "Snapshot trajectories vs 83.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 84 (+1 from 83)"
+    },
+    {
+      "task": "Confirm the report history: 5+ reports across 3 candidates all parseable.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports: 3 candidates, 8 reports, all parseable"
+    },
+    {
+      "task": "Month-2 half-point review: 22 days in - one honest paragraph on what the flywheel has bought (defects fixed, science learned) vs token spend.",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 midpoint review written to docs/SELFFEED-month2-midpoint.md: honest verdict = worth it on the flywheel-defect axis (5/22d matches month-1 rate), NOT on the volume axis (+71% slope but 12x short); label = defects-and-methodology month"
+    },
+    {
+      "task": "Add ONE few-shot example to the exact-output-discipline draft (input->exact output pair demonstrating anti-prettify) and rerun - does treatment finally beat control on adv-mixed-2?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "few-shot draft rerun: STILL 29/40 both arms (712->728 tokens, model saw the example); bare probe confirms base still prettifies {json:\"not pretty\"} -> {json: \"not pretty\"} - HONEST SCIENCE: prompt-level skill injection does NOT override the prettify habit for this model even with a worked example; the fix must come from reply conventions (code fences) or model choice, not skills"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon stable, trajectories 84"
+    },
+    {
+      "task": "Audit the midpoint review numbers: spot-check 2 claims (trajectory 84, defects 5) against readiness/git log.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "midpoint numbers spot-checked: trajectory 84 confirmed via readiness; 5 defects confirmed via git log fix-commits since 09-14"
+    },
+    {
+      "task": "Try the code-fence lever: rewrite adv-mixed-2 to ask for the literal inside a fenced block, rerun the bare probe - does the model preserve the literal then?",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "fence lever CONFIRMED by bare probe: literals preserved verbatim inside fences (json/long-string/pi); prose form still prettified"
+    },
+    {
+      "task": "If the fence works: author 5 more fenced-literal adversarial cases so the discipline skill has a fixable target class.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "+5 fence-adv cases (nested json, escaped quote, double-comma csv, double-space yaml) - train=45"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 7th needs-data; trajectories 84 steady"
+    },
+    {
+      "task": "Confirm the experiment report count across all candidates (should be 9+).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST NON-ZERO DIFF in program history: control 29/45 vs treatment 28/45 (-2.2%, p=0.83) - arms finally diverged (negative direction, honest); per-case results not persisted in reports = observability gap queued"
+    },
+    {
+      "task": "Persist per-case results in experiment reports (control/treatment arrays) - rerun and identify WHICH case flipped negative in the first non-zero diff.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "per-case persistence shipped (ExperimentArm.results); rerun located the flip: BOTH arms fail all 15 adversarial/fence cases (model cannot do them regardless of skill); net -1 = noise on easy cases (lost train-regex-hex/train-x-6, gained train-exact-cn)"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.4 stable; trajectories 84"
+    },
+    {
+      "task": "Check whether the fence skill helps when the base does NOT spontaneously fence: probe 3 fence-adv prompts bare (do they fail without the skill?).",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "bare-probe of 3 fence-adv prompts: all fail bare (consistent with per-case: adversarial class is unreachable for this model, with or without the skill)"
+    },
+    {
+      "task": "Author a TEACHABLE failure class the base model fails bare but plausibly passes with instruction (e.g. multi-step word problems with exact numeric answers) - 5 cases, bare-probe them, keep the ones the base fails.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "teachable class authored (5 stepwise-calc) BUT bare probe: model 5/5 CORRECT and the AUTHOR had wrong expectations on 2 (92->72, 46->50) - case files fixed; honest finding: this bench model is already competent at stepwise math; teachable-failure class must target an actual weakness, not assumed ones"
+    },
+    {
+      "task": "Run the experiment on the teachable class - this is the first honest test of skill lift.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment on the class NOT run (would measure nothing - base passes all 5); saved the tokens"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary 8th needs-data; trajectories 85 (+1)"
+    },
+    {
+      "task": "Confirm per-case results persist in the new report format (spot-check parseable).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "per-case results persisted and parseable in the newest report"
+    },
+    {
+      "task": "Find a REAL weakness: probe 5 diverse capability classes bare (code generation, instruction-following with constraints, CJK mixed tasks, structured extraction, refusal-adjacent) - report which class the base actually fails.",
+      "expectedTurns": 3,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weakness hunt: 5 classes probed bare - code-gen initially judged FAIL but full output re-review shows CORRECT code (author judge too strict AGAIN - required literal \"A-Za-z\" contiguous; code used equivalent [a-zA-Z0-9]); all 5 classes PASS. No common weakness class found at this model level"
+    },
+    {
+      "task": "Author 5 cases in the weakest found class; bare-probe to confirm base fails >=3/5.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "no cases authored (no base-fail class to build on); no experiment run (null result, tokens saved)"
+    },
+    {
+      "task": "Run the experiment with the stepwise skill ONLY IF the weak class is stepwise-fixable; otherwise record the honest mismatch.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "recorded honestly: skill lift at this model level may only be demonstrable on tools:loop behavioral cases, not prompt-class weaknesses"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 85"
+    },
+    {
+      "task": "Month-2 close-out prep: draft the month-2 final review skeleton (what the flywheel bought: 8 instrument/gate defects, the science ladder, honest non-results).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 final review written: docs/SELFFEED-month2-final-review.md (8 defects/29d, science ladder, honest non-results: 85/1000 trajectories, zero promotions, 2 conditions untouched)"
+    },
+    {
+      "task": "Run the weekly bench --impact as the month closes.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing canary: 8th consecutive all needs-data (two months of correct noise refusal)"
+    },
+    {
+      "task": "Snapshot all closing metrics: trajectories, dataset, bench history, labels, candidates.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing metrics: trajectories 85, bench 74 cases (0.54-0.62 history), dataset kept 67, labels 1/100, readiness 2/6"
+    },
+    {
+      "task": "Archive month-2 evidence dataset (ds-2026-10/) alongside month-1.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence archived to ds-2026-10/ (frozen alongside month-1 ds-2026-09)"
+    },
+    {
+      "task": "Freeze month-2 pool: report final done/total.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-2 pool FROZEN: 98/98 items across 20 batches, 100% done"
+    }
+  ],
+  "frozen": "2026-09-15"
+}

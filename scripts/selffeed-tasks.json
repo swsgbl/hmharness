@@ -1,0 +1,125 @@
+{
+  "$comment": "Task pool for the 30-day self-feeding protocol (docs/SELFFEED.md). Each task is a REAL HarmonyOS development job the agent can run end-to-end on this machine (emulator + toolchain proven). pool = the agent picks ONE per day, in order or random. add tasks freely - every added task must stay inside the proven pipeline (scaffold/schema/build/sign/device/ui/apikg/lint).",
+  "tasks": [
+    {
+      "task": "Scaffold a fresh HarmonyOS app named SelfFeedN with two pages (Index + Detail) and run harmony_schema_check on it; report any schema issues found.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "default scaffold: 19-file skeleton, 1 page (Index), SDK 6.1.1(24); pages param is purely additive (same skeleton, extra pages/*.ets + main_pages entries); builds green twice (7.6s, 6.3s); minimal params right for one-screen apps, explicit pages strictly cheaper when count known"
+    },
+    {
+      "task": "Scaffold a HarmonyOS app with an extra feature module (home + login two modules), build it with hvigor, and report the build verdict.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "feature module via tool param (modules=[{name:login,type:feature}]) - NOT by hand; 25 files (+6 vs minimal); dual-module build PASS 8.3s producing BOTH haps (entry+login); schema 5 files green; ergonomics: tool covers HAP-in-app, 0-page feature is valid"
+    },
+    {
+      "task": "Run harmony_build_doctor on the workspace app; if any of the seven failure classes are present, classify and propose the exact fix.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "doctor verified real (ran the actual build, produced this project hap); it is a failure classifier that short-circuits on green builds - agent replayed its 7-signature regex table against real build evidence; zero non-build file mtimes touched"
+    },
+    {
+      "task": "Sign the newest unsigned hap with the debug identity and install+launch it on the emulator; report the lifecycle marker from hilog.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "sign+install+launch executed as part of day-18 SelfFeedR 9-step ALL-PASS loop (explicit sign, install bundle successfully, aa start successfully)"
+    },
+    {
+      "task": "Run harmony_device_test end-to-end on the workspace app (install -> launch -> log marker -> uninstall) and report all four verdicts.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "device_test E2E on SelfFeed1 emulator 5555: PASS install/launch/log-marker/uninstall; EntryAbility onCreate asserted; WindowScene render nodes in hilog"
+    },
+    {
+      "task": "Take a UI screenshot of the running app and run harmony_ui_regression asserting the page renders its title text; quote the vision model's words in the verdict.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "UI regression on SelfFeedR: screenshots A/B/C + uitest nav; baseline file-system baseline (sha256+expectations) recorded via hmh-baseline.cjs; real finding: harmony_emulator_stop fake success (fixed in 0.13.2 with post-kill process verification); ui_regression tool has no baseline param (semantic keyword check only) - workaround scripts reusable"
+    },
+    {
+      "task": "Look up SDK symbols for UIAbility lifecycle and Want via harmony_api_lookup; verify each answer carries file:line evidence; report any symbol NOT in this SDK.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "4/5 symbols found; UIAbility lifecycle + Want + loadContent verified; window.WindowStage + WindowStage are INDEX BLIND SPOTS (namespace-nested decls unparseable, @ohos.window.d.ts:79) - not SDK gaps"
+    },
+    {
+      "task": "Run the codelinter on the workspace entry module and summarize the top three rule categories.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "codelinter executed day 15 with positive controls proving the scan (0 defects, linter reads files)"
+    },
+    {
+      "task": "Create a project with an intentionally wrong module.json5 (missing mainElement), run harmony_schema_check, and confirm the exact field is named in the error.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "closed-loop on fresh SelfFeedN: BOTH corruptions caught with file::path+fix-semantics messages (missing mainElement AND invented deviceTypes array->string type violation); byte-identical restore verified (fc /b), final check green"
+    },
+    {
+      "task": "Check the toolchain health (harmony_toolchain_check) and diff against the last known-good report in memory; report anything that moved.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "cjpm still broken (KB5124114); no-network repair exhausted empirically (shim/KnownDLL/msvcrt WinSxS/rollback admin gates); recommendation: stay on ArkTS until vendor fix, admin rollback commands prepared"
+    },
+    {
+      "task": "Scaffold an app, corrupt its build-profile SDK version to a junk value, and confirm the API matrix pre-check catches it with the expected format.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "two real defects exposed: (1) schema check passes junk SDK version 99.99.99(99) - version plausibility not validated; (2) doctor config-class match was INCIDENTAL (via hvigor hint line; stripped hint => UNKNOWN). Fixed in 0.13.4: new sdk-version signature matches the ERROR CODE (Specification Limit Violation) so hint churn cannot break it; restore byte-identical, rebuild green"
+    },
+    {
+      "task": "Build the workspace app twice and compare build times; if the second build is not faster (cache), investigate why and write an insight.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "incremental steady-state 1.366s; CompileArkTS/PackageHap UP-TO-DATE (hap hash unchanged); ~1.2s fixed hvigor session cost; 4 tasks re-run due to missing declared outputs (SignHap expected without signing config)"
+    },
+    {
+      "task": "Run harmony_project_profile on the workspace app and audit the inventory numbers against the actual directory tree by hand-counting one module.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "8 spot-checks ZERO drift vs disk (modules=1, pages=2 both real @Entry files, nav pair Index<->Detail verified, resources 4json/2png exact); profile misses: page reachability is not reported (nav pair found by hand) and no git-awareness for non-repo projects"
+    },
+    {
+      "task": "Spawn two sub-agents with different roles (explorer vs implementer) on the same scaffold task and record their ok-rates for the role leaderboard.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "explorer+implementer dual-agent audit merged; identity table agreed (bundle com.example.selffeed1, SDK 6.1.1(24)); compileSdkVersion/targetSdkVersion absent flagged; debug-signing guidance for emulator installs"
+    },
+    {
+      "task": "Run a bench pass (hmh bench) and report the per-case verdicts; for any FAIL, write a draft skill only if a fix pattern generalizes.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "26 cases, 13 pass (54%); config has no evolution.minPassRate key so default 0.6 floor applies; agent-flagged gap: bench results not persisted - fixed in 0.13.3 (evolution/benches history, first record 26/14/0.54); readiness eval-regression-stable now decidable"
+    },
+    {
+      "task": "Refresh static knowledge (knowledge pipeline) and report whether the release-notes index changed since the last snapshot.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "apikg 528/542 files + 22789 symbols real (stale \"927\" desc removed); refreshKnowledge was test-only dead code -> wired hmh knowledge refresh (offline no-op verified); SYSTEMIC: 7 callers carried hardcoded C:\\DevEco-Studio -> single resolve.ts now shared by all (index/emulator/apikg/lint/ondevice/signing/uiregress)"
+    },
+    {
+      "task": "Verify emulator state (list images + running instances) and write an insight about any mismatch between requested and actual state.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "Pura 90 survived stop cycle (deployed dir intact, 1964MB data + 4512MB image); insight remembered: DevEco spawns short-lived Emulator.exe probe children - pid-based running checks must filter by -hvd arg or they false-positive"
+    },
+    {
+      "task": "Create an app with three pages A->B->C wired by router, build it, install it, launch it, screenshot each page, and assert navigation actually happened via the UI text.",
+      "done": true,
+      "doneAt": "2026-09-13",
+      "finding": "SelfFeedR three-page router app: 9 steps ALL PASS (scaffold 22 files / wiring / build 8.3s / emulator start / sign / install / launch / EntryAbility onCreate marker / cleanup) + uitest navigation proof Index-A-B-C + screenshot; emulator path bug surfaced and fixed in 0.13.1"
+    },
+    {
+      "task": "Run harmony_api_lookup for five symbols YOU (the agent) are least sure about from this SDK; for each, state whether the index confirmed or refuted your guess.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "5 uncertain symbols verified vs disk (router.replaceUrl/hilog.isLoggable etc.); adjacent-line alias asymmetry blind spot + WantAgentInfo; lesson remembered"
+    },
+    {
+      "task": "Audit the last evolution cycle: read evolution/log.jsonl's latest entry and summarize what was proposed, what passed the gate, and why anything was rejected.",
+      "done": true,
+      "doneAt": "2026-09-14",
+      "finding": "v0.13 gate changes verified live: budget skips durable (4 skip entries in log), floor present in promotion reasons (never triggered - train n=2), bench history 2 records match readiness verdict; meta: legibility outran efficacy - 1000-trajectory condition needs ~136/day vs ~2.6/day observed, RL gate structurally unmeetable in 30d window (the M11 gate saying no is the design working)"
+    }
+  ]
+}

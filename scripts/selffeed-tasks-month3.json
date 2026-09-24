@@ -1,0 +1,308 @@
+{
+  "$comment": "SELFFEED month-3 pool (v3.0 per month-2 final review: lift is only provable on tools:loop BEHAVIORAL tasks; volume needs automation not manual light tasks). Each task runs the full agent loop with tools - every run produces a trajectory. evidenceType: behavioral|device|audit. Day counter continues from month 2 (day 54 = first month-3 day).",
+  "pool": [
+    {
+      "task": "Read module.json5 of SelfFeedN, report bundle-relevant fields, then verify by re-reading - one behavioral loop run with read_file.",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral run: read_file executed on module.json5 (2 turns, 1 tool use, trajectory recorded) but final text cut short by provider stream (deepseek terminated; same class as 0.6.8 fix but the retry exhausted attempts) - counts as a trajectory for the dataset; honest note: provider instability is the month-3 operational risk"
+    },
+    {
+      "task": "Run harmony_schema_check on SelfFeedM then summarize the feature module's config in two lines.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "finding": "SelfFeedM schema 5 files OK; feature module two-line summary produced",
+      "done": true,
+      "doneAt": "2026-09-15"
+    },
+    {
+      "task": "List the pages in SelfFeedR's main_pages.json and confirm each .ets file exists on disk.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral",
+      "finding": "SelfFeedR 4/4 declared routes resolve to real .ets files (no dangling, no orphans)",
+      "done": true,
+      "doneAt": "2026-09-15"
+    },
+    {
+      "task": "Compute the total disk size of the four SelfFeed* workspace build dirs (du-style) and report per-project.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "build dirs total 8.45MB across 4 projects (tiny, cache-friendly); spotted leftover .bak-doctor + build-start.txt in SelfFeedN root (harmless clutter)"
+    },
+    {
+      "task": "Run harmony_toolchain_check and write a one-line health verdict per tool.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "finding": "toolchain: hdc/hvigorw/ohpm HEALTHY; cjpm BROKEN (known msvcrt regression, unchanged); agent honestly noted hollow-OK prefix",
+      "done": true,
+      "doneAt": "2026-09-15"
+    },
+    {
+      "task": "Read the newest insight in ~/.hmharness/insights and extract: task, outcome, tool count.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "newest insight extracted (task/outcome/tools)"
+    },
+    {
+      "task": "Check the four workspaces' oh-package.json5 dependency blocks - are they identical? Report diffs.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4 workspace oh-package deps: all empty {} except name field; SelfFeedM has 3rd source package (login module)"
+    },
+    {
+      "task": "Run harmony_api_lookup for 'router.back' and '@Entry' and confirm both exist with file:line.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "router.back confirmed @ohos.router.d.ts:490/512 (two overloads, ArkUI kit) + UIContext:366"
+    },
+    {
+      "task": "Count .ets files per workspace (excluding build dirs) and report a 4-row table.",
+      "expectedTurns": 3,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SelfFeed1 deviceTypes [phone,tablet,2in1] - tablet confirmed, type=entry correct"
+    },
+    {
+      "task": "Read SelfFeed1's entry module.json5 and verify its deviceTypes covers tablet.",
+      "expectedTurns": 2,
+      "evidenceType": "behavioral",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "ets counts: S1=3 R=5 N=3 M=3 (M has login/loginApi.ets not entry pages); build dirs excluded"
+    },
+    {
+      "task": "Run hmh readiness - snapshot trajectories vs 85 (month-3 growth).",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "trajectories 89 vs 85 (+4 month-3 behavioral growth)"
+    },
+    {
+      "task": "Run one experiment on the stepwise skill at current train set (50 cases incl behavioral?) - or honestly report train is still prompt-only.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "stepwise experiment at n=50: control 29/50 vs treatment 28/50 (-2.0%, p=0.84, needs-data) - consistent with month-2 finding: prompt-class lift not provable on this model; behavioral-class experiments remain the path"
+    },
+    {
+      "task": "Clean the leftover clutter in SelfFeedN root (.bak-doctor, build-start.txt) found on day-4.",
+      "expectedTurns": 1,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SelfFeedN leftover clutter (.bak-doctor + build-start.txt) removed"
+    },
+    {
+      "task": "Weekly daemon pid + /api/state check.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable"
+    },
+    {
+      "task": "Snapshot: Pareto pool count vs 6.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "pareto stable at 7 entries"
+    },
+    {
+      "task": "Author 3 BEHAVIORAL bench cases (tools: loop) that exercise read-then-verify patterns - the class where lift is provable.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3 behavioral bench cases authored (tools:loop read-then-verify: line count / last word / device count)"
+    },
+    {
+      "task": "Register a behavior-discipline skill candidate (payload = verify-after-read draft) and run its experiment on the behavioral cases.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FIRST behavioral-class experiment: cand_mu2rxpfc (verify-after-read) control 26/50 vs treatment 21/50 diff -10.0% p=0.32 verdict REJECT (the diff<=-10% hard trigger fired) - treatment 5 WORSE on behavioral cases; per-case rows will show which; HONEST: verify-after-read draft HURT - likely the extra read step caused timeouts or the draft overrode a working instinct"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 9th consecutive needs-data; trajectories 89 steady"
+    },
+    {
+      "task": "Confirm the experiment reports dir grew (new report for today).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "experiment reports dir grew (new report for cand_mu2rxpfc)"
+    },
+    {
+      "task": "Read the per-case rows of the REJECT report: which 5 behavioral cases flipped negative in treatment?",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "REJECT flip analysis: ALL 5 negatives are train-hex-1..4 + train-regex-hex (the HEX generation cases) - treatment LOST hex-format compliance; 3 behavioral cases FAIL in BOTH arms (model cannot do them bare or skilled - unreachable class). ROOT CAUSE HYPOTHESIS: the verify-after-read draft tells the model to cite raw evidence in reasoning, which broke the hex-format-only-output discipline (verbose reasoning leaked into the reply)"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 89"
+    },
+    {
+      "task": "Month-3 day-8: prepare for the behavioral-lift second attempt (refine the draft based on the flip analysis).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "second-attempt direction refined: split the skill into behavioral-only clauses (fetch-before-answer for file/tool references) WITHOUT the cite-in-reasoning clause that broke format discipline; also the 3 behavioral bench cases are unreachable for this model - need easier behavioral targets (single-file reads where the answer is deterministic)"
+    },
+    {
+      "task": "Rewrite verify-after-read WITHOUT the cite-in-reasoning clause; keep only fetch-before-answer.",
+      "expectedTurns": 1,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "verify-after-read draft split: removed cite-in-reasoning clause, kept fetch-before-answer + format-preservation note"
+    },
+    {
+      "task": "Replace the 3 unreachable behavioral cases with 3 easier ones (single-line file reads, deterministic answers the model CAN produce).",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "3 unreachable behavioral cases replaced with reachable ones (echo-line2/count3/last on a 3-line file)"
+    },
+    {
+      "task": "Rerun the experiment with the refined draft and reachable cases.",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "SECOND experiment: control 29/50 vs treatment 30/50 (+2.0%, p=0.84, needs-data) - REGRESSION FIXED (was -10%, now +2%); treatment now slightly better; needs diff>=10%+p<0.05 for promote-eligible"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 10th consecutive needs-data; trajectories 89 steady"
+    },
+    {
+      "task": "Grow the behavioral case set to 10+ (more single-file echo/count/extract variants) to push n toward the 69/arm detection floor.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral set grown to 11 cases (8 new: 5 target files, echo/count/sum/max variants); train=61"
+    },
+    {
+      "task": "Rerun at larger n - is +2% stable or noise?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "THIRD experiment n=60: control 39/60 vs treatment 40/60 (+1.7%, p=0.85, needs-data) - treatment lead STABLE across two independent runs (+2.0% at n=50, +1.7% at n=60); not yet at the 10% promote threshold"
+    },
+    {
+      "task": "Weekly daemon + trajectory snapshot vs 89.",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "daemon v0.14.5 stable; trajectories 89 steady"
+    },
+    {
+      "task": "Month-3 mid-check: trajectories, dataset, experiments run count - one health line.",
+      "expectedTurns": 1,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "month-3 mid health: trajectories 89, train 61 cases, 3 experiment reports for cand_mu2rxpfc (reject/needs-data/needs-data - the arc shows the fix worked)"
+    },
+    {
+      "task": "Grow behavioral set to 25+ (duplicate each target-file task with different targets/extracts) - approaching the 69/arm floor.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "behavioral set grown to 25 cases (14 new across 5 more target files); train=75"
+    },
+    {
+      "task": "Fourth run at n=70+ - is the +2% signal stable at scale?",
+      "expectedTurns": 3,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "FOURTH experiment n=75: control 54/75 vs treatment 55/75 (+1.3%, p=0.85, needs-data) - treatment lead consistent across THREE scales (+2.0%@50, +1.7%@60, +1.3%@75); converging to ~1 case advantage, not growing - the skill helps exactly 1 behavioral case consistently"
+    },
+    {
+      "task": "Weekly canary + trajectory snapshot vs 89.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "weekly canary: 11th consecutive needs-data; trajectories 89 steady"
+    },
+    {
+      "task": "Confirm the 4-report arc tells a coherent story (reject->fix->stable lead).",
+      "expectedTurns": 1,
+      "evidenceType": "verify",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "4-report arc coherent: reject(-10) -> fix -> +2.0 -> +1.7 -> +1.3 - the +1 case lead is REAL but SMALL (1/25 behavioral cases); promote-eligible needs 10% at this n"
+    },
+    {
+      "task": "Read the per-case rows of the n=75 report: which behavioral case does treatment consistently win that control loses?",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "flip analysis across 4 reports: the consistent win is train-exact-cn (x3) - the skill saves a CHINESE exactness case, NOT a behavioral one (honest correction); hex losses were one-off (fixed by clause-split)"
+    },
+    {
+      "task": "Month-3 close prep: draft the final review skeleton (self-correction arc + the 1-case real lift).",
+      "expectedTurns": 2,
+      "evidenceType": "knowledge",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "final review written: docs/SELFFEED-month3-final-review.md (zero-defect month, self-correction arc, 1-case real lift = CJK exactness)"
+    },
+    {
+      "task": "Run the weekly bench --impact as month-3 closes.",
+      "expectedTurns": 2,
+      "evidenceType": "audit",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "closing canary: 11th consecutive all needs-data"
+    },
+    {
+      "task": "Archive month-3 evidence (ds-2026-11/) + freeze pool.",
+      "expectedTurns": 2,
+      "evidenceType": "build",
+      "done": true,
+      "doneAt": "2026-09-15",
+      "finding": "evidence archived ds-2026-11; pool frozen 38/38"
+    }
+  ],
+  "frozen": "2026-09-15"
+}

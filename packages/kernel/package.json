@@ -1,0 +1,28 @@
+{
+  "name": "@hmharness/kernel",
+  "version": "0.9.6",
+  "description": "hmharness kernel: tool registry, provider adapters, the agent loop, session log, config. Zero runtime dependencies (Node >=22 native fetch).",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

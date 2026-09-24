@@ -1,0 +1,27 @@
+name: publish
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# npm release without ever putting the token in chat/logs: the credential
+# lives as the NPM_TOKEN repo secret (GitHub -> Settings -> Secrets ->
+# Actions). Run this workflow manually, or push a v* tag; publish.cjs runs
+# its own preflight (typecheck + tests + build + pack) before any publish.
+# windows-latest: publish.cjs's whoami check shells through cmd.exe and the
+# project is Windows-first (hdc/hvigor toolchain assumptions).
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: install
+        run: npm install
+      - name: 'publish (ordered set, kernel through cli + codexhost-bridge)'
+        run: node scripts/publish.cjs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
