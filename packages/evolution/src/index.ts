@@ -23,3 +23,4 @@ export * from './router-evolution.ts';
 export * from './context-evolution.ts';
 export * from './rl-governance.ts';
 export * from './policy-optimizer.ts';
+export * from './cloud-finetune.ts';
