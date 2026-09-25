@@ -75,7 +75,12 @@
       "name": "hmharness 和 DevEco Studio / DevEco Code 是什么关系？",
       "acceptedAnswer": { "@type": "Answer", "text": "互补而非替代，且无官方关系。DevEco Studio / DevEco Code 是华为官方主力工具链；hmharness 是独立社区开源项目（MIT，与华为、开放原子基金会无隶属、合作或背书关系，净室重写），面向脚本化/CI/Agent 化场景：全程不登录华为账号、密钥只存本地、任意 OpenAI 兼容模型可换、内核可改。" }
     },
-    {
+        {
+      "@type": "Question",
+      "name": "hmharness 和 DevEco CLI 什么关系？",
+      "acceptedAnswer": { "@type": "Answer", "text": "互补。DevEco CLI 是华为官方的命令行工具（HarmonyOS 7.0 配套），覆盖构建、打包、签名、上架的命令行化。hmharness 是独立开源项目（MIT），在命令行化之上做了官方工具链不做的四件事：全程免华为账号登录（密钥只存本地）、任意 OpenAI 兼容模型可换、API 防幻觉索引（927 个 d.ts 的 20,241 符号，查不到即拒绝）、带双门禁与公开证据页的可审计自进化。两者可以同时使用。" }
+    },
+{
       "@type": "Question",
       "name": "hmharness 收费吗？怎么安装？",
       "acceptedAnswer": { "@type": "Answer", "text": "免费开源，MIT 协议。安装三步：npm install -g @hmharness/cli（Node >= 22）；hmh init 初始化；在 ~/.hmharness/config.json 配置任意 OpenAI 兼容厂商（baseUrl/apiKey/model），然后 hmh \"你的任务\" 直接运行。模型侧费用由你选择的厂商收取。" }
