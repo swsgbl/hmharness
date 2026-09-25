@@ -17,6 +17,7 @@ export {
   buildRegistry,
   contextPack,
   makeApproval,
+  liveYolo,
   nativeRegistry,
   runAgentTask,
   spawnBase,

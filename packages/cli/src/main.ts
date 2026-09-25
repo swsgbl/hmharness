@@ -201,6 +201,9 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
         if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
           const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
           autoApprove = turnOn;
+          // 2026-09-25: live effect + persistent default (same as the TUI)
+          (await import('@hmharness/agent')).liveYolo.on = turnOn;
+          try { cfg = await (await import('@hmharness/kernel')).patchConfig({ approval: turnOn ? 'auto' : 'ask' } as never) as typeof cfg; } catch { /* runtime only */ }
           stdout.write((turnOn ? YELLOW(t.yoloOn) : DIM(t.yoloOff)) + '\n');
           continue;
         }

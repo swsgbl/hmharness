@@ -1187,8 +1187,12 @@ export async function startServer(opts: { port: number; host?: string; version?:
           try {
             const fresh = await patchConfig({ approval: turnOn ? 'auto' : 'ask' });
             cfg.approval = fresh.approval;
+            // LIVE effect (2026-09-25 user request): the running task's next
+            // approval ask consults this flag - no more "wait for next session"
+            const { liveYolo } = await import('@hmharness/agent');
+            liveYolo.on = turnOn;
             broadcast('state', await stateObject());
-            okText(turnOn ? '🔥 YOLO on' : 'approval back to ask');
+            okText(turnOn ? '🔥 YOLO on（已即时生效并保持为默认）' : 'approval back to ask（已即时生效并保持为默认）');
           } catch (err) {
             errText(String(err).slice(0, 200));
           }

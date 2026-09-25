@@ -2313,8 +2313,16 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     if (line === '/yolo' || line === '/yolo on' || line === '/yolo off') {
       const turnOn = line === '/yolo' ? !autoApprove : line === '/yolo on';
       autoApprove = turnOn;
+      // 2026-09-25 user request: LIVE effect (the running task's next
+      // approval ask consults this) + PERSISTENT (one toggle = the standing
+      // default; survives restarts via config)
+      (await import('@hmharness/agent')).liveYolo.on = turnOn;
+      try {
+        const { patchConfig } = await import('@hmharness/kernel');
+        cfg = await patchConfig({ approval: turnOn ? 'auto' : 'ask' } as never) as typeof cfg;
+      } catch { /* runtime toggles still applied */ }
       rt.setModeTag(turnOn ? '🔥' : '');
-      rt.addText(turnOn ? t.yoloOn : t.yoloOff, turnOn ? 'plain' : 'dim');
+      rt.addText((turnOn ? t.yoloOn : t.yoloOff) + (turnOn ? '' : ''), 'plain');
       return;
     }
     if (line === '/lang' || line.startsWith('/lang ')) {

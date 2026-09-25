@@ -205,12 +205,19 @@ export function matchesRule(rules: ApprovedRule[], toolName: string, args: Recor
   });
 }
 
+/** Live unattended-mode override (2026-09-25 user request: "YOLO 需要即时
+ *  生效"). Flipping this applies at the VERY NEXT approval ask of any running
+ *  task - not only from the next session. The web /yolo command and the TUI
+ *  /yolo toggle both write it AND persist via patchConfig, so it survives
+ *  restarts (one selection = the standing default). */
+export const liveYolo = { on: false };
+
 export function makeApproval(cfg: HmhConfig, yes: boolean, sharedRl?: readline.Interface): LoopApproval {
   const t = strings(cfg.locale ?? 'zh');
   const home = homeDir();
   return {
     async ask(toolName, args) {
-      if (yes || cfg.approval === 'auto') return true;
+      if (yes || cfg.approval === 'auto' || liveYolo.on) return true;
       // Persistent rules: patterns the user previously approved are auto-passed
       if (matchesRule(loadApprovedRules(home), toolName, args)) return true;
       const brief = JSON.stringify(args).slice(0, 120);
@@ -380,8 +387,10 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // YOLO fix: when yes=true the caller's approvalAsk (TUI dialog, web remote
   // gate) must NOT override the auto-approve gate - it used to take
   // precedence unconditionally, so /yolo was cosmetic (user-reported).
+  // 2026-09-25: the live toggle also gates a caller-supplied approvalAsk -
+  // the web remote gate is bypassed the moment /yolo goes on, mid-run too.
   const approval: LoopApproval = (opts.approvalAsk && !opts.yes)
-    ? { ask: opts.approvalAsk }
+    ? { ask: async (name, args) => (liveYolo.on ? true : opts.approvalAsk!(name, args)) }
     : makeApproval(cfg, opts.yes === true);
   spawnBase.current = {
     provider: resolveProvider(cfg, 'chat'),

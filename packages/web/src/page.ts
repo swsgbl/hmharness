@@ -622,6 +622,47 @@ ${uiLiteSource()}
   })();
   window.__AN = AN;
   var log = document.getElementById('log');
+  // 2026-09-25 multi-session view: while a task runs, the user may browse
+  // other sessions or open a blank one - the live stream then accumulates in
+  // a detached buffer instead of painting over what they are reading, and a
+  // banner offers the way back. sink() is the single write funnel.
+  var viewLive = true;
+  var liveBox = document.createElement('div');
+  function sink() { return viewLive ? log : liveBox; }
+  /** Stash the live transcript and switch to an away-view (another session
+   *  or a blank new one). The running task keeps streaming into liveBox. */
+  function leaveLiveView() {
+    if (viewLive) { while (log.firstChild) liveBox.appendChild(log.firstChild); }
+    viewLive = false;
+    updateLiveBanner();
+  }
+  /** Back to the live view: restore everything that streamed meanwhile. */
+  function returnToLive() {
+    log.innerHTML = '';
+    while (liveBox.firstChild) log.appendChild(liveBox.firstChild);
+    viewLive = true;
+    updateLiveBanner();
+    log.scrollTop = log.scrollHeight;
+  }
+  var liveBanner = null;
+  function updateLiveBanner() {
+    var running = !!window.__agentBusy;
+    if (viewLive || !running) { if (liveBanner) liveBanner.style.display = 'none'; return; }
+    if (!liveBanner) {
+      liveBanner = document.createElement('div');
+      liveBanner.style.cssText = 'position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:6px 14px;background:color-mix(in srgb,var(--warn) 14%,var(--bg));border-bottom:1px solid var(--line);font-size:12.5px;color:var(--text)';
+      var txt = document.createElement('span');
+      txt.textContent = (L && L.liveRunBehind) || '● 任务仍在后台运行，输出已暂停显示';
+      var back = document.createElement('button');
+      back.type = 'button';
+      back.style.cssText = 'margin-left:auto;padding:2px 10px;font:12px inherit;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer';
+      back.textContent = (L && L.liveRunBack) || '回到运行中的会话';
+      back.onclick = returnToLive;
+      liveBanner.appendChild(txt); liveBanner.appendChild(back);
+      log.parentElement.insertBefore(liveBanner, log);
+    }
+    liveBanner.style.display = 'flex';
+  }
   var state = null;
   var L = null;
   var curView = 'chat';
@@ -637,7 +678,7 @@ ${uiLiteSource()}
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
-          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队', toolGroupCalls:'个工具调用', toolGroupToggle:'点击展开',
+          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队', toolGroupCalls:'个工具调用', toolGroupToggle:'点击展开', liveRunBehind:'● 任务仍在后台运行，输出已暂停显示', liveRunBack:'回到运行中的会话',
           dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏',
           navChat:'对话', navBoard:'任务看板', navDev:'设备', navSk:'技能中心', ws:'工作区',
           viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
@@ -666,7 +707,7 @@ ${uiLiteSource()}
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
-          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued', toolGroupCalls:'tool calls', toolGroupToggle:'click to expand',
+          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued', toolGroupCalls:'tool calls', toolGroupToggle:'click to expand', liveRunBehind:'● a task is still running in the background', liveRunBack:'back to the live session',
           dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear',
           navChat:'Chat', navBoard:'Task board', navDev:'Devices', navSk:'Skills', ws:'Workspace',
           viewChat:'Chat', viewBoard:'Task board', viewDev:'Devices', viewSk:'Skills',
@@ -793,14 +834,17 @@ ${uiLiteSource()}
   };
   try { if (localStorage.getItem('hmh-side-min') === '1') applySide(true); } catch (e) {}
 
-  function el(tag, cls, text) {
+  function el(tag, cls, text, forceLog) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
     if (text !== undefined) e.textContent = text;
-    log.appendChild(e);
-    log.scrollTop = log.scrollHeight;
-    if (cls === 'msg-user') window.__AN.userBubble(e);
-    else window.__AN.rowIn(e);
+    var parent = forceLog ? log : sink();
+    parent.appendChild(e);
+    parent.scrollTop = parent.scrollHeight;
+    if (parent === log) {
+      if (cls === 'msg-user') window.__AN.userBubble(e);
+      else window.__AN.rowIn(e);
+    }
     return e;
   }
   function clearEmpty() {
@@ -836,8 +880,8 @@ ${uiLiteSource()}
     var body = document.createElement('div');
     body.className = 'thinkbody';
     box.appendChild(head); box.appendChild(body);
-    log.appendChild(box);
-    log.scrollTop = log.scrollHeight;
+    sink().appendChild(box);
+    if (viewLive) log.scrollTop = log.scrollHeight;
     return {
       add: function (c) { body.textContent += c; autoscroll(); },
       finalize: function () { box.classList.remove('open'); },
@@ -1658,10 +1702,11 @@ ${uiLiteSource()}
   }
   function viewSession(id) {
     flushStream();
+    leaveLiveView(); // stash the running task's output; it keeps streaming off-screen
     switchView('chat');
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
       log.innerHTML = '';
-      el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---');
+      el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---', true);
       // one-click export (2026-09-25): the viewed session as Markdown
       var xbtn = document.createElement('button');
       xbtn.type = 'button'; xbtn.textContent = '\\u2B07 ' + (L ? (L.sesExportBtn || '导出全文') : 'export');
@@ -1704,9 +1749,9 @@ ${uiLiteSource()}
         var q = (filter || '').toLowerCase();
         rows.forEach(function (r) {
           if (q && r.html.toLowerCase().indexOf(q) < 0) return;
-          el('div', r.kind, r.html);
+          el('div', r.kind, r.html, true);
         });
-        el('div', 'stats', '--- end ---');
+        el('div', 'stats', '--- end ---', true);
         log.scrollTop = log.scrollHeight;
       }
       sin.oninput = function () { renderRows(sin.value); };
@@ -1996,6 +2041,7 @@ ${uiLiteSource()}
     setBusy(d.busy, d.mode);
     flushStream();
     if (d.busy) closeToolGroup();
+    updateLiveBanner(); // banner follows the running state in away-views
     // fromQueue: the task was already echoed when submitted - don't duplicate
     if (d.busy && !d.fromQueue) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
   });
@@ -2659,6 +2705,10 @@ ${uiLiteSource()}
   function newSession() {
     flushStream();
     switchView('chat');
+    // multi-session (2026-09-25): a running task no longer blocks a fresh
+    // view - its output keeps streaming into the stash; new submissions from
+    // this blank view are QUEUED server-side and a banner offers the way back
+    leaveLiveView();
     log.innerHTML = '<div id="empty"><div style="font-size:30px">\\u2699\\uFE0F</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
       '<div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div>' +
       '<div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div>' +
