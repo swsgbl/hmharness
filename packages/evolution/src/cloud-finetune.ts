@@ -1,141 +1,130 @@
 /**
  * Cloud fine-tuning client (2026-09-25, closes the auto-finetune loop).
  *
- * Direction (user, 2026-09-24): users configure ONE api key, the backend
- * adapts everything else; local-GPU training was a developer experiment.
- * This module submits the accumulated DPO preference pairs to the provider's
- * fine-tuning API so "gets smarter as you use it" needs no local stack.
+ * Direction (user, 2026-09-24/25): users configure ONE api key for whatever
+ * provider they use, the backend adapts everything else. Fine-tuning is
+ * therefore a PROVIDER-AGNOSTIC capability: a registry of backends, each
+ * knowing one provider's endpoints, accepted data format and model rules.
+ * Zhipu is the first backend because it is the only one verified live
+ * (2026-09-25, real key, real uploads) - NOT because hmh targets Zhipu.
+ * A user on any other provider gets a clean "not supported yet" status,
+ * never an error, and everything else keeps working.
  *
- * Endpoint surface verified live 2026-09-25 against open.bigmodel.cn with a
- * real key (read-only probes + one 85-byte purpose=fine-tune upload):
- *   POST /api/paas/v4/files                     multipart file + purpose=fine-tune
- *   POST /api/paas/v4/fine_tuning/jobs          {model, training_file, ...}
- *   GET  /api/paas/v4/fine_tuning/jobs          list
- *   GET  /api/paas/v4/fine_tuning/jobs/{id}     retrieve
- *   POST /api/paas/v4/fine_tuning/jobs/{id}/cancel
- *   GET  /api/paas/v4/fine_tuning/jobs/{id}/events
- * Cross-checked field names against zhipuai SDK 2.1.5 source
- * (api_resource/fine_tuning/jobs/jobs.py). The DPO row format follows the
- * official guide: {"input":{messages,tools,parallel_tool_calls},
- * "preferred_output":[...],"non_preferred_output":[...]}.
+ * Zhipu endpoint surface (verified live 2026-09-25):
+ *   POST {apiBase}/files               multipart file + purpose=fine-tune
+ *   POST {apiBase}/fine_tuning/jobs    {model, training_file, ...}
+ *   GET  {apiBase}/fine_tuning/jobs    list (+ /{id}, /{id}/cancel, /{id}/events)
+ * Cross-checked field names against zhipuai SDK 2.1.5 source. The DPO row
+ * format is the LIVE-verified one, which differs from Zhipu's own docs
+ * (see zhipuDpoJsonl).
  */
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DpoPair } from './reward-model.ts';
+import type { ProviderConfig } from '@hmharness/kernel';
 
-/** A fine-tunable model + how its jobs are priced. Prices change - the
- * caller renders the estimate, the catalog only carries what we verified. */
-export interface FineTuneModelInfo {
+/* ---------------- backend abstraction ---------------- */
+
+/** One provider's fine-tuning dialect. Everything provider-specific lives
+ * here; the transport and job flow above it are generic. */
+export interface FineTuneBackend {
   id: string;
-  dpo: boolean;
-  note: string;
+  /** Chinese, human-facing (shown in `hmh auto-finetune` output). */
+  label: string;
+  /** Does this provider entry belong to this backend? */
+  matches(baseUrl: string): boolean;
+  /** Normalize a chat baseUrl into the fine-tuning API root. */
+  apiBase(baseUrl: string): string;
+  /** Fine-tune base candidates, the user's MAIN model first. */
+  modelLadder(mainModel: string): string[];
+  /** Serialize pairs into this provider's DPO JSONL. */
+  dpoJsonl(pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string;
+  /** Does this API error text mean "this model is not fine-tunable here"?
+   * Used by the zero-side-effect model probe. */
+  modelRejected(errorText: string): boolean;
 }
 
-/** Models verified as fine-tunable (guide + live probe 2026-09-25: bare
- * glm-4-air 404s "微调模型不存在", glm-4-flash passes model validation). */
-export const FINE_TUNE_CATALOG: FineTuneModelInfo[] = [
-  { id: 'glm-4-flash', dpo: true, note: '最便宜，LoRA 需开发者 Pro 权益' },
-  { id: 'glm-4.5-air', dpo: false, note: '全参微调，对所有用户开放（SFT）' },
-  { id: 'glm-4-air-250414', dpo: true, note: '全参微调' },
-  { id: 'glm-4-air-x', dpo: true, note: '全参微调' },
-];
-
-export const DEFAULT_FINE_TUNE_MODEL = 'glm-4-flash';
-
-/**
- * Model auto-selection (user direction 2026-09-25: novices must never pick
- * a fine-tune base). Candidates: the user's MAIN model first - if the API
- * rejects it (live probe 2026-09-25: glm-5.3 answers "微调功能未开放") the
- * ladder silently falls to the next documented fine-tunable base. The probe
- * POSTs {model, training_file:"file-probe-invalid"} - model validation runs
- * BEFORE file binding, so the request always fails without creating
- * anything, and the error text tells us whether the model is usable.
- */
-export function fineTuneModelLadder(mainModel: string): string[] {
-  const ladder = [mainModel, DEFAULT_FINE_TUNE_MODEL, 'glm-4.5-air'];
-  return [...new Set(ladder.filter(Boolean))];
-}
-
-/** Zero-side-effect model probe (the request can never create a job - the
- * training_file id is invalid on purpose). "model rejected" vs "reached
- * file validation" is distinguishable in the error text. */
-export async function probeFineTuneModel(opts: {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  fetchImpl?: typeof fetch;
-}): Promise<{ usable: boolean; reason?: string }> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + '/fine_tuning/jobs';
-  const res = await (opts.fetchImpl ?? fetch)(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: opts.model, training_file: 'file-probe-invalid' }),
-  });
-  const text = await res.text();
-  if (res.ok) return { usable: true }; // unreachable in practice; harmless
-  const rejected = /微调模型不存在|微调功能未开放|无权限|not found/i.test(text);
-  return { usable: !rejected, reason: rejected ? text.slice(0, 160) : undefined };
-}
-
-/** Walk the ladder, return the first usable model plus why earlier ones
- * were skipped (surfaced as one Chinese line - the backend adapts, the
- * user reads, never chooses). */
-export async function pickFineTuneModel(opts: {
-  apiKey: string;
-  baseUrl: string;
-  mainModel: string;
-  log?: (line: string) => void;
-  fetchImpl?: typeof fetch;
-}): Promise<string> {
-  for (const m of fineTuneModelLadder(opts.mainModel)) {
-    const r = await probeFineTuneModel({ apiKey: opts.apiKey, baseUrl: opts.baseUrl, model: m, fetchImpl: opts.fetchImpl });
-    if (r.usable) return m;
-    opts.log?.(`微调候选 ${m} 不可用（${(r.reason ?? '').replace(/^.*"message":"([^"]*)".*$/, '$1').slice(0, 60) || 'API 拒绝'}），自动改试下一个`);
-  }
-  throw new Error('所有微调候选模型均不可用——请在智谱控制台确认微调权限（可能需联系客服开放），或用 --model= 指定其他可微调模型');
-}
-
-/**
- * Fine-tuning does not live on the coding endpoint: config.json points the
- * chat route at /api/coding/paas/v4, but the fine_tuning/file APIs sit on
- * /api/paas/v4. Strip the coding segment so the user's existing glm provider
- * entry works unchanged (zero new configuration).
- */
-export function normalizeFineTuneBase(baseUrl: string): string {
-  let u = baseUrl.trim().replace(/\/+$/, '');
-  u = u.replace(/\/coding\/paas\/v4$/, '/paas/v4');
-  if (!/\/api\/paas\/v4$/.test(u)) {
-    const m = u.match(/^(https?:\/\/[^/]+)/);
-    if (!m) throw new Error('baseUrl 需以 http(s):// 开头: ' + baseUrl);
-    u = m[1] + '/api/paas/v4';
-  }
-  return u;
-}
-
-/** Serialize pairs into the provider DPO JSONL row format (pure). Accepts
- * the slim {prompt,chosen,rejected} rows the CLI persists - provenance
- * fields never leave the machine.
- * Format verified live 2026-09-25: the documented {"input":{"messages":...}}
- * nesting is REJECTED by the upload validator ("缺少messages字段"); the
- * accepted shape is top-level messages (MUST contain an assistant turn -
- * "缺少assistant角色" otherwise) plus preferred_output/non_preferred_output.
- * The assistant turn carries the chosen answer, so the row is a complete
- * good trajectory and the preference pair trains the separation. */
-export function toDpoJsonl(pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string {
+const zhipuDpoJsonl = (pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string => {
   const lines: string[] = [];
   for (const p of pairs) {
     if (!p.prompt.trim() || !p.chosen.trim() || !p.rejected.trim()) continue; // quality gate mirrors rl-governance
-    const row = {
+    // Live-verified 2026-09-25: the documented {"input":{"messages":...}}
+    // nesting is REJECTED by the upload validator ("缺少messages字段"); the
+    // accepted shape is top-level messages (MUST contain an assistant turn -
+    // "缺少assistant角色" otherwise) plus preferred_output/non_preferred_output.
+    // The assistant turn carries the chosen answer, so the row is a complete
+    // good trajectory and the preference pair trains the separation.
+    lines.push(JSON.stringify({
       messages: [
         { role: 'user', content: p.prompt },
         { role: 'assistant', content: p.chosen },
       ],
       preferred_output: [{ role: 'assistant', content: p.chosen }],
       non_preferred_output: [{ role: 'assistant', content: p.rejected }],
-    };
-    lines.push(JSON.stringify(row));
+    }));
   }
   return lines.join('\n') + (lines.length ? '\n' : '');
+};
+
+/** Zhipu bigmodel.cn - verified live 2026-09-25 (models glm-5.3 rejected
+ * "微调功能未开放", glm-4-air "微调模型不存在", glm-4-flash/glm-4.5-air pass). */
+export const ZHIPU_BACKEND: FineTuneBackend = {
+  id: 'zhipu',
+  label: '智谱（bigmodel.cn）',
+  matches: (baseUrl) => baseUrl.includes('bigmodel.cn'),
+  apiBase: (baseUrl) => {
+    let u = baseUrl.trim().replace(/\/+$/, '');
+    u = u.replace(/\/coding\/paas\/v4$/, '/paas/v4');
+    if (!/\/api\/paas\/v4$/.test(u)) {
+      const m = u.match(/^(https?:\/\/[^/]+)/);
+      if (!m) throw new Error('baseUrl 需以 http(s):// 开头: ' + baseUrl);
+      u = m[1] + '/api/paas/v4';
+    }
+    return u;
+  },
+  modelLadder: (mainModel) => [...new Set([mainModel, 'glm-4-flash', 'glm-4.5-air'].filter(Boolean))],
+  dpoJsonl: zhipuDpoJsonl,
+  modelRejected: (text) => /微调模型不存在|微调功能未开放|无权限|not found/i.test(text),
+};
+
+/** Registry - one entry per provider dialect, matched against the user's
+ * configured providers at runtime. Extend by adding a verified backend. */
+export const FINE_TUNE_BACKENDS: FineTuneBackend[] = [ZHIPU_BACKEND];
+
+/** Kept for the existing tests/callers: the Zhipu row format. */
+export const toDpoJsonl = zhipuDpoJsonl;
+
+export interface ResolvedFineTune {
+  backend: FineTuneBackend;
+  providerName: string;
+  apiKey: string;
+  baseUrl: string;
+  /** the user's MAIN model on that provider (first ladder candidate) */
+  model: string;
+}
+
+/**
+ * Match the user's providers against the backend registry. The CHAT route's
+ * provider is tried first (fine-tune what you actually use), then any other
+ * configured provider. Returns null when nothing matches - the caller
+ * surfaces "not supported yet" as a status, never as an error.
+ */
+export function resolveFineTuneBackend(
+  providers: Record<string, ProviderConfig> | undefined,
+  chatProviderName?: string,
+): ResolvedFineTune | null {
+  if (!providers) return null;
+  const ordered: Array<[string, ProviderConfig]> = [];
+  if (chatProviderName && providers[chatProviderName]) ordered.push([chatProviderName, providers[chatProviderName]]);
+  for (const [name, p] of Object.entries(providers)) {
+    if (!ordered.some(([n]) => n === name)) ordered.push([name, p]);
+  }
+  for (const [name, p] of ordered) {
+    if (!p.baseUrl || !p.apiKey) continue;
+    const backend = FINE_TUNE_BACKENDS.find((b) => b.matches(p.baseUrl));
+    if (backend) return { backend, providerName: name, apiKey: p.apiKey, baseUrl: p.baseUrl, model: p.model };
+  }
+  return null;
 }
 
 /** Rough token estimate for a cost preview before upload (chars/4 heuristic;
@@ -161,7 +150,7 @@ export interface UploadedFile {
   tokens: number;
 }
 
-async function zhipuFetch(
+async function apiFetch(
   url: string,
   apiKey: string,
   init: RequestInit,
@@ -183,17 +172,18 @@ async function zhipuFetch(
 
 /** Upload a training/validation JSONL (free operation, verified live). */
 export async function uploadFineTuneFile(opts: {
+  backend: FineTuneBackend;
   apiKey: string;
   baseUrl: string;
   filename: string;
   jsonl: string;
   fetchImpl?: typeof fetch;
 }): Promise<UploadedFile> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + '/files';
+  const url = opts.backend.apiBase(opts.baseUrl) + '/files';
   const form = new FormData();
   form.append('purpose', 'fine-tune');
   form.append('file', new Blob([opts.jsonl], { type: 'application/jsonl' }), opts.filename);
-  const body = await zhipuFetch(url, opts.apiKey, { method: 'POST', body: form }, opts.fetchImpl ?? fetch);
+  const body = await apiFetch(url, opts.apiKey, { method: 'POST', body: form }, opts.fetchImpl ?? fetch);
   const o = body as { id: string; bytes: number; samples?: number; text_stats?: Array<{ tokens: number }> };
   const tokens = Math.max(0, ...(o.text_stats ?? []).map((t) => t.tokens ?? 0));
   return { id: o.id, bytes: o.bytes, samples: o.samples ?? 0, tokens };
@@ -212,6 +202,7 @@ export interface FineTuneJob {
 /** Create a fine-tuning job (PAID - callers must gate behind explicit
  * submit consent; uploads alone are free). */
 export async function createFineTuneJob(opts: {
+  backend: FineTuneBackend;
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -221,12 +212,12 @@ export async function createFineTuneJob(opts: {
   hyperparameters?: { batch_size?: number | 'auto'; learning_rate_multiplier?: number | 'auto'; n_epochs?: number | 'auto' };
   fetchImpl?: typeof fetch;
 }): Promise<FineTuneJob> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + '/fine_tuning/jobs';
+  const url = opts.backend.apiBase(opts.baseUrl) + '/fine_tuning/jobs';
   const payload: Record<string, unknown> = { model: opts.model, training_file: opts.trainingFile };
   if (opts.validationFile) payload.validation_file = opts.validationFile;
   if (opts.suffix) payload.suffix = opts.suffix;
   if (opts.hyperparameters) payload.hyperparameters = opts.hyperparameters;
-  return (await zhipuFetch(url, opts.apiKey, {
+  return (await apiFetch(url, opts.apiKey, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -234,34 +225,86 @@ export async function createFineTuneJob(opts: {
 }
 
 export async function listFineTuneJobs(opts: {
+  backend: FineTuneBackend;
   apiKey: string;
   baseUrl: string;
   limit?: number;
   fetchImpl?: typeof fetch;
 }): Promise<FineTuneJob[]> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + `/fine_tuning/jobs?limit=${opts.limit ?? 10}`;
-  const body = await zhipuFetch(url, opts.apiKey, { method: 'GET' }, opts.fetchImpl ?? fetch);
+  const url = opts.backend.apiBase(opts.baseUrl) + `/fine_tuning/jobs?limit=${opts.limit ?? 10}`;
+  const body = await apiFetch(url, opts.apiKey, { method: 'GET' }, opts.fetchImpl ?? fetch);
   return ((body as { data?: FineTuneJob[] }).data ?? []) as FineTuneJob[];
 }
 
 export async function retrieveFineTuneJob(opts: {
+  backend: FineTuneBackend;
   apiKey: string;
   baseUrl: string;
   jobId: string;
   fetchImpl?: typeof fetch;
 }): Promise<FineTuneJob> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + `/fine_tuning/jobs/${opts.jobId}`;
-  return (await zhipuFetch(url, opts.apiKey, { method: 'GET' }, opts.fetchImpl ?? fetch)) as FineTuneJob;
+  const url = opts.backend.apiBase(opts.baseUrl) + `/fine_tuning/jobs/${opts.jobId}`;
+  return (await apiFetch(url, opts.apiKey, { method: 'GET' }, opts.fetchImpl ?? fetch)) as FineTuneJob;
 }
 
 export async function cancelFineTuneJob(opts: {
+  backend: FineTuneBackend;
   apiKey: string;
   baseUrl: string;
   jobId: string;
   fetchImpl?: typeof fetch;
 }): Promise<FineTuneJob> {
-  const url = normalizeFineTuneBase(opts.baseUrl) + `/fine_tuning/jobs/${opts.jobId}/cancel`;
-  return (await zhipuFetch(url, opts.apiKey, { method: 'POST' }, opts.fetchImpl ?? fetch)) as FineTuneJob;
+  const url = opts.backend.apiBase(opts.baseUrl) + `/fine_tuning/jobs/${opts.jobId}/cancel`;
+  return (await apiFetch(url, opts.apiKey, { method: 'POST' }, opts.fetchImpl ?? fetch)) as FineTuneJob;
+}
+
+/* ---------------- model auto-selection ---------------- */
+
+/**
+ * Model auto-selection (user direction 2026-09-25: novices never pick a
+ * fine-tune base). Candidates: the user's MAIN model first - if the API
+ * rejects it the ladder silently falls to the next documented fine-tunable
+ * base. The probe POSTs {model, training_file:"file-probe-invalid"} -
+ * model validation runs BEFORE file binding, so the request always fails
+ * without creating anything, and the error text tells us whether the model
+ * is usable.
+ */
+export async function probeFineTuneModel(opts: {
+  backend: FineTuneBackend;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ usable: boolean; reason?: string }> {
+  const url = opts.backend.apiBase(opts.baseUrl) + '/fine_tuning/jobs';
+  const res = await (opts.fetchImpl ?? fetch)(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: opts.model, training_file: 'file-probe-invalid' }),
+  });
+  const text = await res.text();
+  if (res.ok) return { usable: true }; // unreachable in practice; harmless
+  const rejected = opts.backend.modelRejected(text);
+  return { usable: !rejected, reason: rejected ? text.slice(0, 160) : undefined };
+}
+
+/** Walk the ladder, return the first usable model plus why earlier ones
+ * were skipped (surfaced as one Chinese line - the backend adapts, the
+ * user reads, never chooses). */
+export async function pickFineTuneModel(opts: {
+  backend: FineTuneBackend;
+  apiKey: string;
+  baseUrl: string;
+  mainModel: string;
+  log?: (line: string) => void;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  for (const m of opts.backend.modelLadder(opts.mainModel)) {
+    const r = await probeFineTuneModel({ backend: opts.backend, apiKey: opts.apiKey, baseUrl: opts.baseUrl, model: m, fetchImpl: opts.fetchImpl });
+    if (r.usable) return m;
+    opts.log?.(`微调候选 ${m} 不可用（${(r.reason ?? '').replace(/^.*"message":"([^"]*)".*$/, '$1').slice(0, 60) || 'API 拒绝'}），自动改试下一个`);
+  }
+  throw new Error('所有微调候选模型均不可用——请在服务商控制台确认微调权限（可能需联系客服开放），或用 --model= 指定其他可微调模型');
 }
 
 /* ---------------- local job ledger ---------------- */

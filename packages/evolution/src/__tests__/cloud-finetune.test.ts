@@ -4,11 +4,12 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  normalizeFineTuneBase,
+  ZHIPU_BACKEND,
+  FINE_TUNE_BACKENDS,
+  resolveFineTuneBackend,
   toDpoJsonl,
   estimateTokens,
   estimateTrainingCost,
-  fineTuneModelLadder,
   pickFineTuneModel,
   probeFineTuneModel,
   uploadFineTuneFile,
@@ -16,18 +17,54 @@ import {
   recordFineTuneJob,
   readLocalFineTuneJobs,
   type FineTuneJob,
+  type FineTuneBackend,
 } from '../cloud-finetune.ts';
 import type { DpoPair } from '../reward-model.ts';
 
-test('normalizeFineTuneBase: coding endpoint, bare domain, passthrough', () => {
-  // the user's chat route points at the CODING endpoint - fine-tuning does not
-  assert.equal(normalizeFineTuneBase('https://open.bigmodel.cn/api/coding/paas/v4'), 'https://open.bigmodel.cn/api/paas/v4');
-  assert.equal(normalizeFineTuneBase('https://open.bigmodel.cn/'), 'https://open.bigmodel.cn/api/paas/v4');
-  assert.equal(normalizeFineTuneBase('https://open.bigmodel.cn/api/paas/v4/'), 'https://open.bigmodel.cn/api/paas/v4');
-  assert.throws(() => normalizeFineTuneBase('not-a-url'));
+/* ------------- backend registry & resolution (provider-agnostic) ------------- */
+
+test('backend registry: Zhipu matched by host, coding endpoint normalized, bare domain too', () => {
+  const z = FINE_TUNE_BACKENDS.find((b) => b.matches('https://open.bigmodel.cn/api/coding/paas/v4'));
+  assert.equal(z?.id, 'zhipu');
+  assert.equal(ZHIPU_BACKEND.apiBase('https://open.bigmodel.cn/api/coding/paas/v4'), 'https://open.bigmodel.cn/api/paas/v4');
+  assert.equal(ZHIPU_BACKEND.apiBase('https://open.bigmodel.cn/'), 'https://open.bigmodel.cn/api/paas/v4');
+  assert.equal(ZHIPU_BACKEND.apiBase('https://open.bigmodel.cn/api/paas/v4/'), 'https://open.bigmodel.cn/api/paas/v4');
+  assert.throws(() => ZHIPU_BACKEND.apiBase('not-a-url'));
+  for (const other of ['https://api.deepseek.com/v1', 'https://api.moonshot.cn/v1', 'https://api.groq.com/openai/v1']) {
+    assert.equal(FINE_TUNE_BACKENDS.some((b) => b.matches(other)), false, other + ' must NOT match any backend yet');
+  }
 });
 
-test('toDpoJsonl: provider DPO row format (live-verified 2026-09-25: top-level messages with assistant turn, not the documented input nesting)', () => {
+test('resolveFineTuneBackend: chat-route provider wins; falls back to any configured provider', () => {
+  const providers = {
+    deepseek: { baseUrl: 'https://api.deepseek.com/v1', apiKey: 'k-ds', model: 'deepseek-flash' },
+    glm: { baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4', apiKey: 'k-zp', model: 'glm-5.3' },
+  };
+  // chat routed to deepseek: deepseek first (no backend), glm picked next
+  const r1 = resolveFineTuneBackend(providers as never, 'deepseek');
+  assert.equal(r1?.backend.id, 'zhipu');
+  assert.equal(r1?.apiKey, 'k-zp');
+  assert.equal(r1?.model, 'glm-5.3', 'main model carried for the ladder');
+  // chat routed to glm: same result but glm is FIRST choice
+  const r2 = resolveFineTuneBackend(providers as never, 'glm');
+  assert.equal(r2?.providerName, 'glm');
+});
+
+test('resolveFineTuneBackend: unsupported providers return null (status, not error)', () => {
+  assert.equal(resolveFineTuneBackend(undefined), null);
+  assert.equal(resolveFineTuneBackend({} as never), null);
+  assert.equal(resolveFineTuneBackend({
+    kimi: { baseUrl: 'https://api.moonshot.cn/v1', apiKey: 'k', model: 'kimi-latest' },
+  } as never, 'kimi'), null);
+  // keyless entries are skipped, not matched
+  assert.equal(resolveFineTuneBackend({
+    glm: { baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.3' },
+  } as never), null);
+});
+
+/* ------------- Zhipu DPO row format ------------- */
+
+test('zhipuDpoJsonl: live-verified row format (top-level messages with assistant turn, not the documented input nesting)', () => {
   const pairs: DpoPair[] = [
     { prompt: 'task A', chosen: 'good', rejected: 'bad', chosenSession: 's1', rejectedSession: 's2', gap: 3 },
     { prompt: '', chosen: 'x', rejected: 'y', chosenSession: 's3', rejectedSession: 's4', gap: 1 }, // dropped
@@ -50,10 +87,12 @@ test('cost helpers', () => {
   assert.equal(estimateTrainingCost(1_000_000, 3, 0.1), 300);
 });
 
-test('fineTuneModelLadder: main model first, deduped', () => {
-  assert.deepEqual(fineTuneModelLadder('glm-5.3'), ['glm-5.3', 'glm-4-flash', 'glm-4.5-air']);
-  assert.deepEqual(fineTuneModelLadder('glm-4-flash'), ['glm-4-flash', 'glm-4.5-air']);
+test('model ladder: main model first, deduped', () => {
+  assert.deepEqual(ZHIPU_BACKEND.modelLadder('glm-5.3'), ['glm-5.3', 'glm-4-flash', 'glm-4.5-air']);
+  assert.deepEqual(ZHIPU_BACKEND.modelLadder('glm-4-flash'), ['glm-4-flash', 'glm-4.5-air']);
 });
+
+/* ------------- HTTP layer with injected fetch ------------- */
 
 /** mock fetch; handler sees (url, body) so probes of different models can
  * return different rejections. */
@@ -76,7 +115,7 @@ test('pickFineTuneModel: main model rejected (live 2026-09-25 glm-5.3 behavior) 
       ? { status: 404, body: '{"error":{"code":"1600","message":"微调功能未开放，请联系客服开放"}}' }
       : { status: 400, body: '{"error":{"code":"400","message":"参数校验解析异常"}}' };
   };
-  const model = await pickFineTuneModel({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4', mainModel: 'glm-5.3', fetchImpl: mockFetch(handler, calls) });
+  const model = await pickFineTuneModel({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4', mainModel: 'glm-5.3', fetchImpl: mockFetch(handler, calls) });
   assert.equal(model, 'glm-4-flash');
   // probe never creates a job: invalid training_file id on purpose
   const body = JSON.parse(String(calls[0].init.body));
@@ -86,7 +125,7 @@ test('pickFineTuneModel: main model rejected (live 2026-09-25 glm-5.3 behavior) 
 test('pickFineTuneModel: main model usable -> returned directly', async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const handler = () => ({ status: 400, body: '{"error":{"code":"400","message":"参数校验解析异常"}}' });
-  const model = await pickFineTuneModel({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', mainModel: 'glm-4-flash', fetchImpl: mockFetch(handler, calls) });
+  const model = await pickFineTuneModel({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', mainModel: 'glm-4-flash', fetchImpl: mockFetch(handler, calls) });
   assert.equal(model, 'glm-4-flash');
   assert.equal(calls.length, 1, 'ladder stops at first usable');
 });
@@ -94,16 +133,19 @@ test('pickFineTuneModel: main model usable -> returned directly', async () => {
 test('pickFineTuneModel: every candidate rejected -> throws with guidance', async () => {
   const handler = () => ({ status: 404, body: '{"error":{"code":"1608","message":"微调模型不存在"}}' });
   await assert.rejects(
-    () => pickFineTuneModel({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', mainModel: 'glm-5.3', fetchImpl: mockFetch(handler, []) }),
+    () => pickFineTuneModel({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', mainModel: 'glm-5.3', fetchImpl: mockFetch(handler, []) }),
     /微调/,
   );
 });
 
-test('probeFineTuneModel: 200 counts usable', async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const handler = () => ({ status: 200, body: '{"id":"job-x"}' });
-  const r = await probeFineTuneModel({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', fetchImpl: mockFetch(handler, calls) });
+test('probeFineTuneModel: 200 counts usable; rejection text decided by the BACKEND, not hardcoded', async () => {
+  const ok = () => ({ status: 200, body: '{"id":"job-x"}' });
+  const r = await probeFineTuneModel({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', fetchImpl: mockFetch(ok, []) });
   assert.deepEqual(r, { usable: true });
+  // a hypothetical other backend with different rejection text
+  const other: FineTuneBackend = { ...ZHIPU_BACKEND, modelRejected: (t) => /fine_tuning not enabled/i.test(t) };
+  const r2 = await probeFineTuneModel({ backend: other, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'x', fetchImpl: mockFetch(() => ({ status: 403, body: 'fine_tuning not enabled for model x' }), []) });
+  assert.equal(r2.usable, false);
 });
 
 test('uploadFineTuneFile: multipart purpose=fine-tune, parses token stats', async () => {
@@ -111,7 +153,7 @@ test('uploadFineTuneFile: multipart purpose=fine-tune, parses token stats', asyn
   const handler = (url: string) => url.endsWith('/files')
     ? { status: 200, body: JSON.stringify({ id: 'file-1', bytes: 85, samples: 1, object: 'file', purpose: 'fine-tune', text_stats: [{ tokens: 9 }, { tokens: 7 }] }) }
     : { status: 404, body: '{}' };
-  const up = await uploadFineTuneFile({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', filename: 't.jsonl', jsonl: '{}\n', fetchImpl: mockFetch(handler, calls) });
+  const up = await uploadFineTuneFile({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', filename: 't.jsonl', jsonl: '{}\n', fetchImpl: mockFetch(handler, calls) });
   assert.equal(up.id, 'file-1');
   assert.equal(up.tokens, 9, 'max of tokenizer stats');
   assert.equal(calls[0].init.headers && (calls[0].init.headers as Record<string, string>).Authorization, 'Bearer k');
@@ -122,7 +164,7 @@ test('uploadFineTuneFile: multipart purpose=fine-tune, parses token stats', asyn
 test('createFineTuneJob: payload carries model + training_file; auth header set', async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const handler = () => ({ status: 200, body: JSON.stringify({ id: 'job-1', status: 'queued' }) });
-  const job = await createFineTuneJob({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', trainingFile: 'file-1', suffix: 'hmh', fetchImpl: mockFetch(handler, calls) });
+  const job = await createFineTuneJob({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', trainingFile: 'file-1', suffix: 'hmh', fetchImpl: mockFetch(handler, calls) });
   assert.equal(job.id, 'job-1');
   const body = JSON.parse(String(calls[0].init.body));
   assert.equal(body.model, 'glm-4-flash');
@@ -133,7 +175,7 @@ test('createFineTuneJob: payload carries model + training_file; auth header set'
 test('API errors surface the provider message', async () => {
   const handler = () => ({ status: 401, body: '{"error":{"code":"1000","message":"bad key"}}' });
   await assert.rejects(
-    () => uploadFineTuneFile({ apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', filename: 't.jsonl', jsonl: '{}\n', fetchImpl: mockFetch(handler, []) }),
+    () => uploadFineTuneFile({ backend: ZHIPU_BACKEND, apiKey: 'k', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', filename: 't.jsonl', jsonl: '{}\n', fetchImpl: mockFetch(handler, []) }),
     /bad key/,
   );
 });

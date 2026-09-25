@@ -69,15 +69,10 @@ const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const RED = (s: string) => `\x1b[31m${s}\x1b[0m`;
 
-/** The fine-tune API lives on bigmodel.cn - find the user's ONE Zhipu
- * provider entry (glm) so auto-finetune needs no new configuration.
- * Returns its model too: the main model is the FIRST fine-tune candidate. */
-function zhipuProviderOf(cfg: import('@hmharness/kernel').HmhConfig): { apiKey: string; baseUrl: string; model: string } | null {
-  for (const p of Object.values(cfg.providers ?? {})) {
-    if (p.baseUrl?.includes('bigmodel.cn') && p.apiKey) return { apiKey: p.apiKey, baseUrl: p.baseUrl, model: p.model };
-  }
-  return null;
-}
+/** Fine-tuning is provider-agnostic (helper deleted 2026-09-25): the
+ * auto-finetune command resolves the backend from the user's configured
+ * providers via CF.resolveFineTuneBackend - chat route first. Zhipu is one
+ * supported dialect, not a design target. */
 
 async function uiStrings(): Promise<ReturnType<typeof strings>> {
   const cfg = await loadConfig();
@@ -1015,33 +1010,40 @@ flags:
     return;
   }
   if (cmd === 'auto-finetune') {
-    // 2026-09-25: the cloud fine-tuning loop is CLOSED. Default run exports
-    // the accumulated DPO pairs, converts them to the provider DPO row
-    // format and uploads train/validation files (free) - everything is then
-    // staged for one-command submission. Job creation is PAID, so it needs
-    // --submit. The user never touches a local GPU or Python again.
+    // 2026-09-25: the cloud fine-tuning loop is CLOSED and PROVIDER-AGNOSTIC.
+    // Default run exports the accumulated DPO pairs, converts them to the
+    // matched backend's row format and uploads train/validation files (free)
+    // - everything is then staged for one-command submission. Job creation
+    // is PAID, so it needs --submit. The user never picks a provider, model
+    // or local GPU stack: the chat-route provider is matched against the
+    // backend registry automatically (Zhipu is one dialect, not the design).
     await initHome();
     const home = homeDir();
     const CF = await import('@hmharness/evolution');
     const flag = (name: string) => (rest.find((a) => a.startsWith(`--${name}=`)) ?? '').split('=').slice(1).join('=');
+    const supportedList = CF.FINE_TUNE_BACKENDS.map((b) => b.label).join('、');
+
+    const cfgFT = await loadConfig();
+    const ft = CF.resolveFineTuneBackend(cfgFT.providers, cfgFT.routing?.chat);
 
     if (rest.includes('--status')) {
-      const cfgS = await loadConfig();
-      const zp = zhipuProviderOf(cfgS);
-      if (!zp) { stdout.write(RED('未找到智谱 provider（config.json providers 中需有 baseUrl 含 bigmodel.cn 的条目，如 glm）\n')); return; }
-      const jobs = await CF.listFineTuneJobs({ apiKey: zp.apiKey, baseUrl: zp.baseUrl, limit: 10 });
+      if (!ft) { stdout.write('云端微调：你当前配置的模型供应商暂不支持微调（已支持：' + supportedList + '）。其余功能不受影响。\n'); return; }
+      const jobs = await CF.listFineTuneJobs({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, limit: 10 });
       const local = await CF.readLocalFineTuneJobs(home);
-      stdout.write('云端微调任务（最近 ' + jobs.length + ' 条）：\n');
+      stdout.write('云端微调任务（' + ft.backend.label + '，最近 ' + jobs.length + ' 条）：\n');
       for (const j of jobs) stdout.write('  ' + (j.id ?? '?').padEnd(38) + ' ' + String(j.status ?? '?').padEnd(12) + ' ' + String(j.model ?? '') + (j.fine_tuned_model ? ' → ' + j.fine_tuned_model : '') + '\n');
       if (local.length) { stdout.write('本机提交记录：\n'); for (const l of local) stdout.write('  ' + l.time + '  ' + (l.id ?? '?') + ' ' + String(l.status ?? '') + '\n'); }
       if (!jobs.length && !local.length) stdout.write('（还没有任何微调任务）\n');
       return;
     }
 
-    // provider: the user's ONE Zhipu key already in config (zero new setup)
-    const cfgFT = await loadConfig();
-    const zp = zhipuProviderOf(cfgFT);
-    if (!zp) { stdout.write(RED('未找到智谱 provider：请在 config.json 的 providers 里配置 glm（baseUrl 含 bigmodel.cn）。只需这一个密钥。\n')); return; }
+    if (!ft) {
+      // a clean STATUS, never an error: unsupported provider is normal life
+      stdout.write('云端微调暂未对你当前配置的模型供应商开放（已支持：' + supportedList + '）。\n');
+      stdout.write(DIM('继续正常使用即可——评审、进化等其他能力照常工作；后续版本会接入更多微调后端。\n'));
+      return;
+    }
+    stdout.write('微调后端：' + ft.backend.label + '（provider ' + ft.providerName + '）\n');
 
     // unattended safety rails (2026-09-25 "configure one key, forget it"):
     // kill-switch finetune.auto=false, at most one active cloud job, and a
@@ -1058,15 +1060,15 @@ flags:
       const dueMs = cooldownDays * 86400000;
       if (Date.now() - lastAt < dueMs) { stdout.write(DIM(`冷却中（上次提交 ${cooldownDays} 天内）——本次跳过\n`)); return; }
       try {
-        const running = (await CF.listFineTuneJobs({ apiKey: zp.apiKey, baseUrl: zp.baseUrl, limit: 20 }))
+        const running = (await CF.listFineTuneJobs({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, limit: 20 }))
           .some((j) => ['queued', 'running', 'pending', 'training'].includes(String(j.status ?? '').toLowerCase()));
         if (running) { stdout.write(DIM('云端已有进行中的微调任务——本次跳过\n')); return; }
       } catch { /* status check failed - fail open to the gates below */ }
     }
 
     // 2026-09-25 user call: novices never pick a fine-tune base. Try the
-    // user's MAIN model first (glm-5.3 today answers 微调功能未开放), then
-    // silently fall down the documented ladder. --model= stays as override.
+    // user's MAIN model first (on this account glm-5.3 answers 微调功能未开放),
+    // then silently fall down the backend's ladder. --model= stays as override.
     const forced = flag('model');
     let model: string;
     if (forced) {
@@ -1074,10 +1076,10 @@ flags:
       stdout.write('云端微调模型（手动指定）：' + model + '\n');
     } else {
       model = await CF.pickFineTuneModel({
-        apiKey: zp.apiKey, baseUrl: zp.baseUrl, mainModel: zp.model,
+        backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, mainModel: ft.model,
         log: (l) => stdout.write(DIM(l + '\n')),
       });
-      stdout.write('云端微调模型：' + model + (model !== zp.model ? DIM('（主模型 ' + zp.model + ' 暂不可微调，已自动改用）') : '') + '\n');
+      stdout.write('云端微调模型：' + model + (model !== ft.model ? DIM('（主模型 ' + ft.model + ' 暂不可微调，已自动改用）') : '') + '\n');
     }
 
     // labels gate (same as before)
@@ -1104,8 +1106,8 @@ flags:
     const evalRows = rows.filter((r) => r.split === 'eval').slice(0, 1000); // validation loss needs a sample, not the whole set
     stdout.write('偏好对：' + rows.length + (trainRows.length < rows.filter((r) => r.split !== 'eval').length ? DIM('（本次训练用前 ' + maxPairs + ' 条控制成本）') : '') + '（train ' + trainRows.length + ' / eval ' + evalRows.length + (evalRows.length < rows.filter((r) => r.split === 'eval').length ? DIM('（抽样 1000）') : '') + '）\n');
 
-    const trainJsonl = CF.toDpoJsonl(trainRows);
-    const evalJsonl = CF.toDpoJsonl(evalRows);
+    const trainJsonl = ft.backend.dpoJsonl(trainRows);
+    const evalJsonl = ft.backend.dpoJsonl(evalRows);
     stdout.write('本地预估 token：train ~' + CF.estimateTokens(trainJsonl).toLocaleString() + ' / eval ~' + CF.estimateTokens(evalJsonl).toLocaleString() + DIM('（上传后以官方分词统计为准）') + '\n');
 
     // upload (free) - provider token stats come back exact
@@ -1113,10 +1115,10 @@ flags:
     let upTrain: import('@hmharness/evolution').UploadedFile;
     let upEval: import('@hmharness/evolution').UploadedFile | null = null;
     try {
-      upTrain = await CF.uploadFineTuneFile({ apiKey: zp.apiKey, baseUrl: zp.baseUrl, filename: `hmh-dpo-train-${stamp}.jsonl`, jsonl: trainJsonl });
+      upTrain = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-train-${stamp}.jsonl`, jsonl: trainJsonl });
       stdout.write(GREEN('✓') + ' 训练文件已上传：' + upTrain.id + '（' + upTrain.samples + ' 样本，官方统计 ' + upTrain.tokens.toLocaleString() + ' tokens）\n');
       if (evalRows.length) {
-        upEval = await CF.uploadFineTuneFile({ apiKey: zp.apiKey, baseUrl: zp.baseUrl, filename: `hmh-dpo-eval-${stamp}.jsonl`, jsonl: evalJsonl });
+        upEval = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-eval-${stamp}.jsonl`, jsonl: evalJsonl });
         stdout.write(GREEN('✓') + ' 验证文件已上传：' + upEval.id + '（' + upEval.samples + ' 样本）\n');
       }
     } catch (err) {
@@ -1134,7 +1136,7 @@ flags:
     // PAID step - explicit --submit only
     try {
       const job = await CF.createFineTuneJob({
-        apiKey: zp.apiKey, baseUrl: zp.baseUrl, model,
+        backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, model,
         trainingFile: upTrain.id, validationFile: upEval?.id, suffix: 'hmh',
       });
       await CF.recordFineTuneJob(home, job, { model, trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length });
