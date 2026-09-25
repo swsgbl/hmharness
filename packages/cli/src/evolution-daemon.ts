@@ -109,6 +109,9 @@ export function ensureEvolutionDaemon(): EvolDaemonStatus {
     env: { ...process.env, HMH_HOME: home },
   });
   child.unref();
+  // the child inherited a dup of this fd; closing ours prevents the
+  // "Closing file descriptor on garbage collection" startup warnings
+  try { require('node:fs').closeSync(log); } catch { /* already gone */ }
   return { running: true, pid: child.pid, started: true };
 }
 

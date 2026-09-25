@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { openSync, readFileSync, unlinkSync, writeFileSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
 
@@ -121,6 +121,8 @@ function spawnWebDaemon(port: number, entry = process.argv[1]): number {
     cwd: process.cwd(),
   });
   child.unref();
+  // the child inherited a dup; closing ours prevents GC-close fd warnings
+  try { closeSync(log); } catch { /* already gone */ }
   const pid = child.pid ?? 0;
   if (pid > 0) {
     writeFileSync(join(home, 'web.pid'), String(pid));
