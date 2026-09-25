@@ -15,7 +15,7 @@ import {
   homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
   saveProvider, deleteProvider, patchConfig, getGoal, setGoal,
-  findSessionFile, listSessions, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
+  findSessionFile, listSessions, exportSessionMarkdown, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
 } from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
@@ -602,7 +602,30 @@ export async function startServer(opts: { port: number; host?: string; version?:
         return;
       }
       if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
-        const id = decodeURIComponent(url.pathname.slice('/api/sessions/'.length)).replace(/[^a-zA-Z0-9_:.@-]/g, '');
+        // one-click export (2026-09-25): GET /api/sessions/<id>/export.md
+        // streams the full transcript as a Markdown download - same builder
+        // as `hmh export` / TUI /export, so every surface exports identically.
+        // The suffix check runs BEFORE the id sanitization: the strip regex
+        // deletes '/', which would weld "id/export.md" into one bogus id.
+        const seg = decodeURIComponent(url.pathname.slice('/api/sessions/'.length));
+        const exportMatch = /^(.*)\/export\.md$/.exec(seg) || /^(.*)\.export\.md$/.exec(seg);
+        if (exportMatch && exportMatch[1]) {
+          const realId = exportMatch[1].replace(/[^a-zA-Z0-9_:.@-]/g, '');
+          const realFile = await findSessionFile(home, realId);
+          const realTr = realFile ? await loadTranscript(realFile) : null;
+          if (!realTr) {
+            json(res, 404, { error: 'session not found' });
+            return;
+          }
+          const md = exportSessionMarkdown(realTr);
+          res.writeHead(200, {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Content-Disposition': `attachment; filename="hmh-${(realTr.id || 'session').replace(/[^a-zA-Z0-9_:.@-]/g, '')}.md"`,
+          });
+          res.end(md);
+          return;
+        }
+        const id = seg.replace(/[^a-zA-Z0-9_:.@-]/g, '');
         const file = await findSessionFile(home, id);
         const tr = file ? await loadTranscript(file) : null;
         if (!tr) {

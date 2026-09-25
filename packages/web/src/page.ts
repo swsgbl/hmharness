@@ -633,7 +633,7 @@ ${uiLiteSource()}
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
-          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', labelAnswer:'回答: ', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…',
+          fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', labelAnswer:'回答: ', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…', sesExportBtn:'导出全文',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
@@ -647,7 +647,7 @@ ${uiLiteSource()}
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
           modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
           navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'未配置 SSH 主机 — 在 config.json 添加 sshHosts 后刷新', sshRun:'运行', sshApproveFirst:'该命令需要审批 — 点击「批准并运行」', sshApprovedRun:'批准并运行', sshPh:'远程命令, 回车运行 (ls / df -h / uptime …)',
-          sesRename:'重命名', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
+          sesRename:'重命名', sesExport:'导出会话为 Markdown 文件', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
           wsAdd:'＋ 添加工作区', wsOpen:'在文件管理器中打开工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
           wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
@@ -677,7 +677,7 @@ ${uiLiteSource()}
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
           modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
           navSsh:'SSH', viewSsh:'SSH', sshNoHosts:'No SSH hosts configured - add sshHosts to config.json, then refresh', sshRun:'Run', sshApproveFirst:'This command needs approval - click approve-and-run', sshApprovedRun:'Approve & run', sshPh:'remote command, Enter to run (ls / df -h / uptime ...)',
-          sesRename:'Rename', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
+          sesRename:'Rename', sesExport:'export session as a Markdown file', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
           wsAdd:'＋ add workspace', wsOpen:'open the workspace in the file manager', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
           wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
@@ -1564,6 +1564,11 @@ ${uiLiteSource()}
     acts.appendChild(mk('\\uD83D\\uDCE5', '', L ? L.sesArchive : 'archive', function () {
       fetch('/api/sessions/' + encodeURIComponent(s.id) + '/archive', { method: 'POST' }).then(function () { loadSessions(); });
     }));
+    // one-click export (2026-09-25): full transcript as a Markdown download,
+    // same builder as hmh export / TUI /export
+    acts.appendChild(mk('\\u2B07', '', L ? (L.sesExport || 'export markdown') : 'export markdown', function () {
+      window.location.href = '/api/sessions/' + encodeURIComponent(s.id) + '/export.md';
+    }));
     acts.appendChild(mk('\\uD83D\\uDDD1', 'del', L ? L.sesDelete : 'delete', function () {
       if (!window.confirm(L ? L.sesConfirmDel : 'delete?')) return;
       fetch('/api/sessions/' + encodeURIComponent(s.id) + '/delete', { method: 'POST' }).then(function () { loadSessions(); });
@@ -1657,6 +1662,12 @@ ${uiLiteSource()}
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
       log.innerHTML = '';
       el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---');
+      // one-click export (2026-09-25): the viewed session as Markdown
+      var xbtn = document.createElement('button');
+      xbtn.type = 'button'; xbtn.textContent = '\\u2B07 ' + (L ? (L.sesExportBtn || '导出全文') : 'export');
+      xbtn.style.cssText = 'margin:4px 16px;padding:3px 10px;font:12px inherit;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer';
+      xbtn.onclick = function () { window.location.href = '/api/sessions/' + encodeURIComponent(d.id) + '/export.md'; };
+      log.appendChild(xbtn);
       // A15: session full-text search (filters the rendered previews)
       var sbox = document.createElement('div');
       sbox.style.cssText = 'display:flex;gap:6px;margin:4px 16px';

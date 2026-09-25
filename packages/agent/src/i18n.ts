@@ -81,6 +81,7 @@ export interface Strings {
   cmdNewDone: string;
   cmdFork: string;
   cmdCopy: string;
+  cmdExport: string;
   cmdMouse: string;
   cmdMouseOn: string;
   cmdMouseOff: string;
@@ -240,6 +241,7 @@ const zh: Strings = {
   cmdNewDone: '✓ 新会话开始(旧转录可用 Ctrl+T 回看)',
   cmdFork: 'fork 当前会话为新线程(继承全部上下文)',
   cmdCopy: '复制最后一条 AI 输出到剪贴板',
+  cmdExport: '一键导出整个会话为 Markdown 文件（~/.hmharness/exports/）',
   cmdMouse: '切换全时鼠标捕获（仅无滚轮翻译的终端需要；默认 ?1007 已覆盖大多数终端）',
   cmdMouseOn: '🖱 全时鼠标捕获已开启（滚轮直读；原生划选复制请按住 Shift 再拖动）',
   cmdMouseOff: '🖱 全时鼠标捕获已关闭（滚轮走终端方向键翻译；划选复制恢复原生）',
@@ -390,6 +392,7 @@ const en: Strings = {
   cmdNewDone: '✓ new session (old transcript: Ctrl+T to replay)',
   cmdFork: 'fork this session to a new thread (inherits full context)',
   cmdCopy: 'copy the last AI output to the clipboard',
+  cmdExport: 'export the whole session to a Markdown file (~/.hmharness/exports/)',
   cmdMouse: 'toggle full-time mouse capture (only for terminals without wheel translation; ?1007 covers most)',
   cmdMouseOn: '🖱 full-time mouse capture ON (direct wheel; hold Shift to select natively)',
   cmdMouseOff: '🖱 full-time mouse capture OFF (wheel via terminal translation; native selection restored)',

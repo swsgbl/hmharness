@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir, utimes, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { findSessionFile, latestSession, listSessions, loadTranscript, readSessionHead, Session } from '../session.ts';
+import { findSessionFile, latestSession, listSessions, loadTranscript, readSessionHead, Session, exportSessionMarkdown } from '../session.ts';
 
 test('loadTranscript rebuilds messages with tool_call_id pairing', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'hmh-sess-'));
@@ -168,4 +168,41 @@ test('latestSession resolves ids across nested and flat layouts', async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('exportSessionMarkdown renders a complete, self-contained document', () => {
+  const md = exportSessionMarkdown({
+    id: '2026-09-25T10-00-00-abc123',
+    model: 'glm-5.3',
+    cwd: 'G:/hmharness',
+    file: 'x.jsonl',
+    messages: [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: '帮我修复这个 bug' },
+      { role: 'assistant', content: '看代码后修复如下', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.ts"}' } }] },
+      { role: 'tool', tool_call_id: 'c1', name: 'read_file', content: 'x'.repeat(6000) },
+      { role: 'assistant', content: '修好了' },
+    ],
+  });
+  // header carries identity
+  assert.ok(md.includes('# hmharness 会话导出'));
+  assert.ok(md.includes('`2026-09-25T10-00-00-abc123`'));
+  assert.ok(md.includes('glm-5.3'));
+  // full user input and replies survive
+  assert.ok(md.includes('帮我修复这个 bug'));
+  assert.ok(md.includes('修好了'));
+  // tool call shows name + parsed arg; long tool output truncates
+  assert.ok(md.includes('read_file'));
+  assert.ok(md.includes('path=a.ts'));
+  assert.ok(!md.includes('x'.repeat(5000)), 'oversized tool output truncated');
+  assert.ok(md.includes('输出过长已截断'));
+});
+
+test('exportSessionMarkdown truncation limit is configurable', () => {
+  const t = {
+    id: 's', model: '', cwd: '', file: 'f',
+    messages: [{ role: 'tool' as const, tool_call_id: 'c', name: 'sh', content: 'y'.repeat(3000) }],
+  };
+  assert.ok(!exportSessionMarkdown(t, { maxToolChars: 100 }).includes('y'.repeat(200)));
+  assert.ok(exportSessionMarkdown(t, { maxToolChars: 10000 }).includes('y'.repeat(2000)));
 });

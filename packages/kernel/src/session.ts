@@ -12,7 +12,7 @@
  */
 import { appendFile, mkdir, open as fopen, readdir, readFile, stat } from 'node:fs/promises';
 import { readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename as pathBasename } from 'node:path';
 import type { ChatMessage } from './types.ts';
 
 export type SessionEvent =
@@ -145,6 +145,64 @@ export interface SessionTranscript {
   cwd: string;
   file: string;
   messages: ChatMessage[];
+}
+
+/** One-click export (2026-09-25, user request): render a transcript as a
+ *  readable, self-contained Markdown document - full user inputs and model
+ *  replies, tool calls as compact name+args+truncated-output blocks. Pure;
+ *  shared by `hmh export` (TUI/CLI) and the web session export endpoint. */
+export function exportSessionMarkdown(t: SessionTranscript, opts: { maxToolChars?: number } = {}): string {
+  const maxTool = opts.maxToolChars ?? 4000;
+  const out: string[] = [];
+  out.push('# hmharness 会话导出');
+  out.push('');
+  out.push('- 会话 ID：`' + (t.id || pathBasename(t.file)) + '`');
+  if (t.model) out.push('- 模型：' + t.model);
+  if (t.cwd) out.push('- 工作目录：`' + t.cwd + '`');
+  out.push('- 导出时间：' + new Date().toISOString());
+  out.push('');
+  for (const m of t.messages) {
+    if (m.role === 'user') {
+      out.push('## 👤 用户');
+      out.push('');
+      out.push(String(m.content ?? ''));
+      out.push('');
+    } else if (m.role === 'assistant') {
+      const text = String(m.content ?? '').trim();
+      const calls = (m.tool_calls ?? []) as Array<{ function?: { name?: string; arguments?: string } }>;
+      if (text) {
+        out.push('## 🤖 助手');
+        out.push('');
+        out.push(text);
+        out.push('');
+      }
+      for (const c of calls) {
+        const name = c.function?.name ?? 'tool';
+        let args = '';
+        try {
+          const parsed = JSON.parse(c.function?.arguments ?? '{}') as Record<string, unknown>;
+          args = Object.entries(parsed).map(([k, v]) => k + '=' + String(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 120)).join(' ');
+        } catch { args = String(c.function?.arguments ?? '').slice(0, 120); }
+        out.push('> 🔧 **' + name + '**' + (args ? ' `' + args + '`' : ''));
+        out.push('');
+      }
+    } else if (m.role === 'tool') {
+      const name = (m as { name?: string }).name ?? 'tool';
+      const content = String(m.content ?? '');
+      const shown = content.length > maxTool ? content.slice(0, maxTool) + '\n…（输出过长已截断，完整内容见会话记录）' : content;
+      out.push('<details><summary>🔧 ' + name + ' 输出</summary>');
+      out.push('');
+      out.push('```');
+      out.push(shown);
+      out.push('```');
+      out.push('');
+      out.push('</details>');
+      out.push('');
+    }
+  }
+  out.push('---');
+  out.push('*由 hmharness 导出*');
+  return out.join('\n') + '\n';
 }
 
 /** Head summary of a rollout without a full parse: ONE 64KB read extracts the

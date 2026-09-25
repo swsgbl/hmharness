@@ -116,6 +116,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/new', key: 'cmdNew' },
   { name: '/fork', key: 'cmdFork' },
   { name: '/copy', key: 'cmdCopy' },
+  { name: '/export', key: 'cmdExport' },
   { name: '/mouse', key: 'cmdMouse' },
   { name: '/plan', key: 'cmdPlan' },
   { name: '/goal', key: 'cmdGoal' },
@@ -753,10 +754,17 @@ export class TuiRuntime {
   /** The user's own input, chat-style: separated by a blank line above and
    *  below, right-aligned to the terminal width so it reads as "the human
    *  side" against left-aligned model output. */
+  /** User input renders as a right-aligned chat bubble (2026-09-25 user
+   *  feedback: folded long inputs "were not on the right"). The wrap width
+   *  is 70% of the terminal (floor 40) - a full-width wrap made line 2+
+   *  start at the left margin, which read as left-aligned text. The block
+   *  always ENDS at the right edge either way; short prompts sit clearly
+   *  on the right against left-aligned model output. */
   addUser(text: string): void {
     const width = Math.max(20, (stdout.columns || 100) - 2);
+    const blockW = Math.max(40, Math.floor(width * 0.7));
     const lines: string[] = [''];
-    const wrapped = wrapTo(text.replace(/\n+/g, ' '), width);
+    const wrapped = wrapTo(text.replace(/\n+/g, ' '), blockW);
     // long prompts fold to two lines + a count marker (UX requirement 2026-09-21:
     // a pasted prompt used to eat half the screen); the driver archives the
     // full text into the Ctrl+T replay so nothing is lost
@@ -2085,6 +2093,33 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       }
       if (copied) rt.addText(GREEN('✓') + ' ' + t.cmdCopied, 'plain');
       else rt.addText('(clipboard tool unavailable — output follows)\n' + lastAiText.slice(0, 2000), 'dim');
+      return;
+    }
+    if (line === '/export') {
+      // One-click export (2026-09-25): the CURRENT session (replayed or
+      // fresh) becomes one Markdown file under ~/.hmharness/exports -
+      // full user inputs and replies, folded tool output. Same builder as
+      // `hmh export` and the web session view's download button.
+      try {
+        const { homeDir, findSessionFile, loadTranscript, exportSessionMarkdown } = await import('@hmharness/kernel');
+        const home = homeDir();
+        const sid = currentSessionId;
+        const K = await import('@hmharness/kernel');
+        const file = sid ? await findSessionFile(home, sid) : await K.latestSession(home, '');
+        if (!file) { rt.addText('还没有可导出的会话内容。', 'dim'); return; }
+        const tr = await loadTranscript(file);
+        if (!tr) { rt.addText('会话文件无法解析，稍后再试。', 'dim'); return; }
+        const md = exportSessionMarkdown(tr);
+        const { mkdir, writeFile } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        const dir = join(home, 'exports');
+        await mkdir(dir, { recursive: true });
+        const out = join(dir, ((tr.id || 'session').replace(/[^a-zA-Z0-9_:.@-]/g, '')) + '.md');
+        await writeFile(out, md, 'utf8');
+        rt.addText(GREEN('✓') + ' 会话已导出（' + tr.messages.length + ' 条消息）→ ' + out, 'plain');
+      } catch (err) {
+        rt.addText('导出失败：' + String(err).slice(0, 120), 'dim');
+      }
       return;
     }
     if (line === '/mouse') {

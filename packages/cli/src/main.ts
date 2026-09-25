@@ -1521,6 +1521,31 @@ flags:
     stdout.write('usage: hmh experiment [list|show <id>|run <id> [--cases=N]|promote <id> [--human]|rollback <target>]\n');
     return;
   }
+  if (cmd === 'export') {
+    // One-click export (2026-09-25, user request): session transcript -> a
+    // single readable Markdown file. Shared builder with the web endpoint;
+    // TUI exposes it as /export on the same session it is replaying.
+    await initHome();
+    const home = homeDir();
+    let file: string | null = null;
+    if (rest.includes('--last') || !arg) file = (await listSessions(home, { cwd: process.cwd(), limit: 1 })).items[0]?.file ?? null;
+    else file = await latestSession(home, arg);
+    if (!file) { stdout.write('没有可导出的会话——先使用 hmh 产生一次对话。\n'); return; }
+    const tr = await loadTranscript(file);
+    if (!tr) { stdout.write('会话文件无法解析：' + file + '\n'); return; }
+    const { exportSessionMarkdown } = await import('@hmharness/kernel');
+    const md = exportSessionMarkdown(tr);
+    const dir = join(home, 'exports');
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(dir, { recursive: true });
+    const name = (tr.id || 'session').replace(/[^a-zA-Z0-9_:.@-]/g, '') + '.md';
+    const out = join(dir, name);
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(out, md, 'utf8');
+    stdout.write(GREEN('✓') + ' 已导出 ' + tr.messages.length + ' 条消息 → ' + out + '\n');
+    stdout.write(DIM('完整用户输入与回复都在文件里；工具输出超过 4000 字符自动截断。\n'));
+    return;
+  }
   if (cmd === 'resume') {    await initHome();
     const home = homeDir();
     // bare `hmh resume` on a TTY = codex `codex resume`: the TUI comes up
