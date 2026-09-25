@@ -27,7 +27,7 @@ test('normalizeFineTuneBase: coding endpoint, bare domain, passthrough', () => {
   assert.throws(() => normalizeFineTuneBase('not-a-url'));
 });
 
-test('toDpoJsonl: provider DPO row format, empty rows dropped', () => {
+test('toDpoJsonl: provider DPO row format (live-verified 2026-09-25: top-level messages with assistant turn, not the documented input nesting)', () => {
   const pairs: DpoPair[] = [
     { prompt: 'task A', chosen: 'good', rejected: 'bad', chosenSession: 's1', rejectedSession: 's2', gap: 3 },
     { prompt: '', chosen: 'x', rejected: 'y', chosenSession: 's3', rejectedSession: 's4', gap: 1 }, // dropped
@@ -35,8 +35,11 @@ test('toDpoJsonl: provider DPO row format, empty rows dropped', () => {
   const jsonl = toDpoJsonl(pairs);
   const rows = jsonl.trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(rows.length, 1, 'empty prompt row is dropped');
-  assert.deepEqual(Object.keys(rows[0]).sort(), ['input', 'non_preferred_output', 'preferred_output']);
-  assert.deepEqual(rows[0].input.messages, [{ role: 'user', content: 'task A' }]);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['messages', 'non_preferred_output', 'preferred_output']);
+  assert.deepEqual(rows[0].messages, [
+    { role: 'user', content: 'task A' },
+    { role: 'assistant', content: 'good' },
+  ], 'messages carries the full good trajectory (validator demands an assistant turn)');
   assert.deepEqual(rows[0].preferred_output, [{ role: 'assistant', content: 'good' }]);
   assert.deepEqual(rows[0].non_preferred_output, [{ role: 'assistant', content: 'bad' }]);
   assert.equal(toDpoJsonl([]), '');

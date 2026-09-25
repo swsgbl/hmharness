@@ -1101,8 +1101,8 @@ flags:
     try { rows = (await readFile(pairsFile, 'utf8')).trim().split('\n').filter(Boolean).map((l: string) => JSON.parse(l)); } catch { /* re-export failed */ }
     if (!rows.length) { stdout.write(RED('偏好对导出为空——先运行 hmh judge 积累评审标签\n')); return; }
     const trainRows = rows.filter((r) => r.split !== 'eval').slice(0, maxPairs);
-    const evalRows = rows.filter((r) => r.split === 'eval');
-    stdout.write('偏好对：' + rows.length + (trainRows.length < rows.filter((r) => r.split !== 'eval').length ? DIM('（本次训练用前 ' + maxPairs + ' 条控制成本）') : '') + '（train ' + trainRows.length + ' / eval ' + evalRows.length + '）\n');
+    const evalRows = rows.filter((r) => r.split === 'eval').slice(0, 1000); // validation loss needs a sample, not the whole set
+    stdout.write('偏好对：' + rows.length + (trainRows.length < rows.filter((r) => r.split !== 'eval').length ? DIM('（本次训练用前 ' + maxPairs + ' 条控制成本）') : '') + '（train ' + trainRows.length + ' / eval ' + evalRows.length + (evalRows.length < rows.filter((r) => r.split === 'eval').length ? DIM('（抽样 1000）') : '') + '）\n');
 
     const trainJsonl = CF.toDpoJsonl(trainRows);
     const evalJsonl = CF.toDpoJsonl(evalRows);

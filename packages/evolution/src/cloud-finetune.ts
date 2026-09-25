@@ -114,17 +114,22 @@ export function normalizeFineTuneBase(baseUrl: string): string {
 
 /** Serialize pairs into the provider DPO JSONL row format (pure). Accepts
  * the slim {prompt,chosen,rejected} rows the CLI persists - provenance
- * fields never leave the machine. */
+ * fields never leave the machine.
+ * Format verified live 2026-09-25: the documented {"input":{"messages":...}}
+ * nesting is REJECTED by the upload validator ("缺少messages字段"); the
+ * accepted shape is top-level messages (MUST contain an assistant turn -
+ * "缺少assistant角色" otherwise) plus preferred_output/non_preferred_output.
+ * The assistant turn carries the chosen answer, so the row is a complete
+ * good trajectory and the preference pair trains the separation. */
 export function toDpoJsonl(pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string {
   const lines: string[] = [];
   for (const p of pairs) {
     if (!p.prompt.trim() || !p.chosen.trim() || !p.rejected.trim()) continue; // quality gate mirrors rl-governance
     const row = {
-      input: {
-        messages: [{ role: 'user', content: p.prompt }],
-        tools: [],
-        parallel_tool_calls: false,
-      },
+      messages: [
+        { role: 'user', content: p.prompt },
+        { role: 'assistant', content: p.chosen },
+      ],
       preferred_output: [{ role: 'assistant', content: p.chosen }],
       non_preferred_output: [{ role: 'assistant', content: p.rejected }],
     };
