@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/web",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "hmharness web frontend: local node:http server with SSE streaming, remote approval gate, and an embedded zero-build single page app.",
   "type": "module",
   "main": "dist/index.js",

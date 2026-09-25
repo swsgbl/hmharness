@@ -637,7 +637,7 @@ ${uiLiteSource()}
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
-          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队',
+          emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队', toolGroupCalls:'个工具调用', toolGroupToggle:'点击展开',
           dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏',
           navChat:'对话', navBoard:'任务看板', navDev:'设备', navSk:'技能中心', ws:'工作区',
           viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
@@ -666,7 +666,7 @@ ${uiLiteSource()}
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
-          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued',
+          emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued', toolGroupCalls:'tool calls', toolGroupToggle:'click to expand',
           dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear',
           navChat:'Chat', navBoard:'Task board', navDev:'Devices', navSk:'Skills', ws:'Workspace',
           viewChat:'Chat', viewBoard:'Task board', viewDev:'Devices', viewSk:'Skills',
@@ -1995,6 +1995,7 @@ ${uiLiteSource()}
     var d = JSON.parse(e.data);
     setBusy(d.busy, d.mode);
     flushStream();
+    if (d.busy) closeToolGroup();
     // fromQueue: the task was already echoed when submitted - don't duplicate
     if (d.busy && !d.fromQueue) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
   });
@@ -2017,6 +2018,7 @@ ${uiLiteSource()}
     if (curKind !== d.kind) {
       flushStream();
       clearEmpty();
+      closeToolGroup(); // model text after a tool run settles the group
       curKind = d.kind;
       curBlock = d.kind === 'reasoning' ? thinkBlock() : sayBlock();
     }
@@ -2024,6 +2026,29 @@ ${uiLiteSource()}
   });
   es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', JSON.parse(e.data).text); autoscroll(); });
   var parCount = 0; var parBox = null;
+  // 2026-09-25 consecutive-tool grouping: a run of tool calls with no model
+  // text between them collapses into ONE group row ("N tool calls · names"),
+  // showing only the LIVE call while running and folding the rest. The
+  // summary stays one line however long the run - a 10-call command spree
+  // used to bury the conversation under 20+ rows.
+  function closeToolGroup() {
+    if (parBox) { parBox.classList.add('settled'); setGroupVisible(parBox, false); }
+    parBox = null; parCount = 0;
+  }
+  function setGroupVisible(box, open) {
+    box.classList.toggle('open', open);
+    for (var i = 0; i < box.children.length; i++) {
+      var ch = box.children[i];
+      if (ch.classList && ch.classList.contains('toolrow')) ch.style.display = open ? '' : 'none';
+    }
+  }
+  function groupLabel(n, names) {
+    var counts = {};
+    Object.keys(names).forEach(function (k) { counts[k] = (counts[k] || 0) + 1; });
+    var parts = Object.keys(counts).map(function (k) { return k + '\\u00D7' + counts[k]; });
+    return '\\u25CF ' + n + ' ' + (L.toolGroupCalls || '个工具调用') + ' \\u00B7 ' + parts.slice(0, 4).join(' ') + (parts.length > 4 ? ' \\u2026' : '') + ' \\u00B7 ' + (L.toolGroupToggle || '点击展开');
+  }
+  var groupNames = {};
   es.addEventListener('tool', function (e) {
     flushStream();
     clearEmpty();
@@ -2047,18 +2072,48 @@ ${uiLiteSource()}
     var s = seq;
     row.onclick = function () { showDetails(s); };
     parCount++;
+    groupNames[d.name] = (groupNames[d.name] || 0) + 1;
     if (parCount === 2 && !parBox) {
+      // second CONSECUTIVE call: retroactively group the previous row too
       parBox = document.createElement('div');
-      parBox.className = 'pargrp';
-      var pl = document.createElement('div'); pl.className = 'plabel';
-      pl.textContent = '\u29C9 parallel tools';
+      parBox.className = 'pargrp rungrp';
+      var pl = document.createElement('div');
+      pl.className = 'plabel glabel';
+      pl.style.cursor = 'pointer';
       parBox.appendChild(pl);
-      // move the first row into the group
+      parBox.__label = pl;
+      pl.onclick = function (ev) {
+        ev.stopPropagation();
+        setGroupVisible(parBox, !parBox.classList.contains('open'));
+      };
       var first = log.querySelector('.toolrow:last-of-type');
-      if (first) { log.appendChild(parBox); parBox.appendChild(first); }
-      else log.appendChild(parBox);
+      if (first && first.parentElement === log) {
+        log.insertBefore(parBox, first);
+        parBox.appendChild(first);
+      } else { log.appendChild(parBox); }
+      groupNames = {};
+      // recount from the rows actually inside the group
+      for (var gi = 0; gi < parBox.children.length; gi++) {
+        var gr = parBox.children[gi];
+        if (gr.classList && gr.classList.contains('toolrow')) {
+          var gn = gr.querySelector('.nm');
+          if (gn) groupNames[gn.textContent] = (groupNames[gn.textContent] || 0) + 1;
+        }
+      }
+      groupNames[d.name] = (groupNames[d.name] || 0) + 1;
     }
-    if (parBox) parBox.appendChild(row);
+    if (parBox) {
+      // fold the PREVIOUS row; only the live call stays visible
+      for (var pi = 0; pi < parBox.children.length; pi++) {
+        var pr = parBox.children[pi];
+        if (pr.classList && pr.classList.contains('toolrow')) pr.style.display = parBox.classList.contains('open') ? '' : 'none';
+      }
+      parBox.appendChild(row);
+      parBox.__label.textContent = groupLabel(parBox.querySelectorAll('.toolrow').length, groupNames);
+      row.style.display = parBox.classList.contains('open') ? '' : '';
+    } else {
+      log.appendChild(row);
+    }
     pendingToolRow = { seq: s, st: st, row: parBox || row };
     autoscroll();
   });
@@ -2069,7 +2124,8 @@ ${uiLiteSource()}
       pendingToolRow.st.className = 'st ' + (d.isError ? 'err' : 'ok');
       pendingToolRow.st.textContent = d.isError ? '\\u2717' : '\\u2022';
       pendingToolRow = null;
-      parCount = 0; parBox = null;
+      // the group stays OPEN for the next consecutive call; it closes on
+      // model text / final / the next user task
     }
     // attach output to the most recent matching entry without output
     for (var k in toolRegistry) {
@@ -2101,6 +2157,7 @@ ${uiLiteSource()}
   });
   es.addEventListener('final', function (e) {
     flushStream();
+    closeToolGroup(); // settle any trailing tool run into its folded group
     var d = JSON.parse(e.data);
     // A6 plan card + A9 deliverables + A10 feedback ride the final event
     if (lastAssistantText) renderPlanCard(lastAssistantText);

@@ -985,6 +985,29 @@ export class TuiRuntime {
     return true;
   }
 
+  /** In-progress tool call: ONE line that the result later REPLACES in
+   *  place (2026-09-25 user request: consecutive tool calls used to cost
+   *  two transcript lines each - the `● name args` line plus the folded
+   *  `⎿ result` line - and a run of ten calls buried the conversation).
+   *  Returns the mutable entry so settleToolCall() can swap it. */
+  startToolCall(display: string): Entry {
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    const entry: Entry = { lines: wrapTo(display, width) };
+    this.entries.push(entry);
+    this.scrollFromBottom = 0;
+    this.dirty = true;
+    return entry;
+  }
+
+  /** Fold a settled tool call onto its start line and register it as a
+   *  z-expandable cell (same cell semantics as addToolCell). */
+  settleToolCall(entry: Entry, folded: string, full: string): void {
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    entry.lines = wrapTo(folded, width).map((l) => DIM(l));
+    this.toolCells.push({ entry, full, folded, expanded: false });
+    this.dirty = true;
+  }
+
   /* ---------------- M4: streaming markdown colorizer (B10) ---------------- */
   /** Light zero-dep markdown line color for STREAMED text: headings cyan,
    *  list markers dim, fences dim, blockquotes dim; everything else plain.
@@ -1875,6 +1898,10 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       let reasoningBuf = '';
       const foldThinking = () => { if (reasoningBuf.trim()) { fullToolLog.push({ name: 'thinking', output: reasoningBuf.slice(0, 8000) }); } reasoningBuf = ''; rt.foldThinking(); };
     let kind: import('@hmharness/kernel').DeltaKind | null = null;
+    // the in-flight tool call's transcript entry: the result REPLACES it
+    // in place (one line per call, 2026-09-25)
+    let pendingToolEntry: { lines: string[] } | null = null;
+    let pendingToolName: string | null = null;
     try {
       const result = await runAgentTask({
         task: line,
@@ -1912,14 +1939,21 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
             const brief = name === 'run_command' && typeof args.command === 'string'
               ? args.command
               : JSON.stringify(args);
-            rt.addText(`${YELLOW('●')} ${CYAN(name)} ${DIM(brief.replace(/\s+/g, ' ').slice(0, 90))}`);
+            // ONE line per call (2026-09-25): the running `● name args` line
+            // is REPLACED in place by the folded result line on settle, so a
+            // run of N calls costs N transcript lines, not 2N
+            pendingToolEntry = rt.startToolCall(`${YELLOW('●')} ${CYAN(name)} ${DIM(brief.replace(/\s+/g, ' ').slice(0, 90))}`);
+            pendingToolName = name;
           },
           onToolResult: (name, output, isError) => {
             const dot = isError ? RED('✗') : GREEN('•');
             const first = output.split('\n').find((l) => l.trim()) ?? '';
-            // M4 B8: tool call + result = one collapsible cell (folded summary
-            // by default; `z` with an empty input expands the last one)
-            rt.addToolCell(`  ${dot} ${CYAN(name)} ${DIM('⎿ ' + first.trim().slice(0, 100))}`, output);
+            // M4 B8 + 2026-09-25: the call line settles INTO the folded cell
+            // (one line per call; `z` with an empty input expands the last)
+            const folded = `  ${dot} ${CYAN(name)} ${DIM('⎿ ' + first.trim().slice(0, 100))}`;
+            if (pendingToolEntry && pendingToolName === name) rt.settleToolCall(pendingToolEntry, folded, output);
+            else rt.addToolCell(folded, output);
+            pendingToolEntry = null; pendingToolName = null;
             // M4 B9 (T18 复案 2026-09-21): outputs beyond a screen NO LONGER
             // auto-open the full-screen pager - on every system it read as a
             // break-in (a wall of raw output hijacking the screen while the
