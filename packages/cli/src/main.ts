@@ -1143,11 +1143,24 @@ flags:
         trainingFile: upTrain.id, validationFile: upEval?.id, suffix: 'hmh',
       });
       await CF.recordFineTuneJob(home, job, { model, trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length });
-      stdout.write(GREEN('✓ 微调任务已创建：' + (job.id ?? '?') + '（状态 ' + String(job.status ?? '?') + '）\n'));
+      stdout.write(GREEN('✓') + ' 微调任务已创建：' + (job.id ?? '?') + '（状态 ' + String(job.status ?? '?') + '）\n');
       stdout.write('训练完成后，用返回的模型编码（fine_tuned_model）即可直接调用。\n');
       stdout.write(DIM('查看进度：hmh auto-finetune --status\n'));
     } catch (err) {
-      stdout.write(RED('任务创建失败（上传的文件仍保留在云端可复用）：' + String(err) + '\n'));
+      const msg = String(err);
+      // live finding 2026-09-26: some accounts pass model validation for
+      // glm-4-flash/glm-4.5-air but the job-creation path 500s server-side -
+      // the entitlement is half-open (glm-5.3 answers the clean
+      // "联系客服开放" variant). The uploaded files stay valid, so record
+      // them: a retry after the entitlement opens must NOT re-upload 2.7M tokens.
+      await CF.recordFineTuneJob(home, { id: 'staged-' + stamp, status: 'staged', model }, { trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length, error: msg.slice(0, 200) });
+      stdout.write(RED('任务创建失败：' + msg.slice(0, 160) + '\n'));
+      if (/参数校验解析异常/.test(msg)) {
+        stdout.write(YELLOW('该模型在你账号上的微调权限可能未完全开通（对照：glm-5.3 会返回"微调功能未开放，请联系客服开放"）。') + '\n');
+        stdout.write(DIM('已上传的 ' + upTrain.id + ' / ' + (upEval?.id ?? '-') + ' 保留在云端并已记录，权限开通后重跑 hmh auto-finetune --submit 无需重新上传。\n'));
+      } else {
+        stdout.write(DIM('上传的文件保留在云端可复用：' + upTrain.id + '\n'));
+      }
     }
     return;
   }

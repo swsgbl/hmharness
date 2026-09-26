@@ -1,0 +1,15 @@
+npm notice run hmharness@0.14.9 npx
+npm notice run tsx .tmp-e2e-web.mjs ; cat .tmp-e2e-out.txt; rm -f .tmp-e2e-web.mjs .tmp-e2e-out.txt
+  [mcp] codegraph: unavailable (Error: mcp/codegraph: failed to start server: Error: spawn codegraph ENOENT)
+  [mcp] test: 2 tools attached
+  [mcp] brave-search: unavailable (Error: mcp/brave-search: server exited (code 1): mise ERROR No version is set for shim: npx
+Set a global default version with one of the fol)
+  [mcp] officecli: 1 tools attached
+  [mcp] openspace: 6 tools attached
+  [mcp] web-search-prime: unavailable (TypeError: Cannot read properties of undefined (reading 'tools'))
+  [mcp] web-reader: unavailable (TypeError: Cannot read properties of undefined (reading 'tools'))
+  [mcp] anysearch: 4 tools attached
+  [mcp] context7: 2 tools attached
+hmh web · http://127.0.0.1:19020 · model @quality · home C:\Users\hongfu\.hmharness
+(local only; Ctrl-C to stop)
+NO-SESSIONS

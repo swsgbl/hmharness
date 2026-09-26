@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/cli",
-  "version": "0.18.6",
+  "version": "0.18.7",
   "description": "hmharness command line: one-shot tasks, an interactive REPL, a fullscreen TUI, the web frontend, and direct tool invocation.",
   "type": "module",
   "main": "dist/main.js",
