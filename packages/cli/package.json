@@ -43,14 +43,14 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.9.7",
-    "@hmharness/observability": "0.7.4",
-    "@hmharness/evolution": "0.14.25",
-    "@hmharness/domain-harmony": "0.13.8",
-    "@hmharness/domain-ops": "0.8.3",
-    "@hmharness/agent": "0.14.20",
-    "@hmharness/evaluation": "0.8.6",
-    "@hmharness/web": "0.9.7",
-    "@hmharness/sandbox": "0.8.5"
+    "@hmharness/kernel": "*",
+    "@hmharness/observability": "*",
+    "@hmharness/evolution": "*",
+    "@hmharness/domain-harmony": "*",
+    "@hmharness/domain-ops": "*",
+    "@hmharness/agent": "*",
+    "@hmharness/evaluation": "*",
+    "@hmharness/web": "*",
+    "@hmharness/sandbox": "*"
   }
 }
