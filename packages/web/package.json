@@ -15,10 +15,10 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.9.7",
-    "@hmharness/evolution": "0.14.9",
-    "@hmharness/agent": "0.14.20",
-    "@hmharness/domain-ops": "0.8.0"
+    "@hmharness/kernel": "*",
+    "@hmharness/evolution": "*",
+    "@hmharness/agent": "*",
+    "@hmharness/domain-ops": "*"
   },
   "files": [
     "dist"
