@@ -15,12 +15,12 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/domain-harmony": "0.13.5",
-    "@hmharness/domain-ops": "0.8.0",
-    "@hmharness/evolution": "0.14.9",
-    "@hmharness/kernel": "0.9.7",
-    "@hmharness/observability": "0.7.0",
-    "@hmharness/sandbox": "0.8.0"
+    "@hmharness/domain-harmony": "*",
+    "@hmharness/domain-ops": "*",
+    "@hmharness/evolution": "*",
+    "@hmharness/kernel": "*",
+    "@hmharness/observability": "*",
+    "@hmharness/sandbox": "*"
   },
   "files": [
     "dist"
