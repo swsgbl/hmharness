@@ -15,8 +15,8 @@ function walk(dir) {
     if (!e.name.endsWith('.d.ts')) continue;
     const src = fs.readFileSync(p, 'utf8');
     const out = src
-      .replace(/(from\s+')(\.[^']*?)\.ts('/g, '$1$2.js$3')
-      .replace(/(from\s+")(\.[^"]*?)\.ts("/g, '$1$2.js$3');
+      .replace(/(from\s+')(\.[^']*?)\.ts'/g, '$1$2.js\'')
+      .replace(/(from\s+")(\.[^"]*?)\.ts"/g, '$1$2.js"');
     if (out !== src) { fs.writeFileSync(p, out); touched++; }
   }
 }
