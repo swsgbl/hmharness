@@ -26,3 +26,7 @@ dist.v2bak/
 *界面升级改造*
 audit-doc.txt
 .audit-tmp/
+.tmp-*
+*.tmpbak
+*.opsbak
+*.v2bak
