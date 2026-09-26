@@ -7,32 +7,7 @@
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
-    "paths": {
-      "@hmharness/evolution": [
-        "packages/evolution/src/index.ts"
-      ],
-      "@hmharness/domain-harmony": [
-        "packages/domain-harmony/src/index.ts"
-      ],
-      "@hmharness/domain-ops": [
-        "packages/domain-ops/src/index.ts"
-      ],
-      "@hmharness/web": [
-        "packages/web/src/index.ts"
-      ],
-      "@hmharness/agent": [
-        "packages/agent/src/index.ts"
-      ],
-      "@hmharness/sandbox": [
-        "packages/sandbox/src/index.ts"
-      ],
-      "@hmharness/observability": [
-        "packages/observability/src/index.ts"
-      ],
-      "@hmharness/evaluation": [
-        "packages/evaluation/src/index.ts"
-      ]
-    }
+    "paths": {}
   },
   "include": [
     "src/**/*.ts"
