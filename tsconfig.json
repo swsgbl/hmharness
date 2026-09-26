@@ -29,6 +29,15 @@
       ],
       "@hmharness/domain-ops": [
         "packages/domain-ops/src/index.ts"
+      ],
+      "@hmharness/sandbox": [
+        "packages/sandbox/src/index.ts"
+      ],
+      "@hmharness/observability": [
+        "packages/observability/src/index.ts"
+      ],
+      "@hmharness/evaluation": [
+        "packages/evaluation/src/index.ts"
       ]
     }
   },
