@@ -27,7 +27,7 @@ test('matchCommands filters by prefix and only for slash input', () => {
   assert.equal(all.length, COMMANDS.length);
   const ops = matchCommands('/ops');
   // /ops stats stays a maintainer CLI verb (hmh ops stats) - npm download
-  // telemetry is not a user-facing palette row (user-overturned, 2026-09-20)
+  // telemetry is not a user-facing palette row (design-revised, 2026-09-20)
   assert.deepEqual(ops.map((c) => c.name), ['/ops', '/ops scan', '/ops brief']);
   const one = matchCommands('/be');
   assert.deepEqual(one.map((c) => c.name), ['/bench']);
