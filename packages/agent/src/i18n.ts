@@ -82,9 +82,7 @@ export interface Strings {
   cmdFork: string;
   cmdCopy: string;
   cmdExport: string;
-  cmdMouse: string;
-  cmdMouseOn: string;
-  cmdMouseOff: string;
+  cmdMouseRemoved: string;
   cmdCopied: string;
   cmdPlan: string;
   cmdPlanOn: string;
@@ -246,9 +244,7 @@ const zh: Strings = {
   cmdFork: 'fork 当前会话为新线程(继承全部上下文)',
   cmdCopy: '复制最后一条 AI 输出到剪贴板',
   cmdExport: '一键导出整个会话为 Markdown 文件（~/.hmharness/exports/）',
-  cmdMouse: '切换全时鼠标捕获（仅无滚轮翻译的终端需要；默认 ?1007 已覆盖大多数终端）',
-  cmdMouseOn: '🖱 全时鼠标捕获已开启（滚轮直读；原生划选复制请按住 Shift 再拖动）',
-  cmdMouseOff: '🖱 全时鼠标捕获已关闭（滚轮走终端方向键翻译；划选复制恢复原生）',
+  cmdMouseRemoved: '🖱 鼠标方案已永久固定：滚轮滚动由终端原生翻译（?1007），划选复制始终原生——无需任何开关',
   cmdCopied: '✓ 已复制最后一条 AI 输出',
   cmdPlan: '计划模式开关(先出计划待确认再执行)',
   cmdPlanOn: '🔥 计划模式:先出计划,确认后才执行',
@@ -399,9 +395,7 @@ const en: Strings = {
   cmdFork: 'fork this session to a new thread (inherits full context)',
   cmdCopy: 'copy the last AI output to the clipboard',
   cmdExport: 'export the whole session to a Markdown file (~/.hmharness/exports/)',
-  cmdMouse: 'toggle full-time mouse capture (only for terminals without wheel translation; ?1007 covers most)',
-  cmdMouseOn: '🖱 full-time mouse capture ON (direct wheel; hold Shift to select natively)',
-  cmdMouseOff: '🖱 full-time mouse capture OFF (wheel via terminal translation; native selection restored)',
+  cmdMouseRemoved: '🖱 the mouse scheme is now permanent: wheel scrolling via the terminal\'s native translation, selection/copy always native - no toggle needed',
   cmdCopied: '✓ copied the last AI output',
   cmdPlan: 'plan mode toggle (plan first, confirm, then execute)',
   cmdPlanOn: '🔥 plan mode: present a plan, wait for confirmation before executing',

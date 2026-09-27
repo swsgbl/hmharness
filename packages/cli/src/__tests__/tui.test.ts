@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { COMMANDS, matchCommands, parseWheel, splitMouseReport, sanitizePaste, clipboardCandidates, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
+import { COMMANDS, matchCommands, sanitizePaste, clipboardCandidates, nextLocale, atToken, histMatches, shellBang, forkArm, lastUserIdx, renderStatusline, parseKeySpec } from '../tui.ts';
 import type { TuiRuntime } from '../tui.ts';
 
 test('nextLocale: explicit zh/en wins, bare /lang toggles', () => {
@@ -18,19 +18,6 @@ test('COMMANDS exposes /lang alongside /model', () => {
   const names = matchCommands('/lang').map((c) => c.name);
   assert.deepEqual(names, ['/lang']);
   assert.equal(COMMANDS.some((c) => c.name === '/lang'), true);
-});
-
-test('parseWheel decodes SGR wheel-up and wheel-down', () => {
-  // wheel-up press and release forms; 64 = up, 65 = down
-  assert.equal(parseWheel('\x1b[<64;12;4M'), -1);
-  assert.equal(parseWheel('\x1b[<64;12;4m'), -1);
-  assert.equal(parseWheel('\x1b[<65;12;4M'), 1);
-  // clicks (0/1/2 with M), drag motion (32+), plain keys, empty -> 0
-  assert.equal(parseWheel('\x1b[<0;12;4M'), 0);
-  assert.equal(parseWheel('\x1b[<32;12;4M'), 0);
-  assert.equal(parseWheel('a'), 0);
-  assert.equal(parseWheel(''), 0);
-  assert.equal(parseWheel('\x1b[A'), 0);
 });
 
 test('matchCommands filters by prefix and only for slash input', () => {
@@ -153,13 +140,13 @@ test('picker: arrows + second Enter confirm the highlighted model', async () => 
   } finally { h.restore(); }
 });
 
-test('picker: wheel moves the selection while the palette is open', async () => {
+test('picker: wheel = translated arrows (?1007) moves the selection while the palette is open (T24)', async () => {
   const h = await makeTui();
   try {
     h.rt.openModelPicker();
-    h.keys('\x1b[<65;10;3M');                // SGR wheel-down
+    h.keys('\x1b[B');                       // ?1007 wheel-down arrives as Down
     assert.equal(h.rt.paletteProbe().selected, 1);
-    h.keys('\x1b[<64;10;3M');                // SGR wheel-up
+    h.keys('\x1b[A');                       // ?1007 wheel-up arrives as Up
     assert.equal(h.rt.paletteProbe().selected, 0);
   } finally { h.restore(); }
 });
@@ -177,47 +164,24 @@ test('picker: SS3 application-mode arrows (\x1bOA/\x1bOB) still navigate', async
   } finally { h.restore(); }
 });
 
-test('mouse capture OFF by default - native selection stays native; palette/force opt in (T23)', async () => {
-  // always-on capture (T21) took click-drag selection away on EVERY system;
-  // default is now no capture + ?1007 wheel translation, with capture only
-  // while a palette is open or the user forces it via /mouse
+test('mouse capture is GONE, permanently - selection/copy native at all times (T24)', async () => {
+  // T21 always-on capture took click-drag selection away on every system;
+  // T23 softened it (palette-time capture + /mouse force); T24 removes
+  // capture ENTIRELY: the wheel rides the terminal's ?1007 arrow-key
+  // translation and no mode exists that could ever eat a selection.
   const h = await makeTui();
   try {
-    assert.equal(h.rt.paletteProbe().mouse, false);     // at rest: no capture
+    // an SGR report can no longer arrive (reporting is never enabled) - a
+    // stray one from a weird terminal must be swallowed, not typed into
+    // the input line
+    h.keys('\x1b[<0;12;4M');
+    assert.equal(h.rt.paletteProbe().input, '');
     h.rt.openModelPicker();
     h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, true);      // palette modal captures
-    h.keys('\x1b');                                     // Esc closes
-    h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, false);     // released on close
-    h.rt.setMouseForced(true);                          // /mouse force
-    h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, true);
-    assert.equal(h.rt.isMouseForced(), true);
-    h.rt.setMouseForced(false);
-    h.rt.render();
-    assert.equal(h.rt.paletteProbe().mouse, false);     // and back off
-  } finally { h.restore(); }
-});
-
-test('splitMouseReport stashes a report fragmented across stdin chunks', () => {
-  assert.deepEqual(splitMouseReport('abc'), { data: 'abc', pending: '' });
-  assert.deepEqual(splitMouseReport('\x1b[<64;12;4M'), { data: '\x1b[<64;12;4M', pending: '' });
-  assert.deepEqual(splitMouseReport('\x1b[<64;12;4m'), { data: '\x1b[<64;12;4m', pending: '' });
-  assert.deepEqual(splitMouseReport('ab\x1b[<64;12'), { data: 'ab', pending: '\x1b[<64;12' });
-  assert.deepEqual(splitMouseReport('\x1b[<64;12;4M\x1b[<65;8'), { data: '\x1b[<64;12;4M', pending: '\x1b[<65;8' });
-  assert.deepEqual(splitMouseReport('\x1b[<64'), { data: '', pending: '\x1b[<64' });
-});
-
-test('a wheel event split across chunks still drives the palette (no lost bursts)', async () => {
-  const h = await makeTui();
-  try {
-    h.rt.openModelPicker();
-    h.keys('\x1b[<65;10;');   // fragment one: header only
-    h.keys('3M');             // fragment two: rest of the report
-    assert.equal(h.rt.paletteProbe().selected, 1);  // wheel-down arrived whole
-    h.keys('\x1b[<64;10;3M'); // intact report still works after reassembly
-    assert.equal(h.rt.paletteProbe().selected, 0);
+    // wheel = arrows via ?1007: down-arrow inside the palette moves the
+    // selection (the translation path IS the wheel path now)
+    h.keys('\x1b[B');
+    assert.equal(h.rt.paletteProbe().selected, 1);
   } finally { h.restore(); }
 });
 
@@ -265,17 +229,18 @@ test('clipboardCandidates: win32/darwin/wl-first/x11-fallback/none', () => {
   assert.deepEqual(clipboardCandidates('linux', {}), []);
 });
 
-test('picker: clicking a row selects and confirms it', async () => {
+test('picker: keyboard-only (T24 - SGR click rows removed with capture)', async () => {
   const h = await makeTui();
   try {
     h.rt.openModelPicker();
-    h.rt.render();                                    // records click rows
+    h.rt.render();
     const p = h.rt.paletteProbe();
-    assert.equal(p.clickRows.length > 0, true);
-    const target = p.clickRows[2];
-    assert.equal(p.rows[target.idx], 'nvidia-vision');
-    h.keys(`\x1b[<0;3;${target.row}M`);               // SGR click on that row
-    assert.deepEqual(h.submitted, ['/model nvidia-vision']);
+    assert.equal(p.selected, 0);
+    h.keys('\x1b[B'); h.keys('\x1b[B');   // down, down - keyboard drives the picker
+    assert.equal(h.rt.paletteProbe().selected, 2);
+    h.keys('\x1b[<0;3;4M');               // a stray SGR click must be swallowed:
+    assert.deepEqual(h.submitted, []);    // nothing picked, nothing submitted
+    assert.equal(h.rt.paletteProbe().selected, 2);  // selection unchanged
   } finally { h.restore(); }
 });
 
