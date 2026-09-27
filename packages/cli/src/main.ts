@@ -1059,7 +1059,11 @@ flags:
     if (submit && ftCfg.auto === false) { stdout.write('自动微调已关闭（config finetune.auto=false）——本次跳过\n'); return; }
     if (submit) {
       const localJobs = await CF.readLocalFineTuneJobs(home);
-      const lastAt = localJobs.length ? new Date(localJobs[localJobs.length - 1].time).getTime() : 0;
+      // cooldown counts real SUBMISSIONS only - a 'staged' row means the last
+      // attempt FAILED before creating a job (files parked, nothing trained),
+      // so it must not block the retry that finally lands (2026-09-27)
+      const lastSubmit = [...localJobs].reverse().find((j) => String(j.status) !== 'staged');
+      const lastAt = lastSubmit ? new Date(lastSubmit.time).getTime() : 0;
       const dueMs = cooldownDays * 86400000;
       if (Date.now() - lastAt < dueMs) { stdout.write(DIM(`冷却中（上次提交 ${cooldownDays} 天内）——本次跳过\n`)); return; }
       try {
@@ -1156,8 +1160,9 @@ flags:
       await CF.recordFineTuneJob(home, { id: 'staged-' + stamp, status: 'staged', model }, { trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length, error: msg.slice(0, 200) });
       stdout.write(RED('任务创建失败：' + msg.slice(0, 160) + '\n'));
       if (/参数校验解析异常/.test(msg)) {
-        stdout.write(YELLOW('该模型在你账号上的微调权限可能未完全开通（对照：glm-5.3 会返回"微调功能未开放，请联系客服开放"）。') + '\n');
-        stdout.write(DIM('已上传的 ' + upTrain.id + ' / ' + (upEval?.id ?? '-') + ' 保留在云端并已记录，权限开通后重跑 hmh auto-finetune --submit 无需重新上传。\n'));
+        stdout.write(YELLOW('最常见原因（2026-09-27 实测确认）：微调走开放平台按量付费通道，与 GLM Coding Plan 编码套餐互不通用——') + '\n');
+        stdout.write(YELLOW('编码套餐余额再足，开放平台账户没有充值/余额为 0 时，建任务就会在计费环节报这个 500。') + '\n');
+        stdout.write(DIM('解决：到 bigmodel.cn 控制台「财务/账户中心」给开放平台账户充值（glm-4-flash LoRA 约 0.025 元/千 tokens，4000 对×3 轮约 200-250 元），再重跑本命令。已上传文件无需重传。') + '\n');
       } else {
         stdout.write(DIM('上传的文件保留在云端可复用：' + upTrain.id + '\n'));
       }
