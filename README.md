@@ -54,6 +54,14 @@ npm link -w @hmharness/cli   # 之后任意目录直接 hmh ...
 hmh init               # 建立 ~/.hmharness（配置 + 状态目录）
 ```
 
+**方式三：KaihongOS / OpenHarmony 板端**（无 npm、只读根分区，一条命令装完填密钥即用）：
+
+```bash
+node scripts/install-kaihongos.cjs   # Node >= 22（路径任意，脚本自己找）
+```
+
+板端九个真实踩坑（独立挂载命名空间终端、只读根分区 remount、HOME=/ 等）与对策见 **[docs/KAIHONGOS.md](docs/KAIHONGOS.md)**。
+
 配置任意 OpenAI 兼容厂商（编辑 `~/.hmharness/config.json` 或环境变量 `HMH_BASE_URL / HMH_API_KEY / HMH_MODEL`）：
 
 ```json
