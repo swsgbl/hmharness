@@ -320,6 +320,19 @@ export class TuiRuntime {
   private version = HMH_VERSION;
   /** persistent header tag, e.g. the active approval mode (🔥 YOLO) */
   private modeTag = '';
+  private modePlan = false;
+  /** Rebuild the ALWAYS-VISIBLE header mode badge (2026-09-25 user request:
+   *  "让人知道此时处在什么模式下运行" - a bare 🔥 told half the story and
+   *  the default ask mode showed nothing at all). Composed from state, not
+   *  set ad hoc, so every switch keeps the badge truthful. */
+  setModes(yolo: boolean, plan = this.modePlan): void {
+    this.modePlan = plan;
+    const parts: string[] = [];
+    parts.push(yolo ? '🔥 YOLO' : `🛡 ${this.t.modeAsk}`);
+    if (plan) parts.push(`📋 ${this.t.modePlan}`);
+    this.modeTag = DIM('[') + parts.join(DIM(' · ')) + DIM(']');
+    this.dirty = true;
+  }
   /** rows for the `/model ` picker (configured providers first, set by driver) */
   private modelChoices: Array<{ name: string; desc: string }> = [];
   /** Wheel/click handling (T23, settled design): capture (?1000h+?1006h)
@@ -656,6 +669,8 @@ export class TuiRuntime {
     };
   }
 
+  /** Legacy single-tag setter kept for compatibility; new code uses
+   *  setModes(yolo, plan) which composes the full always-visible badge. */
   setModeTag(tag: string): void {
     this.modeTag = tag;
     this.dirty = true;
@@ -1664,7 +1679,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   const chatModel = resolveProvider(cfg, 'chat').model;
   rt.configure(chatModel, basename(process.cwd()), skills.length, (cfg.locale ?? 'zh') as Locale, HMH_VERSION);
   rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
-  if (autoApprove) rt.setModeTag('🔥');
+  rt.setModes(autoApprove); // always-visible badge, ask mode included
   rt.addText(t.tuiWelcome(chatModel), 'dim');
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
   // update reminder: cached (1/day) registry check, resolved async into the
@@ -2174,7 +2189,8 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       // M4 B7: plan mode toggle (the directive is injected per-task, so the
       // agent always presents a plan and waits for confirmation first)
       planMode = !planMode;
-      rt.addText(planMode ? GREEN('🔥') + ' ' + t.cmdPlanOn : t.cmdPlanOff, 'plain');
+      rt.addText(planMode ? GREEN('📋') + ' ' + t.cmdPlanOn : t.cmdPlanOff, 'plain');
+      rt.setModes(autoApprove, planMode); // plan state joins the always-visible badge
       return;
     }
     if (line === '/goal' || line.startsWith('/goal ')) {
@@ -2321,7 +2337,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
         const { patchConfig } = await import('@hmharness/kernel');
         cfg = await patchConfig({ approval: turnOn ? 'auto' : 'ask' } as never) as typeof cfg;
       } catch { /* runtime toggles still applied */ }
-      rt.setModeTag(turnOn ? '🔥' : '');
+      rt.setModes(turnOn, planMode);
       rt.addText((turnOn ? t.yoloOn : t.yoloOff) + (turnOn ? '' : ''), 'plain');
       return;
     }
@@ -2330,6 +2346,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       cfg = await setLocale(target);
       t = strings(target);
       rt.configure(chatModel, basename(process.cwd()), skills.length, target, HMH_VERSION);
+      rt.setModes(autoApprove, planMode); // badge text follows the new locale
       rt.addText(GREEN('✓') + ' ' + t.langSwitched(target));
       return;
     }

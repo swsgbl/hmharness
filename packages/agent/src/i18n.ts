@@ -147,6 +147,10 @@ export interface Strings {
   tuiPassRate: (pct: string) => string;
   tuiStatus: (locale: string, skills: number, model: string) => string;
   tuiSkills: string;
+  /** persistent header badge for the current approval mode (2026-09-25:
+   *  users must SEE which mode is running, not guess) */
+  modeAsk: string;
+  modePlan: string;
   cmdHelp: string;
   /** REPL feedback for a slash command that does not exist */
   unknownCommand: (line: string) => string;
@@ -301,6 +305,8 @@ const zh: Strings = {
   tuiPassRate: (pct) => `pass rate: ${pct}`,
   tuiStatus: (locale, skills, model) => `${locale} · ${skills} 技能 · ${model}`,
   tuiSkills: '技能',
+  modeAsk: '逐条审批',
+  modePlan: '先计划',
   cmdHelp: '命令帮助',
   unknownCommand: (l) => `未知命令: ${l} (/help 查看全部)`,
   cmdClearDone: '✓ 对话已清空,下一条任务从全新上下文开始',
@@ -452,6 +458,8 @@ const en: Strings = {
   tuiPassRate: (pct) => `pass rate: ${pct}`,
   tuiStatus: (locale, skills, model) => `${locale} · ${skills} skills · ${model}`,
   tuiSkills: 'skills',
+  modeAsk: 'ask',
+  modePlan: 'plan',
   cmdHelp: 'command help',
   unknownCommand: (l) => `unknown command: ${l} (/help lists all)`,
   cmdClearDone: '✓ conversation cleared; the next task starts a fresh context',
