@@ -151,8 +151,10 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
     // 2026-09-27 plan A: experience retrieval - the K most RELEVANT past
     // insights for THIS task (bigram similarity, recency tiebreak) instead
     // of the 5 most recent; a task similar to one from a month ago now
-    // surfaces that lesson instead of five unrelated recent rows
-    retrieveInsights(home, task),
+    // surfaces that lesson instead of five unrelated recent rows.
+    // Plan C: cross-project lessons stay retrievable but carry their
+    // origin stamp ([来自项目:X]) so the model can weigh them.
+    retrieveInsights(home, task, { workspace: opts.workspace ?? undefined }),
   ]);
   let canaryBlock = '';
   let canaryNames: string[] = [];
@@ -569,6 +571,11 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     toolUses: result.toolUses,
     toolsUsed: [...new Set(toolsUsed)],
     skillsInjected: pack.skillsInjected,
+    // plan C (2026-09-27): provenance for cross-project experience - a
+    // lesson learned in project A stays retrievable everywhere (plan A
+    // retrieval is global) AND carries its origin so the model can weigh
+    // "same tooling" vs "different codebase" advice appropriately
+    ...(workspace ? { workspace } : {}),
   });
   // daily self-evolution: every N insights, one background cycle fires
   // (default on; autoEvolveEvery: 0 disables). Fire-and-forget - it never

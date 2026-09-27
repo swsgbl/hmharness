@@ -19,6 +19,11 @@ export interface Insight {
   /** P0 impact attribution: skills (incl. canaries) injected into this
    *  session's system prompt - the join key for canary A/B comparison. */
   skillsInjected?: string[];
+  /** Plan C (2026-09-27): the workspace (project) this session ran in.
+   *  Retrieval stays GLOBAL - a lesson learned in project A is reachable
+   *  from project B - but the origin is stamped on the injected line so
+   *  the model can weigh "same tooling, different codebase" advice. */
+  workspace?: string;
 }
 
 /**
@@ -123,8 +128,12 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
   return inter / (a.size + b.size - inter);
 }
 
-function formatInsight(i: Insight): string {
-  return `- [${i.outcome}] ${i.task.slice(0, 60)} (turns ${i.turns}, tools ${i.toolsUsed.join(',') || 'none'})`;
+function formatInsight(i: Insight, currentWorkspace?: string): string {
+  // cross-project origin stamp (plan C): lessons from ANOTHER project are
+  // still injected (global retrieval) but labelled, so the model knows the
+  // tooling lesson may not carry the codebase specifics with it
+  const from = i.workspace && currentWorkspace && i.workspace !== currentWorkspace ? ` [来自项目:${i.workspace}]` : '';
+  return `- [${i.outcome}] ${i.task.slice(0, 60)} (turns ${i.turns}, tools ${i.toolsUsed.join(',') || 'none'})${from}`;
 }
 
 /** Noise floor: below this similarity an insight is unrelated to the task.
@@ -138,7 +147,7 @@ export const INSIGHT_SIM_FLOOR = 0.05;
  * back to the K most recent when nothing clears the noise floor - so the
  * prompt always carries some experience, exactly like before.
  */
-export async function retrieveInsights(home: string, task: string, opts: { topK?: number; pool?: number } = {}): Promise<string> {
+export async function retrieveInsights(home: string, task: string, opts: { topK?: number; pool?: number; workspace?: string } = {}): Promise<string> {
   const topK = opts.topK ?? 5;
   const pool = opts.pool ?? 500;
   let rows: Insight[] = [];
@@ -153,7 +162,7 @@ export async function retrieveInsights(home: string, task: string, opts: { topK?
   }
   if (rows.length === 0) return '';
   const q = bigrams(task);
-  if (q.size === 0) return rows.slice(-topK).map(formatInsight).join('\n');
+  if (q.size === 0) return rows.slice(-topK).map((r) => formatInsight(r, opts.workspace)).join('\n');
   // newest first within the pool, so idx IS the recency rank
   const newestFirst = [...rows].reverse();
   const scored = newestFirst
@@ -162,6 +171,6 @@ export async function retrieveInsights(home: string, task: string, opts: { topK?
     .sort((a, b) => b.s - a.s)
     .slice(0, topK)
     .map((x) => x.r);
-  if (scored.length === 0) return rows.slice(-topK).map(formatInsight).join('\n');
-  return scored.map(formatInsight).join('\n');
+  if (scored.length === 0) return rows.slice(-topK).map((r) => formatInsight(r, opts.workspace)).join('\n');
+  return scored.map((r) => formatInsight(r, opts.workspace)).join('\n');
 }

@@ -72,9 +72,32 @@ test('retrieveInsights: empty/missing archive -> empty string, no crash', async 
 
 test('noise floor keeps unrelated natural-language experience out', () => {
   // natural tasks sharing at most an accidental bigram score ~0.025; the
-  // 0.03 floor filters exactly that coincidence class
+  // 0.05 floor filters exactly that coincidence class
   const q = bigrams('deploy the hap package to the device with hdc');
   const r = bigrams('write a haiku about autumn leaves and rain');
   assert.ok(jaccard(q, r) < INSIGHT_SIM_FLOOR, 'unrelated tasks stay under the floor');
   assert.ok(jaccard(bigrams('deploy hap via hdc'), bigrams('deploy hap through hdc')) > INSIGHT_SIM_FLOOR, 'related tasks clear it');
+});
+
+test('plan C: cross-project lessons are stamped, same-project ones are not', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-ret4-'));
+  try {
+    await mkdir(join(home, 'insights'), { recursive: true });
+    const mk = (task: string, ws?: string) => JSON.stringify({ time: 't', session: 's', task, outcome: 'ok', turns: 2, toolUses: 1, toolsUsed: ['hdc'], ...(ws ? { workspace: ws } : {}) });
+    await writeFile(join(home, 'insights', 'insights.jsonl'), [
+      mk('deploy hap via hdc on the emulator', 'project-alpha'),
+      mk('deploy hap via hdc on the real device', undefined),
+    ].join('\n') + '\n', 'utf8');
+    // from project BETA: the alpha lesson arrives WITH its origin stamp
+    const cross = await retrieveInsights(home, 'deploy hap via hdc', { workspace: 'project-beta' });
+    assert.ok(cross.includes('[来自项目:project-alpha]'), 'cross-project stamp present: ' + cross.split('\n')[0]);
+    // from project ALPHA itself: no stamp on its own lesson
+    const own = await retrieveInsights(home, 'deploy hap via hdc on the emulator', { workspace: 'project-alpha' });
+    assert.ok(!own.includes('[来自项目:'), 'same-project rows carry no stamp');
+    // legacy rows without a workspace field stay clean everywhere
+    const legacy = await retrieveInsights(home, 'deploy hap via hdc on the real device', { workspace: 'project-beta' });
+    assert.ok(!legacy.split('\n')[0].includes('[来自项目:'), 'workspace-less rows never stamped');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
