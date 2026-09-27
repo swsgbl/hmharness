@@ -55,6 +55,14 @@ npm link -w @hmharness/cli   # then `hmh ...` works from any directory
 hmh init               # creates ~/.hmharness (config + state dirs)
 ```
 
+**Option 3: KaihongOS / OpenHarmony board** (no npm, read-only rootfs — one command, then add your keys):
+
+```bash
+node scripts/install-kaihongos.cjs   # Node >= 22 (any location)
+```
+
+Nine real board pitfalls (isolated mount-namespace terminals, read-only rootfs remount, HOME=/ and more) with fixes: **[docs/KAIHONGOS.md](docs/KAIHONGOS.md)** (Chinese).
+
 Point at any OpenAI-compatible provider (edit `~/.hmharness/config.json` or env vars `HMH_BASE_URL / HMH_API_KEY / HMH_MODEL`):
 
 ```json
