@@ -90,3 +90,78 @@ export async function recentInsights(home: string, limit = 5): Promise<string> {
     return '';
   }
 }
+
+/* ---------------- experience retrieval (2026-09-27, plan A) ----------------
+ * The injection used to be "last 5 insights" - pure recency. After 300
+ * tasks, a question similar to task #50 got five UNRELATED recent lessons
+ * instead of that one. Industry direction (Agent KB / Agent Workflow
+ * Memory, verified 2026-09-27): retrieve relevant experience per task.
+ * Zero-dependency red line -> character-bigram Jaccard (works well for CJK
+ * too), a small recency tiebreak, graceful fallback to recency order. */
+
+/** Task-similarity feature set: per-WORD bigrams plus single chars as
+ *  tokens (2026-09-27). Cross-word bigrams that include the space turned
+ *  out to be a noise factory - 'fix' and 'xxx' shared 'x ' and unrelated
+ *  natural sentences scored 0.06. Words are split on non-alphanumerics;
+ *  CJK text has no spaces, so a whole Chinese clause becomes one word and
+ *  keeps every character bigram. Pure. */
+export function bigrams(s: string): Set<string> {
+  const words = s.toLowerCase().split(/[^a-z0-9\u4e00-\u9fff]+/).filter(Boolean);
+  const out = new Set<string>();
+  for (const w of words) {
+    if (w.length === 1) { out.add(w); continue; }
+    for (let i = 0; i < w.length - 1; i++) out.add(w.slice(i, i + 2));
+  }
+  return out;
+}
+
+/** Jaccard similarity of two bigram sets. Pure. */
+export function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const g of a) if (b.has(g)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+function formatInsight(i: Insight): string {
+  return `- [${i.outcome}] ${i.task.slice(0, 60)} (turns ${i.turns}, tools ${i.toolsUsed.join(',') || 'none'})`;
+}
+
+/** Noise floor: below this similarity an insight is unrelated to the task.
+ *  With per-word bigrams the highest unrelated natural-language pairs score
+ *  ~0.04 (stopword overlap: 'the' contributes th/he); related tasks land at
+ *  0.5+. The floor sits between the two, with margin on both sides. */
+export const INSIGHT_SIM_FLOOR = 0.05;
+
+/**
+ * The K most RELEVANT insights for this task (recency as tiebreak), falling
+ * back to the K most recent when nothing clears the noise floor - so the
+ * prompt always carries some experience, exactly like before.
+ */
+export async function retrieveInsights(home: string, task: string, opts: { topK?: number; pool?: number } = {}): Promise<string> {
+  const topK = opts.topK ?? 5;
+  const pool = opts.pool ?? 500;
+  let rows: Insight[] = [];
+  try {
+    const text = await readFile(join(home, 'insights', 'insights.jsonl'), 'utf8');
+    rows = text.trim().split('\n').filter(Boolean)
+      .map((l) => { try { return JSON.parse(l) as Insight; } catch { return null; } })
+      .filter((x): x is Insight => x !== null)
+      .slice(-pool);
+  } catch {
+    return ''; // no archive at all - same behaviour as recentInsights
+  }
+  if (rows.length === 0) return '';
+  const q = bigrams(task);
+  if (q.size === 0) return rows.slice(-topK).map(formatInsight).join('\n');
+  // newest first within the pool, so idx IS the recency rank
+  const newestFirst = [...rows].reverse();
+  const scored = newestFirst
+    .map((r, idx) => ({ r, s: jaccard(q, bigrams(r.task)) + (1 - idx / (newestFirst.length + 1)) * 1e-4 }))
+    .filter((x) => x.s > INSIGHT_SIM_FLOOR)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, topK)
+    .map((x) => x.r);
+  if (scored.length === 0) return rows.slice(-topK).map(formatInsight).join('\n');
+  return scored.map(formatInsight).join('\n');
+}

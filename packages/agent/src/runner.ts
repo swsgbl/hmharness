@@ -29,7 +29,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { extractFeatures, routeDecision, recordRoutingOutcome } from '@hmharness/kernel';
-import { appendMemory, listSkills, readInsights, readNotes, recentInsights, recordInsight, redactSecrets, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
+import { appendMemory, listSkills, readInsights, readNotes, recentInsights, retrieveInsights, recordInsight, redactSecrets, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
 import * as readline from 'node:readline/promises';
@@ -148,7 +148,11 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
   const [memory, skills, insights] = await Promise.all([
     retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
     listSkills(home),
-    recentInsights(home),
+    // 2026-09-27 plan A: experience retrieval - the K most RELEVANT past
+    // insights for THIS task (bigram similarity, recency tiebreak) instead
+    // of the 5 most recent; a task similar to one from a month ago now
+    // surfaces that lesson instead of five unrelated recent rows
+    retrieveInsights(home, task),
   ]);
   let canaryBlock = '';
   let canaryNames: string[] = [];

@@ -59,6 +59,18 @@ async function npmVersion(name) {
   } catch { return ''; }
 }
 
+/** Is this EXACT version object present in the packument? dist-tags.latest
+ *  lags behind a fresh publish on some registry edges - asking versions{}
+ *  directly closes that propagation race. */
+async function versionExistsOnNpm(name, version) {
+  try {
+    const r = await fetch('https://registry.npmjs.org/' + name);
+    if (!r.ok) return false;
+    const j = await r.json();
+    return Boolean(j.versions && j.versions[version]);
+  } catch { return false; }
+}
+
 async function tarballFileHashes(tgzPath) {
   // extract a packed tgz and hash every file's CONTENT (mtime-insensitive)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hmh-pub-'));
@@ -120,7 +132,12 @@ for (const name of ONLY ? [ONLY] : ORDER) {
   // skipped, so the FULL ordered set can run on every release without
   // failing on the packages that didn't change
   const live = await npmVersion(pkg.name);
-  if (live === pkg.version) {
+  // the exact version being on npm (even when dist-tags.latest is stale -
+  // registry propagation races made the guard miss a just-published
+  // version and npm then refused the republish) also means "skip", gated
+  // by the same content check
+  const versionAlreadyLive = live === pkg.version || (await versionExistsOnNpm(pkg.name, pkg.version));
+  if (versionAlreadyLive) {
     const same = await sameAsRegistry(pkg, dir);
     if (!same.ok) {
       console.error('\n!!! @hmharness/' + name + ' ' + pkg.version + ' is already on npm but the LOCAL source differs:');
