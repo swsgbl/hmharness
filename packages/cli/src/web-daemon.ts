@@ -110,11 +110,13 @@ export function stopWebDaemon(port = DEFAULT_WEB_PORT): boolean {
 }
 
 /** Spawn the daemon (no window, detached). Returns the pid. Records the
- *  spawning CLI's version so a later upgrade can detect the stale snapshot. */
-function spawnWebDaemon(port: number, entry = process.argv[1]): number {
+ *  spawning CLI's version so a later upgrade can detect the stale snapshot.
+ *  extraArgs carries remote-control flags (--exposure/--token) through to the
+ *  child's `web` invocation. */
+function spawnWebDaemon(port: number, entry = process.argv[1], extraArgs: string[] = []): number {
   const home = homeDir();
   const log = openSync(join(home, 'web.log'), 'a');
-  const child = spawn(process.execPath, [entry, 'web', `--port=${port}`], {
+  const child = spawn(process.execPath, [entry, 'web', `--port=${port}`, ...extraArgs], {
     detached: true,
     stdio: ['ignore', log, log],
     windowsHide: true,
@@ -191,8 +193,8 @@ export async function webDaemonStale(port = DEFAULT_WEB_PORT): Promise<{ stale: 
   return { stale: d !== '' && c !== '' && d !== c, daemon: d, cli: c };
 }
 
-export function startWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1]): { already: boolean; pid: number } {
+export function startWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1], extraArgs: string[] = []): { already: boolean; pid: number } {
   const pid = readWebPid();
   if (pid && alive(pid)) return { already: true, pid };
-  return { already: false, pid: spawnWebDaemon(port, entry) };
+  return { already: false, pid: spawnWebDaemon(port, entry, extraArgs) };
 }

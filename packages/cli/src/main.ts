@@ -912,6 +912,45 @@ flags:
   if (cmd === 'web') {
     await initHome();
     const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);
+    // remote control (2026-09-28): --exposure=lan|wan opens the UI to other
+    // devices; web.token in config.json is the auth (REQUIRED for lan/wan).
+    // CLI flags win over config: --exposure / --token=... / --token-gen.
+    const cfgWeb = await loadConfig();
+    const exposureArg = rest.find((a) => a.startsWith('--exposure='))?.slice(11);
+    const exposure = (exposureArg === 'lan' || exposureArg === 'wan' || exposureArg === 'loopback')
+      ? exposureArg
+      : ((cfgWeb as { web?: { exposure?: string } }).web?.exposure === 'lan' || (cfgWeb as { web?: { exposure?: string } }).web?.exposure === 'wan')
+        ? (cfgWeb as { web?: { exposure?: string } }).web!.exposure
+        : 'loopback';
+    const tokenArg = rest.find((a) => a.startsWith('--token='))?.slice(8);
+    let webToken = tokenArg ?? (cfgWeb as { web?: { token?: string } }).web?.token ?? '';
+    if ((exposure === 'lan' || exposure === 'wan') && rest.includes('--token-gen')) {
+      webToken = 'hmh-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8);
+      const { patchConfig } = await import('@hmharness/kernel');
+      await patchConfig({ web: { exposure, token: webToken } });
+    }
+    if ((exposure === 'lan' || exposure === 'wan') && !webToken) {
+      stdout.write(RED('lan/wan exposure requires a token. Run: hmh web start --exposure=' + exposure + ' --token-gen\n'));
+      stdout.write(DIM('(generates a random token, saves it to config.json web.token, and prints it once)\n'));
+      return;
+    }
+    if ((exposure === 'lan' || exposure === 'wan') && tokenArg) {
+      const { patchConfig } = await import('@hmharness/kernel');
+      await patchConfig({ web: { exposure, token: webToken } });
+    }
+    if (exposure !== 'loopback' && webToken) {
+      // print the ready-to-open URL once, so the user never has to assemble it
+      const osMod = await import('node:os');
+      const nets = osMod.networkInterfaces();
+      let lanIp = '';
+      for (const list of Object.values(nets)) {
+        for (const n of list ?? []) {
+          if (n.family === 'IPv4' && !n.internal) { lanIp = lanIp || n.address; }
+        }
+      }
+      const visUrl = (exposure === 'lan' && lanIp ? `http://${lanIp}` : 'http://<your-public-address>') + `:${port}/?key=${webToken}`;
+      stdout.write(YELLOW(`远程访问：${visUrl}\n`));
+    }
     const t = await uiStrings();
     const sub = rest.find((a) => !a.startsWith('-'));
     if (sub === 'stop') {
@@ -934,7 +973,14 @@ flags:
       return;
     }
     if (sub === 'start') {
-      const r = startWebDaemon(Number.isFinite(port) ? port : 7788);
+      // forward remote-control flags to the daemon child so the exposure
+      // survives the respawn cycle (the child re-reads config.json too)
+      const passThrough: string[] = [];
+      const ex = rest.find((a) => a.startsWith('--exposure='));
+      if (ex) passThrough.push(ex);
+      const tk = rest.find((a) => a.startsWith('--token='));
+      if (tk) passThrough.push(tk);
+      const r = startWebDaemon(Number.isFinite(port) ? port : 7788, undefined, passThrough);
     // 2026-09-23: evolution runs silently alongside the web daemon - the
     // user never triggers `hmh evolve` manually (zero-config direction fix)
     try { const { ensureEvolutionDaemon } = await import('./evolution-daemon.ts');
@@ -948,11 +994,16 @@ flags:
       }
       return;
     }
-    // default: foreground server (handy for debugging)
+    // default: foreground server (handy for debugging); foreground trusts the
+    // config-file exposure (flags were persisted above when explicitly given)
     const { startServer } = await import('@hmharness/web');
     const { createRequire: cr } = await import('node:module');
     const ver = (cr(import.meta.url)('../package.json').version as string) ?? '';
-    await startServer({ port: Number.isFinite(port) ? port : 7788, host: '127.0.0.1', version: ver });
+    await startServer({
+      port: Number.isFinite(port) ? port : 7788,
+      host: exposure === 'loopback' ? '127.0.0.1' : '0.0.0.0',
+      version: ver,
+    });
     return; // startServer keeps the process alive
   }
   if (cmd === 'pipeline') {

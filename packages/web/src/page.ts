@@ -148,6 +148,51 @@ export const PAGE = `<!doctype html>
   .sess { position:relative; }
   .sess .sacts { position:absolute; right:4px; top:3px; display:none; gap:2px; background:var(--panel); padding:0 2px; border-radius:6px; z-index:5; }
   .sess:hover .sacts { display:flex; }
+  /* ---- responsive (docx P1 #10 Mobile Web): tablet -> right column becomes a
+     bottom sheet; phone -> sidebar becomes an overlay drawer with a hamburger,
+     hover-only affordances become always-visible. Key actions never need hover. */
+  @media (max-width: 768px) {
+    .sess .sacts { display:flex; opacity:.85; }
+    .sess { padding-right: 66px; }
+    #rightbar.open { position:fixed; left:0; right:0; bottom:0; top:auto; width:auto !important; height:62vh; border-left:0; border-top:1px solid var(--line); border-radius:14px 14px 0 0; z-index:70; box-shadow:0 -18px 50px rgba(0,0,0,.5); }
+    #rdrag { display:none; }
+    #rtab-preview-pane .pvcode, #rtab-detail-pane #dbody pre { font-size:11px; }
+    #approval button { padding:10px 18px; }
+    .msg-user { max-width:92%; }
+    #log { padding:12px 10px; }
+  }
+  @media (max-width: 640px) {
+    #app { grid-template-columns:1fr auto; }
+    body.mobside #side { position:fixed; left:0; top:0; bottom:0; width:280px; z-index:80; box-shadow:14px 0 40px rgba(0,0,0,.5); }
+    body:not(.mobside) #side { display:none; }
+    body.mobside::after { content:''; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:75; }
+    #sideburger { display:inline-flex !important; }
+    #viewchip, #home { display:none; }
+    #composer { padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+    #input { font-size:16px !important; } /* >=16px stops iOS zoom-on-focus */
+    .vhead h2 { font-size:14px; }
+    #deliv .deliv { font-size:10px; }
+  }
+  #sideburger { display:none; background:none; border:1px solid var(--line); border-radius:7px; color:var(--text); cursor:pointer; font-size:15px; padding:3px 9px; }
+
+  /** Structured error text (docx): prefer the human action over the raw string. */
+  function errText(d) {
+    if (!d) return 'error';
+    if (d.action) return d.action + (d.error ? ' (' + String(d.error).slice(0, 120) + ')' : '');
+    return String(d.error || 'error');
+  }
+
+  /* ---- command palette (docx Web 专项): Ctrl+K global console ---- */
+  #cmdpal { display:none; position:fixed; inset:0; background:rgba(4,8,12,.55); z-index:90; align-items:flex-start; justify-content:center; padding-top:12vh; }
+  #cmdpal.on { display:flex; }
+  #cmdpal .card { width:520px; max-width:92vw; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); overflow:hidden; }
+  #cmdpal input { width:100%; background:var(--bg); border:0; border-bottom:1px solid var(--line); color:var(--text); font:14px inherit; padding:12px 14px; outline:none; }
+  #cmdpal .list { max-height:330px; overflow-y:auto; padding:5px; }
+  #cmdpal .row { display:flex; gap:10px; align-items:baseline; padding:8px 11px; border-radius:8px; cursor:pointer; font-size:13px; }
+  #cmdpal .row.sel { background:var(--panel2); }
+  #cmdpal .row .k { font-family:var(--mono); color:var(--accent); white-space:nowrap; }
+  #cmdpal .row .d { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cmdpal .foot { border-top:1px dashed var(--line); color:var(--dim); font-size:11px; padding:6px 12px; }
   .sess .sacts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:12px; padding:1px 4px; border-radius:4px; }
   .sess .sacts button:hover { color:var(--accent); background:var(--panel2); }
   .sess .sacts button.del:hover { color:var(--err); }
@@ -272,6 +317,12 @@ export const PAGE = `<!doctype html>
   #approval.pulse { animation:pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,179,65,0); } 50% { box-shadow:0 0 0 4px rgba(227,179,65,.25); } }
   #approval .name { color:var(--warn); font-family:var(--mono); }
+  .riskbadge { font-size:11px; border-radius:9px; padding:1px 9px; font-weight:600; }
+  .riskbadge.low { background:rgba(63,185,80,.15); color:var(--ok); }
+  .riskbadge.medium { background:rgba(227,179,65,.15); color:var(--warn); }
+  .riskbadge.high { background:rgba(248,81,73,.15); color:var(--err); }
+  #connchip { display:none; font-size:11px; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
+  #connchip.reconnecting { display:inline-block; background:rgba(227,179,65,.18); color:var(--warn); }
   #inputcard { display:flex; flex-direction:column; gap:8px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--bg); }
   #inputcard:focus-within { border-color:var(--accent); }
   textarea { border:0; outline:none; resize:none; background:transparent; color:var(--text); font:inherit; min-height:44px; max-height:160px; }
@@ -440,12 +491,14 @@ export const PAGE = `<!doctype html>
   <div id="main" style="position:relative;">
     <div id="topbar">
       <span class="chip model" id="model" style="position:relative"></span>
+      <button id="sideburger" title="会话">☰</button>
       <span class="chip" id="viewchip">对话</span>
       <span class="chip" id="home"></span>
       <span class="chip" id="locale-chip">zh</span>
       <span class="chip" id="goal-chip" title="会话目标" style="display:none;cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
       <button id="theme-chip" class="ghost sm" title="theme">🌓</button>
       <span id="topspacer" style="margin-left:auto"></span>
+      <span id="connchip" title="connection">⟳ 重连中…</span>
       <button id="clear" class="ghost sm">clear</button>
     </div>
     <div id="view-chat" class="vwrap on">
@@ -454,10 +507,11 @@ export const PAGE = `<!doctype html>
       <div id="log"><div id="empty"><div style="font-size:30px">⚙️</div><div id="empty-title" style="margin:8px 0 4px;font-size:16px">给 hmh 一个任务</div><div id="empty-sub" style="font-size:12.5px">流式输出 · 浏览器审批 · 全程审计</div><div style="margin-top:14px"></div><div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div><div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div><div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div></div>
       <button id="tobot" class="ghost sm">↓</button>
       <div id="composer">
-        <div id="runstatus"><span id="rs-spin">✻</span><span id="rs-text"></span></div>
+        <div id="runstatus"><span id="rs-spin">✻</span><span id="rs-text"></span><span id="rs-phase" style="margin-left:auto;font-family:var(--mono);font-size:11.5px"></span></div>
         <div id="queuebar"></div>
         <div id="approval">
           <div><span id="approval-req-label">审批请求:</span><span class="name" id="ap-name"></span> <span id="ap-args" class="dim" style="font-family:var(--mono);color:var(--dim)"></span></div>
+          <div id="ap-meta" style="margin-top:4px"></div>
           <div style="margin-top:8px"><button id="ap-yes" class="primary sm">批准</button> <button id="ap-no" class="danger sm">拒绝</button></div>
         </div>
         <div id="slashpanel"></div>
@@ -569,6 +623,13 @@ export const PAGE = `<!doctype html>
       </div>
     </div>
   </div>
+  <div id="cmdpal">
+    <div class="card">
+      <input id="cmdpal-in" placeholder="命令 / 视图 / 会话…">
+      <div class="list" id="cmdpal-list"></div>
+      <div class="foot">↑↓ 选择 · Enter 执行 · Esc 关闭</div>
+    </div>
+  </div>
 </div>
 <style>
   button.primary { background:var(--accent); color:#08243a; border:0; border-radius:8px; padding:7px 16px; font-weight:600; cursor:pointer; }
@@ -664,6 +725,9 @@ ${uiLiteSource()}
   /** Mount one session's container as the visible view (others hidden). */
   function mountView(sid) {
     curSid = sid;
+    // refresh-recovery (docx P1): remember the session being viewed; a page
+    // reload reopens it instead of dropping the user back to a blank draft
+    try { localStorage.setItem('hmh-last-sid', String(sid)); } catch (e) {}
     views.forEach(function (v) { v.root.style.display = (v.sid === sid) ? '' : 'none'; });
     var pv = document.getElementById('plancard');
     var v = views.get(sid);
@@ -690,7 +754,7 @@ ${uiLiteSource()}
   var sessData = [];
 
   var LABELS = {
-    zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
+    zh: { localeKey: 'zh', title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
           fbUp:'有帮助', fbDown:'没帮助', planCard:'计划', labelAnswer:'回答: ', goalPh:'会话目标(Enter 保存 / 点 ✕ 清除)', sessSearch:'搜索本会话内容…', sesExportBtn:'导出全文',
           approvalReq:'审批请求:', skills:'技能', sessions:'最近会话', none2:'(无)', ungrouped:'未归类',
           placeholder:'给 hmh 一个任务… (Enter 发送, Shift+Enter 换行)',
@@ -720,8 +784,8 @@ ${uiLiteSource()}
            atNone:'无匹配文件 — 继续输入或按 Esc 关闭',
            cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
            webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
-    en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
-          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', labelAnswer:'Answer: ', goalPh:'session goal (Enter saves / ✕ clears)', sessSearch:'search in session…', approve:'Approve', deny:'Deny',
+    en: { localeKey: 'en', title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
+          fbUp:'helpful', fbDown:'not helpful', planCard:'Plan', labelAnswer:'Answer: ', goalPh:'session goal (Enter saves / ✕ clears)', sessSearch:'search in session…', sesExportBtn:'export full transcript', approve:'Approve', deny:'Deny',
           approvalReq:'Approval request:', skills:'skills', sessions:'recent sessions', none2:'(none)', ungrouped:'ungrouped',
           placeholder:'give hmh a task… (Enter to send, Shift+Enter for newline)',
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
@@ -929,8 +993,12 @@ ${uiLiteSource()}
       var tag = mode === 'yolo' ? '\\uD83D\\uDD25 YOLO' : mode === 'auto' ? '\\u26A1 ' + (L ? L.modeAutoShort : 'auto') : '';
       document.getElementById('rs-text').textContent = L.running + (tag ? ' \\u00B7 ' + tag : '');
       rs.classList.toggle('yolo', mode === 'yolo');
+      taskStartAt = Date.now();
+      setTaskPhase('start');
     } else {
       rs.classList.remove('yolo');
+      setTaskPhase('idle');
+      taskStartAt = 0;
     }
     document.title = b ? '\\u25CF ' + L.running : L.title;
     // The input stays ENABLED while the agent runs (user request): new tasks
@@ -942,6 +1010,44 @@ ${uiLiteSource()}
     if (ph) ph.placeholder = b ? L.injHint : L.placeholder;
     window.__agentBusy = !!b;
     updateSendBtn();
+  }
+
+  /* ---- Long Task Cockpit (2026-09-28 docx P1): one line under the input
+     answers "what is it doing / why not done / how do I stop it" without
+     reading logs: phase + current tool + elapsed + queue. No chain-of-thought
+     is ever shown - only operational phases derived from SSE events. */
+  var taskStartAt = 0;
+  var phaseTimer = null;
+  var PHASE_KEYS = {
+    start: { zh: '启动', en: 'starting' },
+    thinking: { zh: '思考', en: 'thinking' },
+    responding: { zh: '回复', en: 'responding' },
+    executing: { zh: '执行', en: 'executing' },
+    waitingApproval: { zh: '等待审批', en: 'waiting approval' },
+  };
+  function phaseLabel(k) {
+    var p = PHASE_KEYS[k];
+    if (!p) return '';
+    return (L && L.localeKey === 'en') ? p.en : p.zh;
+  }
+  function elapsedStr() {
+    if (!taskStartAt) return '';
+    var s = Math.floor((Date.now() - taskStartAt) / 1000);
+    return s < 60 ? s + 's' : Math.floor(s / 60) + 'm' + (s % 60) + 's';
+  }
+  function setTaskPhase(kind, detail) {
+    var el = document.getElementById('rs-phase');
+    if (!el) return;
+    if (kind === 'idle') { el.textContent = ''; if (phaseTimer) { clearInterval(phaseTimer); phaseTimer = null; } return; }
+    var txt = '\\u25B8 ' + phaseLabel(kind) + (detail ? ' \\u00B7 ' + detail : '');
+    var tick = function () { el.textContent = txt + ' \\u00B7 ' + elapsedStr(); };
+    tick();
+    if (!phaseTimer) phaseTimer = setInterval(function () { if (window.__agentBusy) tick(); }, 1000);
+    window.__taskPhase = kind;
+  }
+  function taskPhaseEvent(kind, detail) {
+    if (!window.__agentBusy) return;
+    setTaskPhase(kind, detail);
   }
 
   function renderState(s) {
@@ -1394,7 +1500,7 @@ ${uiLiteSource()}
         if (!window.confirm(L.provDeleteConfirm)) return;
         fetch('/api/providers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name }) })
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-          .then(function (res) { if (res.d && res.d.error) alert(res.d.error); })
+          .then(function (res) { if (res.d && res.d.error) alert(errText(res.d)); })
           .catch(function (e) { alert(String(e)); });
       };
       acts.appendChild(ed); acts.appendChild(del);
@@ -1557,7 +1663,7 @@ ${uiLiteSource()}
       payload.supportsVision = fVis.input.checked;
       fetch('/api/providers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (res) { if (res.d && res.d.error) alert(res.d.error); })
+        .then(function (res) { if (res.d && res.d.error) alert(errText(res.d)); })
         .catch(function (e) { alert(String(e)); });
     };
     cancel.onclick = function () { form.remove(); };
@@ -2072,6 +2178,16 @@ ${uiLiteSource()}
     var pv = String(d.preview).replace(/\\s+/g, ' ').trim().slice(0, d.isError ? 110 : 72);
     lab.textContent = pv || '(done)';
     fold.appendChild(tri); fold.appendChild(lab);
+    // Recovery First (docx P1 #2): a failure must suggest the NEXT step, not
+    // just say "failed" - plain language + where the evidence lives
+    if (d.isError) {
+      var hint = document.createElement('span');
+      hint.style.cssText = 'margin-left:8px;color:var(--warn);font-size:11px';
+      hint.textContent = (L && L.localeKey === 'en')
+        ? '\\u2190 failed - click this row for the full error, then retry or adjust'
+        : '\\u2190 失败 - 点击本行看完整错误，可修改后重试';
+      fold.appendChild(hint);
+    }
     var body = null;
     fold.onclick = function () {
       fold.classList.toggle('open');
@@ -2095,7 +2211,45 @@ ${uiLiteSource()}
     safeAutoscroll();
   }
   var pendingToolRow = null;   // running tool row awaiting its result
-  var es = new EventSource('/api/events');
+  /* ---- remote-control token plumbing (2026-09-28): the first visit carries
+     ?key=<token>; we park it in sessionStorage and attach it to every fetch
+     (header) and the SSE stream (query param - EventSource cannot set
+     headers). Loopback servers never see any of this. */
+  var AUTH_KEY = '';
+  try {
+    const qk = new URLSearchParams(location.search).get('key');
+    if (qk) { sessionStorage.setItem('hmh-key', qk); history.replaceState(null, '', location.pathname); }
+    AUTH_KEY = sessionStorage.getItem('hmh-key') || '';
+  } catch (e) {}
+  var es = new EventSource('/api/events' + (AUTH_KEY ? '?key=' + encodeURIComponent(AUTH_KEY) : ''));
+  // reconnect dedup (docx): the server replays missed events via Last-Event-ID;
+  // drop anything whose id we already applied (belt-and-braces vs double render)
+  var seenEvtIds = {};
+  ['busy','delta','line','tool','toolResult','final','queued','approvalReq','approvalDone','injected','error'].forEach(function (evName) {
+    es.addEventListener(evName, function (e) {
+      var id = e.lastEventId;
+      if (id) {
+        if (seenEvtIds[id]) { e.stopImmediatePropagation(); return; }
+        seenEvtIds[id] = 1;
+        var ks = Object.keys(seenEvtIds);
+        if (ks.length > 4000) ks.slice(0, 2000).forEach(function (k) { delete seenEvtIds[k]; });
+      }
+    }, true); // capture: runs BEFORE the per-event handlers below
+  });
+  // connection lifecycle (docx P1 #2 Recovery First): EventSource retries on
+  // its own; surface the state so a dead backend is never silent, and refresh
+  // the session list after a reconnect (things may have finished meanwhile)
+  var wasConnected = false;
+  es.onopen = function () {
+    var c = document.getElementById('connchip');
+    if (c) c.classList.remove('reconnecting');
+    if (wasConnected) { loadSessions(); api('/api/state').then(function (r) { return r.json(); }).then(renderState).catch(function () {}); }
+    wasConnected = true;
+  };
+  es.onerror = function () {
+    var c = document.getElementById('connchip');
+    if (c) c.classList.add('reconnecting');
+  };
   es.addEventListener('hello', function (e) { renderState(JSON.parse(e.data)); });
   es.addEventListener('state', function (e) { renderState(JSON.parse(e.data)); });
   var echoedAt = 0; var echoedTask = '';
@@ -2162,6 +2316,7 @@ ${uiLiteSource()}
       closeToolGroup(v); // model text after a tool run settles the group
       v.curKind = d.kind;
       v.curBlock = d.kind === 'reasoning' ? thinkBlock() : sayBlock();
+      taskPhaseEvent(d.kind === 'reasoning' ? 'thinking' : 'responding');
     }
     v.curBlock.add(d.chunk);
   });
@@ -2218,6 +2373,7 @@ ${uiLiteSource()}
     }
     var s = v.seq;
     row.onclick = function () { showDetailsIn(v, s); };
+    taskPhaseEvent('executing', d.name);
     v.parCount++;
     v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
     if (v.parCount === 2 && !v.parBox) {
@@ -2301,6 +2457,8 @@ ${uiLiteSource()}
     box.style.display = 'block';
     box.classList.add('pulse');
     window.__AN.popIn(box);
+    taskPhaseEvent('waitingApproval');
+    renderApprovalMeta(d);
   });
   es.addEventListener('approvalDone', function (e) {
     document.getElementById('approval').style.display = 'none';
@@ -2357,8 +2515,43 @@ ${uiLiteSource()}
     if (e.data) { flushStream(); el('div', 'err', 'error: ' + JSON.parse(e.data).message); }
   });
 
+  /** Approval risk badge (docx P1 #3): what it does + impact + risk level in
+   *  plain language. The risk tier is a static per-tool heuristic; the real
+   *  gate stays server-side (this NEVER replaces the approval logic). */
+  var TOOL_RISK = {
+    run_command: 'high', write_file: 'medium', edit_file: 'medium',
+    delete_file: 'high', web_fetch: 'low', web_search: 'low',
+    read_file: 'low', list_dir: 'low', spawn_agent: 'medium',
+  };
+  function renderApprovalMeta(d) {
+    var box = document.getElementById('approval');
+    var meta = document.getElementById('ap-meta');
+    if (!box || !meta) return;
+    var risk = TOOL_RISK[d.name] ?? 'medium';
+    var riskTxt = { low: { zh: '低风险', en: 'low' }, medium: { zh: '中风险', en: 'medium' }, high: { zh: '高风险', en: 'high' } }[risk];
+    var en = L && L.localeKey === 'en';
+    // plain-language what-it-does for the common gates
+    var does = { zh: '', en: '' };
+    if (d.name === 'run_command') { does.zh = '将在你的电脑上执行命令'; does.en = 'will run a command on your machine'; }
+    else if (d.name === 'write_file' || d.name === 'edit_file') { does.zh = '将修改工作区文件'; does.en = 'will modify a workspace file'; }
+    else if (d.name === 'delete_file') { does.zh = '将删除文件'; does.en = 'will delete a file'; }
+    else if (d.name === 'web_fetch') { does.zh = '将访问外部网址'; does.en = 'will fetch an external URL'; }
+    else if (d.name === 'spawn_agent') { does.zh = '将启动子代理'; does.en = 'will spawn a sub-agent'; }
+    meta.innerHTML = '';
+    var b = document.createElement('span');
+    b.className = 'riskbadge ' + risk;
+    b.textContent = en ? riskTxt.en : riskTxt.zh;
+    meta.appendChild(b);
+    if (does.zh || does.en) {
+      var t = document.createElement('span');
+      t.style.cssText = 'margin-left:8px;color:var(--dim);font-size:12px';
+      t.textContent = en ? does.en : does.zh;
+      meta.appendChild(t);
+    }
+  }
+
   function decide(granted) {
-    fetch('/api/approve', {
+    api('/api/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ granted: granted })
@@ -2475,14 +2668,27 @@ ${uiLiteSource()}
     if (paths.length === 0) return;
     var box = document.createElement('div');
     box.id = 'deliv';
+    // deliverable summary (docx Web 专项): the task-end card names WHAT was
+    // produced so the next action (review/open) is one click away
+    var head = document.createElement('div');
+    head.style.cssText = 'font-size:11px;color:var(--dim);margin:6px 0 2px';
+    head.textContent = (L && L.localeKey === 'en')
+      ? '\\u{1F4E6} Deliverables (' + paths.length + ') - click to preview'
+      : '\\u{1F4E6} 本次产出 ' + paths.length + ' 个文件 - 点击预览';
+    box.appendChild(head);
+    var wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.flexWrap = 'wrap';
+    wrap.style.gap = '6px';
     paths.forEach(function (p) {
       var chip = document.createElement('span');
       chip.className = 'deliv';
       chip.textContent = p.split(/[\\\\/]/).pop();
       chip.title = p;
       chip.onclick = function () { openPreview(p); };
-      box.appendChild(chip);
+      wrap.appendChild(chip);
     });
+    box.appendChild(wrap);
     var stats = v.root.querySelector('.stats');
     if (stats) v.root.insertBefore(box, stats); else v.root.appendChild(box);
   }
@@ -2530,6 +2736,12 @@ ${uiLiteSource()}
       btn.title = running ? L.queueTitle : '';
     }
   }
+  // authenticated fetch wrapper: attaches the remote-control key when present
+  function api(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers || {}, AUTH_KEY ? { 'X-Hmh-Key': AUTH_KEY } : {});
+    return fetch(url, opts);
+  }
   function interrupt() {
     fetch('/api/interrupt', { method: 'POST' })
       .then(function (r) { return r.json(); })
@@ -2555,7 +2767,7 @@ ${uiLiteSource()}
         return;
       }
       el('div', 'msg-user', text);
-      fetch('/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ line: text }) })
+      api('/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ line: text }) })
         .then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
         .then(function (res) {
           if (res.status === 404 || (res.d && res.d.error)) renderCmdResult(res.d && res.d.error ? res.d.error : 'unknown command', true);
@@ -2581,7 +2793,7 @@ ${uiLiteSource()}
     if (images.length) body.images = images;
     attachments = [];
     renderAtts();
-    fetch('/api/task', {
+    api('/api/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -2887,12 +3099,108 @@ ${uiLiteSource()}
   document.getElementById('search').oninput = function () { renderSessions(this.value); };
   wireExamples();
 
-  fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
+  // mobile drawer (docx P1 #10): hamburger toggles the sidebar overlay; picking
+  // a session or an example auto-closes it so the chat fills the phone screen
+  document.getElementById('sideburger').onclick = function () {
+    document.body.classList.toggle('mobside');
+  };
+  document.getElementById('side').addEventListener('click', function (ev) {
+    var s = ev.target.closest && ev.target.closest('.sess');
+    if (s && document.body.classList.contains('mobside')) document.body.classList.remove('mobside');
+  });
+
+  /* ---- command palette (docx Web 专项): Ctrl+K opens a global console with
+     commands, view switches, model routes and session search - full keyboard. */
+  var CMDPAL_ACTIONS = function () {
+    var acts = [];
+    WEB_CMD_NAMES.forEach(function (n) { acts.push({ k: n, d: (L && L.webCmds && L.webCmds[n]) || '', run: function () { document.getElementById('input').value = n + ' '; document.getElementById('input').focus(); } }); });
+    ['chat', 'board', 'devices', 'skills', 'settings', 'label'].forEach(function (v) {
+      acts.push({ k: '\\u2192 ' + v, d: (L && ({ chat: L.viewChat, board: L.viewBoard, devices: L.viewDev, skills: L.viewSk, settings: L.viewSet, label: L.navLabel })[v]) || v, run: function () { switchView(v); } });
+    });
+    acts.push({ k: '+ new session', d: (L ? L.newLabel : 'new'), run: function () { newSession(); } });
+    (state && state.providers || []).forEach(function (p) {
+      if (p.purposes && p.purposes.indexOf('chat') >= 0) return; // current route needs no entry
+      acts.push({ k: '\\u21C4 ' + p.name, d: p.model, run: function () {
+        fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name }) }).catch(function () {});
+      } });
+    });
+    sessData.slice(0, 12).forEach(function (s) {
+      var label = s.title || s.task || s.id;
+      acts.push({ k: '\\u{1F5C3} ' + String(label).slice(0, 44), d: String(s.cwd || '').split(/[\\\\/]/).pop() || '', sid: s.id, run: function () { viewSession(s.id); } });
+    });
+    return acts;
+  };
+  var palOpen = false;
+  var palActs = [];
+  var palSelIdx = 0;
+  function openCmdPal() {
+    palOpen = true;
+    palActs = CMDPAL_ACTIONS();
+    palSelIdx = 0;
+    document.getElementById('cmdpal').classList.add('on');
+    var inp = document.getElementById('cmdpal-in');
+    inp.value = '';
+    renderCmdPal('');
+    inp.focus();
+  }
+  function closeCmdPal() {
+    palOpen = false;
+    document.getElementById('cmdpal').classList.remove('on');
+    document.getElementById('input').focus();
+  }
+  function renderCmdPal(q) {
+    var list = document.getElementById('cmdpal-list');
+    var f = (q || '').toLowerCase();
+    var hits = palActs.filter(function (a) { return !f || (a.k + ' ' + a.d).toLowerCase().indexOf(f) >= 0; }).slice(0, 14);
+    palActs = hits.length ? hits : palActs.slice(0, 0);
+    list.innerHTML = '';
+    palSelIdx = Math.min(palSelIdx, Math.max(0, palActs.length - 1));
+    palActs.forEach(function (a, i) {
+      var row = document.createElement('div');
+      row.className = 'row' + (i === palSelIdx ? ' sel' : '');
+      var k = document.createElement('span'); k.className = 'k'; k.textContent = a.k;
+      var d = document.createElement('span'); d.className = 'd'; d.textContent = a.d;
+      row.appendChild(k); row.appendChild(d);
+      row.onclick = function () { a.run(); closeCmdPal(); };
+      row.onmouseenter = function () { palSelIdx = i; renderCmdPal(q); };
+      list.appendChild(row);
+    });
+    if (!palActs.length) {
+      var e = document.createElement('div');
+      e.className = 'row'; e.style.color = 'var(--dim)';
+      e.textContent = '(无匹配 / no match)';
+      list.appendChild(e);
+    }
+  }
+  document.getElementById('cmdpal').onclick = function (e) { if (e.target === this) closeCmdPal(); };
+  var cmdIn = document.getElementById('cmdpal-in');
+  cmdIn.oninput = function () { palSelIdx = 0; renderCmdPal(this.value); };
+  cmdIn.onkeydown = function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); palSelIdx = Math.min(palActs.length - 1, palSelIdx + 1); renderCmdPal(this.value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); palSelIdx = Math.max(0, palSelIdx - 1); renderCmdPal(this.value); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (palActs[palSelIdx]) { palActs[palSelIdx].run(); closeCmdPal(); } }
+    else if (e.key === 'Escape') { e.preventDefault(); closeCmdPal(); }
+  };
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      if (palOpen) closeCmdPal(); else openCmdPal();
+    } else if (e.key === 'Escape' && palOpen) { closeCmdPal(); }
+  });
+
+  api('/api/state').then(function (r) { return r.json(); }).then(renderState);
   loadWorkspaces();
   loadSessions();
   // boot: the static welcome card moves into the first DRAFT session view, so
-  // the very first task already runs inside a proper per-session container
+  // the very first task already runs inside a proper per-session container.
+  // Refresh-recovery: if the user was viewing a real session, reopen THAT.
   (function () {
+    var last = null;
+    try { last = localStorage.getItem('hmh-last-sid'); } catch (e) {}
+    if (last && last.indexOf('draft-') !== 0) {
+      viewSession(last); // fetches the transcript (loaded stays false until then)
+      return;
+    }
     var sid = 'draft-boot';
     var v = viewFor(sid);
     v.loaded = true;

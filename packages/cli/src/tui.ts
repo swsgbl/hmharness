@@ -1735,7 +1735,10 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       rt.setInput(edited);
       rt.addText(DIM(`✎ external editor (${editor}) → draft loaded (${edited.length} chars)`), 'dim');
     } catch (err) {
+      // Recovery First (docx TUI 专项): external-editor failure suggests the
+      // fallback explicitly - the draft is intact, nothing was lost
       rt.addText(String(err), 'err');
+      rt.addText(DIM('✎ 编辑器打开失败——草稿仍在输入框中未丢失。可直接在 TUI 里继续编辑，或检查 EDITOR 环境变量。 / editor failed; your draft is intact in the input box.'), 'dim');
     }
   });
   // B14: remapped keys from config.json tui.keymap (applied at startup)
@@ -1889,6 +1892,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       rt.setBusy(false);
       currentInject = null;
       rt.addText(String(err), 'err');
+      // Recovery First (docx TUI 专项): every task failure names the next step
+      // instead of leaving a bare stack - retry is one up-arrow away
+      rt.addText(DIM('↑ 重新运行：按 ↑ 调回刚才的输入；持续失败可用 /model 换路由或 /status 查看状态。 / press ↑ to retry, /model to switch route.'), 'dim');
     } finally {
       currentAbort = null;
     }
@@ -2133,7 +2139,22 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
           const pretty = v === '\x1b' ? 'esc' : v === '\x0a' ? 'ctrl+enter' : v === '\x12' ? 'ctrl+r' : v === '\x14' ? 'ctrl+t' : v === '\x07' ? 'ctrl+g' : JSON.stringify(v);
           return `  ${a.padEnd(14)} ${pretty}`;
         });
-        rt.addText('keymap (defaults in parens):\n' + rows.join('\n') + '\n\n/keymap <action>=<key> — e.g. /keymap inject=ctrl+j', 'dim');
+        rt.addText('keymap (defaults in parens):\n' + rows.join('\n') + '\n\n/keymap <action>=<key> — e.g. /keymap inject=ctrl+j\n/keymap reset — restore all defaults', 'dim');
+        return;
+      }
+      // docx TUI 专项: "/keymap 修改后必须能恢复默认" - reset restores every
+      // binding to the factory default in one shot (config + live TUI)
+      if (arg === 'reset' || arg === 'default') {
+        try {
+          const { patchConfig } = await import('@hmharness/kernel');
+          const merged = { ...((cfg as { tui?: object }).tui ?? {}), keymap: { ...KEYMAP_DEFAULTS } };
+          const fresh = await patchConfig({ tui: merged } as never);
+          cfg = fresh as typeof cfg;
+          rt.setKeymap({ ...KEYMAP_DEFAULTS });
+          rt.addText(GREEN('✓') + ' keymap reset to defaults', 'plain');
+        } catch (err) {
+          rt.addText(String(err), 'err');
+        }
         return;
       }
       const eq = arg.indexOf('=');
@@ -2368,8 +2389,19 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     }
   }
 
+  // docx TUI 专项: "SIGINT/SIGTERM/异常退出必须 cleanup" - Ctrl+C in raw mode
+  // never generates SIGINT (the byte is just read), but external kills and
+  // terminal-level signals do; destroy() is idempotent so double-call is safe
+  const sigCleanup = () => { try { rt.destroy(); } catch { /* best effort */ } };
+  process.once('SIGINT', sigCleanup);
+  process.once('SIGTERM', sigCleanup);
+  process.once('SIGHUP', sigCleanup);
+
   await rt.waitExit();
   rt.destroy();
+  process.off('SIGINT', sigCleanup);
+  process.off('SIGTERM', sigCleanup);
+  process.off('SIGHUP', sigCleanup);
   for (const c of clients) c.close();
   stdout.write('\n');
 }

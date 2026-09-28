@@ -172,9 +172,18 @@ export async function startServer(opts: { port: number; host?: string; version?:
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(body));
   };
+  // monotonic SSE event sequence (docx P1 #2 reconnect): every event carries
+  // an id; a reconnecting browser sends Last-Event-ID and we replay nothing
+  // older than it (frontend also dedups by id as belt-and-braces)
+  let sseSeq = 0;
   const sseSend = (res: ServerResponse, event: string, data: unknown) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const id = ++sseSeq;
+    res.write(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    // keep a short replay ring so a reconnect can catch up missed events
+    sseRing.push({ id, event, data });
+    if (sseRing.length > 200) sseRing.splice(0, sseRing.length - 200);
   };
+  const sseRing: Array<{ id: number; event: string; data: unknown }> = [];
   const broadcast = (event: string, data: unknown) => {
     for (const r of sseClients) sseSend(r, event, data);
   };
@@ -356,25 +365,48 @@ export async function startServer(opts: { port: number; host?: string; version?:
     };
   };
 
+  const exposure = (cfg as WebCfg).web?.exposure ?? 'loopback';
+  const remoteToken = (cfg as WebCfg).web?.token ?? '';
   const server = createServer(async (req, res) => {
-    // DNS-rebinding guard: this server is loopback-only, so any request whose
-    // Host (or Origin, when present) is not our own loopback origin is a
-    // rebinding probe -> refuse before touching a route. The approval
-    // endpoint is effectively remote-code-execution; it must never answer a
-    // foreign origin.
+    // ---- exposure gate (2026-09-28 remote control) ----
+    // loopback: the old DNS-rebinding guard (Host/Origin must be our own).
+    // lan/wan: cfg.web.token is MANDATORY and checked on EVERY request
+    // (header or ?key= for the first page/SSE load); the token gates
+    // everything because /api/approve is RCE by design.
     const port = String(opts.port);
     const host = (req.headers.host ?? '').toLowerCase();
     const origin = (req.headers.origin ?? '').toLowerCase();
-    const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
-    if (!allowedHosts.has(host)) {
-      json(res, 403, { error: 'forbidden host' });
-      return;
-    }
-    if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) {
-      json(res, 403, { error: 'forbidden origin' });
-      return;
-    }
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    let authorized = true;
+    if (exposure !== 'loopback') {
+      authorized = false;
+      if (!remoteToken) {
+        json(res, 403, {
+          error: 'exposure lan/wan requires web.token in config.json',
+          code: 'config-missing-token',
+          recoverable: true,
+          action: 'zh: 运行 hmh web start --exposure=' + exposure + ' --token-gen 生成令牌',
+        });
+        return;
+      }
+      const hdr = String(req.headers['x-hmh-key'] ?? '');
+      const qk = url.searchParams.get('key') ?? '';
+      if (hdr === remoteToken || qk === remoteToken) authorized = true;
+    } else {
+      const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+      if (!allowedHosts.has(host)) authorized = false;
+      const originAllowed = !origin || origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
+      if (!originAllowed) authorized = false;
+    }
+    if (!authorized) {
+      json(res, 403, {
+        error: exposure === 'loopback' ? 'forbidden host/origin' : 'invalid or missing key',
+        code: exposure === 'loopback' ? 'forbidden-host' : 'auth-required',
+        recoverable: exposure !== 'loopback',
+        action: exposure === 'loopback' ? 'open via http://127.0.0.1:' + port : 'zh: 请用带 ?key=<web.token> 的链接访问',
+      });
+      return;
+    }
     try {
       if (req.method === 'GET' && url.pathname === '/') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -393,6 +425,16 @@ export async function startServer(opts: { port: number; host?: string; version?:
         });
         res.flushHeaders?.();
         sseClients.add(res);
+        // reconnect catch-up (docx): Last-Event-ID replays everything the
+        // client missed while disconnected (capped ring), then live flow
+        const lastId = Number(req.headers['last-event-id'] ?? 0);
+        if (Number.isFinite(lastId) && lastId > 0) {
+          for (const e of sseRing) {
+            if (e.id > lastId) {
+              res.write(`id: ${e.id}\nevent: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`);
+            }
+          }
+        }
         sseSend(res, 'hello', await stateObject());
         req.on('close', () => sseClients.delete(res));
         return;
@@ -1476,7 +1518,14 @@ export async function startServer(opts: { port: number; host?: string; version?:
       }
       json(res, 404, { error: 'not found' });
     } catch (err) {
-      json(res, 500, { error: String(err).slice(0, 300) });
+      // structured error (docx Web 专项): the UI renders code/action in plain
+      // language instead of dumping a stack trace as the main text
+      json(res, 500, {
+        error: String(err).slice(0, 300),
+        code: 'internal',
+        recoverable: true,
+        action: 'zh: 稍后重试；若持续失败请查看 web.log',
+      });
     }
   });
 
@@ -1493,7 +1542,9 @@ export async function startServer(opts: { port: number; host?: string; version?:
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(opts.port, host, resolve);
+    // lan/wan must bind the wildcard; loopback stays on 127.0.0.1
+    const bind = exposure === 'loopback' ? host : '0.0.0.0';
+    server.listen(opts.port, bind, resolve);
   }).catch((err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`port ${opts.port} is already in use - hmh web may already be running.`);
@@ -1503,7 +1554,13 @@ export async function startServer(opts: { port: number; host?: string; version?:
     throw err;
   });
   console.log(`hmh web · http://${host}:${opts.port} · model ${cfg.provider.model} · home ${home}`);
-  console.log('(local only; Ctrl-C to stop)');
+  if (exposure !== 'loopback') {
+    console.log(`exposure: ${exposure.toUpperCase()} - the UI is reachable from other devices via this machine's IP`);
+    console.log(`auth: token required (first visit: http://<this-ip>:${opts.port}/?key=<your web.token>)`);
+    if (exposure === 'wan') console.log('WARNING: WAN exposure means ANYONE who has the address+token can run commands on this machine. Keep the token secret.');
+  } else {
+    console.log('(local only; Ctrl-C to stop)');
+  }
 
   const shutdown = () => {
     clearInterval(heartbeat);

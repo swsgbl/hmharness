@@ -121,6 +121,22 @@ export interface HmhConfig {
   };
   /** Named vendor endpoints for multi-provider routing. */
   providers?: Record<string, ProviderConfig>;
+  /** Web UI exposure. Default loopback-only (zero remote attack surface).
+   *  LAN/WAN listening REQUIRES a token: the approval endpoint is RCE by
+   *  design, so any non-loopback bind without auth is a remote-code-execution
+   *  hole, not a feature. */
+  web?: {
+    /** 'loopback' (default) | 'lan' | 'wan'. lan = bind 0.0.0.0, host-allowlist
+     *  accepts private-range IPs; wan = same but host-allowlist is disabled
+     *  (any Host/Origin header accepted) because WAN visitors arrive through
+     *  NAT/frp/tailscale domains we cannot enumerate. Token is MANDATORY for
+     *  both. */
+    exposure?: 'loopback' | 'lan' | 'wan';
+    /** Shared secret for non-loopback access. Sent as ?key= on first load,
+     *  then via the X-Hmh-Key header (SSE cannot set custom headers, so the
+     *  page keeps the key in sessionStorage and appends it to /api/events). */
+    token?: string;
+  };
   /** Per-purpose provider names resolved against `providers`. */
   routing?: {
     /** main chat loop (default: `provider`) */
