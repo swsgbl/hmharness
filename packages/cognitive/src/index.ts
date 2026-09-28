@@ -23,3 +23,4 @@ export * from './multi-agent.ts';
 export * from './benchmark.ts';
 export * from './status.ts';
 export * from './analysis.ts';
+export * from './explore-runner.ts';

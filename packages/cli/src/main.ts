@@ -24,7 +24,9 @@
 import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { readFile } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid } from './web-daemon.ts';
 import {
   chat,
@@ -972,8 +974,37 @@ flags:
       }
       return;
     }
+    if (sub === 'explore') {
+      // blueprint M4: run the exploration engine against a real environment.
+      // Unknown affordances get probed under budget; the outcome lands in
+      // the trajectory store + episodic index like any task run.
+      const actions = Number(rest.find((a) => a.startsWith('--actions='))?.slice(10) ?? 6);
+      const home = homeDir();
+      const scratch = join(tmpdir(), `hmh-explore-${Date.now().toString(36)}`);
+      await mkdir(scratch, { recursive: true });
+      try {
+        const { runExploration } = await import('@hmharness/cognitive');
+        const { TerminalEnvironment } = await import('@hmharness/environments');
+        const summary = await runExploration(home, {
+          environmentId: 'terminal',
+          maxActions: Number.isFinite(actions) ? Math.min(Math.max(actions, 1), 20) : 6,
+          maxCost: 40,
+          env: new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 }),
+        });
+        stdout.write(`探索完成 · ${summary.result.actionsTaken} 动作 / ${summary.result.costSpent} 成本单位${summary.result.aborted ? `（${summary.result.aborted === 'budget' ? '预算到限' : summary.result.aborted === 'risk' ? '风险熔断' : '无候选动作'}）` : ''}\n`);
+        stdout.write(`  轨迹 ${summary.trajectoryId} 已落盘 · 假设裁决 ${summary.result.hypothesesResolved} 条\n`);
+        for (const h of summary.hypotheses) stdout.write(DIM(`  [${h.status}] ${h.claim}\n`));
+        if (summary.worldModelBeliefs.length) {
+          stdout.write('  信念更新:\n');
+          for (const b of summary.worldModelBeliefs.slice(0, 6)) stdout.write(`    ${b.actionType.padEnd(22)} 置信 ${b.confidence.toFixed(2)} × ${b.evidenceCount}\n`);
+        }
+      } finally {
+        await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+      }
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');
