@@ -124,6 +124,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/keymap', key: 'cmdKeymap' },
   { name: '/review', key: 'cmdReview' },
   { name: '/web', key: 'cmdWeb' },
+  { name: '/remote', key: 'cmdRemote' },
   { name: '/exit', key: 'cmdExit' },
 ];
 
@@ -2210,6 +2211,51 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       const up = await ensureWebDaemon(DEFAULT_WEB_PORT);
       rt.setBusy(false);
       rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
+      return;
+    }
+    if (line === '/remote' || line === '/remote lan' || line === '/remote wan') {
+      // 2026-09-28 DSH Desktop pattern: /remote shows a QR of a ONE-TIME
+      // pairing link fetched from the running web server (/api/pair-info).
+      // WiFi scan = connected (no password); internet mode goes through a
+      // free tunnel and asks the phone for the 6-digit PIN shown here.
+      rt.setBusy(true, '/remote');
+      try {
+        const mode = line === '/remote wan' ? 'wan' : 'lan';
+        const { patchConfig } = await import('@hmharness/kernel');
+        let webCfg = (cfg as { web?: { exposure?: string; token?: string } }).web ?? {};
+        if (webCfg.exposure !== mode) {
+          await patchConfig({ web: { exposure: mode, token: webCfg.token ?? '' } });
+        }
+        // ensure daemon is up on the exposure
+        await ensureWebDaemon(DEFAULT_WEB_PORT);
+        // ask the SERVER for the live pairing state (token rotates there)
+        const info = await fetch(`http://127.0.0.1:${DEFAULT_WEB_PORT}/api/pair-info`).then((r) => r.json()) as {
+          pairingUrl?: string; lanPairingUrl?: string; tunnelPairingUrl?: string; pin?: string;
+          tunnel?: { active?: boolean; loading?: boolean; url?: string; error?: string };
+        };
+        const url = (mode === 'wan' ? info.tunnelPairingUrl : info.lanPairingUrl) || info.pairingUrl || '';
+        if (!url) throw new Error('no pairing URL (is the web server on --exposure=lan?)');
+        const QR = (await import('qrcode')).default;
+        const art = await QR.toString(url, { type: 'terminal', small: true, margin: 1 });
+        rt.addText('┌─────────────────────────────────┐', 'plain');
+        rt.addText('│  📱 连接手机（' + (mode === 'lan' ? 'WiFi 直连' : '互联网隧道') + '）    │', 'plain');
+        rt.addText('├─────────────────────────────────┤', 'plain');
+        for (const l of art.split('\n')) rt.addText('│' + l.replace(/\x1b\[[0-9;]*m/g, '') + '│', 'plain');
+        rt.addText('├─────────────────────────────────┤', 'plain');
+        if (mode === 'wan') {
+          rt.addText('│  配对密码(6位): ' + (info.pin ?? '(服务器窗口查看)'), 'plain');
+        }
+        rt.addText('│  链接: ' + url, 'plain');
+        rt.addText('│  (二维码 5 分钟内有效, 过期自动刷新)', 'plain');
+        rt.addText('└─────────────────────────────────┘', 'plain');
+        rt.addText(DIM(mode === 'lan'
+          ? '手机与电脑连同一 WiFi，扫码即连（无需密码）。'
+          : '任何网络可连：扫码后在手机输入上面的 6 位密码。网页里可切换线路。'), 'dim');
+      } catch (err) {
+        rt.addText(String(err), 'err');
+        rt.addText(DIM('/remote 失败 - 先运行: hmh web start --exposure=lan'), 'dim');
+      }
+      rt.setBusy(false);
       return;
     }
     if (line === '/resume' || line.startsWith('/resume ')) {

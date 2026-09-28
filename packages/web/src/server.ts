@@ -11,6 +11,8 @@ import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm } from 'nod
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { networkInterfaces } from 'node:os';
 import {
   homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
@@ -20,12 +22,175 @@ import {
 import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
+import { tunnel, isInternetTunnelHost, type TunnelState } from './tunnel.ts';
 import {
   insideRoot, toRel, fuzzyScore, parseImageDataUrl, buildAttachmentsPrefix, buildImagePrefix,
   isBinaryHead, SKIP_DIRS, MAX_SEARCH_DEPTH, MAX_SEARCH_ENTRIES, MAX_SEARCH_RESULTS, type SearchHit,
 } from './fs-utils.ts';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;
+
+/* ---- mobile pairing (2026-09-28, deepseek-harness Desktop pattern) ----
+   The phone proves itself ONCE with a QR-borne one-time token (5-min TTL),
+   then holds a session cookie; on WiFi the paired LAN IP also stays trusted
+   (same-network position). The long-term cfg.web.token (?key=) remains as a
+   power-user fallback. Internet mode relays through a free tunnel
+   (cloudflared Quick Tunnel / pinggy) so no firewall or port-forward config
+   is ever needed from ANY network. */
+const PAIRING_TTL_MS = 5 * 60_000;
+const MOBILE_COOKIE = 'hmh_mobile';
+interface MobileSession { cookie: string; remote: string; at: number }
+const mobileSessions = new Map<string, MobileSession>(); // cookie -> session
+const trustedLanIps = new Set<string>(); // DSH-style LAN position trust
+let pairToken = '';
+let pairExpiresAt = 0;
+let pairPin = '';
+
+function rotatePairing(): void {
+  pairToken = randomBytes(32).toString('base64url');
+  pairPin = String(100000 + Math.floor(Math.random() * 900000));
+  pairExpiresAt = Date.now() + PAIRING_TTL_MS;
+}
+function pairingValid(): boolean {
+  return Boolean(pairToken && pairExpiresAt >= Date.now());
+}
+function safeEqual(a: string, b: string): boolean {
+  const l = Buffer.from(a);
+  const r = Buffer.from(b);
+  return l.length === r.length && timingSafeEqual(l, r);
+}
+function cookieValue(req: IncomingMessage, name: string): string {
+  const m = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(req.headers.cookie ?? '');
+  return m?.[1] ?? '';
+}
+function transportIp(req: IncomingMessage): string {
+  return (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+}
+const isRfc1918 = (a: string) => /^10\./.test(a) || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
+
+/** The LAN address a phone on the same WiFi can actually reach. Enumerating
+   os.networkInterfaces() naively grabs the FIRST IPv4 — on machines with
+   Tailscale/VMware/WSL that is a virtual adapter the phone cannot route to
+   (the 2026-09-28 "QR scans but page won't load" bug: we QR'd the Tailscale
+   100.x address). Prefer real physical adapters, RFC1918 only. */
+function preferredLanAddress(): string {
+  const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
+  let fallback = '';
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    for (const n of list ?? []) {
+      if (n.family !== 'IPv4' || n.internal || !isRfc1918(n.address)) continue;
+      if (!VIRTUAL.test(name)) return n.address;
+      if (!fallback) fallback = n.address;
+    }
+  }
+  return fallback;
+}
+function requestIsFromLoopbackTransport(req: IncomingMessage): boolean {
+  const ip = transportIp(req);
+  return ip === '127.0.0.1' || ip === '::1' || ip === '';
+}
+/** tunnel requests arrive from the LOCAL cloudflared process (loopback
+   transport) but carry the public tunnel Host — detect like DSH does. */
+function requestConnectionMode(req: IncomingMessage): 'lan' | 'tunnel' {
+  const host = (req.headers.host ?? '').split(':', 1)[0]?.toLowerCase() ?? '';
+  if (!requestIsFromLoopbackTransport(req)) return 'lan';
+  return isInternetTunnelHost(host) ? 'tunnel' : 'lan';
+}
+function mobileAuthorized(req: IncomingMessage): boolean {
+  const cookie = cookieValue(req, MOBILE_COOKIE);
+  if (cookie && mobileSessions.has(cookie)) return true;
+  if (requestConnectionMode(req) === 'lan' && trustedLanIps.has(transportIp(req))) return true;
+  return false;
+}
+function issueMobileCookie(res: ServerResponse, remote: string): void {
+  const cookie = randomBytes(32).toString('base64url');
+  mobileSessions.set(cookie, { cookie, remote, at: Date.now() });
+  if (mobileSessions.size > 16) mobileSessions.delete(mobileSessions.keys().next().value as string);
+  if (requestConnectionMode(res.req as IncomingMessage) === 'lan' && remote && isRfc1918(remote)) {
+    trustedLanIps.add(remote);
+    if (trustedLanIps.size > 32) trustedLanIps.delete(trustedLanIps.values().next().value as string);
+  }
+  persistMobileSessions();
+  res.setHeader('set-cookie', `${MOBILE_COOKIE}=${cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
+}
+/** Paired phones survive a server restart (no re-scan): the session store
+    lives next to config.json. Restarted with a fresh process otherwise. */
+function persistMobileSessions(): void {
+  try {
+    const file = join(homeDir(), 'web-mobile.json');
+    const rows = [...mobileSessions.values()].map((s) => ({ cookie: s.cookie, remote: s.remote, at: s.at }));
+    void writeFile(file, JSON.stringify(rows, null, 2), 'utf8').catch(() => undefined);
+  } catch { /* best-effort */ }
+}
+async function loadMobileSessions(): Promise<void> {
+  try {
+    const file = join(homeDir(), 'web-mobile.json');
+    const rows = JSON.parse(await readFile(file, 'utf8')) as Array<{ cookie: string; remote: string; at: number }>;
+    for (const r of rows ?? []) {
+      if (typeof r.cookie === 'string' && r.cookie.length >= 32) {
+        mobileSessions.set(r.cookie, { cookie: r.cookie, remote: String(r.remote ?? ''), at: Number(r.at) || Date.now() });
+        if (isRfc1918(r.remote)) trustedLanIps.add(r.remote);
+      }
+    }
+  } catch { /* absent/corrupt file: start clean */ }
+}
+/** CSRF guard for pairing POSTs (DSH verifyTrustedOrigin pattern). */
+function sameOriginOk(req: IncomingMessage): boolean {
+  const site = String(req.headers['sec-fetch-site'] ?? '');
+  if (site && site !== 'same-origin' && site !== 'none') return false;
+  const origin = req.headers.origin;
+  const host = req.headers.host;
+  if (origin && host) {
+    try { if (new URL(String(origin)).host !== host) return false; } catch { return false; }
+  }
+  return true;
+}
+const pinFailures = new Map<string, { n: number; until: number }>();
+function pinRateLimited(ip: string): number {
+  const f = pinFailures.get(ip);
+  if (!f) return 0;
+  return f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0;
+}
+function recordPinFailure(ip: string): void {
+  const f = pinFailures.get(ip) ?? { n: 0, until: 0 };
+  f.n += 1;
+  if (f.n >= 3) { f.until = Date.now() + 60_000; f.n = 0; }
+  pinFailures.set(ip, f);
+}
+
+/** Phone-side PIN entry page (internet pairing only; minimal, self-contained). */
+const PIN_PAGE = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>配对 hmh</title><style>
+:root{color-scheme:light dark}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#141416;color:#f5f5f6;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.card{width:100%;max-width:320px;padding:28px 24px;text-align:center}
+h1{font-size:18px;margin:0 0 6px}
+p{color:#95979d;font-size:13px;margin:0 0 18px}
+input{width:100%;box-sizing:border-box;padding:12px;font:24px/1 monospace;letter-spacing:8px;text-align:center;border-radius:10px;border:1px solid #33353a;background:#1e2024;color:#f5f5f6;outline:none}
+button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:10px;background:#2f81f7;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+#st{margin-top:12px;font-size:12px;color:#95979d;min-height:18px}
+.err{color:#f85149}
+</style></head><body><div class="card"><h1>输入配对密码</h1>
+<p>密码显示在电脑上的配对窗口中（6 位数字）</p>
+<input id="pin" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••" autofocus>
+<button onclick="go()">连接</button><div id="st"></div>
+<script>
+var st=document.getElementById('st');
+document.getElementById('pin').addEventListener('keydown',function(e){if(e.key==='Enter')go()});
+async function go(){
+  var pin=document.getElementById('pin').value.trim();
+  if(pin.length!==6){st.className='err';st.textContent='请输入 6 位密码';return}
+  st.className='';st.textContent='正在验证…';
+  try{
+    var r=await fetch('/pair/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pin:pin})});
+    var j=await r.json();
+    if(j.ok){st.textContent='配对成功，正在进入…';location.href='/';return}
+    st.className='err';st.textContent=j.error||'验证失败';
+    if(j.rescan)st.textContent='二维码已过期，请在电脑上重新扫码';
+  }catch(e){st.className='err';st.textContent='网络异常，请重试'}
+}
+</script></div></body></html>`;
 
 /** Version of THIS serving process's code. The CLI's version-aware daemon
  *  check compares the SERVED value against its own instead of trusting the
@@ -93,6 +258,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
   const daemonVersion = opts.version ?? DAEMON_VERSION;
   const home = homeDir();
   const cfg = await loadConfig();
+  await loadMobileSessions();
   const { reg, clients } = await buildRegistry();
 
   let busy = false;
@@ -320,6 +486,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
       // topbar follows THIS, not the global workspace, when showing status
       activeSessionId,
       activeThreadCwd: activeSessionId ? sessionThreads.get(activeSessionId)?.cwd ?? '' : '',
+      exposure,
       workspace: currentWs() ?? null,
       daemonVersion,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
@@ -368,30 +535,95 @@ export async function startServer(opts: { port: number; host?: string; version?:
   const exposure = (cfg as WebCfg).web?.exposure ?? 'loopback';
   const remoteToken = (cfg as WebCfg).web?.token ?? '';
   const server = createServer(async (req, res) => {
-    // ---- exposure gate (2026-09-28 remote control) ----
-    // loopback: the old DNS-rebinding guard (Host/Origin must be our own).
-    // lan/wan: cfg.web.token is MANDATORY and checked on EVERY request
-    // (header or ?key= for the first page/SSE load); the token gates
-    // everything because /api/approve is RCE by design.
+    // ---- mobile pairing routes run BEFORE the exposure gate: the phone's
+    // ONLY proof is the QR-borne one-time token (or the tunnel PIN). These
+    // two routes never expose task data by themselves. ----
     const port = String(opts.port);
     const host = (req.headers.host ?? '').toLowerCase();
-    const origin = (req.headers.origin ?? '').toLowerCase();
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-    let authorized = true;
-    if (exposure !== 'loopback') {
-      authorized = false;
-      if (!remoteToken) {
-        json(res, 403, {
-          error: 'exposure lan/wan requires web.token in config.json',
-          code: 'config-missing-token',
-          recoverable: true,
-          action: 'zh: 运行 hmh web start --exposure=' + exposure + ' --token-gen 生成令牌',
-        });
+    try {
+      if (req.method === 'GET' && url.pathname === '/pair') {
+        if (exposure === 'loopback') { json(res, 403, { error: 'pairing requires --exposure=lan|wan' }); return; }
+        if (mobileAuthorized(req) || loopbackHost()) {
+          res.writeHead(302, { location: '/' }); res.end(); return;
+        }
+        if (!pairingValid() || !safeEqual(url.searchParams.get('token') ?? '', pairToken)) {
+          res.writeHead(401, { 'content-type': 'text/html; charset=utf-8' });
+          res.end('<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><body style="font:15px/1.6 -apple-system,sans-serif;display:grid;place-items:center;min-height:100dvh;margin:0;background:#141416;color:#f5f5f6"><div style=text-align:center><div style=font-size:44px>⏱️</div><h3>配对链接已失效</h3><p style=color:#95979d>请在电脑上的 hmh 网页点 📱 重新扫码</p></div></body>');
+          return;
+        }
+        if (requestConnectionMode(req) === 'lan') {
+          // WiFi pairing: token proof is enough — issue the session cookie
+          // and remember this LAN IP (DSH semantics: no PIN on WiFi).
+          issueMobileCookie(res, transportIp(req));
+          res.writeHead(302, { location: '/' }); res.end(); return;
+        }
+        // internet pairing: the QR token opened the door, the 6-digit PIN
+        // (shown on the computer) keeps anyone else who copied the link out.
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(PIN_PAGE);
         return;
       }
-      const hdr = String(req.headers['x-hmh-key'] ?? '');
-      const qk = url.searchParams.get('key') ?? '';
-      if (hdr === remoteToken || qk === remoteToken) authorized = true;
+      if (req.method === 'POST' && url.pathname === '/pair/verify') {
+        if (!sameOriginOk(req)) { json(res, 403, { ok: false, error: 'cross-origin rejected' }); return; }
+        if (requestConnectionMode(req) !== 'tunnel') {
+          json(res, 400, { ok: false, error: 'PIN verification is only used for internet pairing' });
+          return;
+        }
+        const ip = transportIp(req);
+        const retry = pinRateLimited(ip);
+        if (retry) { res.setHeader('retry-after', String(retry)); json(res, 429, { ok: false, error: '尝试过于频繁，请稍后再试', retryAfter: retry }); return; }
+        let pin = '';
+        try {
+          const body = await new Promise<string>((ok) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => ok(b)); });
+          pin = String(JSON.parse(body).pin ?? '').trim();
+        } catch { pin = ''; }
+        if (!pairingValid() || !pairPin || !safeEqual(pin, pairPin)) {
+          if (!pairingValid() || !pairPin) { json(res, 401, { ok: false, error: 'expired', rescan: true }); return; }
+          recordPinFailure(ip);
+          json(res, 401, { ok: false, error: '配对密码不正确' });
+          return;
+        }
+        pinFailures.clear();
+        issueMobileCookie(res, ip);
+        json(res, 200, { ok: true });
+        return;
+      }
+    } catch (err) {
+      json(res, 500, { error: String(err).slice(0, 200) });
+      return;
+    }
+    // ---- exposure gate (2026-09-28 remote control) ----
+    // Trust ladder, most-local first:
+    //   1. loopback Host (desktop sitting at the machine)
+    //   2. paired mobile: session cookie OR remembered LAN IP (WiFi trust)
+    //   3. long-term cfg.web.token (X-Hmh-Key header or ?key= link)
+    // loopback: the old DNS-rebinding guard (Host/Origin must be our own).
+    const origin = (req.headers.origin ?? '').toLowerCase();
+    function loopbackHost(): boolean {
+      return host.startsWith('127.0.0.1:') || host.startsWith('localhost:') || host.startsWith('[::1]:');
+    }
+    let authorized = true;
+    if (exposure !== 'loopback') {
+      if (loopbackHost()) {
+        authorized = true; // same-machine: no token needed
+      } else if (mobileAuthorized(req)) {
+        authorized = true; // paired phone (cookie / trusted LAN IP)
+      } else {
+        authorized = false;
+        const hdr = String(req.headers['x-hmh-key'] ?? '');
+        const qk = url.searchParams.get('key') ?? '';
+        if (remoteToken && (hdr === remoteToken || qk === remoteToken)) authorized = true;
+        if (!authorized) {
+          json(res, 403, {
+            error: 'invalid or missing key',
+            code: 'auth-required',
+            recoverable: true,
+            action: 'zh: 在电脑上的 hmh 网页点 📱 扫码配对，或用带 ?key=<web.token> 的链接访问',
+          });
+          return;
+        }
+      }
     } else {
       const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
       if (!allowedHosts.has(host)) authorized = false;
@@ -403,7 +635,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
         error: exposure === 'loopback' ? 'forbidden host/origin' : 'invalid or missing key',
         code: exposure === 'loopback' ? 'forbidden-host' : 'auth-required',
         recoverable: exposure !== 'loopback',
-        action: exposure === 'loopback' ? 'open via http://127.0.0.1:' + port : 'zh: 请用带 ?key=<web.token> 的链接访问',
+        action: exposure === 'loopback' ? 'open via http://127.0.0.1:' + port : 'zh: 在电脑上的 hmh 网页点 📱 扫码配对',
       });
       return;
     }
@@ -411,6 +643,112 @@ export async function startServer(opts: { port: number; host?: string; version?:
       if (req.method === 'GET' && url.pathname === '/') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(PAGE);
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/qr') {
+        // QR code SVG for phone pairing (docx remote control): rendered by
+        // the `qrcode` npm lib (battle-tested, always scannable). The old
+        // hand-rolled encoder produced unscannable codes (format-info bug).
+        const text = url.searchParams.get('text') ?? '';
+        if (!text || text.length > 500) { json(res, 400, { error: 'text required (max 500 chars)' }); return; }
+        try {
+          const QR = (await import('qrcode')).default;
+          const svg = await QR.toString(text, { type: 'svg', margin: 2, width: 260 });
+          res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+          res.end(svg);
+          return;
+        } catch (err) {
+          json(res, 400, { error: String(err).slice(0, 200) });
+          return;
+        }
+      }
+      if (req.method === 'GET' && url.pathname === '/api/remote-info') {
+        // phone pairing helper (docx remote control): the page needs the LAN
+        // IP + token to build the QR URL. This is read-only metadata; auth
+        // is enforced by the exposure gate above.
+        const lanIp = preferredLanAddress();
+        const webCfg = (cfg as WebCfg).web ?? {};
+        json(res, 200, {
+          lanIp,
+          token: webCfg.token ?? '',
+          exposure: webCfg.exposure ?? 'loopback',
+          port: opts.port,
+        });
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/pair-info') {
+        // Desktop pairing-window feed (DSH snapshot() pattern): one-time
+        // pairing URL + countdown + tunnel state. The PIN is only ever sent
+        // to the loopback desktop — never to a paired phone or the tunnel.
+        if (exposure === 'loopback') { json(res, 400, { error: 'pairing requires --exposure=lan|wan' }); return; }
+        if (!pairingValid()) rotatePairing();
+        const t = tunnel.state;
+        const lanIp = preferredLanAddress();
+        const lanUrl = lanIp ? `http://${lanIp}:${opts.port}/pair?token=${pairToken}` : '';
+        const tunnelUrl = t.url ? `${t.url}/pair?token=${pairToken}` : '';
+        json(res, 200, {
+          lanIp,
+          port: opts.port,
+          pairingUrl: t.url ? tunnelUrl : lanUrl,
+          lanPairingUrl: lanUrl,
+          tunnelPairingUrl: tunnelUrl,
+          expiresAt: pairExpiresAt,
+          now: Date.now(),
+          connected: mobileSessions.size > 0,
+          pin: requestIsFromLoopbackTransport(req) && requestConnectionMode(req) === 'lan' ? pairPin : '',
+          tunnel: t,
+        });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/pair/rotate') {
+        rotatePairing();
+        json(res, 200, { ok: true, expiresAt: pairExpiresAt });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/tunnel/toggle') {
+        if (!requestIsFromLoopbackTransport(req) || requestConnectionMode(req) !== 'lan') {
+          json(res, 403, { ok: false, error: 'desktop only' });
+          return;
+        }
+        if (!sameOriginOk(req)) { json(res, 403, { ok: false, error: 'cross-origin rejected' }); return; }
+        let enable = true;
+        try {
+          const body = await new Promise<string>((ok) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => ok(b)); });
+          if (body) enable = JSON.parse(body).enable !== false;
+        } catch { /* default enable */ }
+        // persist the intent: a restart must bring the tunnel back, or every
+        // printed QR keeps pointing at a dead trycloudflare URL (1033)
+        try {
+          const cur = ((cfg as WebCfg).web ?? {}) as { exposure?: 'loopback' | 'lan' | 'wan'; token?: string; tunnel?: boolean };
+          if ((cur.tunnel ?? false) !== enable) await patchConfig({ web: { ...cur, tunnel: enable } });
+          (cfg as WebCfg).web = { ...cur, tunnel: enable };
+        } catch { /* config write failed — runtime toggle still applies */ }
+        const t: TunnelState = enable
+          ? await tunnel.start(opts.port, 'cloudflare', (m) => console.log(m))
+          : await tunnel.stop().then(() => tunnel.state);
+        json(res, 200, { ok: !t.error, tunnel: t });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/tunnel/switch-line') {
+        if (!requestIsFromLoopbackTransport(req) || requestConnectionMode(req) !== 'lan') {
+          json(res, 403, { ok: false, error: 'desktop only' });
+          return;
+        }
+        if (!sameOriginOk(req)) { json(res, 403, { ok: false, error: 'cross-origin rejected' }); return; }
+        const t = await tunnel.switchLine(opts.port, (m) => console.log(m));
+        json(res, 200, { ok: !t.error, tunnel: t });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/mobile/disconnect') {
+        if (!requestIsFromLoopbackTransport(req) || requestConnectionMode(req) !== 'lan') {
+          json(res, 403, { ok: false, error: 'desktop only' });
+          return;
+        }
+        mobileSessions.clear();
+        trustedLanIps.clear();
+        rotatePairing();
+        persistMobileSessions();
+        json(res, 200, { ok: true });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/state') {
@@ -1554,10 +1892,24 @@ export async function startServer(opts: { port: number; host?: string; version?:
     throw err;
   });
   console.log(`hmh web · http://${host}:${opts.port} · model ${cfg.provider.model} · home ${home}`);
-  if (exposure !== 'loopback') {
-    console.log(`exposure: ${exposure.toUpperCase()} - the UI is reachable from other devices via this machine's IP`);
-    console.log(`auth: token required (first visit: http://<this-ip>:${opts.port}/?key=<your web.token>)`);
-    if (exposure === 'wan') console.log('WARNING: WAN exposure means ANYONE who has the address+token can run commands on this machine. Keep the token secret.');
+    if (exposure !== 'loopback') {
+    const lanIp = preferredLanAddress();
+    console.log(`exposure: ${exposure.toUpperCase()} - 手机与电脑同一 WiFi 时扫网页里的 📱 二维码即可连接`);
+    if (lanIp) console.log(`wifi:   http://${lanIp}:${opts.port} （配对走二维码，无需输密码）`);
+    else console.log('wifi:   未找到可用的局域网 IP（虚拟网卡已排除）');
+    console.log(`auth:   未配对设备需要 ?key=<web.token> 链接；已配对手机凭 cookie/局域网位置直连`);
+    if (exposure === 'wan' || ((cfg as WebCfg).web?.tunnel ?? false)) {
+      // internet mode: bring up the free tunnel so any network (4G/5G/other
+      // WiFi) can reach us with zero firewall/port-forward configuration.
+      // web.tunnel=true is the PERSISTED intent from the pairing modal —
+      // restarts must restore the tunnel or old QRs point at dead links.
+      console.log('internet: 正在启动免费隧道（cloudflared，首次会自动下载）…');
+      void tunnel.start(opts.port, 'cloudflare', (m) => console.log(m)).then((t) => {
+        if (t.url) console.log(`internet: ${t.url} （互联网扫码 + 6 位配对密码）`);
+        else console.log(`internet: 隧道启动失败（${t.error ?? 'unknown'}）；网页 📱 弹窗里可重试或换 pinggy 线路`);
+      });
+      if (exposure === 'wan') console.log('WARNING: WAN exposure means ANYONE who has the address+pairing code can run commands on this machine.');
+    }
   } else {
     console.log('(local only; Ctrl-C to stop)');
   }
@@ -1566,6 +1918,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
     clearInterval(heartbeat);
     for (const c of clients) c.close();
     for (const r of sseClients) r.end();
+    void tunnel.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 1500).unref();
   };

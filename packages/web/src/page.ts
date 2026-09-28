@@ -174,6 +174,18 @@ export const PAGE = `<!doctype html>
     #deliv .deliv { font-size:10px; }
   }
   #sideburger { display:none; background:none; border:1px solid var(--line); border-radius:7px; color:var(--text); cursor:pointer; font-size:15px; padding:3px 9px; }
+  /* ---- phone pairing modal (docx remote control, deepseek-harness pattern) ---- */
+  #pairmod { display:none; position:fixed; inset:0; background:rgba(4,8,12,.62); z-index:95; align-items:center; justify-content:center; }
+  #pairmod.on { display:flex; }
+  #pairmod .card { width:380px; max-width:92vw; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  #pairmod h3 { margin:0; font-size:15px; }
+  #pairmod .qr { background:#fff; border-radius:10px; padding:10px; line-height:0; }
+  #pairmod .qr img { width:220px; height:220px; }
+  #pairmod .url { font-family:var(--mono); font-size:11px; color:var(--accent); word-break:break-all; text-align:center; max-width:100%; }
+  #pairmod .pin { font-family:var(--mono); font-size:30px; font-weight:800; color:var(--ok); letter-spacing:8px; }
+  #pairmod .pinlab { font-size:11px; color:var(--dim); }
+  #pairmod .hint { font-size:12px; color:var(--dim); text-align:center; }
+  #pairmod button { margin-top:6px; }
 
   /** Structured error text (docx): prefer the human action over the raw string. */
   function errText(d) {
@@ -499,6 +511,7 @@ export const PAGE = `<!doctype html>
       <button id="theme-chip" class="ghost sm" title="theme">🌓</button>
       <span id="topspacer" style="margin-left:auto"></span>
       <span id="connchip" title="connection">⟳ 重连中…</span>
+      <button id="phone-pair" title="📱 手机远程控制" style="display:none;background:none;border:1px solid var(--line);border-radius:7px;color:var(--text);cursor:pointer;font-size:15px;padding:3px 9px">📱</button>
       <button id="clear" class="ghost sm">clear</button>
     </div>
     <div id="view-chat" class="vwrap on">
@@ -628,6 +641,26 @@ export const PAGE = `<!doctype html>
       <input id="cmdpal-in" placeholder="命令 / 视图 / 会话…">
       <div class="list" id="cmdpal-list"></div>
       <div class="foot">↑↓ 选择 · Enter 执行 · Esc 关闭</div>
+    </div>
+  </div>
+  <div id="pairmod">
+    <div class="card">
+      <h3>📱 连接手机</h3>
+      <div style="display:flex;gap:6px;margin:4px 0">
+        <button id="pair-lan" class="ghost sm" style="font-weight:600">🏠 WiFi 连接</button>
+        <button id="pair-wan" class="ghost sm" style="font-weight:600">🌐 互联网连接</button>
+      </div>
+      <div class="qr" id="pair-qrbox"><img id="pair-qr" alt="QR"></div>
+      <div class="pin" id="pair-pin" style="display:none">—</div>
+      <div class="pinlab" id="pair-pinlab" style="display:none;font-size:11px;color:var(--dim)">配对密码（互联网模式，输入到手机）</div>
+      <div class="url" id="pair-url">—</div>
+      <div class="hint" id="pair-hint">手机扫码即可连接</div>
+      <div class="hint" id="pair-count" style="color:var(--accent)">—</div>
+      <div style="display:flex;gap:6px">
+        <button id="pair-copy" class="ghost sm">复制链接</button>
+        <button id="pair-line" class="ghost sm" style="display:none">换一条线路</button>
+        <button id="pair-close" class="ghost sm">关闭</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1065,6 +1098,9 @@ ${uiLiteSource()}
     // topbar path: the VIEWED session's cwd wins; the global workspace is the
     // fallback (user bug: switching project sessions never moved the chip)
     updateTopbarCwd();
+    // phone pairing icon: visible when the server is in LAN/WAN mode
+    var pp = document.getElementById('phone-pair');
+    if (pp) pp.style.display = (s.exposure && s.exposure !== 'loopback') ? '' : 'none';
     // A11 theme + A6 goal from the persisted state
     applyTheme((s.settings && s.settings.theme) || 'dark');
     var gc = document.getElementById('goal-chip');
@@ -3108,6 +3144,137 @@ ${uiLiteSource()}
     var s = ev.target.closest && ev.target.closest('.sess');
     if (s && document.body.classList.contains('mobside')) document.body.classList.remove('mobside');
   });
+
+  /* ---- phone pairing (2026-09-28, DSH Desktop pattern): topbar 📱 opens a
+     modal; WiFi tab QRs the one-time /pair?token link (scan = connected,
+     no password on same WiFi); 互联网 tab brings up a free tunnel so any
+     network works — the phone then also enters a 6-digit PIN shown here.
+     The QR token rotates every 5 minutes; the countdown auto-refreshes. */
+  var pairMode = 'lan';
+  var pairData = null;
+  var pairTimer = null;
+  var pairUrl = '';
+  function pel(id) { return document.getElementById(id); }
+  function fmtCountdown(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    return '二维码 ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' 后失效（自动刷新）';
+  }
+  function renderPair() {
+    var t = (pairData && pairData.tunnel) || {};
+    var lan = pairMode === 'lan';
+    pel('pair-lan').style.borderColor = lan ? 'var(--accent)' : 'var(--line)';
+    pel('pair-wan').style.borderColor = lan ? 'var(--line)' : 'var(--accent)';
+    if (lan) {
+      pairUrl = (pairData && pairData.lanPairingUrl) || '';
+      pel('pair-pin').style.display = 'none';
+      pel('pair-pinlab').style.display = 'none';
+      pel('pair-line').style.display = 'none';
+      pel('pair-hint').textContent = '手机与电脑连接同一 WiFi，扫码即可连接（无需密码）';
+      if (!pairUrl) {
+        pel('pair-qr').removeAttribute('src');
+        pel('pair-url').textContent = '未找到可用的局域网 IP';
+        pel('pair-hint').textContent = '请确认电脑已连接 WiFi/网线（虚拟网卡已自动排除）';
+        pel('pair-count').textContent = '';
+        return;
+      }
+    } else {
+      pairUrl = (pairData && pairData.tunnelPairingUrl) || '';
+      pel('pair-hint').textContent = '任何网络均可远程（4G/5G/其他 WiFi），同步实时性中等';
+      pel('pair-line').style.display = t.active ? '' : 'none';
+      if (t.loading) {
+        pel('pair-qr').removeAttribute('src');
+        pel('pair-url').textContent = '隧道启动中…（首次使用会自动下载 cloudflared）';
+        pel('pair-pin').style.display = 'none';
+        pel('pair-pinlab').style.display = 'none';
+        pel('pair-count').textContent = '';
+        return;
+      }
+      if (!t.active) {
+        pel('pair-qr').removeAttribute('src');
+        pel('pair-url').textContent = '互联网模式未开启';
+        pel('pair-pin').style.display = 'none';
+        pel('pair-pinlab').style.display = 'none';
+        pel('pair-count').textContent = '';
+        pel('pair-hint').textContent = '点击下方「开启互联网连接」按钮，通过免费隧道从任何网络远程';
+        var btn = pel('pair-line');
+        btn.textContent = '开启互联网连接';
+        btn.style.display = '';
+        return;
+      }
+      pel('pair-line').textContent = '换一条线路';
+      pel('pair-pin').style.display = '';
+      pel('pair-pinlab').style.display = '';
+      pel('pair-pin').textContent = pairData.pin || '—';
+    }
+    pel('pair-url').textContent = pairUrl;
+    pel('pair-qr').src = '/api/qr?text=' + encodeURIComponent(pairUrl);
+    tickPair();
+  }
+  function tickPair() {
+    if (!pairData || !pairData.expiresAt) { pel('pair-count').textContent = ''; return; }
+    pel('pair-count').textContent = fmtCountdown(pairData.expiresAt - Date.now());
+  }
+  function refreshPair() {
+    api('/api/pair-info').then(function (r) { return r.json(); })
+      .then(function (d) { pairData = d; renderPair(); })
+      .catch(function () {
+        pel('pair-url').textContent = '获取配对信息失败（服务器需 --exposure=lan 启动）';
+      });
+  }
+  var pairPolls = 0;
+  function openPairModal() {
+    var mod = pel('pairmod');
+    mod.classList.add('on');
+    refreshPair();
+    clearInterval(pairTimer);
+    pairTimer = setInterval(function () {
+      if (!pel('pairmod').classList.contains('on')) { clearInterval(pairTimer); return; }
+      if (!pairData) return;
+      if (pairData.expiresAt - Date.now() < 3000) { refreshPair(); tickPair(); return; }
+      // live poll every ~5s: a restarted/self-healed tunnel changes the URL,
+      // and a stale QR would send the phone to a Cloudflare 1033 dead link
+      pairPolls += 1;
+      if (pairPolls % 5 === 0) refreshPair();
+      else if (pairData.tunnel && pairData.tunnel.loading) refreshPair();
+      tickPair();
+    }, 1000);
+  }
+  pel('phone-pair').onclick = openPairModal;
+  pel('pair-lan').onclick = function () { pairMode = 'lan'; renderPair(); };
+  pel('pair-wan').onclick = function () {
+    pairMode = 'wan';
+    // entering the internet tab with no tunnel: start it on demand
+    if (pairData && pairData.tunnel && !pairData.tunnel.active && !pairData.tunnel.loading) {
+      api('/api/tunnel/toggle', { method: 'POST', body: JSON.stringify({ enable: true }) })
+        .then(function () { refreshPair(); })
+        .catch(function () { refreshPair(); });
+      pairData.tunnel.loading = true;
+    }
+    renderPair();
+    refreshPair();
+  };
+  pel('pair-line').onclick = function () {
+    var t = pairData && pairData.tunnel;
+    if (t && t.loading) return;
+    api('/api/tunnel/switch-line', { method: 'POST', body: '{}' })
+      .then(function () { refreshPair(); })
+      .catch(function () { refreshPair(); });
+    if (pairData && pairData.tunnel) pairData.tunnel.loading = true;
+    renderPair();
+  };
+  pel('pair-copy').onclick = function () {
+    if (!pairUrl) return;
+    try { navigator.clipboard.writeText(pairUrl); } catch (e) {}
+    var b = pel('pair-copy'); b.textContent = '已复制 ✓';
+    setTimeout(function () { b.textContent = '复制链接'; }, 1400);
+  };
+  pel('pair-close').onclick = function () {
+    pel('pairmod').classList.remove('on');
+    clearInterval(pairTimer);
+  };
+  el('pairmod').onclick = function (e) {
+    if (e.target === this) { this.classList.remove('on'); clearInterval(pairTimer); }
+  };
 
   /* ---- command palette (docx Web 专项): Ctrl+K opens a global console with
      commands, view switches, model routes and session search - full keyboard. */

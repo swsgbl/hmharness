@@ -136,6 +136,10 @@ export interface HmhConfig {
      *  then via the X-Hmh-Key header (SSE cannot set custom headers, so the
      *  page keeps the key in sessionStorage and appends it to /api/events). */
     token?: string;
+    /** Internet tunnel intent (cloudflared Quick Tunnel / pinggy). Set from
+     *  the pairing modal; on restart the server brings the tunnel back so
+     *  previously printed QR URLs do not rot into Cloudflare 1033 pages. */
+    tunnel?: boolean;
   };
   /** Per-purpose provider names resolved against `providers`. */
   routing?: {

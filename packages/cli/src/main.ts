@@ -929,27 +929,35 @@ flags:
       const { patchConfig } = await import('@hmharness/kernel');
       await patchConfig({ web: { exposure, token: webToken } });
     }
-    if ((exposure === 'lan' || exposure === 'wan') && !webToken) {
-      stdout.write(RED('lan/wan exposure requires a token. Run: hmh web start --exposure=' + exposure + ' --token-gen\n'));
-      stdout.write(DIM('(generates a random token, saves it to config.json web.token, and prints it once)\n'));
-      return;
+    if ((exposure === 'lan' || exposure === 'wan') && !webToken && !rest.includes('--token-gen')) {
+      // Pairing (QR one-time token) no longer needs a long-term key; the
+      // cfg token is just an extra always-valid link. Hint, don't block.
+      stdout.write(DIM('(提示：手机用网页里的 📱 二维码配对即可；如需长期固定链接可加 --token-gen)\n'));
     }
     if ((exposure === 'lan' || exposure === 'wan') && tokenArg) {
       const { patchConfig } = await import('@hmharness/kernel');
       await patchConfig({ web: { exposure, token: webToken } });
     }
-    if (exposure !== 'loopback' && webToken) {
-      // print the ready-to-open URL once, so the user never has to assemble it
+    if (exposure !== 'loopback') {
+      // print the phone-ready access info once; the LAN IP shown must be the
+      // one a phone on the same WiFi can route to (virtual adapters like
+      // Tailscale/VMware excluded — see server.ts preferredLanAddress).
       const osMod = await import('node:os');
-      const nets = osMod.networkInterfaces();
+      const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
+      const isRfc1918 = (a: string) => /^10\./.test(a) || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
       let lanIp = '';
-      for (const list of Object.values(nets)) {
+      let virtualFallback = '';
+      for (const [name, list] of Object.entries(osMod.networkInterfaces())) {
         for (const n of list ?? []) {
-          if (n.family === 'IPv4' && !n.internal) { lanIp = lanIp || n.address; }
+          if (n.family !== 'IPv4' || n.internal || !isRfc1918(n.address)) continue;
+          if (!VIRTUAL.test(name)) { lanIp = lanIp || n.address; }
+          else { virtualFallback = virtualFallback || n.address; }
         }
       }
-      const visUrl = (exposure === 'lan' && lanIp ? `http://${lanIp}` : 'http://<your-public-address>') + `:${port}/?key=${webToken}`;
-      stdout.write(YELLOW(`远程访问：${visUrl}\n`));
+      lanIp = lanIp || virtualFallback;
+      stdout.write(YELLOW('手机连接：打开 http://127.0.0.1:' + port + ' 点 📱 扫二维码（WiFi 直连免密码；互联网模式任何网络可用）\n'));
+      if (lanIp) stdout.write(YELLOW(`WiFi 地址：http://${lanIp}:${port}（手机与电脑同一 WiFi）\n`));
+      if (exposure === 'wan') stdout.write(YELLOW('互联网模式：启动后自动建立免费隧道（trycloudflare.com），无需公网 IP/端口转发\n'));
     }
     const t = await uiStrings();
     const sub = rest.find((a) => !a.startsWith('-'));
