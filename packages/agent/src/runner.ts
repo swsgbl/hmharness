@@ -143,10 +143,10 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
   // injection entirely — the model doesn't need them for "你好" and they add
   // ~4K tokens of noise that dilutes the identity anchor
   if (isTrivialTask(task)) {
-    return { memory: '', skills: '', insights: '', skillsInjected: [] as string[] };
+    return { memory: '', skills: '', insights: '', cognitive: '', skillsInjected: [] as string[] };
   }
 
-  const [memory, skills, insights] = await Promise.all([
+  const [memory, skills, insights, cognitive] = await Promise.all([
     retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
     listSkills(home),
     // 2026-09-27 plan A: experience retrieval - the K most RELEVANT past
@@ -156,6 +156,10 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
     // Plan C: cross-project lessons stay retrievable but carry their
     // origin stamp ([来自项目:X]) so the model can weigh them.
     retrieveInsights(home, task, { workspace: opts.workspace ?? undefined }),
+    // blueprint M3: the world model feeds the planner — which tools history
+    // trusts/distrusts lands in the system prompt (empty until ≥3 steps of
+    // evidence exist, so cold starts see nothing)
+    import('@hmharness/cognitive').then((m) => m.buildContextDigest(home)).catch(() => ''),
   ]);
   let canaryBlock = '';
   let canaryNames: string[] = [];
@@ -166,7 +170,7 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
       canaryBlock = canaryWatermark(canaryNames) + '\n' + skillsToPrompt(canary);
     }
   }
-  return { memory, skills: skillsToPrompt(skills) + (canaryBlock ? '\n' + canaryBlock : ''), insights, skillsInjected: [...skills.map((s) => s.name), ...canaryNames] };
+  return { memory, skills: skillsToPrompt(skills) + (canaryBlock ? '\n' + canaryBlock : ''), insights, cognitive, skillsInjected: [...skills.map((s) => s.name), ...canaryNames] };
 }
 
 /**
@@ -373,6 +377,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     memory: pack.memory,
     skills: pack.skills,
     insights: pack.insights,
+    ...(pack.cognitive ? { cognitive: pack.cognitive } : {}),
     model: cfg.provider.model,
     locale: cfg.locale,
     agentsMd: agentsMd ?? undefined,
@@ -391,6 +396,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     memoryChars: pack.memory.length,
     skills: pack.skills.length,
     insights: pack.insights.length,
+    cognitiveChars: pack.cognitive.length,
   });
 
   await session.user(opts.task);

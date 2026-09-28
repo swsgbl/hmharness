@@ -564,6 +564,8 @@ export const PAGE = `<!doctype html>
       <div id="cog-body">
         <div class="setbox"><h3 class="sec">五层记忆</h3><div id="cog-memory" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">世界模型（轨迹回放）</h3><div id="cog-world" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">目标漂移检测</h3><div id="cog-drift" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">技能候选（历史挖掘）</h3><div id="cog-skills" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">环境注册表</h3><div id="cog-env" class="hint">加载中…</div></div>
@@ -1407,6 +1409,27 @@ ${uiLiteSource()}
       document.getElementById('cog-env').innerHTML = (d.environments || []).map(function (e) {
         return '<span class="ob ok">' + e.id + ' <small>v' + e.version + '</small></span>';
       }).join(' ') + '<div class="hint" style="margin-top:6px">环境适配器（terminal 原生 / harmonyos hdc / browser CDP / desktop / arc3 骨架）</div>';
+      // lazy sections: goal drift + skill candidates (separate cheap endpoints)
+      api('/api/cognitive/drift').then(function (r) { return r.json(); }).then(function (dd) {
+        var views = dd.views || [];
+        document.getElementById('cog-drift').innerHTML = views.length
+          ? views.slice(0, 5).map(function (v) {
+              return '<div style="margin:2px 0"><span class="ob ' + (v.driftScore >= 0.7 ? 'err' : v.driftScore >= 0.3 ? 'tb' : 'ok') + '">' + v.driftScore.toFixed(2) + ' ' + v.recommendation + '</span> <small>' + String(v.goalDescription).slice(0, 50) + '</small></div>';
+            }).join('')
+          : '<div class="hint">暂无带目标的轨迹——设置会话目标后自动检测</div>';
+      }).catch(function () {
+        document.getElementById('cog-drift').innerHTML = '<div class="hint">加载失败</div>';
+      });
+      api('/api/cognitive/skills').then(function (r) { return r.json(); }).then(function (dd) {
+        var cands = dd.candidates || [];
+        document.getElementById('cog-skills').innerHTML = cands.length
+          ? cands.map(function (c) {
+              return '<div style="margin:2px 0"><span class="ob tb">' + c.status + '</span> ' + c.procedure.join(' → ') + ' <small>×' + c.evidenceTrajectories + ' 轨迹</small></div>';
+            }).join('') + '<div class="hint" style="margin-top:4px">晋升仍需过基准门禁（verify → promote）</div>'
+          : '<div class="hint">暂无候选——需要≥2 条含≥2 步成功动作序列的轨迹</div>';
+      }).catch(function () {
+        document.getElementById('cog-skills').innerHTML = '<div class="hint">加载失败</div>';
+      });
     }).catch(function () {
       ['memory', 'world', 'traj', 'audit', 'env'].forEach(function (k) {
         var el = document.getElementById('cog-' + k);

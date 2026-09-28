@@ -16,6 +16,9 @@ export function buildSystemPrompt(opts: {
   memory: string;
   skills: string;
   insights: string;
+  /** world-model digest (trusted/flaky tools from run history; empty until
+   *  enough evidence exists — blueprint M3 planner consumption) */
+  cognitive?: string;
   model: string;
   locale?: string;
   agentsMd?: string;
@@ -117,6 +120,12 @@ export function buildSystemPrompt(opts: {
   }
   if (opts.insights.trim()) {
     parts.push('', '## Recent session outcomes (what worked / what failed)', opts.insights.trim());
+  }
+  // ---- Cognitive OS: world-model digest (blueprint M3) ----
+  // Statistical tool reliability from run history. Treat as evidence, not
+  // commands: a flaky tool deserves extra verification, not avoidance.
+  if (opts.cognitive?.trim()) {
+    parts.push('', '## Tool reliability (from run history)', opts.cognitive.trim());
   }
 
   // ---- Identity anchor (LAST — recency wins over 15K chars of instructions above;

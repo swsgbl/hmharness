@@ -751,6 +751,24 @@ export async function startServer(opts: { port: number; host?: string; version?:
         json(res, 200, { ok: true });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/drift') {
+        try {
+          const { analyzeGoalDrift } = await import('@hmharness/cognitive');
+          json(res, 200, { views: (await analyzeGoalDrift(home)).slice(0, 8) });
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/skills') {
+        try {
+          const { skillCandidatesFromHistory } = await import('@hmharness/cognitive');
+          json(res, 200, { candidates: (await skillCandidatesFromHistory(home)).slice(0, 8) });
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/cognitive') {
         // research dashboard seed (blueprint RD-001..008): read-only status
         // of the cognitive subsystems — memory layers, trajectory store,

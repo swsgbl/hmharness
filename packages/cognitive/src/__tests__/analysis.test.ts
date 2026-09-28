@@ -4,14 +4,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TrajectoryStore, TrajectoryRecorder } from '../trajectory.ts';
-import { analyzeWorldModel, diagnoseOpportunities, benchFromTrajectories, loadTrajectories } from '../analysis.ts';
+import { analyzeWorldModel, diagnoseOpportunities, benchFromTrajectories, loadTrajectories, buildContextDigest, analyzeGoalDrift, skillCandidatesFromHistory } from '../analysis.ts';
 
 async function tmpHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'cog-analysis-'));
 }
 
-function seedTrajectory(home: string, id: string, steps: Array<{ type: string; outcome: 'success' | 'failure' }>, success: boolean): Promise<void> {
-  const rec = new TrajectoryRecorder(id, 'ses-x', { id: 'terminal', version: '1.0.0' });
+function seedTrajectory(home: string, id: string, steps: Array<{ type: string; outcome: 'success' | 'failure' }>, success: boolean, goal?: string): Promise<void> {
+  const rec = new TrajectoryRecorder(id, 'ses-x', { id: 'terminal', version: '1.0.0' }, goal ? { id: `goal-${id}`, description: goal } : undefined);
   for (const s of steps) rec.record({ action: { id: 'a', type: s.type, args: {} }, outcome: s.outcome, evidence: [] });
   const traj = rec.finish(success);
   return new TrajectoryStore(home).append(traj).then(() => undefined);
@@ -88,5 +88,50 @@ test('analysis: bench aggregates uniform metrics over recorded runs', async () =
   assert.ok((report?.aggregate.recoveryRate ?? 0) > 0); // b2 recovered from a failure
   const empty = await benchFromTrajectories(home, 'harmonyos');
   assert.equal(empty, null);
+  await rm(home, { recursive: true, force: true });
+});
+
+test('analysis: context digest stays silent on thin history, advises on flaky tools', async () => {
+  const home = await tmpHome();
+  // fewer than 3 steps: no advice (cold start sees nothing)
+  await seedTrajectory(home, 'thin', [{ type: 'read', outcome: 'success' }], true);
+  assert.equal(await buildContextDigest(home), '');
+  // now history with a failing tool: the digest must name it
+  await seedTrajectory(home, 'h1', [
+    { type: 'read', outcome: 'success' }, { type: 'read', outcome: 'success' }, { type: 'read', outcome: 'success' },
+    { type: 'deploy', outcome: 'failure' }, { type: 'deploy', outcome: 'failure' },
+  ], false);
+  const digest = await buildContextDigest(home);
+  assert.match(digest, /deploy/i);
+  assert.match(digest, /Flaky/i);
+  assert.ok(digest.length <= 500);
+  await rm(home, { recursive: true, force: true });
+});
+
+test('analysis: goal drift ranks off-goal trajectories worst', async () => {
+  const home = await tmpHome();
+  await seedTrajectory(home, 'focused', [
+    { type: 'fix_login_bug', outcome: 'success' }, { type: 'fix_login_bug', outcome: 'success' },
+    { type: 'fix_login_bug', outcome: 'success' }, { type: 'fix_login_bug', outcome: 'success' },
+    { type: 'fix_login_bug', outcome: 'success' },
+  ], true, 'fix the login bug');
+  await seedTrajectory(home, 'wandering', Array.from({ length: 8 }, () => ({ type: 'refactor_ui_styling', outcome: 'success' as const })), true, 'fix the login bug');
+  const views = await analyzeGoalDrift(home);
+  assert.equal(views.length, 2);
+  assert.equal(views[0].trajectoryId.startsWith('wandering') || views[0].goalDescription === 'fix the login bug', true);
+  assert.ok(views[0].driftScore > views[1].driftScore, 'off-goal run must rank worst');
+  assert.notEqual(views[0].recommendation, 'continue');
+  await rm(home, { recursive: true, force: true });
+});
+
+test('analysis: skill candidates mined from repeated successful runs', async () => {
+  const home = await tmpHome();
+  await seedTrajectory(home, 's1', [{ type: 'scan', outcome: 'success' }, { type: 'build', outcome: 'success' }, { type: 'test', outcome: 'success' }], true);
+  await seedTrajectory(home, 's2', [{ type: 'scan', outcome: 'success' }, { type: 'build', outcome: 'success' }, { type: 'test', outcome: 'success' }], true);
+  const candidates = await skillCandidatesFromHistory(home);
+  assert.ok(candidates.length >= 1);
+  assert.equal(candidates[0].status, 'candidate');
+  assert.equal(candidates[0].evidenceTrajectories, 2);
+  assert.deepEqual(candidates[0].procedure, ['scan', 'build', 'test']);
   await rm(home, { recursive: true, force: true });
 });

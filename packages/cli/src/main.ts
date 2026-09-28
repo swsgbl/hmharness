@@ -950,8 +950,30 @@ flags:
       stdout.write(`  规划门: 可信[${wm.plannerGate.trusted.join(',')}] 存疑[${wm.plannerGate.untrusted.join(',')}] 未知[${wm.plannerGate.unknown.join(',')}]\n`);
       return;
     }
+    if (sub === 'drift') {
+      // GOAL-005 on live data: did recorded runs actually serve their goals?
+      const { analyzeGoalDrift } = await import('@hmharness/cognitive');
+      const views = await analyzeGoalDrift(homeDir());
+      if (views.length === 0) { stdout.write('（尚无带目标的轨迹——设置会话目标后再跑任务）\n'); return; }
+      for (const v of views.slice(0, 10)) {
+        stdout.write(`  ${v.driftScore.toFixed(2).padEnd(5)} ${v.recommendation.padEnd(22)} ${v.goalDescription.slice(0, 60)}\n`);
+        for (const s of v.signals.slice(0, 2)) stdout.write(DIM(`      ${s}\n`));
+      }
+      return;
+    }
+    if (sub === 'skills') {
+      // SK-002 on live data: repeated successful action runs as candidates
+      const { skillCandidatesFromHistory } = await import('@hmharness/cognitive');
+      const candidates = await skillCandidatesFromHistory(homeDir());
+      if (candidates.length === 0) { stdout.write('（暂无技能候选——需要≥2 条含≥2 步成功动作序列的轨迹）\n'); return; }
+      for (const c of candidates) {
+        stdout.write(`  [${c.status}] ${c.name}\n`);
+        stdout.write(`      流程: ${c.procedure.join(' → ')} · 证据 ${c.evidenceTrajectories} 条轨迹（晋升仍需过基准门禁）\n`);
+      }
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench — 认知子系统状态与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

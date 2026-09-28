@@ -132,3 +132,103 @@ export async function benchFromTrajectories(home: string, environmentId = 'termi
     },
   };
 }
+
+/* ---- context advisor (blueprint M3: the planner consumes the world model) ---- */
+
+/** Compact world-model digest for the SYSTEM PROMPT. The model sees which
+ *  tool types history trusts, which keep failing, and what the diagnosis
+ *  layer currently suggests — perception feeding action, capped hard so it
+ *  can never bloat the prompt (max ~500 chars). */
+export async function buildContextDigest(home: string, maxChars = 500): Promise<string> {
+  try {
+    const wm = await analyzeWorldModel(home);
+    if (wm.stepsReplayed < 3) return ''; // too little evidence to advise on
+    const lines: string[] = [];
+    const untrusted = wm.beliefs.filter((b) => b.confidence < 0.5 && b.evidenceCount >= 2);
+    if (untrusted.length > 0) {
+      lines.push(`Flaky tools historically (verify carefully when using): ${untrusted.slice(0, 3).map((b) => `${b.actionType}(${Math.round(b.confidence * 100)}%)`).join(', ')}.`);
+    }
+    const trusted = wm.beliefs.filter((b) => b.confidence >= 0.7 && b.evidenceCount >= 3);
+    if (trusted.length > 0) {
+      lines.push(`Reliable tools: ${trusted.slice(0, 3).map((b) => b.actionType).join(', ')}.`);
+    }
+    const { opportunities } = await diagnoseOpportunities(home);
+    const opp = opportunities[0];
+    if (opp) lines.push(`Learning focus right now: ${opp.signal.slice(0, 120)}.`);
+    const text = lines.join(' ');
+    return text.length > maxChars ? text.slice(0, maxChars - 3) + '...' : text;
+  } catch {
+    return ''; // advising is best-effort; never block context assembly
+  }
+}
+
+/* ---- goal drift over recorded trajectories (blueprint GOAL-005 on live data) ---- */
+
+export interface GoalDriftView {
+  trajectoryId: string;
+  goalDescription: string;
+  driftScore: number;
+  signals: string[];
+  recommendation: string;
+}
+
+/** GOAL-005 on live data: for every recorded trajectory that carried a goal,
+ *  compare its actions against the goal's keywords and report drift. */
+export async function analyzeGoalDrift(home: string, limit = 100): Promise<GoalDriftView[]> {
+  const { GoalManager } = await import('./goal.ts');
+  const gm = new GoalManager();
+  const trajectories = (await loadTrajectories(home, limit)).filter((t) => t.goal?.description);
+  const out: GoalDriftView[] = [];
+  for (const traj of trajectories) {
+    const goal = gm.propose({
+      id: traj.goal!.id,
+      description: traj.goal!.description,
+      source: 'user',
+      priority: 1,
+      constraints: [],
+      successCriteria: [],
+    });
+    const transitions = traj.steps.map((s) => ({
+      stateBefore: {} as never,
+      action: s.action,
+      observation: { environmentId: traj.environment.id, timestamp: traj.startedAt, state: null, availableActions: [] },
+      outcome: s.outcome,
+    }));
+    const report = gm.detectDrift(goal, transitions, { sessionId: traj.sessionId, actionsTaken: traj.steps.length });
+    out.push({
+      trajectoryId: traj.id,
+      goalDescription: traj.goal!.description,
+      driftScore: report.driftScore,
+      signals: report.signals,
+      recommendation: report.recommendation,
+    });
+  }
+  return out.sort((a, b) => b.driftScore - a.driftScore);
+}
+
+/* ---- skill candidates from real trajectories (blueprint M7 on live data) ---- */
+
+export interface SkillCandidateView {
+  id: string;
+  name: string;
+  procedure: string[];
+  evidenceTrajectories: number;
+  status: string;
+}
+
+/** SK-002 on live data: mine repeated successful action runs from the
+ *  trajectory store into skill CANDIDATES (promotion still requires the
+ *  benchmark gate — this only surfaces what the history suggests). */
+export async function skillCandidatesFromHistory(home: string, opts?: { minRepeat?: number }): Promise<SkillCandidateView[]> {
+  const { SkillCompiler } = await import('./skill-compiler.ts');
+  const compiler = new SkillCompiler();
+  const trajectories = await loadTrajectories(home);
+  const candidates = await compiler.compile(trajectories, opts);
+  return candidates.map((c) => ({
+    id: c.id,
+    name: c.name,
+    procedure: c.procedure.map((s) => s.ref),
+    evidenceTrajectories: c.evidence.length,
+    status: c.status,
+  }));
+}
