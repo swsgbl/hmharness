@@ -1,7 +1,7 @@
 {
-  "name": "@hmharness/evolution",
+  "name": "@hmharness/environments",
   "version": "0.19.0",
-  "description": "hmharness evolution subsystem: persistent memory, insight capture, skill library, and the bench that gives evolution its fitness signal. First-class kernel citizen, not a plugin.",
+  "description": "HMH Cognitive OS environment adapters: Terminal (native), HarmonyOS (via domain-harmony), Browser/Desktop (via host automation bridge), ARC3 (external adapter). Every adapter implements the @hmharness/cognitive Environment protocol and must pass the shared conformance test.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -14,9 +14,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
   },
-  "dependencies": {
-    "@hmharness/kernel": "0.19.0"
-  },
   "files": [
     "dist"
   ],
@@ -27,5 +24,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@hmharness/kernel": "0.19.0",
+    "@hmharness/cognitive": "0.19.0"
   }
 }

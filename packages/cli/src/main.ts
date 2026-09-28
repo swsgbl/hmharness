@@ -909,6 +909,21 @@ flags:
     await tui(yes, rest.includes('--no-web'));
     return;
   }
+  if (cmd === 'cognitive') {
+    // Cognitive OS (blueprint 2026-09): read-only status one-pager. The
+    // subsystems are libraries first — they come alive when the agent loop
+    // and evolution pipeline adopt them; this command shows what exists.
+    await initHome();
+    const sub = rest.find((a) => !a.startsWith('-'));
+    if (sub !== 'status') {
+      stdout.write('用法: hmh cognitive status — 认知子系统状态（记忆五层/轨迹库/进化审计/环境注册表）\n');
+      return;
+    }
+    const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');
+    const status = await cognitiveStatus(homeDir());
+    stdout.write(formatCognitiveStatus(status) + '\n');
+    return;
+  }
   if (cmd === 'web') {
     await initHome();
     const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);

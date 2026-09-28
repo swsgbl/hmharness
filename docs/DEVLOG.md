@@ -4,6 +4,50 @@
 
 ---
 
+## 2026-09-29 · Cognitive OS 蓝图落地:认知层+环境层两包(591/591)
+
+**动机**:执行《HMH_Cognitive_OS_AGI_实施蓝图_2026-09.docx》——把 hmharness 从
+HarmonyOS 自进化代理升级为可跨环境、可持续学习、可验证自进化的 Cognitive Runtime。
+战略结论(蓝图 §0):下一阶段不是继续堆自进化功能,而是把学习对象、环境状态、
+世界模型、目标、探索和跨环境迁移变成**可测量的一等公民**。
+
+**关键决策**:
+1. **两个新包,协议先行**:`@hmharness/cognitive`(13 模块:environment 协议+注册表、
+   trajectory 存储、world-model、goal、exploration、rlm、五层 memory、skill-compiler、
+   continual、evolution2、multi-agent、benchmark、status)+ `@hmharness/environments`
+   (terminal 原生/harmonyos hdc 桥/browser CDP/desktop 窗口枚举/arc3 骨架)。
+   每个接口先 schema+validation+测试,后实现(蓝图主提示词铁律)。
+2. **诚实降级**:browser 无 act 桥返回 E_NO_CDP_BRIDGE、desktop 无自动化桥返回
+   E_NO_AUTOMATION_BRIDGE、arc3 无 SDK 直接拒跑——**结构化报错,永不伪装成功**。
+   注册表 conformance() 是所有环境必须通过的同一份契约测试(ENV-010 防伪适配器)。
+3. **世界模型允许"不知道"**:未见过的动作类型预测置信度=0 且 knownUnknown——
+   规划器把它当探索信号而非 0% 成功率(蓝图 §3 硬规则)。信念 EMA 从 0.3 悲观起点
+   收敛(4 次成功≈0.83,绝不跳 1.0)。预测误差聚类→修订只加 correction 规则,
+   永不静默改写信念(可解释修订)。
+4. **安全规则进结构不进约定**:goal.adopt() 对 intrinsic 来源+副作用目标强制审批;
+   RLM eval 沙箱 freeze 治理态(meta 只读);evolution2 入口拒批不完整候选契约
+   (无假设/无回归声明/无 holdout/无 transfer/无回滚=进不了门),序贯门禁只认
+   holdout+transfer 样本(train 永不决策),reward-hacking 检测(指标涨真任务不涨=
+   冻结管线),append-only 不可变审计。
+5. **记忆只增不删**:矛盾检测同主题分歧打标;巩固用 supersededBy 合并重复/衰减陈旧,
+   原始记录永不出文件——与 evolution/memory 的 ACE 纪律同源。
+6. **技能=可执行对象**:SkillSpec(trigger/preconditions/procedure/verification/
+   evidence/version),compile 从≥2 个成功轨迹挖重复模式,verify 过 benchmark 才能
+   promote——与 bench 门禁同一条纪律。
+
+**实测证据**:cognitive 47 测试+environments 10 测试全绿;类型零错;全仓 591/591;
+`hmh cognitive status` 真机输出五层记忆/轨迹库/进化审计/环境注册表状态;
+terminal 环境过 conformance 契约测试(写文件→命令→快照→恢复→评估全链);
+harmonyos 无设备时 conformance 仍过(诚实降级态)。
+
+**教训**:
+- observe() 必须幂等只读——harmonyos 首版在 observe 里追加 history 导致快照哈希
+  永远漂移;conformance 测试当场抓住(这正是 ENV-010 存在的理由)。
+- JS 无 Math.erfc,正态尾概率手写 A&S 7.1.26 近似;SPRT-lite 门禁 4/9 平局样本
+  判不了任何事(统计上就是不该判)。
+
+---
+
 ## 2026-09-10 · 外部评审六项落地:打破自指适应度景观(126/126)
 
 **动机**:评审指出最深的问题是"进化系统正在一个自己人造的适应度景观上优化"——

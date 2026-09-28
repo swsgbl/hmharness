@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/cli",
-  "version": "0.18.15",
+  "version": "0.19.0",
   "description": "hmharness command line: one-shot tasks, an interactive REPL, a fullscreen TUI, the web frontend, and direct tool invocation.",
   "type": "module",
   "main": "dist/main.js",
@@ -43,15 +43,17 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/agent": "0.18.15",
-    "@hmharness/domain-harmony": "0.18.15",
-    "@hmharness/domain-ops": "0.18.15",
-    "@hmharness/evaluation": "0.18.15",
-    "@hmharness/evolution": "0.18.15",
-    "@hmharness/kernel": "0.18.15",
-    "@hmharness/observability": "0.18.15",
-    "@hmharness/sandbox": "0.18.15",
-    "@hmharness/web": "0.18.15",
+    "@hmharness/agent": "0.19.0",
+    "@hmharness/cognitive": "0.19.0",
+    "@hmharness/domain-harmony": "0.19.0",
+    "@hmharness/domain-ops": "0.19.0",
+    "@hmharness/environments": "0.19.0",
+    "@hmharness/evaluation": "0.19.0",
+    "@hmharness/evolution": "0.19.0",
+    "@hmharness/kernel": "0.19.0",
+    "@hmharness/observability": "0.19.0",
+    "@hmharness/sandbox": "0.19.0",
+    "@hmharness/web": "0.19.0",
     "qrcode": "^1.5.4"
   }
 }

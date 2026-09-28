@@ -38,6 +38,12 @@
       ],
       "@hmharness/evaluation": [
         "packages/evaluation/src/index.ts"
+      ],
+      "@hmharness/cognitive": [
+        "packages/cognitive/src/index.ts"
+      ],
+      "@hmharness/environments": [
+        "packages/environments/src/index.ts"
       ]
     }
   },

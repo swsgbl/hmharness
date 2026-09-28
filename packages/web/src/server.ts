@@ -751,6 +751,18 @@ export async function startServer(opts: { port: number; host?: string; version?:
         json(res, 200, { ok: true });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive') {
+        // research dashboard seed (blueprint RD-001..008): read-only status
+        // of the cognitive subsystems — memory layers, trajectory store,
+        // evolution audit tail, environment registry.
+        try {
+          const { cognitiveStatus } = await import('@hmharness/cognitive');
+          json(res, 200, await cognitiveStatus(home));
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/state') {
         json(res, 200, await stateObject());
         return;

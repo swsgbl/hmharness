@@ -1,5 +1,35 @@
 # hmharness 路线图
 
+## Cognitive OS 12 个月里程碑(2026-09 蓝图,2026-09-29 首批落地)
+
+依据《HMH_Cognitive_OS_AGI_实施蓝图_2026-09》§19/§24。执行顺序铁律(§28):
+先 Environment+Trajectory 协议,再 World Model,后 Goal/Exploration——
+每阶段必须有 benchmark,没有 benchmark 的"智能升级"不算完成。
+
+| 月 | 里程碑 | 交付 | 状态 |
+|---|---|---|---|
+| M1 | Cognitive OS Foundation | Environment/Observation/Action/Trajectory schema | ✅ 协议+注册表+conformance+terminal 环境 |
+| M2 | World Model v0 | state/transition/prediction/revision | ✅ 信念表+置信+误差聚类+可解释修订 |
+| M3 | Goal + Planner | goal graph/drift/verification | ✅ 图谱/分解/打分/漂移/高影响审批 |
+| M4 | Exploration Engine | uncertainty/information gain/hypothesis | ✅ UCB 策略+假设注册表+预算 |
+| M5 | RLM Runtime | persistent workspace/recursive/checkpoint | ✅ 变量工作台/eval 沙箱/fork/checkpoint |
+| M6 | Five Memory | working/episodic/semantic/procedural/world | ✅ 五层+溯源+矛盾检测+只增巩固 |
+| M7 | Skill Compiler | experience→skill→verify→promote | ✅ 模式挖掘+验证门禁+晋升/回滚 |
+| M8 | Continual Learning | learning control plane | ✅ 九类对象+harness 优先+模型高门槛 |
+| M9 | Self-Evolution 2.0 | prediction/holdout/canary/rollback | ✅ 候选契约+序贯门禁+审计+hacking 检测 |
+| M10 | Multi-Agent 2.0 | role topology/budget | ✅ 角色契约+共享黑板+心跳/取消/预算 |
+| M11 | GeneralBench + ARC | cross-env benchmark/replay | ◐ 统一指标+transfer lab 已建;ARC3 骨架待 SDK |
+| M12 | Transfer + Research | transfer matrix + dashboard | ◐ matrix 已建;/api/cognitive 种子;面板 UI 待做 |
+
+**首批验收证据(2026-09-29)**:cognitive 47 测试+environments 10 测试全绿,
+terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机可用,
+类型零错,全仓构建链纳入(13 包)。
+
+**下一步(蓝图 §25 Issue 池驱动)**:runner 事件流接 TrajectoryRecorder(每次
+任务自动落 episodic 轨迹)→ evolution/evolve 换用 evolution2 治理壳 →
+memory 写入走 CognitiveMemory(带溯源) → browser/desktop act 桥接 agent 工具 →
+ARC3 SDK 到位后启用 adapter → 研究面板 UI。
+
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 
 外部评审结论:瓶颈已从"机制不够"转为"证据不够、纵深不够、人手不够"。采纳其节奏:

@@ -4,8 +4,30 @@
 
 ```
 ┌────────────────────────────────────────────────┐
-│  前端  cli(终端:REPL/一次性/evolve/web 启动)    │
-│        web(浏览器:SSE 推流+远程审批+会话回放)   │
+│  前端  cli(终端:REPL/一次性/evolve/web/cognitive)│
+│        web(浏览器:SSE 推流+远程审批+会话回放     │
+│              +/api/cognitive 研究面板)           │
+├────────────────────────────────────────────────┤
+│  认知层 cognitive(2026-09 蓝图,Cognitive OS)     │
+│   environment 协议+注册表(observe/act/snapshot/ │
+│     restore/evaluate 一致性测试)                │
+│   world-model(信念表+预测置信+误差聚类+修订)    │
+│   goal(图谱/分解/漂移/高影响审批)               │
+│   exploration(不确定性×信息增益×相关性−风险)    │
+│   rlm(可编程认知工作台:变量/checkpoint/fork)     │
+│   memory 五层(working/episodic/semantic/        │
+│     procedural/world+溯源+矛盾检测+只增巩固)    │
+│   skill-compiler(经验→可验证技能→门禁晋升)      │
+│   continual(学习控制平面:九类对象,harness优先)  │
+│   evolution2(候选契约/序贯门禁/金丝雀/审计/     │
+│     reward-hacking 检测)                        │
+│   multi-agent(角色契约/共享黑板/预算/心跳/取消) │
+│   benchmark(GeneralBench 统一指标+transfer lab) │
+├────────────────────────────────────────────────┤
+│  环境层 environments(Cognitive OS 适配器)        │
+│   terminal(原生:文件/命令/评估探针)             │
+│   harmonyos(hdc 桥)/browser(CDP 观察+桥接动作) │
+│   desktop(窗口枚举+自动化桥)/arc3(骨架,拒伪装) │
 ├────────────────────────────────────────────────┤
 │  执行层 agent(工具·系统提示·spawn_agent·runner) │
 ├────────────────────────────────────────────────┤
@@ -30,9 +52,11 @@
 └────────────────────────────────────────────────┘
 ```
 
-六包依赖方向(自上而下,禁止反向):cli/web → agent → evolution + domain-harmony → kernel。
+十三包依赖方向(自上而下,禁止反向):cli/web → cognitive + environments + agent →
+evolution + domain-harmony → kernel。
 cli 与 web 互为兄弟前端,共享 agent 层的 runner 事件协议(onDelta/onToolCall/onApproval/onFinal),
 行为完全一致——终端与浏览器只是同一事件流的两张皮。
+cognitive 只依赖 kernel:认知策略不碰审批/沙箱内部,治理组合它们而非绕过它们。
 
 ## 关键决策及依据(立项调研存档于本地)
 
