@@ -125,3 +125,24 @@ test('uiLiteSource: serialized functions are plain ES5 (no arrows, no ${}) for i
   assert.ok(!src.includes('=>'), 'no arrow functions — must run in the vanilla page script');
   assert.ok(!src.includes('${'), 'no template interpolation syntax');
 });
+
+test('uiLiteSource: inline bundle is SELF-CONTAINED — renderMarkdown runs from the serialized source alone', () => {
+  // regression (2026-09-27): Function#toString only serializes one function
+  // body, so the page's renderMarkdown threw "renderInlineBlocks is not
+  // defined" and every live reply fell back to raw text. The serialized
+  // bundle must define every private helper it calls.
+  const src = uiLiteSource();
+  const run = new Function(src + '\nreturn renderMarkdown;')() as (s: string) => string;
+  const html = run('# title\n\nsome **bold** and `code` with [link](http://example.com/a?b=1)');
+  assert.match(html, /<h1>title<\/h1>/);
+  assert.match(html, /<b>bold<\/b>/);
+  assert.match(html, /<code>code<\/code>/);
+  assert.match(html, /<a href="http:\/\/example\.com\/a\?b=1"/);
+  // fence blocks render through tokLine without escaping into helper land
+  const fenced = run('text\n' + '```js\nconst x = "s";\n```');
+  assert.match(fenced, /<pre>/);
+  assert.match(fenced, /tok-k/);
+  // quote-escape: a " in a URL must not break out of the href attribute
+  const q = run('see [x](http://example.com/a"onmouseover="alert(1))');
+  assert.ok(!q.includes('onmouseover="alert'), 'URL quotes are escaped inside href');
+});

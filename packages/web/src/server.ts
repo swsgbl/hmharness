@@ -100,16 +100,34 @@ export async function startServer(opts: { port: number; host?: string; version?:
   // current task finishes (replaces the old 409 rejection). Codex-style: the
   // send button doubles as the stop button, so the queue itself needs no
   // commands - it is visible in the UI and interruptible per item.
-  const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean }> = [];
+  const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }> = [];
   let currentAbort: AbortController | null = null;
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
-  // cross-task conversation memory (Claude-Code-style continuous thread):
-  // every task resumes the working transcript, so follow-ups have context.
-  // currentSessionId keeps the whole web conversation on ONE rollout file
-  // (codex thread semantics); fresh=true starts a new thread.
-  let conversation: ChatMessage[] = [];
-  let currentSessionId: string | undefined;
+  // 2026-09-28 deepseek-harness semantics transplant: every session is an
+  // INDEPENDENT thread. The old single global `conversation` meant viewing a
+  // history session and following up corrupted the live thread, and outputs
+  // from one thread leaked into another. Threads are keyed by the client's
+  // session id; a history session resumes its own rollout transcript.
+  interface SessionThread { conversation: ChatMessage[]; cwd: string; rolloutId?: string }
+  const sessionThreads = new Map<string, SessionThread>();
+  let activeSessionId = '';
+  const threadFor = (id: string): SessionThread => {
+    let t = sessionThreads.get(id);
+    if (!t) {
+      t = { conversation: [], cwd: wsRoot() };
+      sessionThreads.set(id, t);
+    }
+    return t;
+  };
+  const threadCap = 40;
+  if (sessionThreads.size > threadCap) {
+    // bound memory: drop the oldest non-active threads (history is durable on disk)
+    for (const k of sessionThreads.keys()) {
+      if (sessionThreads.size <= threadCap) break;
+      if (k !== activeSessionId) sessionThreads.delete(k);
+    }
+  }
 
   // ---- workspaces: the agent's project contexts ----
   // A workspace is a project directory; switching one chdirs the server so
@@ -166,27 +184,53 @@ export async function startServer(opts: { port: number; host?: string; version?:
   // duplicated the whole runner inside the finally-block to drain the queue -
   // a degraded copy (missing onLine/onApproval, mismatched event names) that
   // drifted every time the direct path changed. One runOne + one pump.
-  const runOne = async (item: { text: string; mode: string; yes: boolean; fresh: boolean }, fromQueue = false): Promise<void> => {
+  const runOne = async (item: { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }, fromQueue = false): Promise<void> => {
     busy = true;
     currentAbort = new AbortController();
-    broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue });
+    // this task runs INSIDE its session's thread (deepseek-harness semantics:
+    // the session owns the state; the runner never sees a global thread)
+    const sid = item.sessionId || `web-${Date.now().toString(36)}`;
+    activeSessionId = sid;
+    const thread = threadFor(sid);
+    // history-session follow-up: adopt that rollout's transcript + cwd as the
+    // thread, so "continue chatting in an old session" is a REAL resume
+    if (!thread.rolloutId && !item.fresh) {
+      try {
+        const file = await findSessionFile(home, sid);
+        if (file) {
+          const tr = await loadTranscript(file);
+          if (tr) {
+            thread.conversation = tr.messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+            thread.rolloutId = tr.id ?? sid;
+            if (tr.cwd) thread.cwd = tr.cwd;
+          }
+        }
+      } catch { /* not a known rollout - fresh thread */}
+    }
+    const resume = item.fresh ? [] : thread.conversation;
+    broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue, sessionId: sid, cwd: thread.cwd });
     const unattended = item.yes || cfg.approval === 'auto';
+    // run inside the SESSION's directory: each thread remembers its own
+    // project cwd (deepseek-harness semantics); single-slot execution means
+    // the chdir is safe, and the previous cwd is restored afterwards
+    const prevCwd = process.cwd();
+    if (isAbsolute(thread.cwd)) {
+      try { process.chdir(thread.cwd); } catch { /* vanished dir - keep server cwd */ }
+    }
     try {
-      const resume = item.fresh ? [] : conversation;
       const result = await runAgentTask({
         task: item.text,
         registry: reg,
         cfg,
         yes: item.yes,
         resumeMessages: resume,
-        sessionId: item.fresh ? undefined : currentSessionId,
+        sessionId: item.fresh ? undefined : thread.rolloutId,
         signal: currentAbort.signal,
         // runtime steering: the runner polls this between tool batches and
         // lands injected text as user messages in the live transcript
         inject: { poll: () => injectionQueue.splice(0).map((text) => ({ text })) },
-        // per-session persistent goal (web settings "goal" card); fresh
-        // threads deliberately start without one
-        goal: item.fresh ? undefined : await getGoal(home, currentSessionId ?? 'web'),
+        // per-session persistent goal; fresh threads deliberately start without one
+        goal: item.fresh ? undefined : await getGoal(home, thread.rolloutId ?? sid),
         // auto/yolo tasks must not wire the remote approval prompt at all -
         // the remote gate used to override the yes flag unconditionally,
         // which is why "auto" still popped approvals (the audited bug)
@@ -201,31 +245,39 @@ export async function startServer(opts: { port: number; host?: string; version?:
             broadcast('approvalReq', { name, args });
           }),
         events: {
-          onLine: (l) => broadcast('line', { text: l }),
-          onDelta: (kind, chunk) => broadcast('delta', { kind, chunk }),
-          onToolCall: (name, args) => broadcast('tool', { name, args }),
+          onLine: (l) => broadcast('line', { text: l, sessionId: sid }),
+          onDelta: (kind, chunk) => broadcast('delta', { kind, chunk, sessionId: sid }),
+          onToolCall: (name, args) => broadcast('tool', { name, args, sessionId: sid }),
           onToolResult: (name, output, isError) =>
-            broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000) }),
-          onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted }),
-          onInjected: (text) => broadcast('injected', { text }),
+            broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000), sessionId: sid }),
+          onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted, sessionId: sid }),
+          onInjected: (text) => broadcast('injected', { text, sessionId: sid }),
           onFinal: (r) => {
-            // extend the cross-task thread: [..prior, user, ...new turns]
-            conversation = [...resume, { role: 'user', content: item.text }, ...(r as { messages?: ChatMessage[] }).messages?.slice(resume.length + 2) ?? []];
-            currentSessionId = r.sessionId;
-            broadcast('final', { ...r, turnsInThread: Math.floor(conversation.length / 2) });
+            // extend THIS session's thread only. r.messages carries the whole
+            // run; keep user/assistant turns with tool_calls stripped (the
+            // next run prepends its own system prompt and must not inherit
+            // dangling tool-call pairs).
+            const full = (r as { messages?: ChatMessage[] }).messages;
+            thread.conversation = full
+              ? full.filter((m) => m.role === 'user' || m.role === 'assistant')
+                  .map((m) => (m.role === 'assistant' && m.tool_calls ? { role: 'assistant', content: m.content } : m))
+              : [...resume, { role: 'user', content: item.text }];
+            thread.rolloutId = r.sessionId;
+            broadcast('final', { ...r, sessionId: sid, turnsInThread: Math.floor(thread.conversation.length / 2) });
           },
         },
       });
       // the result itself already fanned out via onFinal; nothing to return
       void result;
     } catch (err) {
-      broadcast('error', { message: String(err).slice(0, 400) });
+      broadcast('error', { message: String(err).slice(0, 400), sessionId: sid });
     } finally {
+      try { if (process.cwd() !== prevCwd) process.chdir(prevCwd); } catch { /* best effort */ }
       currentAbort = null;
       pendingApproval = null;
       busy = false;
       injectionQueue.length = 0; // stale steering text must not leak into the next task
-      broadcast('busy', { busy: false });
+      broadcast('busy', { busy: false, sessionId: sid });
       broadcast('state', await stateObject());
     }
   };
@@ -255,6 +307,10 @@ export async function startServer(opts: { port: number; host?: string; version?:
       busy,
       approvalPending: pendingApproval !== null,
       queue: taskQueue.map((t) => t.text),
+      // the session whose task is currently running (or last ran) - the web
+      // topbar follows THIS, not the global workspace, when showing status
+      activeSessionId,
+      activeThreadCwd: activeSessionId ? sessionThreads.get(activeSessionId)?.cwd ?? '' : '',
       workspace: currentWs() ?? null,
       daemonVersion,
       providers: listProviders(cfg).map((p) => ({ name: p.name, model: p.model, purposes: p.purposes })),
@@ -296,7 +352,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
         };
       }),
       // per-session persistent goal ('web' key when no thread is open yet)
-      goal: await getGoal(home, currentSessionId ?? 'web'),
+      goal: await getGoal(home, activeSessionId || 'web'),
     };
   };
 
@@ -637,7 +693,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
           text: (m.content ?? '').slice(0, 500),
           tools: m.tool_calls?.map((c) => c.function.name) ?? [],
         });
-        json(res, 200, { id: tr.id, model: tr.model, messages: tr.messages.slice(-80).map(preview) });
+        json(res, 200, { id: tr.id, model: tr.model, cwd: tr.cwd ?? '', messages: tr.messages.slice(-80).map(preview) });
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/task') {
@@ -745,13 +801,18 @@ export async function startServer(opts: { port: number; host?: string; version?:
         // what runs, queues, and echoes in the 'busy' SSE event
         const composed = prefix + imagePrefix + text;
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
-        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true };
+        // sessionId routes the task into ITS session's thread (deepseek-harness
+        // semantics): a follow-up in a history view resumes that rollout, a
+        // fresh session starts clean. The thread state lives server-side; the
+        // browser view is just a projection of it.
+        const sidIn = typeof (body as { sessionId?: unknown }).sessionId === 'string' ? String((body as { sessionId?: unknown }).sessionId).slice(0, 80) : undefined;
+        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn };
         // Queue instead of reject: tasks submitted while busy are accepted
         // and auto-started when the current one finishes (user request:
         // "input always available, new tasks queue during execution")
         if (busy) {
           taskQueue.push(item);
-          broadcast('queued', { position: taskQueue.length, task: composed });
+          broadcast('queued', { position: taskQueue.length, task: composed, sessionId: sidIn ?? '' });
           broadcastQueue();
           json(res, 200, { ok: true, queued: true, position: taskQueue.length });
           return;
@@ -1115,17 +1176,19 @@ export async function startServer(opts: { port: number; host?: string; version?:
           return;
         }
         injectionQueue.push(text);
-        broadcast('injected', { text });
+        broadcast('injected', { text, sessionId: activeSessionId });
         json(res, 200, { ok: true });
         return;
       }
       // ---- per-session persistent goal ----
       if (req.method === 'POST' && url.pathname === '/api/goal') {
-        const body = JSON.parse((await readBody(req)) || '{}') as { goal?: unknown };
+        const body = JSON.parse((await readBody(req)) || '{}') as { goal?: unknown; sessionId?: unknown };
         const goal = typeof body.goal === 'string' ? body.goal : '';
-        const key = currentSessionId ?? 'web';
+        const sidIn = typeof body.sessionId === 'string' ? body.sessionId.slice(0, 80) : '';
+        const thread = sidIn ? sessionThreads.get(sidIn) : undefined;
+        const key = thread?.rolloutId ?? (sidIn || activeSessionId || 'web');
         await setGoal(home, key, goal);
-        broadcast('goal', { goal: goal.trim() || null });
+        broadcast('goal', { goal: goal.trim() || null, sessionId: sidIn || activeSessionId });
         json(res, 200, { ok: true });
         return;
       }
@@ -1351,8 +1414,11 @@ export async function startServer(opts: { port: number; host?: string; version?:
           const degraded = degradedPool.slice(0, 6);
           const good = picked.filter((x) => !degraded.some((d2) => d2.session === x.session));
           const ordered = [...degraded, ...good];
-          const sessions = [] as Array<{ session: string; task: string; answer: string; outcome: string; toolUses: number }>;
-          for (const s of ordered) {
+          const labeled = (await readLabels(home)).length;
+          // concurrent fetch of head+transcript per candidate: the serial loop
+          // read 24+ rollout files back-to-back and made the first label-page
+          // load take ~6s (looked broken). Disk IO parallelizes fine locally.
+          const sessions = (await Promise.all(ordered.map(async (s) => {
             let task = s.task;
             let answer = '';
             try {
@@ -1373,15 +1439,14 @@ export async function startServer(opts: { port: number; host?: string; version?:
               }
             } catch { /* keep the insight task */ }
             const ins = byIns.get(s.session);
-            sessions.push({
+            return {
               session: s.session,
               task: task.slice(0, 300),
               answer: answer.slice(0, 400),
               outcome: ins?.outcome ?? '',
               toolUses: ins?.toolUses ?? 0,
-            });
-          }
-          const labeled = (await readLabels(home)).length;
+            };
+          }))) as Array<{ session: string; task: string; answer: string; outcome: string; toolUses: number }>;
           json(res, 200, { sessions, labeled, goal: 100 });
         } catch (err) {
           json(res, 400, { error: String(err).slice(0, 200) });

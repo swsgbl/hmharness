@@ -622,55 +622,72 @@ ${uiLiteSource()}
   })();
   window.__AN = AN;
   var log = document.getElementById('log');
-  // 2026-09-25 multi-session view: while a task runs, the user may browse
-  // other sessions or open a blank one - the live stream then accumulates in
-  // a detached buffer instead of painting over what they are reading, and a
-  // banner offers the way back. sink() is the single write funnel.
-  var viewLive = true;
-  var liveBox = document.createElement('div');
-  function sink() { return viewLive ? log : liveBox; }
-  /** Stash the live transcript and switch to an away-view (another session
-   *  or a blank new one). The running task keeps streaming into liveBox. */
-  function leaveLiveView() {
-    if (viewLive) { while (log.firstChild) liveBox.appendChild(log.firstChild); }
-    viewLive = false;
-    updateLiveBanner();
+  /* ---- per-session views (2026-09-28, deepseek-harness semantics) ----
+     Every session owns ONE dedicated container + state; "the current session"
+     is the root of all rendering. Switching sessions swaps which container is
+     mounted - never which buffer a stream writes to. A running task's events
+     keep flowing into ITS session's container whether or not you are looking
+     at it; other sessions can never be painted over. This replaces the old
+     shared-log + stash/liveBox state machine (the cross-session pollution
+     class of bugs). */
+  var views = new Map();          // sid -> view record
+  var curSid = null;              // the session currently displayed
+  var activeSink = null;          // write target while routing an SSE event (per-session root)
+  var busySid = '';               // session whose task is running (server echo)
+  function newViewRecord(sid) {
+    var root = document.createElement('div');
+    root.className = 'sessview';
+    root.style.display = 'none';
+    log.appendChild(root);
+    return {
+      sid: sid, root: root, loaded: false, cwd: '',
+      // per-session render state (was global - the actual pollution bug)
+      seq: 0, toolRegistry: {}, curBlock: null, curKind: null,
+      pendingToolRow: null, parCount: 0, parBox: null, groupNames: {},
+      deliverables: [], lastTask: '', lastAssistantText: '', planText: '',
+    };
   }
-  /** Back to the live view: restore everything that streamed meanwhile. */
-  function returnToLive() {
-    log.innerHTML = '';
-    while (liveBox.firstChild) log.appendChild(liveBox.firstChild);
-    viewLive = true;
-    updateLiveBanner();
+  function viewFor(sid, create) {
+    var v = views.get(sid);
+    if (!v && create !== false) { v = newViewRecord(sid); views.set(sid, v); }
+    return v;
+  }
+  /** The write target for an incoming session event: that session's own
+   *  container, created on demand. Never the shared log. */
+  function sink(sid) {
+    var s = sid === undefined ? (activeSinkSid() || curSid) : sid;
+    if (!s) return log;
+    return viewFor(s).root;
+  }
+  function activeSinkSid() { return activeSinkSidVal; }
+  var activeSinkSidVal = null;
+  /** Mount one session's container as the visible view (others hidden). */
+  function mountView(sid) {
+    curSid = sid;
+    views.forEach(function (v) { v.root.style.display = (v.sid === sid) ? '' : 'none'; });
+    var pv = document.getElementById('plancard');
+    var v = views.get(sid);
+    if (pv) {
+      if (v && v.planText) { renderPlanCardInto(v, true); pv.style.display = 'block'; }
+      else pv.style.display = 'none';
+    }
+    updateTopbarCwd();
+    var shown = views.get(sid);
+    if (shown) shown.root.scrollTop = 0;
     log.scrollTop = log.scrollHeight;
   }
-  var liveBanner = null;
-  function updateLiveBanner() {
-    var running = !!window.__agentBusy;
-    if (viewLive || !running) { if (liveBanner) liveBanner.style.display = 'none'; return; }
-    if (!liveBanner) {
-      liveBanner = document.createElement('div');
-      liveBanner.style.cssText = 'position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:6px 14px;background:color-mix(in srgb,var(--warn) 14%,var(--bg));border-bottom:1px solid var(--line);font-size:12.5px;color:var(--text)';
-      var txt = document.createElement('span');
-      txt.textContent = (L && L.liveRunBehind) || '● 任务仍在后台运行，输出已暂停显示';
-      var back = document.createElement('button');
-      back.type = 'button';
-      back.style.cssText = 'margin-left:auto;padding:2px 10px;font:12px inherit;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer';
-      back.textContent = (L && L.liveRunBack) || '回到运行中的会话';
-      back.onclick = returnToLive;
-      liveBanner.appendChild(txt); liveBanner.appendChild(back);
-      log.parentElement.insertBefore(liveBanner, log);
-    }
-    liveBanner.style.display = 'flex';
+  /** Topbar project/path follows the VIEWED session's cwd (user-visible fix:
+   *  it used to show the server's global workspace no matter what you read). */
+  function updateTopbarCwd() {
+    var v = curSid ? views.get(curSid) : null;
+    var path = (v && v.cwd) || (state && state.workspace && state.workspace.path) || (state && state.home) || '';
+    var elc = document.getElementById('home');
+    if (elc) { elc.textContent = path; elc.title = path; }
   }
   var state = null;
   var L = null;
   var curView = 'chat';
-  var toolRegistry = {};   // seq -> {name, args, output}
-  var seq = 0;
   var sessData = [];
-  var lastTask = '';
-  var lastAssistantText = '';
 
   var LABELS = {
     zh: { title:'hmh web', idle:'空闲', running:'运行中…', send:'运行', sendNow:'发送', stop:'停止', stopTitle:'停止当前任务(排队任务继续)', queueTitle:'发送后将排队,当前任务完成后自动运行', queueClear:'清空队列', queueRemove:'移除该排队任务', approve:'批准', deny:'拒绝',
@@ -700,6 +717,7 @@ ${uiLiteSource()}
            rtabDetail:'详情', rtabFiles:'文件', rtabPreview:'预览', rcollapse:'折叠右栏', rclose:'关闭右栏',
            pvHint:'在文件树或对话中点击文件路径在此预览', pvBinary:'二进制文件，无法预览（', pvTrunc:'(仅前 64KB)', pvNotFile:'文件不存在或在工作区外',
            slashHint:'↑↓ 选择 · Enter 插入 · Esc 关闭', atHint:'↑↓ 选择 · Enter 插入路径 · Esc 关闭', injHint:'运行中: Enter=排队 · Ctrl+Enter=注入当前轮', injected:'已注入当前轮', queueNone:'(空)',
+           atNone:'无匹配文件 — 继续输入或按 Esc 关闭',
            cmdOk:'命令结果', cmdHelp:'命令', searchAt:'输入 @ 搜索工作区文件…',
            webCmds: { '/help':'列出 Web 可用命令', '/clear':'清屏并开新线程', '/status':'当前模型/语言/队列状态', '/model':'查看/切换模型路由', '/lang':'切换语言 zh/en', '/yolo':'全自动审批开关', '/providers':'检测本机可用厂商', '/tools':'列出全部工具', '/skills':'列出技能', '/mcp':'列出 MCP 服务器', '/ops':'鸿蒙工具链体检', '/ops scan':'生态雷达扫描', '/resume':'从左侧会话列表回看', '/web':'显示 web 地址', '/exit':'退出提示' } },
     en: { title:'hmh web', idle:'idle', running:'running…', send:'Run', sendNow:'Send', stop:'Stop', stopTitle:'stop the current task (queued tasks still run)', queueTitle:'queues; runs when the current task finishes', queueClear:'clear queue', queueRemove:'remove this queued task',
@@ -729,7 +747,8 @@ ${uiLiteSource()}
            provDeleteConfirm:'Delete this provider? (config.json is rewritten in place, not recoverable)', presetEnv:'needs env var', presetLocal:'local endpoint',
            rtabDetail:'Detail', rtabFiles:'Files', rtabPreview:'Preview', rcollapse:'collapse', rclose:'close',
            pvHint:'click a file path in the file tree or the chat to preview it here', pvBinary:'binary file, cannot preview (', pvTrunc:'(first 64KB only)', pvNotFile:'file not found or outside the workspace',
-           slashHint:'↑↓ select · Enter insert · Esc close', atHint:'↑↓ select · Enter insert path · Esc close', injHint:'while running: Enter=queue · Ctrl+Enter=inject this turn', injected:'injected into the current turn', queueNone:'(empty)',
+          slashHint:'↑↓ select · Enter insert · Esc close', atHint:'↑↓ select · Enter insert path · Esc close', injHint:'while running: Enter=queue · Ctrl+Enter=inject this turn', injected:'injected into the current turn', queueNone:'(empty)',
+          atNone:'no matching files — keep typing or press Esc',
            cmdOk:'command output', cmdHelp:'commands', searchAt:'type @ to search workspace files…',
            webCmds: { '/help':'list web commands', '/clear':'clear screen, new thread', '/status':'model/locale/queue state', '/model':'list/switch chat route', '/lang':'switch locale zh/en', '/yolo':'toggle hands-free approvals', '/providers':'detect local providers', '/tools':'list all tools', '/skills':'list skills', '/mcp':'list MCP servers', '/ops':'harmony toolchain check', '/ops scan':'ecosystem radar scan', '/resume':'revisit sessions in the sidebar', '/web':'show the web address', '/exit':'how to quit' } }
   };
@@ -838,17 +857,22 @@ ${uiLiteSource()}
     var e = document.createElement(tag);
     if (cls) e.className = cls;
     if (text !== undefined) e.textContent = text;
-    var parent = forceLog ? log : sink();
+    // forceLog = user-just-typed feedback -> the VIEWED session's container.
+    // Default = the EVENT's session container (activeSink routing) - a running
+    // task in session A never writes into the session B the user is reading.
+    var parent = forceLog ? (curSid ? viewFor(curSid).root : log) : sink();
     parent.appendChild(e);
-    parent.scrollTop = parent.scrollHeight;
-    if (parent === log) {
+    if (parent.style.display !== 'none') parent.scrollTop = parent.scrollHeight;
+    if (parent === (curSid ? viewFor(curSid).root : null) || parent === log) {
       if (cls === 'msg-user') window.__AN.userBubble(e);
       else window.__AN.rowIn(e);
     }
     return e;
   }
   function clearEmpty() {
-    var e = document.getElementById('empty');
+    // the welcome card lives INSIDE a session view; clear the routed one
+    var t = sink();
+    var e = t.querySelector('#empty');
     if (e) e.remove();
   }
   function copyText(s) {
@@ -881,7 +905,7 @@ ${uiLiteSource()}
     body.className = 'thinkbody';
     box.appendChild(head); box.appendChild(body);
     sink().appendChild(box);
-    if (viewLive) log.scrollTop = log.scrollHeight;
+    autoscroll();
     return {
       add: function (c) { body.textContent += c; autoscroll(); },
       finalize: function () { box.classList.remove('open'); },
@@ -894,7 +918,7 @@ ${uiLiteSource()}
     var txt = '';
     return {
       add: function (c) { txt += c; e.textContent = txt; autoscroll(); },
-      finalize: function () { e.innerHTML = renderMarkdown(txt); lastAssistantText = txt; autoscroll(); },
+      finalize: function () { e.innerHTML = renderMarkdown(txt); var v = activeSinkSidVal && views.get(activeSinkSidVal); if (v) v.lastAssistantText = txt; autoscroll(); },
       discard: function () { if (e.parentNode) e.parentNode.removeChild(e); }
     };
   }
@@ -930,18 +954,26 @@ ${uiLiteSource()}
     document.getElementById('model').textContent = s.model;
     document.getElementById('model2').textContent = s.model;
     renderModelPick(s);
-    var hp = s.workspace && s.workspace.path ? s.workspace.path : s.home;
-    document.getElementById('home').textContent = hp;
-    document.getElementById('home').title = hp;
+    // mid-run reload: remember which session is running server-side
+    if (s.activeSessionId) busySid = s.activeSessionId;
+    // topbar path: the VIEWED session's cwd wins; the global workspace is the
+    // fallback (user bug: switching project sessions never moved the chip)
+    updateTopbarCwd();
     // A11 theme + A6 goal from the persisted state
     applyTheme((s.settings && s.settings.theme) || 'dark');
     var gc = document.getElementById('goal-chip');
     if (s.goal) { gc.style.display = ''; gc.textContent = '🎯 ' + s.goal; gc.title = s.goal; }
     else { gc.style.display = 'none'; }
     if (s.workspace) {
+      var wsPrev = curWs && curWs.path;
       curWs = s.workspace;
       var n = document.getElementById('wscur-name');
       if (n && n.textContent !== s.workspace.name) n.textContent = s.workspace.name;
+      // workspace switched: the file tree's one-shot cache is stale
+      if (wsPrev && wsPrev !== s.workspace.path) {
+        var ft = document.getElementById('ftree');
+        if (ft) { ft.removeAttribute('data-loaded'); ft.innerHTML = ''; }
+      }
       renderSessions(document.getElementById('search').value);
     }
     document.getElementById('skills-n').textContent = s.skills.active.length + s.skills.drafts.length;
@@ -1625,6 +1657,10 @@ ${uiLiteSource()}
    *  the last path segment. The current workspace's group is first and open;
    *  others are collapsed by default so the sidebar stays scannable with
    *  hundreds of sessions (user request: "按项目为主菜单归类"). */
+  // user-toggled group open/closed state, keyed by project path - survives the
+  // renderSessions reruns that every state broadcast triggers (the sidebar used
+  // to snap every group back to its default fold on each task finish)
+  var grpOpen = {};
   function renderSessions(filter) {
     var mine = document.getElementById('sessions');
     var other = document.getElementById('sessions-other');
@@ -1668,7 +1704,8 @@ ${uiLiteSource()}
       var head = document.createElement('button');
       head.type = 'button';
       head.className = 'projgrp' + (isCur ? ' cur' : '');
-      var open = isCur || idx === 0 || !!f;
+      var defOpen = isCur || idx === 0 || !!f;
+      var open = Object.prototype.hasOwnProperty.call(grpOpen, key) ? grpOpen[key] : defOpen;
       head.innerHTML = '<span class="pcaret">' + (open ? '\\u25BE' : '\\u25B8') + '</span>'
         + '<span class="pname">' + projName(g.path) + '</span>'
         + '<span class="pcount">' + g.items.length + '</span>';
@@ -1681,6 +1718,7 @@ ${uiLiteSource()}
       head.onclick = function () {
         var vis = body.style.display !== 'none';
         body.style.display = vis ? 'none' : '';
+        grpOpen[key] = !vis;
         head.querySelector('.pcaret').textContent = vis ? '\\u25B8' : '\\u25BE';
       };
     });
@@ -1700,19 +1738,30 @@ ${uiLiteSource()}
       renderSessions(document.getElementById('search').value);
     });
   }
+  /** Open one session's view. History sessions render into their own
+   *  container (once), live sessions keep their streaming container - either
+   *  way mounting NEVER disturbs any other session's content. */
   function viewSession(id) {
     flushStream();
-    leaveLiveView(); // stash the running task's output; it keeps streaming off-screen
     switchView('chat');
+    var v = viewFor(id);
+    if (v.cwd) { /* already known */ }
+    mountView(id);
+    if (v.loaded) { updateTopbarCwd(); return; }
+    v.loaded = true;
     fetch('/api/sessions/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (d) {
-      log.innerHTML = '';
-      el('div', 'stats', '--- session ' + d.id + ' \\u00B7 ' + d.model + ' ---', true);
+      if (d.cwd) { v.cwd = d.cwd; if (curSid === id) updateTopbarCwd(); }
+      var root = v.root;
+      root.innerHTML = '';
+      var st = document.createElement('div'); st.className = 'stats';
+      st.textContent = '--- session ' + d.id + ' \u00B7 ' + d.model + ' ---';
+      root.appendChild(st);
       // one-click export (2026-09-25): the viewed session as Markdown
       var xbtn = document.createElement('button');
       xbtn.type = 'button'; xbtn.textContent = '\\u2B07 ' + (L ? (L.sesExportBtn || '导出全文') : 'export');
       xbtn.style.cssText = 'margin:4px 16px;padding:3px 10px;font:12px inherit;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer';
       xbtn.onclick = function () { window.location.href = '/api/sessions/' + encodeURIComponent(d.id) + '/export.md'; };
-      log.appendChild(xbtn);
+      root.appendChild(xbtn);
       // A15: session full-text search (filters the rendered previews)
       var sbox = document.createElement('div');
       sbox.style.cssText = 'display:flex;gap:6px;margin:4px 16px';
@@ -1720,7 +1769,7 @@ ${uiLiteSource()}
       sin.placeholder = (L ? L.sessSearch : 'search in session…');
       sin.style.cssText = 'flex:1;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:12px inherit;outline:none';
       sbox.appendChild(sin);
-      log.appendChild(sbox);
+      root.appendChild(sbox);
       // A13: trajectory timeline — every tool call in order, one dot per call
       var tools = [];
       d.messages.forEach(function (m) { (m.tools || []).forEach(function (tn) { tools.push(tn); }); });
@@ -1735,7 +1784,7 @@ ${uiLiteSource()}
           c.title = tn + ' called ' + names[tn] + 'x';
           strip.appendChild(c);
         });
-        log.appendChild(strip);
+        root.appendChild(strip);
       }
       var rows = [];
       d.messages.forEach(function (m) {
@@ -1744,16 +1793,23 @@ ${uiLiteSource()}
         else rows.push({ kind: 'toolres', html: m.text });
       });
       function renderRows(filter) {
-        var existing = log.querySelectorAll('.msg-user,.toolrow,.say,.toolres');
+        var existing = root.querySelectorAll('.msg-user,.toolrow,.say,.toolres');
         Array.prototype.forEach.call(existing, function (n) { n.remove(); });
         var q = (filter || '').toLowerCase();
         rows.forEach(function (r) {
           if (q && r.html.toLowerCase().indexOf(q) < 0) return;
-          el('div', r.kind, r.html, true);
+          var e = document.createElement('div');
+          e.className = r.kind;
+          e.textContent = r.html;
+          root.insertBefore(e, endMark);
         });
-        el('div', 'stats', '--- end ---', true);
-        log.scrollTop = log.scrollHeight;
+        var endMark2 = root.querySelector('.endmark');
+        if (curSid === id) log.scrollTop = log.scrollHeight;
       }
+      var endMark = document.createElement('div');
+      endMark.className = 'stats endmark';
+      endMark.textContent = '--- end ---';
+      root.appendChild(endMark);
       sin.oninput = function () { renderRows(sin.value); };
       renderRows('');
     });
@@ -1822,8 +1878,8 @@ ${uiLiteSource()}
       document.body.style.cursor = '';
     });
   })();
-  function showDetails(seqId) {
-    var d = toolRegistry[seqId];
+  function showDetailsIn(v, seqId) {
+    var d = v && v.toolRegistry[seqId];
     if (!d) return;
     openRight('detail');
     document.getElementById('dname').textContent = d.name;
@@ -1907,9 +1963,14 @@ ${uiLiteSource()}
       })
       .catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
   }
-  // clickable file paths inside the chat: a path-looking <code> opens the preview tab
+  // clickable file paths inside the chat: a path-looking <code> opens the preview tab.
+  // Relative paths AND Windows/POSIX absolute paths (the old regex rejected the
+  // drive letter / leading slash, so agent-quoted absolute paths were dead text)
   function maybePath(t) {
-    return /^[A-Za-z0-9_.\\/-]+\\.[a-zA-Z0-9]{1,8}$/.test(t) && t.length < 200 && t.indexOf(' ') < 0 && !/^https?:/.test(t);
+    if (/^https?:/.test(t) || t.indexOf(' ') >= 0 || t.length >= 200) return false;
+    if (/^[A-Za-z]:[\\\\/][^:<>"|?*]{0,180}/.test(t)) return true;  // G:\\x\\y or C:/x/y
+    if (/^\\//.test(t)) return true;                                  // /abs/posix/path
+    return /^[A-Za-z0-9_.\\/-]+\\.[a-zA-Z0-9]{1,8}$/.test(t);        // rel/file.ext
   }
   log.addEventListener('click', function (ev) {
     var t = ev.target;
@@ -1920,16 +1981,17 @@ ${uiLiteSource()}
     }
   });
 
-  // ---- streaming state ----
-  var curBlock = null;
-  var curKind = null;
+  // ---- streaming state (per-view; the active view is set by SSE routing) ----
   function flushStream() {
-    if (curBlock) curBlock.finalize();
+    var v = activeSinkSidVal ? views.get(activeSinkSidVal) : null;
+    if (!v) return;
+    if (v.curBlock) v.curBlock.finalize();
     // a new model turn resets the parallel group context
-    parCount = 0; parBox = null;
-    curBlock = null;
-    curKind = null;
+    v.parCount = 0; v.parBox = null;
+    v.curBlock = null;
+    v.curKind = null;
   }
+  function safeAutoscroll() { if (!activeSinkSidVal || activeSinkSidVal === curSid) autoscroll(); }
   function nearBottom() { return log.scrollHeight - log.scrollTop - log.clientHeight < 80; }
   function autoscroll() { if (nearBottom()) log.scrollTop = log.scrollHeight; }
   log.addEventListener('scroll', function () {
@@ -1979,8 +2041,8 @@ ${uiLiteSource()}
       pre.appendChild(row);
     });
     box.appendChild(pre);
-    log.appendChild(box);
-    autoscroll();
+    sink().appendChild(box);
+    safeAutoscroll();
   }
   function renderSearchCards(d) {
     var urls = [];
@@ -1998,9 +2060,9 @@ ${uiLiteSource()}
       var h = document.createElement('span'); h.className = 'lh';
       try { h.textContent = new URL(u).host; } catch (e2) {}
       card.appendChild(a); card.appendChild(h);
-      log.appendChild(card);
+      sink().appendChild(card);
     });
-    autoscroll();
+    safeAutoscroll();
   }
   function foldToolResult(d) {
     var fold = document.createElement('div');
@@ -2029,57 +2091,95 @@ ${uiLiteSource()}
         fold.after(body);
       } else { body.style.display = body.style.display === 'none' ? '' : 'none'; }
     };
-    log.appendChild(fold);
-    autoscroll();
+    sink().appendChild(fold);
+    safeAutoscroll();
   }
   var pendingToolRow = null;   // running tool row awaiting its result
   var es = new EventSource('/api/events');
   es.addEventListener('hello', function (e) { renderState(JSON.parse(e.data)); });
   es.addEventListener('state', function (e) { renderState(JSON.parse(e.data)); });
+  var echoedAt = 0; var echoedTask = '';
+  /** Route ONE event into its session's view: sets the active sink so every
+   *  el()/thinkBlock()/renderer below writes THAT session's container, never
+   *  the shared log. The view is created on demand - even for sessions this
+   *  tab never opened (another tab's task) - so nothing is ever lost. */
+  function route(sid) {
+    var s = (typeof sid === 'string' && sid) ? sid : busySid || curSid || '';
+    activeSinkSidVal = s || null;
+    if (s) viewFor(s); // ensure the container exists (hidden is fine)
+    return s ? views.get(s) : null;
+  }
   es.addEventListener('busy', function (e) {
     var d = JSON.parse(e.data);
+    var v = route(d.sessionId);
     setBusy(d.busy, d.mode);
+    if (d.busy) {
+      busySid = d.sessionId || '';
+      if (v) {
+        if (d.cwd) v.cwd = d.cwd;
+        // per-task state reset: deliverables must not leak into the next task
+        v.deliverables = [];
+        closeToolGroup(v);
+      }
+      if (d.cwd && curSid === busySid) updateTopbarCwd();
+    } else {
+      busySid = '';
+    }
     flushStream();
-    if (d.busy) closeToolGroup();
-    updateLiveBanner(); // banner follows the running state in away-views
-    // fromQueue: the task was already echoed when submitted - don't duplicate
-    if (d.busy && !d.fromQueue) { lastTask = d.task; clearEmpty(); el('div', 'msg-user', d.task); }
+    // echo the running task as a user bubble so OTHER tabs see it too; the
+    // submitting tab already painted it in sendTask (dedup within 3s)
+    if (d.busy && d.task && v) {
+      v.lastTask = d.task;
+      var now = Date.now();
+      if (!(d.task === echoedTask && now - echoedAt < 3000)) {
+        echoedTask = d.task; echoedAt = now;
+        clearEmpty();
+        el('div', 'msg-user', d.task);
+      }
+    }
   });
   es.addEventListener('queued', function (e) {
     var d = JSON.parse(e.data);
-    el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \\u2014 ' + d.task);
+    el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \u2014 ' + d.task, true);
   });
   es.addEventListener('queue', function (e) {
     renderQueue(JSON.parse(e.data).items || []);
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
+    var v = route(d.sessionId);
+    if (!v) return;
     if (d.kind === 'reset') {
       // provider retried after a mid-stream cut: drop the half answer so the
       // regenerated text is not shown as a duplicate
-      if (curBlock && curBlock.discard) curBlock.discard();
-      curBlock = null; curKind = null;
+      if (v.curBlock && v.curBlock.discard) v.curBlock.discard();
+      v.curBlock = null; v.curKind = null;
       return;
     }
-    if (curKind !== d.kind) {
+    if (v.curKind !== d.kind) {
       flushStream();
       clearEmpty();
-      closeToolGroup(); // model text after a tool run settles the group
-      curKind = d.kind;
-      curBlock = d.kind === 'reasoning' ? thinkBlock() : sayBlock();
+      closeToolGroup(v); // model text after a tool run settles the group
+      v.curKind = d.kind;
+      v.curBlock = d.kind === 'reasoning' ? thinkBlock() : sayBlock();
     }
-    curBlock.add(d.chunk);
+    v.curBlock.add(d.chunk);
   });
-  es.addEventListener('line', function (e) { flushStream(); el('div', 'toolres', JSON.parse(e.data).text); autoscroll(); });
-  var parCount = 0; var parBox = null;
+  es.addEventListener('line', function (e) {
+    var d = JSON.parse(e.data);
+    route(d.sessionId);
+    flushStream();
+    el('div', 'toolres', d.text);
+    safeAutoscroll();
+  });
   // 2026-09-25 consecutive-tool grouping: a run of tool calls with no model
   // text between them collapses into ONE group row ("N tool calls · names"),
   // showing only the LIVE call while running and folding the rest. The
   // summary stays one line however long the run - a 10-call command spree
-  // used to bury the conversation under 20+ rows.
-  function closeToolGroup() {
-    if (parBox) { parBox.classList.add('settled'); setGroupVisible(parBox, false); }
-    parBox = null; parCount = 0;
+  // used to bury the conversation under 20+ rows. (All state per-view.)
+  function closeToolGroup(v) {
+    if (v && v.parBox) { v.parBox.classList.add('settled'); setGroupVisible(v.parBox, false); }
+    if (v) { v.parBox = null; v.parCount = 0; }
   }
   function setGroupVisible(box, open) {
     box.classList.toggle('open', open);
@@ -2094,15 +2194,16 @@ ${uiLiteSource()}
     var parts = Object.keys(counts).map(function (k) { return k + '\\u00D7' + counts[k]; });
     return '\\u25CF ' + n + ' ' + (L.toolGroupCalls || '个工具调用') + ' \\u00B7 ' + parts.slice(0, 4).join(' ') + (parts.length > 4 ? ' \\u2026' : '') + ' \\u00B7 ' + (L.toolGroupToggle || '点击展开');
   }
-  var groupNames = {};
   es.addEventListener('tool', function (e) {
+    var d = JSON.parse(e.data);
+    var v = route(d.sessionId);
+    if (!v) return;
     flushStream();
     clearEmpty();
-    var d = JSON.parse(e.data);
-    seq++;
-    toolRegistry[seq] = { name: d.name, args: d.args, output: '' };
+    v.seq++;
+    v.toolRegistry[v.seq] = { name: d.name, args: d.args, output: '' };
     var row = el('div', 'toolrow');
-    row.setAttribute('data-seq', String(seq));
+    row.setAttribute('data-seq', String(v.seq));
     var st = document.createElement('span'); st.className = 'st run'; st.textContent = '\\u25CF';
     var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = d.name;
     var ar = document.createElement('span'); ar.className = 'dim2'; ar.style.color = 'var(--dim)';
@@ -2113,69 +2214,76 @@ ${uiLiteSource()}
     // A9: remember touched files for the deliverables chips at 'final'
     if (d.name === 'edit_file' || d.name === 'write_file') {
       var p0 = d.args && d.args.path;
-      if (typeof p0 === 'string' && p0) deliverables.push({ name: d.name, args: { path: p0 } });
+      if (typeof p0 === 'string' && p0) v.deliverables.push({ name: d.name, args: { path: p0 } });
     }
-    var s = seq;
-    row.onclick = function () { showDetails(s); };
-    parCount++;
-    groupNames[d.name] = (groupNames[d.name] || 0) + 1;
-    if (parCount === 2 && !parBox) {
-      // second CONSECUTIVE call: retroactively group the previous row too
-      parBox = document.createElement('div');
-      parBox.className = 'pargrp rungrp';
+    var s = v.seq;
+    row.onclick = function () { showDetailsIn(v, s); };
+    v.parCount++;
+    v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
+    if (v.parCount === 2 && !v.parBox) {
+      // second CONSECUTIVE call: retroactively group the previous row too.
+      // Walk THIS view root's direct children backwards for the last tool row.
+      v.parBox = document.createElement('div');
+      v.parBox.className = 'pargrp rungrp';
       var pl = document.createElement('div');
       pl.className = 'plabel glabel';
       pl.style.cursor = 'pointer';
-      parBox.appendChild(pl);
-      parBox.__label = pl;
+      v.parBox.appendChild(pl);
+      v.parBox.__label = pl;
       pl.onclick = function (ev) {
         ev.stopPropagation();
-        setGroupVisible(parBox, !parBox.classList.contains('open'));
+        setGroupVisible(v.parBox, !v.parBox.classList.contains('open'));
       };
-      var first = log.querySelector('.toolrow:last-of-type');
-      if (first && first.parentElement === log) {
-        log.insertBefore(parBox, first);
-        parBox.appendChild(first);
-      } else { log.appendChild(parBox); }
-      groupNames = {};
+      var first = null;
+      for (var li = v.root.children.length - 1; li >= 0; li--) {
+        var lc = v.root.children[li];
+        if (lc.classList && lc.classList.contains('toolrow')) { first = lc; break; }
+      }
+      if (first && first.parentElement === v.root) {
+        v.root.insertBefore(v.parBox, first);
+        v.parBox.appendChild(first);
+      } else { v.root.appendChild(v.parBox); }
+      v.groupNames = {};
       // recount from the rows actually inside the group
-      for (var gi = 0; gi < parBox.children.length; gi++) {
-        var gr = parBox.children[gi];
+      for (var gi = 0; gi < v.parBox.children.length; gi++) {
+        var gr = v.parBox.children[gi];
         if (gr.classList && gr.classList.contains('toolrow')) {
           var gn = gr.querySelector('.nm');
-          if (gn) groupNames[gn.textContent] = (groupNames[gn.textContent] || 0) + 1;
+          if (gn) v.groupNames[gn.textContent] = (v.groupNames[gn.textContent] || 0) + 1;
         }
       }
-      groupNames[d.name] = (groupNames[d.name] || 0) + 1;
+      v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
     }
-    if (parBox) {
+    if (v.parBox) {
       // fold the PREVIOUS row; only the live call stays visible
-      for (var pi = 0; pi < parBox.children.length; pi++) {
-        var pr = parBox.children[pi];
-        if (pr.classList && pr.classList.contains('toolrow')) pr.style.display = parBox.classList.contains('open') ? '' : 'none';
+      for (var pi = 0; pi < v.parBox.children.length; pi++) {
+        var pr = v.parBox.children[pi];
+        if (pr.classList && pr.classList.contains('toolrow')) pr.style.display = v.parBox.classList.contains('open') ? '' : 'none';
       }
-      parBox.appendChild(row);
-      parBox.__label.textContent = groupLabel(parBox.querySelectorAll('.toolrow').length, groupNames);
-      row.style.display = parBox.classList.contains('open') ? '' : '';
+      v.parBox.appendChild(row);
+      v.parBox.__label.textContent = groupLabel(v.parBox.querySelectorAll('.toolrow').length, v.groupNames);
+      row.style.display = '';
     } else {
-      log.appendChild(row);
+      v.root.appendChild(row);
     }
-    pendingToolRow = { seq: s, st: st, row: parBox || row };
-    autoscroll();
+    v.pendingToolRow = { seq: s, st: st, row: v.parBox || row };
+    safeAutoscroll();
   });
   es.addEventListener('toolResult', function (e) {
-    flushStream();
     var d = JSON.parse(e.data);
-    if (pendingToolRow) {
-      pendingToolRow.st.className = 'st ' + (d.isError ? 'err' : 'ok');
-      pendingToolRow.st.textContent = d.isError ? '\\u2717' : '\\u2022';
-      pendingToolRow = null;
+    var v = route(d.sessionId);
+    if (!v) return;
+    flushStream();
+    if (v.pendingToolRow) {
+      v.pendingToolRow.st.className = 'st ' + (d.isError ? 'err' : 'ok');
+      v.pendingToolRow.st.textContent = d.isError ? '\\u2717' : '\\u2022';
+      v.pendingToolRow = null;
       // the group stays OPEN for the next consecutive call; it closes on
       // model text / final / the next user task
     }
     // attach output to the most recent matching entry without output
-    for (var k in toolRegistry) {
-      if (toolRegistry[k].name === d.name && toolRegistry[k].output === '') { toolRegistry[k].output = d.full || d.preview || ''; break; }
+    for (var k in v.toolRegistry) {
+      if (v.toolRegistry[k].name === d.name && v.toolRegistry[k].output === '') { v.toolRegistry[k].output = d.full || d.preview || ''; break; }
     }
     // keyed views (A4); default keeps W1: fold to one line, click to expand
     if (!d.isError && (d.name === 'edit_file' || d.name === 'write_file') && looksLikeDiff(d.full || d.preview || '')) {
@@ -2197,43 +2305,46 @@ ${uiLiteSource()}
   es.addEventListener('approvalDone', function (e) {
     document.getElementById('approval').style.display = 'none';
     document.getElementById('approval').classList.remove('pulse');
-    flushStream();
     var d = JSON.parse(e.data);
+    route(d.sessionId);
+    flushStream();
     el('div', 'toolres', '[approval ' + d.name + ': ' + (d.granted ? 'granted' : 'DENIED') + ']');
   });
   es.addEventListener('final', function (e) {
-    flushStream();
-    closeToolGroup(); // settle any trailing tool run into its folded group
     var d = JSON.parse(e.data);
+    var v = route(d.sessionId);
+    if (!v) return;
+    flushStream();
+    closeToolGroup(v); // settle any trailing tool run into its folded group
     // A6 plan card + A9 deliverables + A10 feedback ride the final event
-    if (lastAssistantText) renderPlanCard(lastAssistantText);
-    renderDeliverables();
+    if (v.lastAssistantText) renderPlanCard(v, v.lastAssistantText);
+    renderDeliverables(v);
     var tok = (d.usage && (d.usage.promptTokens + d.usage.completionTokens) > 0) ? ' \\u00B7 \\u2191' + d.usage.promptTokens + ' \\u2193' + d.usage.completionTokens + ' tok' : '';
-    el('div', 'stats', d.turns + ' turns \\u00B7 ' + d.toolUses + ' tool uses' + tok + ' \\u00B7 session ' + d.sessionId.slice(11));
+    el('div', 'stats', d.turns + ' turns \\u00B7 ' + d.toolUses + ' tool uses' + tok + ' \\u00B7 session ' + String(d.sessionId).slice(11));
     if (tok) document.getElementById('tokchip').textContent = tok.replace(' \\u00B7 ', '');
-    if (lastAssistantText && lastTask) {
+    if (v.lastAssistantText && v.lastTask) {
       var acts = document.createElement('div'); acts.className = 'acts';
       var bc = document.createElement('button'); bc.type = 'button'; bc.textContent = '\\u29C9 ' + L.copy;
-      bc.onclick = function () { copyText(lastAssistantText); bc.textContent = '\\u2713'; setTimeout(function () { bc.textContent = '\\u29C9 ' + L.copy; }, 1200); };
+      bc.onclick = function () { copyText(v.lastAssistantText); bc.textContent = '\\u2713'; setTimeout(function () { bc.textContent = '\\u29C9 ' + L.copy; }, 1200); };
       var br = document.createElement('button'); br.type = 'button'; br.textContent = '\\u27F3 ' + L.regen;
-      br.onclick = function () { sendTask(lastTask); };
+      br.onclick = function () { sendTask(v.lastTask, v.sid); };
       var sessionId = d.sessionId;
       var fbUp = document.createElement('button'); fbUp.type = 'button'; fbUp.className = 'fb'; fbUp.textContent = '\\uD83D\\uDC4D';
       fbUp.title = L ? L.fbUp : 'helpful';
       fbUp.onclick = function () {
         fbUp.classList.add('on'); fbDown.classList.remove('on');
-        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'up', text: lastAssistantText.slice(0, 200) }) });
+        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'up', text: v.lastAssistantText.slice(0, 200) }) });
       };
       var fbDown = document.createElement('button'); fbDown.type = 'button'; fbDown.className = 'fb'; fbDown.textContent = '\\uD83D\\uDC4E';
       fbDown.title = L ? L.fbDown : 'not helpful';
       fbDown.onclick = function () {
         fbDown.classList.add('on'); fbUp.classList.remove('on');
-        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'down', text: lastAssistantText.slice(0, 200) }) });
+        fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, thumbs: 'down', text: v.lastAssistantText.slice(0, 200) }) });
       };
       acts.appendChild(fbUp); acts.appendChild(fbDown);
       acts.appendChild(bc); acts.appendChild(br);
-      log.appendChild(acts);
-      autoscroll();
+      v.root.appendChild(acts);
+      safeAutoscroll();
     }
     loadSessions();
   });
@@ -2307,7 +2418,8 @@ ${uiLiteSource()}
     if (goalRow.style.display === 'flex') {
       var inp = document.getElementById('goal-input');
       inp.placeholder = L ? L.goalPh : '会话目标';
-      inp.value = goalChip.textContent === '' ? '' : goalChip.textContent;
+      // strip the display prefix - editing must not bake '\\uD83C\\uDFAF ' into the saved goal
+      inp.value = (state && state.goal) ? state.goal : '';
       inp.focus();
     }
   };
@@ -2315,22 +2427,30 @@ ${uiLiteSource()}
     var v = document.getElementById('goal-input').value.trim();
     fetch('/api/goal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal: v })
+      body: JSON.stringify({ goal: v, sessionId: curSid || '' })
     });
     goalRow.style.display = 'none';
   };
   document.getElementById('goal-clear').onclick = function () {
     fetch('/api/goal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal: '' })
+      body: JSON.stringify({ goal: '', sessionId: curSid || '' })
     });
     goalRow.style.display = 'none';
   };
 
   // ---- A6 plan card (checkable numbered-step list pinned at the top) ----
-  function renderPlanCard(text) {
-    var steps = extractPlan(text);
+  /** Plan card renders INTO the session's own container (per-view state);
+   *  the one pinned #plancard element shows the CURRENT session's plan and is
+   *  refreshed on mount. */
+  function renderPlanCard(v, text) {
+    v.planText = text || '';
+    if (activeSinkSidVal === curSid) renderPlanCardInto(v);
+  }
+  function renderPlanCardInto(v) {
     var card = document.getElementById('plancard');
+    if (!v || !v.planText) { if (card) card.style.display = 'none'; return; }
+    var steps = extractPlan(v.planText);
     if (steps.length === 0) { card.style.display = 'none'; return; }
     var title = document.getElementById('plancard-title');
     title.textContent = (L ? L.planCard : '计划') + ' (' + steps.length + ')';
@@ -2350,17 +2470,11 @@ ${uiLiteSource()}
   }
 
   // ---- A9 deliverables chips (edit_file/write_file paths -> preview) ----
-  var deliverables = [];
-  function renderDeliverables() {
-    var box = document.getElementById('deliv');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'deliv';
-      log.appendChild(box);
-    }
-    var paths = extractDeliverables(deliverables);
+  function renderDeliverables(v) {
+    var paths = extractDeliverables(v.deliverables);
     if (paths.length === 0) return;
-    box.innerHTML = '';
+    var box = document.createElement('div');
+    box.id = 'deliv';
     paths.forEach(function (p) {
       var chip = document.createElement('span');
       chip.className = 'deliv';
@@ -2369,8 +2483,8 @@ ${uiLiteSource()}
       chip.onclick = function () { openPreview(p); };
       box.appendChild(chip);
     });
-    var stats = log.querySelector('.stats');
-    if (stats) log.insertBefore(box, stats);
+    var stats = v.root.querySelector('.stats');
+    if (stats) v.root.insertBefore(box, stats); else v.root.appendChild(box);
   }
   /** A6/A9: extractPlan and extractDeliverables are the tested uilite
    *  functions injected above — no page-local copies. */
@@ -2387,6 +2501,20 @@ ${uiLiteSource()}
   // send (idle: runs now; busy: queues) and a STOP button when the agent is
   // running and the box is empty. No slash commands, no separate stop
   // control - one affordance, state decides.
+  // remembered approval mode (user principle: one choice sticks across reloads).
+  // Scope: per-task intent only - flipping the GLOBAL default stays with the
+  // explicit /yolo command (no hidden side effects from a dropdown pick).
+  (function () {
+    var sel = document.getElementById('mode');
+    try {
+      var m0 = localStorage.getItem('hmh-mode');
+      if (m0 === 'ask' || m0 === 'auto' || m0 === 'yolo') sel.value = m0;
+    } catch (e) {}
+    sel.onchange = function () {
+      try { localStorage.setItem('hmh-mode', sel.value); } catch (e) {}
+    };
+  })();
+
   function updateSendBtn() {
     if (!L) return; // first frame before /api/state resolves - keep the static label
     var btn = document.getElementById('send');
@@ -2408,7 +2536,12 @@ ${uiLiteSource()}
       .then(function (d) { if (d && d.error) el('div', 'err', d.error); })
       .catch(function (err) { el('div', 'err', String(err)); });
   }
-  function sendTask(text) {
+  function sendTask(text, sidIn) {
+    regenSid = sidIn || null;
+    sendTaskInner(text);
+  }
+  var regenSid = null;
+  function sendTaskInner(text) {
     if (!text) return;
     clearEmpty();
     switchView('chat');
@@ -2431,8 +2564,16 @@ ${uiLiteSource()}
         .catch(function (err) { renderCmdResult(String(err), true); });
       return;
     }
-    if (!window.__agentBusy) el('div', 'msg-user', text);
-    var body = { text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value };
+    // the user bubble always shows right where the user typed it - even when
+    // the task will queue (busy); without this the send press gave zero
+    // feedback in away views
+    el('div', 'msg-user', text, true);
+    echoedTask = text; echoedAt = Date.now(); // busy-event echo dedup
+    var submitSid = (regenSid || curSid) || '';
+    var v0 = submitSid ? views.get(submitSid) : null;
+    if (v0) v0.lastTask = text;
+    regenSid = null;
+    var body = { text: text, yes: document.getElementById('mode').value !== 'ask', mode: document.getElementById('mode').value, sessionId: submitSid, fresh: /^draft-/.test(submitSid) };
     var files = [];
     var images = [];
     attachments.forEach(function (a) { if (a.kind === 'image') images.push({ name: a.name, dataUrl: a.dataUrl }); else files.push(a.path); });
@@ -2447,7 +2588,7 @@ ${uiLiteSource()}
     }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
       .then(function (res) {
         if (res.d && res.d.queued) {
-          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' — ' + text);
+          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' \u2014 ' + text, true);
         } else if (res.status === 409) {
           el('div', 'err', L.alreadyRunning);
         }
@@ -2505,7 +2646,7 @@ ${uiLiteSource()}
     if (!list.length) {
       var em = document.createElement('div');
       em.className = 'pickfoot';
-      em.textContent = palMode === 'at' ? L.pvNotFile : '';
+      em.textContent = palMode === 'at' ? (L.atNone || 'no matching files') : '';
       panel.appendChild(em);
     }
     var foot = document.createElement('div');
@@ -2702,17 +2843,21 @@ ${uiLiteSource()}
   }
 
   // ---- sidebar actions ----
+  /** A fresh DRAFT session: its own container + draft id; the first task
+   *  submitted from it carries this id, so the server thread and this view
+   *  are the same session from the very first message. */
   function newSession() {
     flushStream();
     switchView('chat');
-    // multi-session (2026-09-25): a running task no longer blocks a fresh
-    // view - its output keeps streaming into the stash; new submissions from
-    // this blank view are QUEUED server-side and a banner offers the way back
-    leaveLiveView();
-    log.innerHTML = '<div id="empty"><div style="font-size:30px">\\u2699\\uFE0F</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
+    var sid = 'draft-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    var v = viewFor(sid);
+    v.loaded = true;
+    v.cwd = (curWs && curWs.path) || '';
+    v.root.innerHTML = '<div id="empty"><div style="font-size:30px">\\u2699\\uFE0F</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
       '<div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div>' +
       '<div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div>' +
       '<div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div>';
+    mountView(sid);
     wireExamples();
     document.getElementById('rightbar').classList.remove('open');
   }
@@ -2745,6 +2890,17 @@ ${uiLiteSource()}
   fetch('/api/state').then(function (r) { return r.json(); }).then(renderState);
   loadWorkspaces();
   loadSessions();
+  // boot: the static welcome card moves into the first DRAFT session view, so
+  // the very first task already runs inside a proper per-session container
+  (function () {
+    var sid = 'draft-boot';
+    var v = viewFor(sid);
+    v.loaded = true;
+    var empty = document.getElementById('empty');
+    if (empty && empty.parentNode === log) v.root.appendChild(empty);
+    mountView(sid);
+    wireExamples();
+  })();
   // first paint: the sidebar and the welcome view drift in
   window.__AN.stagger('#side .nav');
   window.__AN.viewIn(document.getElementById('view-chat'));

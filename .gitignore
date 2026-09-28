@@ -30,3 +30,5 @@ audit-doc.txt
 *.tmpbak
 *.opsbak
 *.v2bak
+
+.verify/

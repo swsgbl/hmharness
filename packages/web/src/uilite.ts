@@ -251,15 +251,18 @@ function renderInlineBlocks(body: string): string {
  *  re-wrap the URL already rendered inside an href (double-anchor bug). */
 function inlineMd(s: string): string {
   var links: Array<{ label: string; url: string }> = [];
+  // quote-escape the URL before it lands inside href="..." - a bare " in the
+  // text (esc only handles & < >) would break out of the attribute
+  var q = function (u: string) { return u.replace(/"/g, '%22'); };
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, function (_m, label, url) {
-    links.push({ label: label, url: url });
+    links.push({ label: label, url: q(url) });
     return '\u0001L' + (links.length - 1) + '\u0001';
   });
   s = s
     .replace(/`([^`\n]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
     .replace(/\*([^*\n]+)\*/g, '<i>$1</i>')
-    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    .replace(/(https?:\/\/[^\s<"]+)/g, function (m2) { return '<a href="' + q(m2) + '" target="_blank" rel="noopener">' + m2 + '</a>'; });
   s = s.replace(/\u0001L(\d+)\u0001/g, function (_m, idx) {
     var l = links[Number(idx)];
     return '<a href="' + l.url + '" target="_blank" rel="noopener">' + l.label + '</a>';
@@ -298,8 +301,20 @@ export function zhTask(t: string): string {
 }
 
 /** Serialized source for the single-file page: the pure functions above are
- *  injected verbatim into page.ts's <script> (single source of truth). */
+ *  injected verbatim into page.ts's <script> (single source of truth).
+ *  EVERY module-private helper a public function calls must ride along too -
+ *  Function#toString only serializes the one function body, so a missing
+ *  helper meant renderMarkdown threw "renderInlineBlocks is not defined" in
+ *  the page and EVERY live reply fell back to raw text (found live 2026-09-27;
+ *  covered by the inline-completeness test in uilite.test.ts). */
 export function uiLiteSource(): string {
-  return [fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask]
-    .map(function (f) { return f.toString(); }).join('\n');
+  // __name polyfill: tsx/esbuild (keep-names) rewrites inner function decls as
+  // `var f = __name(function f(){...})` INSIDE the serialized bodies - the
+  // page/eval scope has no such helper, so define an identity fallback first.
+  const prelude = 'var __name = (typeof __name === "function") ? __name : function (fn) { return fn; };'
+    + 'var TOK_KW = ' + JSON.stringify(TOK_KW) + ';';
+  return [prelude,
+    tokLine, renderInlineBlocks, inlineMd,
+    fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask]
+    .map(function (f) { return typeof f === 'string' ? f : f.toString(); }).join('\n');
 }

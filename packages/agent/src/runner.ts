@@ -261,7 +261,7 @@ export interface RunnerEvents {
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
   /** A runtime-steering user message entered the running loop's transcript. */
   onInjected?(message: string): void;
-  onFinal?(r: { text: string; turns: number; toolUses: number; sessionId: string; usage?: { promptTokens: number; completionTokens: number } }): void;
+  onFinal?(r: { text: string; turns: number; toolUses: number; sessionId: string; usage?: { promptTokens: number; completionTokens: number }; messages?: ChatMessage[] }): void;
 }
 
 /** Live runtime-steering channel (web Ctrl+Enter / TUI Enter-while-running):
@@ -590,8 +590,12 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       /* insight count is best-effort */
     }
   }
-  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage });
-  return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)] };
+  // messages rides along so cross-task callers (web thread mode) can extend
+  // their conversation with the assistant turns - without it the caller could
+  // only ever see the final text and every follow-up lost the answers (the
+  // web conversation bug, 2026-09-27).
+  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage, messages });
+  return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)], messages };
 }
 
 /** One background evolution cycle (auto-triggered). Logs to the evolution

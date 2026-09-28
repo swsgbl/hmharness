@@ -1153,16 +1153,22 @@ flags:
     } catch (err) {
       const msg = String(err);
       // live finding 2026-09-26: some accounts pass model validation for
-      // glm-4-flash/glm-4.5-air but the job-creation path 500s server-side -
-      // the entitlement is half-open (glm-5.3 answers the clean
-      // "联系客服开放" variant). The uploaded files stay valid, so record
-      // them: a retry after the entitlement opens must NOT re-upload 2.7M tokens.
+      // glm-4-flash/glm-4.5-air but the job-creation path 500s server-side.
+      // 2026-09-27 verdict: this persists after topping up - the API job
+      // channel is effectively unusable; the web console is the only working
+      // path (and console datasets do NOT see API-uploaded files - two
+      // separate systems). The uploaded files stay valid, so record
+      // them: a retry if the API channel ever opens must NOT re-upload.
       await CF.recordFineTuneJob(home, { id: 'staged-' + stamp, status: 'staged', model }, { trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length, error: msg.slice(0, 200) });
       stdout.write(RED('任务创建失败：' + msg.slice(0, 160) + '\n'));
       if (/参数校验解析异常/.test(msg)) {
-        stdout.write(YELLOW('最常见原因（2026-09-27 实测确认）：微调走开放平台按量付费通道，与 GLM Coding Plan 编码套餐互不通用——') + '\n');
-        stdout.write(YELLOW('编码套餐余额再足，开放平台账户没有充值/余额为 0 时，建任务就会在计费环节报这个 500。') + '\n');
-        stdout.write(DIM('解决：到 bigmodel.cn 控制台「财务/账户中心」给开放平台账户充值（glm-4-flash LoRA 约 0.025 元/千 tokens，4000 对×3 轮约 200-250 元），再重跑本命令。已上传文件无需重传。') + '\n');
+        // 2026-09-27 实测定案：充值后该 500 依旧——智谱 API 建任务通道对
+        // 微调实际不可用，且 API 上传的文件与控制台数据集是两套互不相通
+        // 的体系。控制台网页（console/data-mgt + modelft/finetuning/create）
+        // 是已验证可行的唯一通道；DPO 全参单价 0.04 元/千 tokens。
+        stdout.write(YELLOW('实测结论（2026-09-27）：该 API 通道建任务持续 500，充值无法解决；') + '\n');
+        stdout.write(YELLOW('控制台网页是唯一可行通道，且 API 上传的文件不会出现在控制台数据集列表里（两套体系）。') + '\n');
+        stdout.write(DIM('解决：到 bigmodel.cn 控制台「数据管理/微调数据」上传 JSONL 创建数据集，再到「模型微调」创建任务（DPO 全参 0.04 元/千 tokens）。命令行侧数据已备好，可直接联系维护者代操作。') + '\n');
       } else {
         stdout.write(DIM('上传的文件保留在云端可复用：' + upTrain.id + '\n'));
       }
