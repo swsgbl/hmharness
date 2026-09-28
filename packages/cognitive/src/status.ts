@@ -19,6 +19,13 @@ export interface CognitiveStatus {
   evolutionLastEvent?: Record<string, unknown>;
   environments: Array<{ id: string; version: string }>;
   ready: { memory: boolean; trajectories: boolean; evolutionAudit: boolean };
+  /** world-model digest replayed from recorded trajectories (blueprint M2) */
+  worldModel?: {
+    beliefs: Array<{ actionType: string; confidence: number; evidenceCount: number }>;
+    plannerGate: { trusted: string[]; untrusted: string[]; unknown: string[] };
+    calibration: { resolved: number; meanError: number | undefined };
+    stepsReplayed: number;
+  };
 }
 
 export async function cognitiveStatus(home: string): Promise<CognitiveStatus> {
@@ -47,6 +54,17 @@ export async function cognitiveStatus(home: string): Promise<CognitiveStatus> {
     { id: 'arc3', version: '0.1.0' },
   ];
   void loaded;
+  let worldModel: CognitiveStatus['worldModel'];
+  try {
+    const { analyzeWorldModel } = await import('./analysis.ts');
+    const wm = await analyzeWorldModel(home);
+    worldModel = {
+      beliefs: wm.beliefs.slice(0, 10).map((b) => ({ actionType: b.actionType, confidence: b.confidence, evidenceCount: b.evidenceCount })),
+      plannerGate: wm.plannerGate,
+      calibration: wm.calibration,
+      stepsReplayed: wm.stepsReplayed,
+    };
+  } catch { /* world model digest is best-effort */ }
   return {
     home,
     memory: mem.stats() as Record<string, number>,
@@ -60,6 +78,7 @@ export async function cognitiveStatus(home: string): Promise<CognitiveStatus> {
       trajectories: trajectories > 0,
       evolutionAudit: auditEvents > 0,
     },
+    worldModel,
   };
 }
 
@@ -75,6 +94,11 @@ export function formatCognitiveStatus(s: CognitiveStatus): string {
     `  进化审计    ${s.evolutionAuditEvents} 条事件${s.evolutionLastEvent ? `（最近: ${String(s.evolutionLastEvent.event)}）` : ''}`,
     `  环境注册表  ${s.environments.map((e) => e.id).join(' / ')}`,
   ];
+  if (s.worldModel && s.worldModel.beliefs.length > 0) {
+    const top = s.worldModel.beliefs.slice(0, 3).map((b) => `${b.actionType}≈${b.confidence.toFixed(1)}`).join(' ');
+    const cal = s.worldModel.calibration;
+    lines.push(`  世界模型    ${s.worldModel.stepsReplayed} 步回放，top 信念 ${top}${cal.meanError !== undefined ? `，校准误差 ${cal.meanError}` : ''}`);
+  }
   const notReady = Object.entries(s.ready).filter(([, v]) => !v).map(([k]) => k);
   if (notReady.length) lines.push(`  未激活      ${notReady.join(', ')}（对应能力尚未产生第一条数据）`);
   else lines.push('  全部子系统已产生数据');

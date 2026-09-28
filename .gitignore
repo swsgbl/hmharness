@@ -34,3 +34,7 @@ audit-doc.txt
 .verify/
 ".bh-*.py"  
 ".bump.cjs"  
+.bh-*.py
+.bump.cjs
+.publish.cjs
+.scan.txt

@@ -20,9 +20,10 @@ test('cognitive-run-recorder: tool calls become trajectory steps + episodic inde
   rec.call('run_cmd', { cmd: 'npm test' });
   rec.result('run_cmd', 'all green', false);
   const done = await rec.finish(true, { turns: 3, toolUses: 3, task: 'build the module' });
-  assert.ok(done?.trajectoryId.startsWith('trj-ses-42-'));
+  assert.ok(done, 'finish must succeed with a writable home');
+  assert.ok(done!.trajectoryId.startsWith('trj-ses-42-'));
   // trajectory file landed
-  const trajText = await readFile(join(home, 'cognitive', 'trajectories', `${done.trajectoryId}.jsonl`), 'utf8');
+  const trajText = await readFile(join(home, 'cognitive', 'trajectories', `${done!.trajectoryId}.jsonl`), 'utf8');
   const traj = JSON.parse(trajText.trim());
   assert.equal(traj.steps.length, 3);
   assert.equal(traj.steps[1].outcome, 'failure');

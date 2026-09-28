@@ -915,8 +915,43 @@ flags:
     // and evolution pipeline adopt them; this command shows what exists.
     await initHome();
     const sub = rest.find((a) => !a.startsWith('-'));
+    if (sub === 'diagnose') {
+      // CL-003 over live data: which learning opportunity pays off now?
+      const { diagnoseOpportunities } = await import('@hmharness/cognitive');
+      const { opportunities, trajectories } = await diagnoseOpportunities(homeDir());
+      stdout.write(`认知诊断（${trajectories} 条轨迹）\n`);
+      if (opportunities.length === 0) stdout.write('  （暂无满足证据阈值的学习机会）\n');
+      for (const o of opportunities) {
+        stdout.write(`  [${o.suggestedTargets.join('/')}] ${o.signal}\n`);
+        stdout.write(DIM(`      证据: ${o.evidence.metric}=${o.evidence.value}（${o.evidence.trajectories.length} 条轨迹）\n`));
+      }
+      return;
+    }
+    if (sub === 'bench') {
+      // BENCH seed: uniform metrics over recorded runs
+      const { benchFromTrajectories } = await import('@hmharness/cognitive');
+      const report = await benchFromTrajectories(homeDir());
+      if (!report) { stdout.write('（尚无轨迹——跑几次任务后再来）\n'); return; }
+      const a = report.aggregate;
+      stdout.write(`GeneralBench 种子报告 · ${report.environmentId} · ${report.runs} 次运行\n`);
+      stdout.write(`  成功率 ${a.successRate} · 动作效率 ${a.actionEfficiency} · 恢复率 ${a.recoveryRate} · 校准 ${a.calibration} · 平均耗时 ${(a.latencyMs / 1000).toFixed(1)}s\n`);
+      return;
+    }
+    if (sub === 'world-model') {
+      const { analyzeWorldModel } = await import('@hmharness/cognitive');
+      const wm = await analyzeWorldModel(homeDir());
+      stdout.write(`世界模型（${wm.trajectoriesReplayed} 轨迹 / ${wm.stepsReplayed} 步回放）\n`);
+      if (wm.beliefs.length === 0) stdout.write('  （暂无信念——跑几次任务后自动生成）\n');
+      for (const b of wm.beliefs.slice(0, 20)) {
+        stdout.write(`  ${b.actionType.padEnd(26)} 置信 ${b.confidence.toFixed(2)}  证据 ${b.evidenceCount} 次\n`);
+      }
+      const cal = wm.calibration;
+      stdout.write(`  校准: ${cal.resolved} 条预测已裁决${cal.meanError !== undefined ? `，平均误差 ${cal.meanError}` : ''}\n`);
+      stdout.write(`  规划门: 可信[${wm.plannerGate.trusted.join(',')}] 存疑[${wm.plannerGate.untrusted.join(',')}] 未知[${wm.plannerGate.unknown.join(',')}]\n`);
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status — 认知子系统状态（记忆五层/轨迹库/进化审计/环境注册表）\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench — 认知子系统状态与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

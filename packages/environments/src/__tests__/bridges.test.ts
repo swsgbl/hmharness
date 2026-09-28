@@ -13,9 +13,10 @@ function fakeExecute(log: string[]) {
 
 test('bridges: browser actions dispatch to the real tools', async () => {
   const log: string[] = [];
-  const env = new BrowserEnvironment({ act: browserActBridge(fakeExecute(log)) });
+  // pin a dead CDP port so the test stays hermetic even when the host's
+  // automation Chrome happens to be running on :9222
+  const env = new BrowserEnvironment({ cdpBase: 'http://127.0.0.1:1', act: browserActBridge(fakeExecute(log)) });
   await env.reset();
-  // pretend a tab exists by going through capabilities first (observe with no browser -> 0 tabs)
   const nav = await env.act({ id: 'n1', type: 'navigate', args: { url: 'https://example.com' } });
   // no CDP tabs reachable -> E_NO_TABS (bridge configured but browser down)
   assert.equal(nav.outcome, 'failure');

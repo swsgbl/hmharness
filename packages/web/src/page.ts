@@ -563,6 +563,7 @@ export const PAGE = `<!doctype html>
       <div class="vhead"><h2 id="cog-title">🧠 认知面板</h2><button id="cog-refresh" class="ghost sm">↻ 刷新</button></div>
       <div id="cog-body">
         <div class="setbox"><h3 class="sec">五层记忆</h3><div id="cog-memory" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">世界模型（轨迹回放）</h3><div id="cog-world" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">环境注册表</h3><div id="cog-env" class="hint">加载中…</div></div>
@@ -1373,7 +1374,7 @@ ${uiLiteSource()}
      memory, episodic trajectory store, immutable evolution audit and the
      environment registry, from /api/cognitive. Read-only by design. ---- */
   function loadCognitive() {
-    ['memory', 'traj', 'audit', 'env'].forEach(function (k) {
+    ['memory', 'world', 'traj', 'audit', 'env'].forEach(function (k) {
       var el = document.getElementById('cog-' + k);
       if (el) el.innerHTML = '<div class="hint">加载中…</div>';
     });
@@ -1386,6 +1387,16 @@ ${uiLiteSource()}
         }).join(' ') +
         (d.memoryContradictions ? ' <span class="ob err">矛盾待审 ' + d.memoryContradictions + '</span>' : '') +
         '<div class="hint" style="margin-top:6px">' + (m.total ? '共 ' + m.total + ' 条长期记录（只增不删，矛盾打标待审）' : '尚未产生认知记忆——跑一次任务即自动落盘（带溯源）') + '</div>';
+      var wm = d.worldModel;
+      var worldEl = document.getElementById('cog-world');
+      if (wm && wm.beliefs && wm.beliefs.length) {
+        worldEl.innerHTML = wm.beliefs.slice(0, 8).map(function (b) {
+          return '<span class="ob ' + (b.confidence >= 0.6 ? 'ok' : b.confidence >= 0.3 ? 'tb' : 'err') + '">' + b.actionType + ' ' + (b.confidence * 100).toFixed(0) + '%<small>×' + b.evidenceCount + '</small></span>';
+        }).join(' ') +
+          '<div class="hint" style="margin-top:6px">' + wm.stepsReplayed + ' 步回放 · 校准 ' + (wm.calibration.meanError !== undefined ? '误差 ' + wm.calibration.meanError : '暂无预测') + ' · 可信动作 [' + (wm.plannerGate.trusted || []).join(',') + ']</div>';
+      } else {
+        worldEl.innerHTML = '<div class="hint">暂无信念——任务轨迹积累后自动生成（预测先行=无泄漏回放）</div>';
+      }
       document.getElementById('cog-traj').innerHTML =
         '<span class="ob ' + (d.trajectories ? 'ok' : 'none') + '">' + (d.trajectories || 0) + ' 条轨迹</span>' +
         '<div class="hint" style="margin-top:6px">' + (d.trajectories ? '每次 agent 任务自动记录工具动作/结果/耗时（episodic 层）' : '任务运行后自动生成') + '</div>';
@@ -1397,7 +1408,7 @@ ${uiLiteSource()}
         return '<span class="ob ok">' + e.id + ' <small>v' + e.version + '</small></span>';
       }).join(' ') + '<div class="hint" style="margin-top:6px">环境适配器（terminal 原生 / harmonyos hdc / browser CDP / desktop / arc3 骨架）</div>';
     }).catch(function () {
-      ['memory', 'traj', 'audit', 'env'].forEach(function (k) {
+      ['memory', 'world', 'traj', 'audit', 'env'].forEach(function (k) {
         var el = document.getElementById('cog-' + k);
         if (el) el.innerHTML = '<div class="hint err">加载失败</div>';
       });
