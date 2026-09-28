@@ -32,3 +32,5 @@ audit-doc.txt
 *.v2bak
 
 .verify/
+".bh-*.py"  
+".bump.cjs"  

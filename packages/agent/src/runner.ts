@@ -25,6 +25,7 @@ import {
   type ToolContext,
 } from '@hmharness/kernel';
 import { brief, createTrajectoryRecorder } from '@hmharness/observability';
+import { CognitiveRunRecorder } from './cognitive-recorder.ts';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -329,6 +330,10 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // are swallowed inside the recorder and can never fail the task itself.
   const traj = createTrajectoryRecorder(ctx.home, { task: opts.task, model: cfg.provider.model, cwd: ctx.cwd });
   traj.emit('run.started', 'user', { task: brief(opts.task, 400) });
+  // Cognitive OS (blueprint 2026-09 CL-001): the same tool-call stream also
+  // feeds the COGNITIVE trajectory store + episodic memory index, so goal/
+  // exploration/learning layers have real data from day one. Best-effort.
+  const cogRec = new CognitiveRunRecorder(ctx.home, opts.task, session.id, ctx.cwd);
   // V2 M10 shadow router: log what the adaptive router WOULD pick vs the live
   // static route - data for a later, gated switch (never steers traffic now)
   {
@@ -457,6 +462,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       onToolCall: (name, args) => {
         toolsUsed.push(name);
         traj.emit('tool.requested', 'tool', { name, args: brief(args, 120) });
+        cogRec.call(name, args);
         events.onToolCall?.(name, args);
       },
       onToolResult: (name, output, isError) => {
@@ -468,6 +474,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         }
         void session.tool(name, output, isError);
         traj.emit('tool.completed', 'tool', { name, isError, preview: brief(output, 120) });
+        cogRec.result(name, output, isError);
         events.onToolResult?.(name, output, isError);
       },
       onApproval: (name, args, granted) => {
@@ -494,6 +501,9 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     { success: result.reason === 'final', reason: result.reason },
     { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },
   );
+  // cognitive trajectory + episodic index land AFTER the observability
+  // recorder settles, still before onFinal so callers can rely on both
+  await cogRec.finish(result.reason === 'final', { turns: result.turns, toolUses: result.toolUses, task: opts.task });
   // routing.outcome backfill: did the ACTUAL route succeed? (shadow stats)
   {
     const routing = (cfg as { routing?: Record<string, string> }).routing ?? {};

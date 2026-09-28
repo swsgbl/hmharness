@@ -258,9 +258,22 @@ export async function runEvolution(opts: {
   } catch { /* default floor */ }
 
   // 5. A/B gate each proposal on the train set.
+  const draftsMd = new Map<string, string>();
   for (const p of proposals.slice(0, maxProposals)) {
+    draftsMd.set(p.name, p.skill_md);
     say(`candidate "${p.name}": drafting + candidate bench`);
     try {
+      // Cognitive OS contract gate (blueprint EV-002, strict mode only):
+      // with evolution.requireContract=true a draft must DECLARE hypothesis
+      // + possible regression before any bench budget is spent on it.
+      const { enforceContractGate } = await import('./cognitive-audit.ts');
+      const requireContract = Boolean((opts as { requireContract?: boolean }).requireContract);
+      const contractGate = await enforceContractGate(home, p.name, p.skill_md, requireContract);
+      if (!contractGate.pass) {
+        report.outcomes.push({ name: p.name, action: 'rejected', reason: 'contract gate: draft lacks Hypothesis/Regression declaration (evolution.requireContract)' });
+        say('  rejected by contract gate (no declaration)');
+        continue;
+      }
       // Write-channel anti-poisoning (Misevolve lesson): the behavior gate
       // only sees bench output, so instructions the model merely IGNORES
       // slip through. Screen drafted content for attempts to suppress tool
@@ -417,6 +430,17 @@ export async function runEvolution(opts: {
     } catch (err) {
       report.outcomes.push({ name: p.name, action: 'error', reason: String(err).slice(0, 200) });
       say(`  error: ${String(err).slice(0, 120)}`);
+    }
+  }
+
+  // Cognitive OS immutable audit (blueprint EV-011): every outcome of this
+  // cycle lands in cognitive/evolution/audit.jsonl — promoted, rejected,
+  // rolled-back or error, declared contract or honest declared:false.
+  {
+    const { auditEvolutionOutcome } = await import('./cognitive-audit.ts');
+    for (const o of report.outcomes) {
+      const draftMd = draftsMd.get(o.name);
+      await auditEvolutionOutcome(home, o, draftMd);
     }
   }
 

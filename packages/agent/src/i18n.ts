@@ -93,6 +93,7 @@ export interface Strings {
   cmdStatusline: string;
   cmdKeymap: string;
   cmdRemote: string;
+  cmdCognitive: string;
   cmdReview: string;
   /* --- TUI slash-command feedback (previously hardcoded Chinese) --- */
   cmdModelHint: string;
@@ -256,6 +257,7 @@ const zh: Strings = {
   cmdStatusline: '自定义底栏字段(/statusline "{model} · {cwd}")',
   cmdKeymap: '查看/重映射动作键(/keymap <action>=<key>)',
   cmdRemote: '手机配对二维码/远程连接(/remote lan|wan)',
+  cmdCognitive: '认知子系统状态面板(/cognitive)',
   cmdReview: '一键发起「审查当前工作树」任务',
   cmdModelHint: '切换 chat 路由: /model <name>',
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
@@ -408,6 +410,7 @@ const en: Strings = {
   cmdStatusline: 'custom bottom-line fields (/statusline "{model} · {cwd}")',
   cmdKeymap: 'view/remap action keys (/keymap <action>=<key>)',
   cmdRemote: 'phone pairing QR / remote connect (/remote lan|wan)',
+  cmdCognitive: 'cognitive subsystem status panel (/cognitive)',
   cmdReview: 'one-click "review the current worktree" task',
   cmdModelHint: 'switch chat route: /model <name>',
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',

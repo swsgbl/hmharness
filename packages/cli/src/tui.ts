@@ -125,6 +125,7 @@ export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/review', key: 'cmdReview' },
   { name: '/web', key: 'cmdWeb' },
   { name: '/remote', key: 'cmdRemote' },
+  { name: '/cognitive', key: 'cmdCognitive' },
   { name: '/exit', key: 'cmdExit' },
 ];
 
@@ -2211,6 +2212,20 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       const up = await ensureWebDaemon(DEFAULT_WEB_PORT);
       rt.setBusy(false);
       rt.addText(up ? t.tuiWebLinked(DEFAULT_WEB_PORT) : t.tuiWebHint, 'dim');
+      return;
+    }
+    if (line === '/cognitive') {
+      // Cognitive OS status (blueprint RD seed): same one-pager as
+      // `hmh cognitive status` — memory layers, trajectories, audit, envs.
+      rt.setBusy(true, '/cognitive');
+      try {
+        const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');
+        const status = await cognitiveStatus(homeDir());
+        for (const l of formatCognitiveStatus(status).split('\n')) rt.addText(l, 'plain');
+      } catch (err) {
+        rt.addText(String(err), 'err');
+      }
+      rt.setBusy(false);
       return;
     }
     if (line === '/remote' || line === '/remote lan' || line === '/remote wan') {

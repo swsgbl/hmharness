@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-09-29(二) · 认知层接线:从库到活系统(602/602)
+
+**动机**:v0.19.0 交付的认知层是"正确的库"但还没接进运行链路——蓝图要求的是
+可测量的一等公民,不是孤立模块。本轮把 runner/evolution/web/TUI 全部接上。
+
+**关键决策**:
+1. **runner→认知轨迹**:`CognitiveRunRecorder` 挂进 onToolCall/onToolResult——
+   每个工具调用=一个认知步(动作类型/参数裁剪/成功失败/耗时),任务结束自动写
+   `cognitive/trajectories/` + episodic 记忆索引条目(完整溯源:source=agent-run/
+   provenance=trajectory:id/environment/session)。Best-effort 契约:认知记录
+   永远不能弄死任务本身。
+2. **进化审计桥**:每个 evolve 结局(promoted/rejected/rolled-back/error)追加进
+   `cognitive/evolution/audit.jsonl` 不可变审计;草稿可携带声明头
+   (Hypothesis/Expected/Regression,支持中文冒号)——有声明的记 declared:true,
+   无声明的诚实记 declared:false(可见,不静默)。`evolution.requireContract=true`
+   开严格模式:未声明草稿在花任何 bench 预算前被拒。canary 影响 seam 提供
+   reward-hacking 检测器(bench 指标涨+真任务不动=Goodhart)。
+3. **研究面板**:web 侧栏新增 🧠 认知面板(五层记忆徽章+矛盾数/轨迹库/审计
+   最近事件/环境注册表,双语);TUI 新增 `/cognitive` 同款;CLI `hmh cognitive status`。
+4. **工具桥**:`browserActBridge`/`desktopActBridge` 把 agent 真实自动化工具
+   (browser_open/desktop 三件套)接成 Environment act 桥——environments 不
+   import agent,execute 回调注入保持分层;hotkey 组合键无原语→诚实 E_UNSUPPORTED。
+
+**实测证据**:602/602 全绿(新增 11:cognitive-recorder 7+bridges 4);
+真机跑"reply with exactly"→cognitive status 显示 episodic:1/轨迹 1;
+再跑带工具任务→轨迹含 `read_file` success 步+recovery 计数;web /api/cognitive
+返回真实数据,浏览器点开认知面板四区块全渲染;类型零错;13 包构建通过。
+
+**教训**:
+- "文件被占用"的重启失败会静默回退到旧进程——验收前先确认端口 PID 对应
+  新代码,别信 curl 200。
+- i18n 键(navCog/cmdCognitive)必须 zh/en 同步补,COMMANDS 完整性测试
+  会在发布前抓住漏网——这次提前补了,没被抓。
+
+---
+
 ## 2026-09-29 · Cognitive OS 蓝图落地:认知层+环境层两包(591/591)
 
 **动机**:执行《HMH_Cognitive_OS_AGI_实施蓝图_2026-09.docx》——把 hmharness 从

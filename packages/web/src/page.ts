@@ -482,6 +482,7 @@ export const PAGE = `<!doctype html>
     <nav>
       <button class="nav on" data-view="chat"><span class="ico">💬</span><span class="txt minhide">对话</span></button>
       <button class="nav" data-view="board"><span class="ico">🗒</span><span class="txt minhide">任务看板</span></button>
+      <button class="nav" data-view="cognitive"><span class="ico">🧠</span><span class="txt minhide">认知面板</span></button>
       <button class="nav" data-view="devices"><span class="ico">📟</span><span class="txt minhide">设备</span></button>
       <button class="nav" data-view="ssh"><span class="ico">🖧</span><span class="txt minhide">SSH</span></button>
       <button class="nav" data-view="skills"><span class="ico">📚</span><span class="txt minhide">技能中心</span></button>
@@ -557,6 +558,15 @@ export const PAGE = `<!doctype html>
     <div id="view-board" class="view">
       <div class="vhead"><h2 id="board-title">任务看板</h2><button id="board-refresh" class="ghost sm">↻ 刷新</button></div>
       <div id="board-grid" class="bgrid"></div>
+    </div>
+    <div id="view-cognitive" class="view">
+      <div class="vhead"><h2 id="cog-title">🧠 认知面板</h2><button id="cog-refresh" class="ghost sm">↻ 刷新</button></div>
+      <div id="cog-body">
+        <div class="setbox"><h3 class="sec">五层记忆</h3><div id="cog-memory" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">环境注册表</h3><div id="cog-env" class="hint">加载中…</div></div>
+      </div>
     </div>
     <div id="view-devices" class="view">
       <div class="vhead"><h2 id="dev-title">设备</h2><button id="dev-refresh" class="ghost sm">↻ 刷新</button></div>
@@ -794,7 +804,7 @@ ${uiLiteSource()}
           newLabel:'新会话', searchPh:'搜索会话…', skillsN:'技能',
           emptyTitle:'给 hmh 一个任务', emptySub:'流式输出 · 浏览器审批 · 全程审计', alreadyRunning:'已有一个任务在运行', queuedHint:'已排队', toolGroupCalls:'个工具调用', toolGroupToggle:'点击展开', liveRunBehind:'● 任务仍在后台运行，输出已暂停显示', liveRunBack:'回到运行中的会话',
           dempty:'点击对话流中的工具行查看详情', ask:'🔒 审批询问', auto:'⚡ 自动批准', clear:'清屏',
-          navChat:'对话', navBoard:'任务看板', navDev:'设备', navSk:'技能中心', ws:'工作区',
+          navChat:'对话', navBoard:'任务看板', navCog:'认知面板', navDev:'设备', navSk:'技能中心', ws:'工作区',
           viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
           thinkL:'思考过程', copy:'复制', regen:'重新生成', refresh:'刷新',
           noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
@@ -824,7 +834,7 @@ ${uiLiteSource()}
           newLabel:'New session', searchPh:'search sessions…', skillsN:'skills',
           emptyTitle:'give hmh a task', emptySub:'streaming · browser approvals · fully audited', alreadyRunning:'a task is already running', queuedHint:'queued', toolGroupCalls:'tool calls', toolGroupToggle:'click to expand', liveRunBehind:'● a task is still running in the background', liveRunBack:'back to the live session',
           dempty:'click a tool row in the chat to inspect', ask:'🔒 ask approval', auto:'⚡ auto-approve', clear:'clear',
-          navChat:'Chat', navBoard:'Task board', navDev:'Devices', navSk:'Skills', ws:'Workspace',
+          navChat:'Chat', navBoard:'Task board', navCog:'Cognitive', navDev:'Devices', navSk:'Skills', ws:'Workspace',
           viewChat:'Chat', viewBoard:'Task board', viewDev:'Devices', viewSk:'Skills',
           thinkL:'Thinking', copy:'Copy', regen:'Regenerate', refresh:'Refresh',
           noDev:'No devices found - plug in a device or start an emulator, then refresh',
@@ -886,7 +896,7 @@ ${uiLiteSource()}
     document.getElementById('ws-new').title = L.pickTitle;
     document.getElementById('ws-open').title = L.wsOpen;
     document.getElementById('wscur').title = L.wsSwitch;
-    var navNames = { chat:L.navChat, board:L.navBoard, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
+    var navNames = { chat:L.navChat, board:L.navBoard, cognitive:L.navCog, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
       if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
@@ -920,7 +930,7 @@ ${uiLiteSource()}
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       n.classList.toggle('on', n.getAttribute('data-view') === v);
     });
-    ['chat', 'board', 'devices', 'ssh', 'skills', 'settings', 'label'].forEach(function (k) {
+    ['chat', 'board', 'cognitive', 'devices', 'ssh', 'skills', 'settings', 'label'].forEach(function (k) {
       var elv = document.getElementById('view-' + k);
       if (elv) elv.classList.toggle('on', k === v);
     });
@@ -928,9 +938,10 @@ ${uiLiteSource()}
     if (shown) window.__AN.viewIn(shown);
     if (L) {
       document.getElementById('viewchip').textContent =
-        ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[v] || v;
+        ({ chat:L.viewChat, board:L.viewBoard, cognitive:L.navCog, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[v] || v;
     }
     if (v === 'board') loadBoard();
+    if (v === 'cognitive') loadCognitive();
     if (v === 'devices') loadDevices();
     if (v === 'ssh') renderSsh();
     if (v === 'skills') renderSkills();
@@ -1358,6 +1369,42 @@ ${uiLiteSource()}
     s.textContent = o || '\\u2014';
     return s;
   }
+  /* ---- cognitive research panel (blueprint RD-001..008 seed): five-layer
+     memory, episodic trajectory store, immutable evolution audit and the
+     environment registry, from /api/cognitive. Read-only by design. ---- */
+  function loadCognitive() {
+    ['memory', 'traj', 'audit', 'env'].forEach(function (k) {
+      var el = document.getElementById('cog-' + k);
+      if (el) el.innerHTML = '<div class="hint">加载中…</div>';
+    });
+    api('/api/cognitive').then(function (r) { return r.json(); }).then(function (d) {
+      var m = d.memory || {};
+      var layers = [['working', '工作'], ['episodic', '情景'], ['semantic', '语义'], ['procedural', '程序'], ['world', '世界']];
+      document.getElementById('cog-memory').innerHTML =
+        layers.map(function (l) {
+          return '<span class="ob ' + (m[l[0]] ? 'ok' : 'none') + '">' + l[1] + ' ' + (m[l[0]] || 0) + '</span>';
+        }).join(' ') +
+        (d.memoryContradictions ? ' <span class="ob err">矛盾待审 ' + d.memoryContradictions + '</span>' : '') +
+        '<div class="hint" style="margin-top:6px">' + (m.total ? '共 ' + m.total + ' 条长期记录（只增不删，矛盾打标待审）' : '尚未产生认知记忆——跑一次任务即自动落盘（带溯源）') + '</div>';
+      document.getElementById('cog-traj').innerHTML =
+        '<span class="ob ' + (d.trajectories ? 'ok' : 'none') + '">' + (d.trajectories || 0) + ' 条轨迹</span>' +
+        '<div class="hint" style="margin-top:6px">' + (d.trajectories ? '每次 agent 任务自动记录工具动作/结果/耗时（episodic 层）' : '任务运行后自动生成') + '</div>';
+      var last = d.evolutionLastEvent;
+      document.getElementById('cog-audit').innerHTML =
+        '<span class="ob ' + (d.evolutionAuditEvents ? 'ok' : 'none') + '">' + (d.evolutionAuditEvents || 0) + ' 条事件</span>' +
+        (last ? '<div class="hint" style="margin-top:6px">最近: ' + String(last.event) + ' · ' + String(last.candidateId || '') + '</div>' : '<div class="hint" style="margin-top:6px">进化轮次结束后自动追加（promoted/rejected/rolled-back 全记录）</div>');
+      document.getElementById('cog-env').innerHTML = (d.environments || []).map(function (e) {
+        return '<span class="ob ok">' + e.id + ' <small>v' + e.version + '</small></span>';
+      }).join(' ') + '<div class="hint" style="margin-top:6px">环境适配器（terminal 原生 / harmonyos hdc / browser CDP / desktop / arc3 骨架）</div>';
+    }).catch(function () {
+      ['memory', 'traj', 'audit', 'env'].forEach(function (k) {
+        var el = document.getElementById('cog-' + k);
+        if (el) el.innerHTML = '<div class="hint err">加载失败</div>';
+      });
+    });
+  }
+  var cogRefresh = document.getElementById('cog-refresh');
+  if (cogRefresh) cogRefresh.onclick = loadCognitive;
   function loadBoard() {
     var grid = document.getElementById('board-grid');
     grid.innerHTML = '<div class="hint">' + L.loading + '</div>';
