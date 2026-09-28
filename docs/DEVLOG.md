@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-09-29(五) · 探索引擎上线:主动不确定性削减(612/612)
+
+**动机**:M4 Exploration Engine 一直是库+测试,没有真入口——蓝图要求
+"对未知环境先建立可解释的最小模型",这需要真的跑探索。
+
+**关键决策**:
+1. **层级铁律修正**:explore-runner 首版 import 了 @hmharness/environments
+   ——依赖环(cognitive↔environments)。改为**环境由宿主注入**:cognitive
+   只留 MemoryEnvironment 内置参照,terminal 适配器由 CLI 接线并负责
+   scratch 清理。架构方向不可为方便破例。
+2. **探索=一等轨迹**:探索会话走与任务相同的落盘路径(认知轨迹+带溯源
+   episodic 索引,source=exploration-run),每步带预测(校准数据)。
+3. **预算+风险熔断**:maxActions/maxCost/riskTolerance 三闸;假设注册表
+   预注册"探未知动作会成功"——探索结果可以**证伪**它(科学诚实)。
+
+**实测证据**:612/612(新增 2);真机 `hmh cognitive explore --actions=4`
+跑 4 动作/10 成本单位,假设被**refuted**(探针默认参数对部分动作不适
+用——诚实结果非 bug);世界模型信念表因此暴露出丰富历史(run_command
+×124/write_file ×6/edit_file ×3);进化审计发现 2 条真实事件(后台进化
+轮两候选被 bench 拒后自动落审计,declared:false)——**治理桥在生产
+路径已在自动工作**;status 全子系统激活(11 轨迹/150 步回放/校准 0.36)。
+
+**教训**:
+- 依赖方向错误在"顺手 import"时最易发生——写代码前先画箭头。
+- GitHub 断连重试序列:直连→socks5→等 90s→**socks5h**(DNS 也走代理
+  才通)——xray 间歇期 socks5h 是最后一块拼图。
+
+---
+
 ## 2026-09-29(四) · 闭环合拢:世界模型反哺决策+目标漂移+技能挖掘(610/610)
 
 **动机**:数据飞轮有了,但方向是单向的——轨迹喂世界模型,世界模型还没
