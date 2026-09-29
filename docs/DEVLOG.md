@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-09-29(八) · 多智能体 2.0 实弹:spawn 治理上线(621/621)
+
+**动机**:M10 的角色契约/拓扑/预算一直是库。真接线=每个真实 spawn_agent
+调用都被治理:角色映射+共享预算+不可变审计,治理失败永不阻塞工作。
+
+**关键决策**:
+1. **治理壳而非重写**:`withTopologyGovernance` 包住 makeSpawnTool——
+   角色映射(planner→planner/tester|judge→verifier/reviewer→critic/
+   researcher→researcher/其余→implementer),每次 spawn 建拓扑节点
+   (AgentTopology.addNode 新 API),预算 trySpend(每回合≈1 单位,总 400,
+   超限拒绝并明示"直接做"),成功/失败落 cognitive/multi-agent.jsonl
+   **跨进程不可变审计**(CLI/面板读文件而非进程内存)。
+2. **降级契约**:治理自身抛错→裸跑原始 spawn(永不因治理破坏任务);
+   首个 spawn 建 team(created 事件带目标),此后复用同一拓扑。
+
+**实测证据**:621/621(新增 5:生命周期/失败记录/降级/预算拒绝/角色映射);
+**真机委派任务**(spawn_agent role=researcher 列包名)→ `cognitive team`
+显示完整治理记录:team created → spawn researcher-3 [researcher] budget=6
+→ done 49081ms。蓝图 MA-002/003/007/009 首次在真实 LLM 子代理上运转。
+
+**教训**:
+- **ACL 疫病**:多文件/目录陆续丢 Users 写权限(EPERM)——`sudo icacls
+  /grant "BUILTIN\Users:(OI)(CI)F" /T /C` 递归授权可治;病因未明(疑
+  sudo elevate 的写回副作用),再遇 EPERM 先查 icacls 别瞎猜锁。
+- 复合命令里 grep 的引号模式被 npm 吞成 flag(-oE)——长命令必须拆分跑。
+
+---
+
 ## 2026-09-29(七) · 首个正迁移证据:校准度量+目标时间线(616/616)
 
 **动机**:上轮迁移实验 neutral 的根因是成功率度量在"探针都成功"时无区分度。
