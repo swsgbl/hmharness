@@ -12,5 +12,7 @@ export { HarmonyOsEnvironment } from './harmonyos.ts';
 export type { HarmonyOsEnvOptions } from './harmonyos.ts';
 export { BrowserEnvironment, DesktopEnvironment, Arc3Environment } from './adapters.ts';
 export type { BrowserEnvOptions, DesktopEnvOptions, Arc3EnvOptions } from './adapters.ts';
+export { Arc3RestBridge, ARC3_BASE } from './arc3-rest.ts';
+export type { Arc3Frame, Arc3Game } from './arc3-rest.ts';
 export { browserActBridge, desktopActBridge } from './bridges.ts';
 export type { ToolExecute } from './bridges.ts';
