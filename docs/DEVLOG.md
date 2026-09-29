@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-09-29(十三) · LLM 实玩 ARC-AGI-3:视觉推理驱动动作(637/637)
+
+**动机**:蓝图 §14 的终点不是"能调 API"而是"agent 在游戏里探索、建模、
+获取目标并规划执行"——让 LLM 看着帧真实推理选动作。
+
+**关键决策**:
+1. **零依赖帧渲染器**:`renderFramePng`——frame=[前帧,后帧] 锯齿网格→
+   并排真彩 PNG(zlib deflate+手写 chunk/CRC32,16 色高区分近似调色板,
+   稳定一致);gridSummary 文字行程编码兜底。
+2. **`hmh cognitive play --env=arc3`**:每步渲染→chatVision(vision 路由)
+   →模型推理→解析 ACTIONn/ACTION6 x,y→官方 API(**模型原话随 reasoning
+   字段入档**)→轨迹落盘(面板可回放每步+推理)。
+3. **视觉路由事故三连修**:chat 路由 400(不支持 image_url)→切 vision
+   路由 glm-4.5v 返回空→**用户建议 GLM-5.3-flash,实测定案**(测试图
+   描述正确);真 ARC 帧复测仍空→根因 **maxTokens 400 被思考吃光**,
+   1500 后完整推理输出。
+
+**实测证据**:637/637(渲染器 4:PNG 签名/尺寸/锯齿/调色板);单测 GLM-5.3
+-flash 读真实 ARC 帧:"black square below an orange-framed purple
+rectangle, top shows two small framed examples…black square may need to
+move up→ACTION1"(识别演示样例区+假设移动机制);实玩 bp35 模型连续选
+ACTION3(默认 ACTION1=视觉驱动生效);re86 每步推理入轨迹("yellow cross
+with a black cursor at its center…")。记分卡 0/8 关——ARC-AGI-3 前沿
+模型也低分,诚实呈现。
+
+**教训**:
+- 思考型视觉模型的 maxTokens 预算要按"思考+正文"算,400 会静默返回空
+  正文——空回复先查 token 预算再怀疑格式。
+- 用户的模型直觉(GELM-5.3-flash 可用)比默认路由配置可靠。
+
+---
+
 ## 2026-09-29(十二) · ARC-AGI-3 实弹:用户 key 点火,探索+迁移上真游戏(633/633)
 
 **动机**:用户提供 ARC-AGI-3 API key——骨架→桥→真游戏,一步点火。
