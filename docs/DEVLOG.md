@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-09-29(十二) · ARC-AGI-3 实弹:用户 key 点火,探索+迁移上真游戏(633/633)
+
+**动机**:用户提供 ARC-AGI-3 API key——骨架→桥→真游戏,一步点火。
+
+**关键决策**:
+1. **真机冒烟先行**:listGames(25 游戏)/openScorecard/RESET/ACTION1/
+   getScorecard/close 全链真实跑通——发现**真实帧结构与 schema 可选字段
+   不同**:available_actions 是**数字数组**([6]=只接受 ACTION6)、
+   levels_completed/win_levels/state 才是实况(score/reward/status 未出现)。
+2. **投影适配真实字段**:observe 投影 levelsCompleted/winLevels/gameState;
+   **affordances 从帧的 available_actions 动态过滤**(每游戏只暴露它接受
+   的动作);evaluate 用 scorecard 的 levels_completed/level_count/actions;
+   act 输出 levelProgressed(层级推进可见)。
+3. **抽象映射补 ARC**:ACTION1-7→@interact(与 desktop_click/type 同意图)。
+
+**实测证据**:633/633;`cognitive explore --env=arc3 --actions=4` 真机跑通
+(4 动作/假设 supported/ACTION1-4 信念 0.30×1);轨迹落盘 episodic 27/
+39 条;世界模型 532 步回放含 arc3 信念;transfer terminal→arc3 诚实报
+"无重叠不构成检验"(terminal 历史全是 @run/@read/@write,ARC 是 @interact
+——需桌面/浏览器历史才可能产生重叠,不硬凑)。npm v0.20.1 三同步
+(dist-tags 核实,CDN 延迟一次复核)。
+
+**教训**:
+- OpenAPI schema 的可选字段≠实况:真机冒烟一次胜过读十遍 schema;
+  available_actions 数字数组这种细节只有打了真 API 才知道。
+- 迁移矩阵的 arc3 列要诚实空着,直到 source 历史里有 @interact 动作。
+
+---
+
 ## 2026-09-29(十一) · ARC-AGI-3 官方 REST 桥:骨架变真适配器(633/633)
 
 **动机**:蓝图唯一"等 SDK"的模块。调研发现 SDK 早已存在——官方 REST API
