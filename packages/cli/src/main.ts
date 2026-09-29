@@ -1083,8 +1083,44 @@ flags:
       }
       return;
     }
+    if (sub === 'replay') {
+      // RD-010: inspect one recorded trajectory step by step
+      const id = rest.find((a) => !a.startsWith('-') && a !== 'replay') ?? 'latest';
+      const { replayTrajectory } = await import('@hmharness/cognitive');
+      const view = await replayTrajectory(homeDir(), id);
+      if (!view) { stdout.write(`轨迹 '${id}' 不存在（hmh cognitive replay [id|latest]）\n`); return; }
+      stdout.write(`轨迹 ${view.trajectoryId} · ${view.environmentId} · ${view.steps.length} 步 · ${Math.round((view.metrics.elapsedMs ?? 0) / 1000)}s${view.goal ? `\n  目标: ${view.goal.slice(0, 80)}` : ''}\n`);
+      for (const s of view.steps) {
+        const mark = s.outcome === 'success' ? GREEN('✓') : s.outcome === 'failure' ? RED('✗') : '?';
+        const pred = s.prediction ? DIM(` 预测${Math.round(s.prediction.confidence * 100)}%`) : '';
+        stdout.write(`  ${mark} ${String(s.step).padStart(3)} ${s.actionType}${pred}${s.durationMs !== undefined ? DIM(` ${s.durationMs}ms`) : ''}\n`);
+      }
+      return;
+    }
+    if (sub === 'export') {
+      // §18 data governance: everything out, verbatim, one file
+      const { exportCognitiveState } = await import('@hmharness/cognitive');
+      const out = rest.find((a) => a.startsWith('--out='))?.slice(6);
+      const { file, export: exp } = await exportCognitiveState(homeDir(), out);
+      stdout.write(`已导出 → ${file}\n`);
+      stdout.write(`  轨迹 ${exp.trajectoryCount} 条 · 记忆 ${exp.memoryLineCount} 行 · 进化审计 ${exp.auditLineCount} 行 · 多智能体日志 ${exp.multiAgentJsonl.split('\n').filter((l) => l.trim()).length} 行\n`);
+      return;
+    }
+    if (sub === 'purge') {
+      // §18 data governance: delete ONLY the cognitive store, explicit token
+      const confirm = rest.find((a) => a.startsWith('--confirm='))?.slice(10) ?? '';
+      const { purgeCognitiveState } = await import('@hmharness/cognitive');
+      const r = await purgeCognitiveState(homeDir(), confirm);
+      if (!r.ok) {
+        stdout.write(RED(`拒绝删除: ${r.error}\n`));
+        stdout.write(DIM('  确认要删除认知库(轨迹/记忆/审计,不影响会话与洞察)请加 --confirm=purge-cognitive\n'));
+        return;
+      }
+      stdout.write(`已删除: ${r.removed.join(', ')}\n`);
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

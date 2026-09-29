@@ -567,6 +567,7 @@ export const PAGE = `<!doctype html>
         <div class="setbox"><h3 class="sec">目标漂移检测</h3><div id="cog-drift" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">技能候选（历史挖掘）</h3><div id="cog-skills" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">多智能体（治理审计）</h3><div id="cog-team" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">轨迹回放（RD-010）</h3><div id="cog-replay" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">环境注册表</h3><div id="cog-env" class="hint">加载中…</div></div>
@@ -1458,6 +1459,21 @@ ${uiLiteSource()}
       }).catch(function () {
         document.getElementById('cog-team').innerHTML = '<div class="hint">加载失败</div>';
       });
+      // trajectory replay viewer (RD-010): pick a run, inspect every step
+      api('/api/cognitive/trajectories').then(function (r) { return r.json(); }).then(function (dd) {
+        var list = dd.trajectories || [];
+        var el = document.getElementById('cog-replay');
+        if (!list.length) { el.innerHTML = '<div class="hint">暂无轨迹——跑任务/探索后自动生成</div>'; return; }
+        var sel = '<select id="cog-replay-sel" style="background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;max-width:100%">' +
+          list.map(function (t) {
+            return '<option value="' + t.id + '">' + (t.success ? '✓' : '✗') + ' ' + t.id.slice(0, 34) + ' · ' + t.actions + ' 步 · ' + t.environmentId + '</option>';
+          }).join('') + '</select>';
+        el.innerHTML = sel + '<div id="cog-replay-body" class="hint" style="margin-top:6px">选择上方轨迹查看逐步回放</div>';
+        document.getElementById('cog-replay-sel').onchange = function () { loadReplay(this.value); };
+        loadReplay(list[0].id);
+      }).catch(function () {
+        document.getElementById('cog-replay').innerHTML = '<div class="hint">加载失败</div>';
+      });
     }).catch(function () {
       ['memory', 'world', 'traj', 'audit', 'env'].forEach(function (k) {
         var el = document.getElementById('cog-' + k);
@@ -1467,6 +1483,24 @@ ${uiLiteSource()}
   }
   var cogRefresh = document.getElementById('cog-refresh');
   if (cogRefresh) cogRefresh.onclick = loadCognitive;
+  function loadReplay(id) {
+    var body = document.getElementById('cog-replay-body');
+    if (!body) return;
+    body.innerHTML = '<div class="hint">回放中…</div>';
+    api('/api/cognitive/replay?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (v) {
+      var steps = (v.steps || []).map(function (s) {
+        var cls = s.outcome === 'success' ? 'ok' : s.outcome === 'failure' ? 'err' : 'none';
+        var pred = s.prediction ? ' <small>预测 ' + Math.round(s.prediction.confidence * 100) + '%</small>' : '';
+        var dur = s.durationMs !== undefined ? ' <small>' + s.durationMs + 'ms</small>' : '';
+        return '<div style="margin:1px 0"><span class="ob ' + cls + '">' + s.step + '</span> ' + s.actionType + pred + dur + '</div>';
+      }).join('');
+      body.innerHTML =
+        '<div class="hint" style="margin-bottom:4px">' + (v.goal ? '目标: ' + String(v.goal).slice(0, 60) + ' · ' : '') + v.environmentId + ' · 耗时 ' + Math.round((v.metrics.elapsedMs || 0) / 1000) + 's' + (v.metrics.brierScore !== undefined ? ' · Brier ' + v.metrics.brierScore : '') + '</div>' +
+        (steps || '<div class="hint">（0 步）</div>');
+    }).catch(function () {
+      body.innerHTML = '<div class="hint err">回放失败</div>';
+    });
+  }
   function loadBoard() {
     var grid = document.getElementById('board-grid');
     grid.innerHTML = '<div class="hint">' + L.loading + '</div>';

@@ -770,6 +770,27 @@ export async function startServer(opts: { port: number; host?: string; version?:
         }
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/trajectories') {
+        try {
+          const { listTrajectoryIds } = await import('@hmharness/cognitive');
+          json(res, 200, { trajectories: await listTrajectoryIds(home, 30) });
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/replay') {
+        try {
+          const { replayTrajectory } = await import('@hmharness/cognitive');
+          const id = url.searchParams.get('id') ?? 'latest';
+          const view = await replayTrajectory(home, id);
+          if (!view) { json(res, 404, { error: `trajectory '${id}' not found` }); return; }
+          json(res, 200, view);
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/cognitive/team') {
         try {
           const { teamLog, liveTopologySnapshot } = await import('@hmharness/agent');
