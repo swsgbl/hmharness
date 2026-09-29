@@ -96,6 +96,16 @@ export class AgentTopology {
     return [...this.nodes.values()];
   }
 
+  /** grow the running topology with a new node of a role (live spawns) */
+  addNode(role: AgentRoleName): AgentNode {
+    const contract = ROLE_CONTRACTS[role];
+    const id = `${role}-${++this.seq}`;
+    const node: AgentNode = { id, role, status: 'pending', contract };
+    this.nodes.set(id, node);
+    this.spec.nodes.push(contract);
+    return node;
+  }
+
   board(): SharedBlackboard {
     return JSON.parse(JSON.stringify(this.blackboard));
   }

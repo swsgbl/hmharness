@@ -566,6 +566,7 @@ export const PAGE = `<!doctype html>
         <div class="setbox"><h3 class="sec">世界模型（轨迹回放）</h3><div id="cog-world" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">目标漂移检测</h3><div id="cog-drift" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">技能候选（历史挖掘）</h3><div id="cog-skills" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">多智能体（治理审计）</h3><div id="cog-team" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">环境注册表</h3><div id="cog-env" class="hint">加载中…</div></div>
@@ -1435,6 +1436,27 @@ ${uiLiteSource()}
           : '<div class="hint">暂无候选——需要≥2 条含≥2 步成功动作序列的轨迹</div>';
       }).catch(function () {
         document.getElementById('cog-skills').innerHTML = '<div class="hint">加载失败</div>';
+      });
+      api('/api/cognitive/team').then(function (r) { return r.json(); }).then(function (dd) {
+        var events = dd.events || [];
+        var liveT = dd.live;
+        var html = liveT && liveT.nodes && liveT.nodes.length
+          ? '<div class="hint" style="margin-bottom:4px">当前拓扑: ' + liveT.nodes.map(function (n) {
+              return '<span class="ob ' + (n.status === 'done' ? 'ok' : n.status === 'running' ? 'tb' : n.status === 'failed' ? 'err' : 'none') + '">' + n.role + '·' + n.status + '</span>';
+            }).join(' ') + '</div>' : '';
+        html += events.length
+          ? events.slice(-8).reverse().map(function (e) {
+              var cls = e.event === 'spawn.done' ? 'ok' : e.event === 'spawn.failed' ? 'err' : 'tb';
+              var label = e.event === 'team.created' ? 'team · ' + String(e.goal).slice(0, 40)
+                : e.event === 'spawn.started' ? e.nodeId + ' [' + e.role + '] 预算' + e.budgetUnits
+                : e.event === 'spawn.done' ? e.nodeId + ' [' + e.role + '] ' + e.durationMs + 'ms'
+                : e.nodeId + ' [' + e.role + '] 失败';
+              return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + String(e.at).slice(11, 19) + '</span> ' + label + '</div>';
+            }).join('')
+          : '<div class="hint">暂无记录——跑一个带 spawn_agent 的任务后自动生成（角色契约+共享预算+不可变审计）</div>';
+        document.getElementById('cog-team').innerHTML = html;
+      }).catch(function () {
+        document.getElementById('cog-team').innerHTML = '<div class="hint">加载失败</div>';
       });
     }).catch(function () {
       ['memory', 'world', 'traj', 'audit', 'env'].forEach(function (k) {

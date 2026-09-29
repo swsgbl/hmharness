@@ -39,6 +39,7 @@ import { baseTools } from './tools.ts';
 import { buildSystemPrompt } from './prompt.ts';
 import { strings } from './i18n.ts';
 import { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';
+import { withTopologyGovernance } from './topology-live.ts';
 
 /** Flatten the config.json shape into the runtime discriminated union. */
 export function toServerConfig(c: McpServerImport): McpServerConfig {
@@ -56,8 +57,11 @@ export function nativeRegistry(depth: number): Registry {
   const reg = new Registry();
   reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
   if (depth < MAX_SPAWN_DEPTH) {
+    // blueprint M10: every spawn_agent is governed by the live topology
+    // (role contract + shared budget + immutable multi-agent.jsonl audit);
+    // governance failure falls back to the bare spawn (never blocks work)
     reg.register(
-      makeSpawnTool({
+      withTopologyGovernance(makeSpawnTool({
         depth,
         getBase: () =>
           spawnBase.current ?? {
@@ -65,7 +69,7 @@ export function nativeRegistry(depth: number): Registry {
             ctx: { cwd: process.cwd(), home: homeDir() },
           },
         buildChildRegistry: nativeRegistry,
-      }),
+      })),
     );
   }
   return reg;

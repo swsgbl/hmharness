@@ -1051,8 +1051,23 @@ flags:
       }
       return;
     }
+    if (sub === 'team') {
+      // blueprint M10: replay the governed multi-agent history (immutable
+      // multi-agent.jsonl — teams, spawns, budgets, failures)
+      const { teamLog } = await import('@hmharness/agent');
+      const events = await teamLog(40);
+      if (events.length === 0) { stdout.write('（暂无多智能体记录——跑一个带 spawn_agent 的任务后自动生成）\n'); return; }
+      for (const e of events.slice(-20)) {
+        const label = e.event === 'team.created' ? `team created · goal: ${String(e.goal).slice(0, 50)}`
+          : e.event === 'spawn.started' ? `spawn ${e.nodeId} [${e.role}] budget=${e.budgetUnits} · ${String(e.task).slice(0, 50)}`
+          : e.event === 'spawn.done' ? `done  ${e.nodeId} [${e.role}] ${e.durationMs}ms`
+          : `FAIL  ${e.nodeId} [${e.role}] ${String(e.error ?? '').slice(0, 60)}`;
+        stdout.write(`  ${String(e.at).slice(11, 19)} ${label}\n`);
+      }
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');
