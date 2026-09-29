@@ -1121,8 +1121,26 @@ flags:
       stdout.write(`已删除: ${r.removed.join(', ')}\n`);
       return;
     }
+    if (sub === 'play') {
+      // blueprint §14 finale: the LLM plays an ARC-AGI-3 game for real
+      // (vision renders the frame, the model reasons, actions carry reasoning)
+      if (!rest.includes('--env=arc3')) {
+        stdout.write('用法: hmh cognitive play --env=arc3 [--game=<id前缀>] [--steps=N] [--no-vision]\n');
+        return;
+      }
+      const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 3);
+      const game = rest.find((a) => a.startsWith('--game='))?.slice(7);
+      const { runArc3Play } = await import('./arc3-play.ts');
+      const { loadConfig: lc, resolveProvider: rp, homeDir: hd } = await import('@hmharness/kernel');
+      await runArc3Play((s) => stdout.write(s), {
+        game,
+        steps: Number.isFinite(steps) ? Math.min(Math.max(steps, 1), 30) : 3,
+        vision: !rest.includes('--no-vision'),
+      }, { home: hd, loadConfig: lc, resolveProvider: rp as never });
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge|play — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

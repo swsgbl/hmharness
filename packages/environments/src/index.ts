@@ -14,5 +14,6 @@ export { BrowserEnvironment, DesktopEnvironment, Arc3Environment } from './adapt
 export type { BrowserEnvOptions, DesktopEnvOptions, Arc3EnvOptions } from './adapters.ts';
 export { Arc3RestBridge, ARC3_BASE } from './arc3-rest.ts';
 export type { Arc3Frame, Arc3Game } from './arc3-rest.ts';
+export { renderFramePng, gridSummary, ARC3_PALETTE } from './arc3-render.ts';
 export { browserActBridge, desktopActBridge } from './bridges.ts';
 export type { ToolExecute } from './bridges.ts';
