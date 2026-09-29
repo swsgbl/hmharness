@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-09-29(十) · 轨迹回放+数据治理:研究平台的最后两块(628/628)
+
+**动机**:蓝图 RD-010(轨迹回放 UI)与 §18 数据治理(可导出/可删除)是
+面板与安全清单上最后没落的两项。
+
+**关键决策**:
+1. **回放后端+前端**:`replayTrajectory`(逐步动作/参数/预测/结果/耗时)
+   +`listTrajectoryIds`;web 两端点+面板"轨迹回放"区(下拉选择器+步列表,
+   预测置信内联显示);CLI `cognitive replay [id|latest]`。
+2. **导出**:`exportCognitiveState` 单文件全量 bundle(轨迹+记忆+进化审计+
+   多智能体日志,逐字 jsonl)——用户随时带走全部数据。
+3. **删除**:`purgeCognitiveState` 显式 token(`--confirm=purge-cognitive`)
+   才执行,只删 cognitive 库(会话/洞察/技能不动);无 token 一律拒绝。
+
+**实测证据**:628/628(新增 3);真机 `replay latest` 回放 harmonyos 迁移
+轨迹 4 步(**预测置信 83%→90% 的校准学习现场**);`export` 导出 37 轨迹/
+25 记忆/6 审计/3 多智能体日志单文件;`purge` 无 token 正确拒绝;浏览器
+面板回放区选择器+步列表+Brier 渲染验证通过。
+
+**教训**:
+- npm registry CDN 的 /latest 端点有分钟级缓存——核对发版要查全量文档
+  的 dist-tags(versions 列表+latest tag),别被 /latest 的旧值骗。
+
+---
+
 ## 2026-09-29(九) · RLM 工作区实弹+学习环闭合(625/625)
 
 **动机**:M5 RLM 是最后一个"只有库"的模块;M8 的 train 环节也没接真数据。
