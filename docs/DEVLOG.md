@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-09-29(九) · RLM 工作区实弹+学习环闭合(625/625)
+
+**动机**:M5 RLM 是最后一个"只有库"的模块;M8 的 train 环节也没接真数据。
+
+**关键决策**:
+1. **rlm_workspace 工具**:模型获得跨调用持久的结构化工作区——
+   set/get/list/eval/checkpoint/restore/reset 七动作;eval 沙箱冻结治理态
+   (改 ctx.meta 抛错);预算计量(200 evals/30min 墙钟);每会话一实例。
+   这是"上下文窗口外的记忆"的最小实弹形态(蓝图 M5 的 persistent
+   workspace 语义)。
+2. **学习环(harness 层)**:`runLearningLoop`——diagnose(真轨迹)→对
+   memory 目标机会蒸馏语义记忆条目(完整溯源 source=learning-loop/
+   provenance=opportunity:id)+写 evolution 记忆注(下个任务检索注入即可
+   用);**晋升不在此处发生**——候选继续走 evolve 基准管线(评估器独立性,
+   蓝图 §9 禁自晋升)。非 memory 目标(workflow/router)诚实跳过。
+
+**实测证据**:625/625(新增 4);**真机模型三次调用 rlm_workspace**
+(set varA=hmh → set varB=harness → eval 拼接)返回 `hmhharness` 正确;
+`cognitive learn` 真机:35 轨迹→2 机会(恢复模式/长轨迹效率),均为
+workflow/router 目标→诚实跳过训练(不硬凑)。
+
+**教训**:
+- npm publish 网络抖动会漏包——发完用 `npm view <pkg> version` 逐包
+  核对再收工,别信 failures:0(轮询超时也算 0)。
+- git push 的"Everything up-to-date"在代理回落时会骗人——用
+  ls-remote 确认远端 SHA 才算数。
+
+---
+
 ## 2026-09-29(八) · 多智能体 2.0 实弹:spawn 治理上线(621/621)
 
 **动机**:M10 的角色契约/拓扑/预算一直是库。真接线=每个真实 spawn_agent
