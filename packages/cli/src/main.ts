@@ -979,19 +979,25 @@ flags:
       // Unknown affordances get probed under budget; the outcome lands in
       // the trajectory store + episodic index like any task run.
       const actions = Number(rest.find((a) => a.startsWith('--actions='))?.slice(10) ?? 6);
+      const envId = rest.find((a) => a.startsWith('--env='))?.slice(6) ?? 'terminal';
       const home = homeDir();
       const scratch = join(tmpdir(), `hmh-explore-${Date.now().toString(36)}`);
       await mkdir(scratch, { recursive: true });
       try {
         const { runExploration } = await import('@hmharness/cognitive');
-        const { TerminalEnvironment } = await import('@hmharness/environments');
+        const { TerminalEnvironment, HarmonyOsEnvironment } = await import('@hmharness/environments');
+        const env = envId === 'harmonyos'
+          ? new HarmonyOsEnvironment({ timeoutMs: 20_000 })
+          : envId === 'terminal' ? new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 })
+          : undefined;
+        if (!env) { stdout.write(`环境 '${envId}' 暂不支持 headless 探索（terminal | harmonyos）\n`); return; }
         const summary = await runExploration(home, {
-          environmentId: 'terminal',
+          environmentId: envId,
           maxActions: Number.isFinite(actions) ? Math.min(Math.max(actions, 1), 20) : 6,
           maxCost: 40,
-          env: new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 }),
+          env,
         });
-        stdout.write(`探索完成 · ${summary.result.actionsTaken} 动作 / ${summary.result.costSpent} 成本单位${summary.result.aborted ? `（${summary.result.aborted === 'budget' ? '预算到限' : summary.result.aborted === 'risk' ? '风险熔断' : '无候选动作'}）` : ''}\n`);
+        stdout.write(`探索完成 · ${envId} · ${summary.result.actionsTaken} 动作 / ${summary.result.costSpent} 成本单位${summary.result.aborted ? `（${summary.result.aborted === 'budget' ? '预算到限' : summary.result.aborted === 'risk' ? '风险熔断' : '无候选动作'}）` : ''}\n`);
         stdout.write(`  轨迹 ${summary.trajectoryId} 已落盘 · 假设裁决 ${summary.result.hypothesesResolved} 条\n`);
         for (const h of summary.hypotheses) stdout.write(DIM(`  [${h.status}] ${h.claim}\n`));
         if (summary.worldModelBeliefs.length) {
@@ -1003,8 +1009,47 @@ flags:
       }
       return;
     }
+    if (sub === 'transfer') {
+      // blueprint §17: controlled transfer experiment — the with-arm explores
+      // the target with SOURCE-env beliefs seeded, the without-arm starts
+      // empty. Same budgets, same environments; only knowledge differs.
+      if (!rest.includes('--run')) {
+        stdout.write('用法: hmh cognitive transfer --run [--source=terminal] [--target=harmonyos] [--runs=3]\n');
+        stdout.write(DIM('  需要目标环境可达（harmonyos 需要 hdc 设备在线）；每臂各 runs 次探索，动作级成功率对照\n'));
+        return;
+      }
+      const source = rest.find((a) => a.startsWith('--source='))?.slice(9) ?? 'terminal';
+      const target = rest.find((a) => a.startsWith('--target='))?.slice(9) ?? 'harmonyos';
+      const runs = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 3);
+      const home = homeDir();
+      const scratch = join(tmpdir(), `hmh-transfer-${Date.now().toString(36)}`);
+      await mkdir(scratch, { recursive: true });
+      try {
+        const { runTransferExperiment } = await import('@hmharness/cognitive');
+        const { TerminalEnvironment, HarmonyOsEnvironment } = await import('@hmharness/environments');
+        const makeEnv = target === 'harmonyos'
+          ? () => new HarmonyOsEnvironment({ timeoutMs: 20_000 })
+          : target === 'terminal' ? () => new TerminalEnvironment({ workspaceDir: join(scratch, `t-${Date.now().toString(36)}`), timeoutMs: 15_000 })
+          : null;
+        if (!makeEnv) { stdout.write(`目标环境 '${target}' 暂不支持（terminal | harmonyos）\n`); return; }
+        const report = await runTransferExperiment(home, {
+          sourceEnv: source,
+          targetEnv: target,
+          makeTargetEnv: makeEnv,
+          runsPerArm: Number.isFinite(runs) ? Math.min(Math.max(runs, 1), 10) : 3,
+          maxActions: 4,
+        });
+        stdout.write(`迁移实验 ${source} → ${target}（每臂 ${report.runsPerArm} 次探索）\n`);
+        stdout.write(`  动作重叠: ${report.actionOverlap.length ? report.actionOverlap.join(', ') : '（无——两环境无共享动作类型，本实验不构成迁移检验）'}\n`);
+        stdout.write(`  带迁移成功率 ${report.withTransfer} vs 空白对照 ${report.fromScratch} → 迁移分 ${report.score} [${report.verdict}]\n`);
+        if (report.verdict === 'negative') stdout.write(YELLOW('  ⚠ 负迁移：源环境信念在目标环境有害——世界模型需要修订\n'));
+      } finally {
+        await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+      }
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

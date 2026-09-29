@@ -24,3 +24,5 @@ export * from './benchmark.ts';
 export * from './status.ts';
 export * from './analysis.ts';
 export * from './explore-runner.ts';
+export * from './transfer-lab.ts';
+export * from './abstract-actions.ts';
