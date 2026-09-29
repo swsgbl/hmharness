@@ -64,3 +64,28 @@ test('transfer: same-source seeding is deterministic in structure (arms symmetri
   assert.ok(Number.isFinite(r1.score));
   await rm(home, { recursive: true, force: true });
 });
+
+test('transfer: seeded arm predicts overlapping actions better (calibration delta > 0)', async () => {
+  const home = await tmpHome();
+  // source: 'set' succeeds repeatedly → seeded arm BELIEVES set works
+  await seedHistory(home, 'memory', 's1', [
+    { type: 'set', outcome: 'success' }, { type: 'set', outcome: 'success' },
+    { type: 'set', outcome: 'success' }, { type: 'set', outcome: 'success' },
+  ]);
+  const report = await runTransferExperiment(home, {
+    sourceEnv: 'memory',
+    targetEnv: 'memory',
+    makeTargetEnv: () => new MemoryEnvironment('memory'),
+    runsPerArm: 2,
+    maxActions: 3,
+    record: false,
+  });
+  // both arms probe successfully → success rates tie; the DIFFERENCE is that
+  // the seeded arm predicted those successes while the empty arm guessed 0
+  assert.ok(report.actionOverlap.includes('set'));
+  assert.notEqual(report.brierWith, undefined);
+  assert.notEqual(report.brierWithout, undefined);
+  assert.ok((report.brierWith ?? 1) < (report.brierWithout ?? 0), 'seeded arm must be better calibrated');
+  assert.ok((report.calibrationDelta ?? 0) > 0, 'calibration delta must be positive = real carried knowledge');
+  await rm(home, { recursive: true, force: true });
+});

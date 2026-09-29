@@ -1409,14 +1409,20 @@ ${uiLiteSource()}
       document.getElementById('cog-env').innerHTML = (d.environments || []).map(function (e) {
         return '<span class="ob ok">' + e.id + ' <small>v' + e.version + '</small></span>';
       }).join(' ') + '<div class="hint" style="margin-top:6px">环境适配器（terminal 原生 / harmonyos hdc / browser CDP / desktop / arc3 骨架）</div>';
-      // lazy sections: goal drift + skill candidates (separate cheap endpoints)
-      api('/api/cognitive/drift').then(function (r) { return r.json(); }).then(function (dd) {
+      // lazy sections: goal drift timeline (time-ordered trend) + skill candidates
+      api('/api/cognitive/drift?order=time').then(function (r) { return r.json(); }).then(function (dd) {
         var views = dd.views || [];
-        document.getElementById('cog-drift').innerHTML = views.length
-          ? views.slice(0, 5).map(function (v) {
-              return '<div style="margin:2px 0"><span class="ob ' + (v.driftScore >= 0.7 ? 'err' : v.driftScore >= 0.3 ? 'tb' : 'ok') + '">' + v.driftScore.toFixed(2) + ' ' + v.recommendation + '</span> <small>' + String(v.goalDescription).slice(0, 50) + '</small></div>';
-            }).join('')
-          : '<div class="hint">暂无带目标的轨迹——设置会话目标后自动检测</div>';
+        var el = document.getElementById('cog-drift');
+        if (!views.length) { el.innerHTML = '<div class="hint">暂无带目标的轨迹——设置会话目标后自动检测</div>'; return; }
+        // mini timeline: newest last, each run a colored dot scaled by drift
+        var dots = views.map(function (v) {
+          var cls = v.driftScore >= 0.7 ? 'err' : v.driftScore >= 0.3 ? 'tb' : 'ok';
+          return '<span class="ob ' + cls + '" title="' + String(v.goalDescription).slice(0, 60).replace(/"/g, '') + ' · 漂移 ' + v.driftScore.toFixed(2) + '">' + v.driftScore.toFixed(1) + '</span>';
+        }).join(' → ');
+        var worst = views.slice().sort(function (a, b) { return b.driftScore - a.driftScore; })[0];
+        el.innerHTML =
+          '<div style="margin-bottom:4px">' + dots + '</div>' +
+          '<div class="hint">时间线（旧→新），最重漂移 ' + worst.driftScore.toFixed(2) + ' [' + worst.recommendation + ']：' + String(worst.goalDescription).slice(0, 50) + '</div>';
       }).catch(function () {
         document.getElementById('cog-drift').innerHTML = '<div class="hint">加载失败</div>';
       });

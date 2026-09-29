@@ -1042,6 +1042,9 @@ flags:
         stdout.write(`迁移实验 ${source} → ${target}（每臂 ${report.runsPerArm} 次探索）\n`);
         stdout.write(`  动作重叠: ${report.actionOverlap.length ? report.actionOverlap.join(', ') : '（无——两环境无共享动作类型，本实验不构成迁移检验）'}\n`);
         stdout.write(`  带迁移成功率 ${report.withTransfer} vs 空白对照 ${report.fromScratch} → 迁移分 ${report.score} [${report.verdict}]\n`);
+        if (report.brierWith !== undefined && report.brierWithout !== undefined) {
+          stdout.write(`  校准: 带迁移 Brier ${report.brierWith} vs 空白 ${report.brierWithout}${report.calibrationDelta !== undefined && report.calibrationDelta > 0 ? `（种子臂预测更准 +${report.calibrationDelta} = 真实携带知识）` : ''}\n`);
+        }
         if (report.verdict === 'negative') stdout.write(YELLOW('  ⚠ 负迁移：源环境信念在目标环境有害——世界模型需要修订\n'));
       } finally {
         await rm(scratch, { recursive: true, force: true }).catch(() => undefined);

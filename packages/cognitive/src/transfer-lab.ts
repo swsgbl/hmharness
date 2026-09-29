@@ -21,7 +21,7 @@
  *  - small N is small N: verdicts below are labelled with sample counts.
  */
 import type { Environment } from './index.ts';
-import { TrajectoryStore, TrajectoryRecorder } from './index.ts';
+import { TrajectoryStore, TrajectoryRecorder, brierScore, type TrajectoryStep } from './index.ts';
 import { WorldModel } from './world-model.ts';
 import { ExplorationEngine, UcbExplorationPolicy, HypothesisRegistry, type ExplorationResult } from './exploration.ts';
 import { loadTrajectories, replayIntoWorldModel } from './analysis.ts';
@@ -53,6 +53,13 @@ export interface TransferExperimentReport {
   score: number;
   verdict: 'positive' | 'neutral' | 'negative';
   trajectoryIds: string[];
+  /** calibration: mean Brier per arm (lower = better predicted). The seeded
+   *  arm should predict overlapping actions better than the empty arm even
+   *  when success rates tie — that is real carried knowledge. */
+  brierWith?: number;
+  brierWithout?: number;
+  /** positive = seeded arm better calibrated (its Brier is lower) */
+  calibrationDelta?: number;
 }
 
 /** one exploration run against `env`, optionally seeded by `wm` */
@@ -99,11 +106,12 @@ async function runArm(
   maxActions: number,
   envId: string,
   armLabel: string,
-): Promise<TransferArmResult & { wm: WorldModel; successfulActions: number }> {
+): Promise<TransferArmResult & { wm: WorldModel; successfulActions: number; meanBrier: number | undefined }> {
   const store = home === 'NOREC' ? null : new TrajectoryStore(home);
   const details: ExplorationResult[] = [];
   let successfulActions = 0;
   let totalActions = 0;
+  const allSteps: TrajectoryStep[] = [];
   const wm = wmSeed ?? new WorldModel(envId);
   // each run gets a FRESH environment (no cross-run state leakage) but the
   // SAME world model — that is the "carried knowledge" being measured
@@ -115,10 +123,11 @@ async function runArm(
     totalActions += result.actionsTaken;
     successfulActions += result.successfulActions;
     const traj = rec.finish(result.actionsTaken > 0);
+    allSteps.push(...traj.steps);
     await store?.append(traj).catch(() => undefined);
     await env.close().catch(() => undefined);
   }
-  return { successes: successfulActions, runs, totalActions, details, wm, successfulActions };
+  return { successes: successfulActions, runs, totalActions, details, wm, successfulActions, meanBrier: brierScore(allSteps) };
 }
 
 export async function runTransferExperiment(
@@ -192,5 +201,11 @@ export async function runTransferExperiment(
     score: transferScore(cell),
     verdict: transferVerdict(cell),
     trajectoryIds: [],
+    brierWith: withArm.meanBrier,
+    brierWithout: withoutArm.meanBrier,
+    calibrationDelta:
+      withArm.meanBrier !== undefined && withoutArm.meanBrier !== undefined
+        ? Number((withoutArm.meanBrier - withArm.meanBrier).toFixed(4))
+        : undefined,
   };
 }

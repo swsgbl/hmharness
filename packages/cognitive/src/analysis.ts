@@ -173,12 +173,14 @@ export interface GoalDriftView {
 }
 
 /** GOAL-005 on live data: for every recorded trajectory that carried a goal,
- *  compare its actions against the goal's keywords and report drift. */
-export async function analyzeGoalDrift(home: string, limit = 100): Promise<GoalDriftView[]> {
+ *  compare its actions against the goal's keywords and report drift.
+ *  order='score' (default) ranks worst-first; order='time' is the timeline
+ *  view (oldest→newest) the dashboard renders as a trend. */
+export async function analyzeGoalDrift(home: string, limit = 100, order: 'score' | 'time' = 'score'): Promise<GoalDriftView[]> {
   const { GoalManager } = await import('./goal.ts');
   const gm = new GoalManager();
   const trajectories = (await loadTrajectories(home, limit)).filter((t) => t.goal?.description);
-  const out: GoalDriftView[] = [];
+  const out: Array<GoalDriftView & { startedAt: string }> = [];
   for (const traj of trajectories) {
     const goal = gm.propose({
       id: traj.goal!.id,
@@ -201,9 +203,12 @@ export async function analyzeGoalDrift(home: string, limit = 100): Promise<GoalD
       driftScore: report.driftScore,
       signals: report.signals,
       recommendation: report.recommendation,
+      startedAt: traj.startedAt,
     });
   }
-  return out.sort((a, b) => b.driftScore - a.driftScore);
+  if (order === 'time') out.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  else out.sort((a, b) => b.driftScore - a.driftScore);
+  return out;
 }
 
 /* ---- skill candidates from real trajectories (blueprint M7 on live data) ---- */

@@ -754,7 +754,8 @@ export async function startServer(opts: { port: number; host?: string; version?:
       if (req.method === 'GET' && url.pathname === '/api/cognitive/drift') {
         try {
           const { analyzeGoalDrift } = await import('@hmharness/cognitive');
-          json(res, 200, { views: (await analyzeGoalDrift(home)).slice(0, 8) });
+          const order = url.searchParams.get('order') === 'time' ? 'time' : 'score';
+          json(res, 200, { views: (await analyzeGoalDrift(home, 100, order)).slice(0, 12) });
         } catch (err) {
           json(res, 500, { error: String(err).slice(0, 200) });
         }
