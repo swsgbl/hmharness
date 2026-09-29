@@ -26,3 +26,4 @@ export * from './analysis.ts';
 export * from './explore-runner.ts';
 export * from './transfer-lab.ts';
 export * from './abstract-actions.ts';
+export * from './learning-loop.ts';

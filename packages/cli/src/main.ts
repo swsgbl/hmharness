@@ -1066,8 +1066,25 @@ flags:
       }
       return;
     }
+    if (sub === 'learn') {
+      // blueprint M8 live: diagnose -> train memory-target opportunities ->
+      // entries land with provenance; promotion continues via evolve bench.
+      const { runLearningLoop } = await import('@hmharness/cognitive');
+      const { appendMemory } = await import('@hmharness/evolution');
+      const home = homeDir();
+      const report = await runLearningLoop(home, {
+        writeEvolutionNote: (note) => appendMemory(home, note),
+      });
+      stdout.write(`学习环 · ${report.trajectories} 条轨迹 → ${report.opportunities} 个机会,训练 ${report.trained} 个\n`);
+      if (report.outcomes.length === 0) stdout.write('  （暂无满足证据阈值的学习机会——多跑几次任务）\n');
+      for (const o of report.outcomes) {
+        stdout.write(`  ${o.trained ? '✓ 已训练' : '· 跳过'}  ${o.signal.slice(0, 70)}\n`);
+        if (o.trained) stdout.write(DIM(`      记忆 ${o.memoryEntries.join(',')} 已落盘(带溯源);晋升继续走 evolve 基准管线\n`));
+      }
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

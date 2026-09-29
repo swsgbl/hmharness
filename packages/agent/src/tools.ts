@@ -10,6 +10,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chatVision, homeDir, isBareProbe, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 import { cognitiveQueryTool } from './cognitive-tools.ts';
+import { rlmWorkspaceTool } from './rlm-tool.ts';
 
 const execCb = promisify(exec);
 
@@ -664,5 +665,5 @@ export const seeImageTool: Tool = {
 export const baseTools: Tool[] = [
   readFileTool, editFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool,
   webSearchTool, webFetchTool, browserOpenTool, desktopScreenshotTool, desktopClickTool, desktopTypeTool, sshRunTool,
-  cognitiveQueryTool,
+  cognitiveQueryTool, rlmWorkspaceTool,
 ];
