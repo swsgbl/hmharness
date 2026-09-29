@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-09-29(十一) · ARC-AGI-3 官方 REST 桥:骨架变真适配器(633/633)
+
+**动机**:蓝图唯一"等 SDK"的模块。调研发现 SDK 早已存在——官方 REST API
+(docs.arcprize.org/arc3v1.yaml)+Python Toolkit(pip install arc-agi)。
+"等"没有理由,缺的只是 API key。
+
+**关键决策**:
+1. **按官方 OpenAPI 规范逐字实现**:`Arc3RestBridge`——base
+   three.arcprize.org;X-API-Key 头(key 来源:显式参数>HMH_HOME config
+   arc3.apiKey>env ARC_API_KEY);**AWSALB cookie 亲和自管理**(有状态游戏
+   必须回传会话 cookie,桥内置 cookie jar);全端点:/api/games、
+   scorecard open/close/get、/api/cmd/RESET(guid 有无=新局/重置当前层)、
+   ACTION1-5/7 简单动作、ACTION6 坐标动作(**64×64 网格钳制+四舍五入**);
+   reasoning 字段随动作携带(蓝图要求的决策可观测)。
+2. **Arc3Environment 升 v1.0.0**:reset 开 scorecard+起实例;observe 投影
+   FrameResponse(score/reward/status/帧预览);evaluate 拉官方 scorecard;
+   快照记 guid 句柄(服务端有状态,诚实标注不可 fork);无桥时 observe
+   pre-reset 仍展示 affordance 地图,act 结构化拒绝。
+3. **无 key 全可测**:桥的 cookie/钳制/错误路径用注入 fetch 桩 5 测试;
+   真机 curl 验证 three.arcprize.org 网关在线。
+
+**实测证据**:633/633(新增 5:无 key 拒绝/cookie 亲和回显/未接线诚实/
+桩桥全生命周期含负 reward 判失败/坐标钳制);npm 13 包 v0.20.0 三同步
+(dist-tags 核实)。**启用只差一步:用户从 ARC-AGI-3 控制台领 API key
+写进 config.json arc3.apiKey 或环境变量 ARC_API_KEY。**
+
+**教训**:
+- "等外部依赖"先查一次再等——官方文档(llms.txt 索引+OpenAPI yaml)是
+  全的,一小时的调研把"不可能"变成"只差一个 key"。
+- 测桩桥时坐标钳制这类真实逻辑会被绕过(桩收到了原始 70,-3)——
+  对钳制必须单独对真桥(注入 fetch)测,不能只测环境层。
+
+---
+
 ## 2026-09-29(十) · 轨迹回放+数据治理:研究平台的最后两块(628/628)
 
 **动机**:蓝图 RD-010(轨迹回放 UI)与 §18 数据治理(可导出/可删除)是
