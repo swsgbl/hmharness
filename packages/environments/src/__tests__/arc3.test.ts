@@ -1,15 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Arc3RestBridge, ARC3_BASE } from '../arc3-rest.ts';
 import { Arc3Environment } from '../adapters.ts';
 
 test('arc3 bridge: base URL and no-key behavior are explicit', async () => {
   assert.equal(ARC3_BASE, 'https://three.arcprize.org');
-  const bridge = new Arc3RestBridge(); // no key anywhere
-  await assert.rejects(
-    () => bridge.listGames(),
-    /E_NO_API_KEY.*arcprize\.org/s,
-  );
+  // point at an empty home so the developer's real config key can't leak in
+  const emptyHome = await mkdtemp(join(tmpdir(), 'arc3-nokey-'));
+  try {
+    const bridge = new Arc3RestBridge({ home: emptyHome });
+    await assert.rejects(
+      () => bridge.listGames(),
+      /E_NO_API_KEY.*arcprize\.org/s,
+    );
+  } finally {
+    await rm(emptyHome, { recursive: true, force: true });
+  }
 });
 
 test('arc3 bridge: cookie jar absorbs Set-Cookie and echoes it (session affinity)', async () => {
@@ -53,17 +62,18 @@ test('arc3 environment: unwired still refuses honestly; pre-reset observe shows 
 });
 
 test('arc3 environment: full lifecycle against a stubbed bridge', async () => {
-  const frame = (reward: number): { game_id: string; guid: string; score: number; reward: number; status: string; frame: number[] } => ({
-    game_id: 'ls20-x', guid: 'guid-1', score: 10 + reward, reward, status: 'PLAYING', frame: [1, 2, 3],
+  const frame = (levels: number): { game_id: string; guid: string; levels_completed: number; state: string; frame: number[]; available_actions?: string[] } => ({
+    game_id: 'ls20-x', guid: 'guid-1', levels_completed: levels, state: 'PLAYING', frame: [1, 2, 3],
+    available_actions: ['ACTION1', 'ACTION2', 'ACTION6'],
   });
   const calls: string[] = [];
   const bridge = {
     listGames: async () => { calls.push('listGames'); return [{ game_id: 'ls20-x', title: 'LS20' }]; },
     openScorecard: async () => { calls.push('openScorecard'); return 'card-1'; },
     closeScorecard: async () => { calls.push('closeScorecard'); return {}; },
-    getScorecard: async () => { calls.push('getScorecard'); return { environments: [{ game_id: 'ls20-x', score: 42, win_rate: 0.5 }] }; },
+    getScorecard: async () => { calls.push('getScorecard'); return { environments: [{ id: 'ls20-x', levels_completed: 3, level_count: 9, actions: 7, completed: false }] }; },
     reset: async () => { calls.push('reset'); return frame(0); },
-    action: async (_g: string, _guid: string, n: number) => { calls.push(`action${n}`); return frame(n === 5 ? -1 : 1); },
+    action: async (_g: string, _guid: string, n: number) => { calls.push(`action${n}`); return frame(n === 5 ? 3 : 1); },
     actionXY: async (_g: string, _guid: string, x: number, y: number) => { calls.push(`action6@${x},${y}`); return frame(1); },
   };
   const env = new Arc3Environment({ bridge: bridge as unknown as Arc3RestBridge, gameId: 'ls20-x' });
@@ -71,21 +81,25 @@ test('arc3 environment: full lifecycle against a stubbed bridge', async () => {
   // explicit gameId skips listGames; the discovery path is covered by its own stub
   assert.equal(calls[0], 'openScorecard');
   assert.equal(calls[1], 'reset');
-  const state = obs.state as { gameId: string; guid: string };
+  const state = obs.state as { gameId: string; guid: string; levelsCompleted: number };
   assert.equal(state.gameId, 'ls20-x');
   assert.equal(state.guid, 'guid-1');
+  assert.equal(state.levelsCompleted, 0);
+  // affordances come from the live frame's available_actions
+  assert.equal(obs.availableActions.length, 3);
+  assert.ok(obs.availableActions.every((a) => ['ACTION1', 'ACTION2', 'ACTION6'].includes(a.type)));
   const a1 = await env.act({ id: 'x1', type: 'ACTION1', args: {} });
   assert.equal(a1.outcome, 'success');
+  assert.equal((a1.output as { levelsCompleted: number }).levelsCompleted, 1);
   const a6 = await env.act({ id: 'x6', type: 'ACTION6', args: { x: 70, y: -3 } });
   assert.equal(a6.outcome, 'success');
   assert.ok(calls.includes('action6@70,-3'), 'stubbed bridge receives raw coords; clamping lives in the real bridge (next test)');
   const bad = await env.act({ id: 'xb', type: 'JUMP', args: {} });
   assert.equal(bad.outcome, 'failure');
   assert.equal(bad.error?.code, 'E_UNKNOWN_ACTION');
-  const a5 = await env.act({ id: 'x5', type: 'ACTION5', args: {} });
-  assert.equal(a5.outcome, 'failure', 'negative reward counts as failure');
   const score = await env.evaluate();
-  assert.equal(score.metrics.score, 42);
+  assert.equal(score.metrics.levelsCompleted, 3);
+  assert.equal(score.metrics.levelCount, 9);
   const snap = await env.snapshot();
   assert.match(snap.stateHash, /^[0-9a-f]+$/);
   await env.close();

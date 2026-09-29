@@ -278,27 +278,26 @@ export class Arc3Environment implements Environment {
         availableActions: this.actionSpecs(),
       };
     }
-    const f = this.session.lastFrame;
+    const f = this.session.lastFrame as Arc3Frame & { available_actions?: Array<string | number>; levels_completed?: number; win_levels?: number; state?: unknown };
     return {
       environmentId: this.id,
       timestamp: new Date().toISOString(),
       state: {
         gameId: this.session.gameId,
         guid: this.session.guid,
-        score: f.score,
-        reward: f.reward,
-        status: f.status,
+        levelsCompleted: f.levels_completed ?? 0,
+        winLevels: f.win_levels ?? 0,
+        gameState: f.state ?? null,
         framePreview: Array.isArray(f.frame) ? f.frame.slice(0, 64) : f.frame,
         steps: this.session.steps,
-        totalReward: this.session.totalReward,
       },
-      availableActions: this.actionSpecs(),
+      availableActions: this.actionSpecs(f.available_actions),
       raw: f,
     };
   }
 
-  private actionSpecs(): ActionSpec[] {
-    return [
+  private actionSpecs(available?: Array<string | number>): ActionSpec[] {
+    const all: ActionSpec[] = [
       { id: 'a1', type: 'ACTION1', description: 'simple action 1 (game-defined, e.g. move up / option A)', cost: 1 },
       { id: 'a2', type: 'ACTION2', description: 'simple action 2', cost: 1 },
       { id: 'a3', type: 'ACTION3', description: 'simple action 3', cost: 1 },
@@ -307,6 +306,13 @@ export class Arc3Environment implements Environment {
       { id: 'a6', type: 'ACTION6', description: 'coordinate action: click/tap at (x,y) on the 64×64 grid', argsSchema: { x: 'number 0-63', y: 'number 0-63' }, cost: 1 },
       { id: 'a7', type: 'ACTION7', description: 'undo (games that support it)', cost: 1 },
     ];
+    // the live frame advertises which actions THIS game accepts — trust it
+    // (the API returns action NUMBERS: [6] means only ACTION6)
+    if (available && available.length > 0) {
+      const set = new Set(available.map((a) => (typeof a === 'number' ? `ACTION${a}` : String(a).toUpperCase())));
+      return all.filter((a) => set.has(a.type));
+    }
+    return all;
   }
 
   async act(action: Action): Promise<ActionResult> {
@@ -325,13 +331,16 @@ export class Arc3Environment implements Environment {
       } else {
         return { actionId: action.id, outcome: 'failure', error: { code: 'E_UNKNOWN_ACTION', message: `unknown ARC action ${action.type}` }, durationMs: Date.now() - started };
       }
+      const before = (this.session.lastFrame as (Arc3Frame & { levels_completed?: number }) | undefined)?.levels_completed ?? 0;
+      const after = (frame as Arc3Frame & { levels_completed?: number }).levels_completed ?? 0;
       this.session.lastFrame = frame;
       this.session.steps += 1;
       this.session.totalReward += frame.reward ?? 0;
       return {
         actionId: action.id,
-        outcome: frame.status === 'DEAD' || frame.reward !== undefined && frame.reward < 0 ? 'failure' : 'success',
-        output: { score: frame.score, reward: frame.reward, status: frame.status },
+        // outcome: the call landed; a level win shows as progress
+        outcome: frame.status === 'DEAD' ? 'failure' : 'success',
+        output: { levelsCompleted: after, levelProgressed: after > before, reward: frame.reward, status: frame.status },
         durationMs: Date.now() - started,
         cost: 1,
       };
@@ -365,15 +374,16 @@ export class Arc3Environment implements Environment {
     if (!this.session) return { environmentId: this.id, metrics: {} };
     const summary = await bridge.getScorecard(this.session.cardId).catch(() => ({}) as Record<string, unknown>);
     const envs = (summary.environments ?? []) as Array<Record<string, unknown>>;
-    const mine = envs.find((e) => e.game_id === this.session?.gameId) ?? summary;
+    const mine = envs.find((e) => e.id === this.session?.gameId || e.game_id === this.session?.gameId) ?? summary;
     const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
     return {
       environmentId: this.id,
       metrics: {
         steps: this.session.steps,
-        totalReward: this.session.totalReward,
-        score: num(mine.score),
-        winRate: num(mine.win_rate),
+        levelsCompleted: num(mine.levels_completed),
+        levelCount: num(mine.level_count),
+        actions: num(mine.actions),
+        completed: num(mine.completed) || (mine.completed === true ? 1 : 0),
       },
       details: 'ARC-AGI-3 official scorecard',
     };

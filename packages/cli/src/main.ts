@@ -985,12 +985,12 @@ flags:
       await mkdir(scratch, { recursive: true });
       try {
         const { runExploration } = await import('@hmharness/cognitive');
-        const { TerminalEnvironment, HarmonyOsEnvironment } = await import('@hmharness/environments');
-        const env = envId === 'harmonyos'
-          ? new HarmonyOsEnvironment({ timeoutMs: 20_000 })
-          : envId === 'terminal' ? new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 })
-          : undefined;
-        if (!env) { stdout.write(`环境 '${envId}' 暂不支持 headless 探索（terminal | harmonyos）\n`); return; }
+        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge } = await import('@hmharness/environments');
+        let env;
+        if (envId === 'harmonyos') env = new HarmonyOsEnvironment({ timeoutMs: 20_000 });
+        else if (envId === 'arc3') env = new Arc3Environment({ bridge: new Arc3RestBridge() });
+        else if (envId === 'terminal') env = new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 });
+        if (!env) { stdout.write(`环境 '${envId}' 暂不支持 headless 探索（terminal | harmonyos | arc3）\n`); return; }
         const summary = await runExploration(home, {
           environmentId: envId,
           maxActions: Number.isFinite(actions) ? Math.min(Math.max(actions, 1), 20) : 6,
@@ -1026,12 +1026,14 @@ flags:
       await mkdir(scratch, { recursive: true });
       try {
         const { runTransferExperiment } = await import('@hmharness/cognitive');
-        const { TerminalEnvironment, HarmonyOsEnvironment } = await import('@hmharness/environments');
+        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge } = await import('@hmharness/environments');
         const makeEnv = target === 'harmonyos'
           ? () => new HarmonyOsEnvironment({ timeoutMs: 20_000 })
-          : target === 'terminal' ? () => new TerminalEnvironment({ workspaceDir: join(scratch, `t-${Date.now().toString(36)}`), timeoutMs: 15_000 })
-          : null;
-        if (!makeEnv) { stdout.write(`目标环境 '${target}' 暂不支持（terminal | harmonyos）\n`); return; }
+          : target === 'arc3'
+            ? () => new Arc3Environment({ bridge: new Arc3RestBridge() })
+            : target === 'terminal' ? () => new TerminalEnvironment({ workspaceDir: join(scratch, `t-${Date.now().toString(36)}`), timeoutMs: 15_000 })
+            : null;
+        if (!makeEnv) { stdout.write(`目标环境 '${target}' 暂不支持（terminal | harmonyos | arc3）\n`); return; }
         const report = await runTransferExperiment(home, {
           sourceEnv: source,
           targetEnv: target,

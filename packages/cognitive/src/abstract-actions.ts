@@ -32,6 +32,11 @@ export const ABSTRACT_ACTION_MAP: Record<string, AbstractAction> = {
   'hdc-shell': 'run',
   'hdc-install': 'install',
   'hdc-aa-start': 'launch',
+  // arc-agi-3 environment (all seven actions are game interactions;
+  // ACTION6 is the coordinate variant of the same intent)
+  'ACTION1': 'interact', 'ACTION2': 'interact', 'ACTION3': 'interact',
+  'ACTION4': 'interact', 'ACTION5': 'interact', 'ACTION6': 'interact',
+  'ACTION7': 'interact',
 };
 
 export function abstractOf(actionType: string): AbstractAction | undefined {
