@@ -55,7 +55,12 @@ test('cognitive-run-recorder: unmatched results still recorded (preflight denial
 });
 
 test('cognitive-run-recorder: storage failure never throws', async () => {
-  const rec = new CognitiveRunRecorder('Z:\\definitely\\not\\a\\real\\home', 't', 'ses-1', 'G:/p');
+  // an EXISTING FILE as home: mkdir under it can never succeed on any
+  // machine (drive-letter tricks like Z: exist on some hosts — env drift)
+  const blocker = join(tmpdir(), `hmh-blocker-${Date.now().toString(36)}`);
+  const { writeFile } = await import('node:fs/promises');
+  await writeFile(blocker, 'x', 'utf8');
+  const rec = new CognitiveRunRecorder(blocker, 't', 'ses-1', 'G:/p');
   const done = await rec.finish(true, { turns: 1, toolUses: 0, task: 't' });
   assert.equal(done, null);
 });

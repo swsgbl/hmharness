@@ -1180,17 +1180,23 @@ flags:
       if (rest.includes('--task')) {
         // §26 in the WORKING domain: verifiable terminal mini-tasks, same
         // model, digest on vs HMH_NO_COGNITIVE=1 — result-level harness delta.
-        // --difficulty=mid is the measurable band (bare runs sometimes slip).
+        // --difficulty selects the band; --calibrate bare-runs first (admission
+        // to the measurable band = 20-80% bare failure, not author intuition).
         const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
-        const difficulty = rest.includes('--difficulty=mid') ? 'mid' : 'easy';
-        const { runTaskAblation } = await import('./ablate-task.ts');
+        const difficulty = rest.includes('--difficulty=hard') ? 'hard' : rest.includes('--difficulty=mid') ? 'mid' : 'easy';
+        const { runTaskAblation, runBareCalibration } = await import('./ablate-task.ts');
         const { homeDir: hd } = await import('@hmharness/kernel');
+        if (rest.includes('--calibrate')) {
+          const probes = Number(rest.find((a) => a.startsWith('--probes='))?.slice(9) ?? 2);
+          await runBareCalibration((s) => stdout.write(s), difficulty, Number.isFinite(probes) ? Math.min(Math.max(probes, 1), 4) : 2);
+          return;
+        }
         await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1, difficulty);
         return;
       }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid] | --stats\n');
-        stdout.write(DIM('  --env=arc3: ARC 域(上限); --task: terminal 域; --difficulty=mid: 中等难度区(结果层可测带); 结果落 cognitive/ablation.jsonl\n'));
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid|hard] [--calibrate [--probes=N]] | --stats\n');
+        stdout.write(DIM('  --calibrate: 裸臂定标(准入带=裸失败率20-80%); --difficulty=hard: 跨文件聚合带; 结果落 cognitive/ablation.jsonl\n'));
         return;
       }
       const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);

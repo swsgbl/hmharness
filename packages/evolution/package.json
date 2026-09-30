@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/evolution",
-  "version": "0.21.3",
+  "version": "0.22.0",
   "description": "hmharness evolution subsystem: persistent memory, insight capture, skill library, and the bench that gives evolution its fitness signal. First-class kernel citizen, not a plugin.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,8 +15,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/cognitive": "0.21.3",
-    "@hmharness/kernel": "0.21.3"
+    "@hmharness/cognitive": "0.22.0",
+    "@hmharness/kernel": "0.22.0"
   },
   "files": [
     "dist"

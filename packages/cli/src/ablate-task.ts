@@ -29,10 +29,19 @@ const TASKS: Array<{ text: string; expect: string; label: string }> = [
 ];
 
 /**
- * MID-difficulty band (§26's measurable zone): multi-step extraction where
- * bare-prompt runs sometimes slip — counting, sorted enumeration, version
- * arithmetic. Expected values verified against the repo at authoring time.
+ * HARD band: cross-file aggregation and format transforms — models slip
+ * here more often. Expected values verified against the repo at authoring.
  */
+const HARD_TASKS: Array<{ text: string; expect: string; label: string }> = [
+  { text: '分别读取 G:/hmharness/packages/kernel/src/index.ts 和 G:/hmharness/packages/agent/src/index.ts 两个文件，统计两个文件中包含 export 的行数总和，只回复该数字。', expect: '29', label: 'cross-file-count' },
+  { text: '读取 G:/hmharness/packages/web/package.json，只回复 dependencies 中 qrcode 这一项的精确版本约束字符串（含符号），不要其他文字。', expect: '^1.5.4', label: 'dep-constraint' },
+  { text: '统计 G:/hmharness/packages/cognitive/src/__tests__ 和 G:/hmharness/packages/environments/src/__tests__ 两个目录中 .test.ts 结尾文件的总个数，只回复数字。', expect: '9', label: 'cross-dir-count' },
+  { text: '读取 G:/hmharness/package.json 的 version 字段，把其中的点全部换成短横线后回复结果，不要其他文字。', expect: '0-21-3', label: 'version-dashes' },
+];
+
+function poolOf(difficulty: 'easy' | 'mid' | 'hard'): Array<{ text: string; expect: string; label: string }> {
+  return difficulty === 'hard' ? HARD_TASKS : difficulty === 'mid' ? MID_TASKS : TASKS;
+}
 const MID_TASKS: Array<{ text: string; expect: string; label: string }> = [
   { text: '用 read_file 读取 G:/hmharness/packages/kernel/src/index.ts，统计包含 export 的行数，只回复该数字。', expect: '16', label: 'count-export' },
   { text: '读取 G:/hmharness/packages/cli/package.json，按字母序只列出全部 @hmharness 开头的依赖名，逗号分隔不要空格。', expect: '@hmharness/agent,@hmharness/cognitive,@hmharness/domain-harmony,@hmharness/domain-ops,@hmharness/environments,@hmharness/evaluation,@hmharness/evolution,@hmharness/kernel,@hmharness/observability,@hmharness/sandbox,@hmharness/web', label: 'sorted-deps' },
@@ -58,9 +67,9 @@ function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: 
   });
 }
 
-export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' = 'easy'): Promise<void> {
+export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' | 'hard' = 'easy'): Promise<void> {
   const homeDir = home();
-  const pool = difficulty === 'mid' ? MID_TASKS : TASKS;
+  const pool = poolOf(difficulty);
   write(`Terminal 域消融 · ${difficulty} 难度 · ${pool.length} 个可验证任务 × ${runs} 轮 × 双臂（§26 工作域测量）\n`);
   let withOk = 0;
   let bareOk = 0;
@@ -93,4 +102,26 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
   await appendFile(join(homeDir, 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
   write(`结论 · 认知层 ${withOk}/${total} vs 裸 ${bareOk}/${total} → harness 结果层净贡献 ${(record.harnessDelta * 100).toFixed(1)}%\n`);
   write(DIM('（ARC 域测上限=诚实零;本域测工作范围=模型胜任区的结果增益）\n'));
+}
+
+/**
+ * Bare-arm calibration (the v0.21.3 lesson, implemented): BEFORE an ablation
+ * claims a band is measurable, run each candidate task bare and measure its
+ * actual failure rate. Admission to the measurable band is 20-80% bare
+ * failure — the author's intuition about difficulty is not the instrument.
+ */
+export async function runBareCalibration(write: (s: string) => void, difficulty: 'easy' | 'mid' | 'hard', probes: number): Promise<void> {
+  const pool = poolOf(difficulty);
+  write(`裸臂定标 · ${difficulty} 难度 · ${pool.length} 任务 × ${probes} 次裸跑（准入带=失败率 20%-80%）\n`);
+  for (const t of pool) {
+    let fails = 0;
+    for (let i = 0; i < probes; i++) {
+      const r = await runOnce(t.text, true, 240_000);
+      if (!r.output.includes(t.expect)) fails += 1;
+    }
+    const rate = Number((fails / probes).toFixed(2));
+    const band = rate === 0 ? '地板（剔除）' : rate >= 1 ? '天花板（剔除）' : rate >= 0.2 && rate <= 0.8 ? '可测带 ✓' : '边缘';
+    write(`  ${t.label.padEnd(18)} 裸失败率 ${Math.round(rate * 100)}% → ${band}\n`);
+  }
+  write(DIM('  定标纪律:只有可测带任务进消融池;地板/天花板任务测不出处理效应\n'));
 }
