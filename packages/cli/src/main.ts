@@ -1179,16 +1179,18 @@ flags:
       }
       if (rest.includes('--task')) {
         // §26 in the WORKING domain: verifiable terminal mini-tasks, same
-        // model, digest on vs HMH_NO_COGNITIVE=1 — result-level harness delta
+        // model, digest on vs HMH_NO_COGNITIVE=1 — result-level harness delta.
+        // --difficulty=mid is the measurable band (bare runs sometimes slip).
         const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
+        const difficulty = rest.includes('--difficulty=mid') ? 'mid' : 'easy';
         const { runTaskAblation } = await import('./ablate-task.ts');
         const { homeDir: hd } = await import('@hmharness/kernel');
-        await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1);
+        await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1, difficulty);
         return;
       }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] | --stats\n');
-        stdout.write(DIM('  --env=arc3: ARC 域(上限测量); --task: terminal 域(工作范围测量); 结果落 cognitive/ablation.jsonl\n'));
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid] | --stats\n');
+        stdout.write(DIM('  --env=arc3: ARC 域(上限); --task: terminal 域; --difficulty=mid: 中等难度区(结果层可测带); 结果落 cognitive/ablation.jsonl\n'));
         return;
       }
       const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);

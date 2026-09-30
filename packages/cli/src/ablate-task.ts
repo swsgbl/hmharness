@@ -28,6 +28,18 @@ const TASKS: Array<{ text: string; expect: string; label: string }> = [
   { text: '用 list_dir 列出 G:/hmharness/packages 下名为 kernel 的目录是否存在，只回复 是 或 否。', expect: '是', label: 'exists-check' },
 ];
 
+/**
+ * MID-difficulty band (§26's measurable zone): multi-step extraction where
+ * bare-prompt runs sometimes slip — counting, sorted enumeration, version
+ * arithmetic. Expected values verified against the repo at authoring time.
+ */
+const MID_TASKS: Array<{ text: string; expect: string; label: string }> = [
+  { text: '用 read_file 读取 G:/hmharness/packages/kernel/src/index.ts，统计包含 export 的行数，只回复该数字。', expect: '16', label: 'count-export' },
+  { text: '读取 G:/hmharness/packages/cli/package.json，按字母序只列出全部 @hmharness 开头的依赖名，逗号分隔不要空格。', expect: '@hmharness/agent,@hmharness/cognitive,@hmharness/domain-harmony,@hmharness/domain-ops,@hmharness/environments,@hmharness/evaluation,@hmharness/evolution,@hmharness/kernel,@hmharness/observability,@hmharness/sandbox,@hmharness/web', label: 'sorted-deps' },
+  { text: '读取 G:/hmharness/package.json 的 version 字段，计算 主版本+次版本+修订版 三个数字之和，只回复数字。', expect: '23', label: 'version-sum' },
+  { text: '用 list_dir 查看 G:/hmharness/packages/cognitive/src/__tests__ 目录，统计其中 .test.ts 结尾的文件个数，只回复数字。', expect: '5', label: 'count-tests' },
+];
+
 function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
     const child = spawn('npx', ['tsx', 'packages/cli/src/main.ts', '--yes', task], {
@@ -46,15 +58,16 @@ function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: 
   });
 }
 
-export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number): Promise<void> {
+export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' = 'easy'): Promise<void> {
   const homeDir = home();
-  write(`Terminal 域消融 · ${TASKS.length} 个可验证任务 × ${runs} 轮 × 双臂（§26 工作域测量）\n`);
+  const pool = difficulty === 'mid' ? MID_TASKS : TASKS;
+  write(`Terminal 域消融 · ${difficulty} 难度 · ${pool.length} 个可验证任务 × ${runs} 轮 × 双臂（§26 工作域测量）\n`);
   let withOk = 0;
   let bareOk = 0;
   let total = 0;
   const details: Array<{ label: string; with: boolean; bare: boolean }> = [];
   for (let r = 1; r <= runs; r++) {
-    for (const t of TASKS) {
+    for (const t of pool) {
       total += 1;
       const a = await runOnce(t.text, false, 240_000);
       const b = await runOnce(t.text, true, 240_000);
@@ -69,6 +82,7 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
   const record = {
     at: new Date().toISOString(),
     type: 'terminal-task',
+    difficulty,
     runs,
     withCognitive: { pass: withOk, total },
     bare: { pass: bareOk, total },
