@@ -1152,8 +1152,26 @@ flags:
       }, { home: hd, loadConfig: lc, resolveProvider: rp as never });
       return;
     }
+    if (sub === 'ablate') {
+      // blueprint §26 final question, measured: same model, same game —
+      // how much does the cognitive layer contribute vs a bare prompt?
+      if (!rest.includes('--env=arc3')) {
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--game=<id前缀>] [--steps=N]\n');
+        stdout.write(DIM('  双臂对照: 认知层(世界模型信念+经验教训) vs 裸提示词; 结果落 cognitive/ablation.jsonl\n'));
+        return;
+      }
+      const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);
+      const game = rest.find((a) => a.startsWith('--game='))?.slice(7);
+      const { runArc3Ablation } = await import('./arc3-play.ts');
+      const { loadConfig: lc, resolveProvider: rp, homeDir: hd } = await import('@hmharness/kernel');
+      await runArc3Ablation((s) => stdout.write(s), {
+        game,
+        steps: Number.isFinite(steps) ? Math.min(Math.max(steps, 2), 15) : 5,
+      }, { home: hd, loadConfig: lc, resolveProvider: rp as never });
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge|play — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge|play|ablate — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');
