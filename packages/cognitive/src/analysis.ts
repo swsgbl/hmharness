@@ -133,6 +133,84 @@ export async function benchFromTrajectories(home: string, environmentId = 'termi
   };
 }
 
+/* ---- ARC-AGI-3 metrics (blueprint §14 / ARC-005) ---- */
+
+export interface Arc3PlayMetrics {
+  trajectoryId: string;
+  gameId?: string;
+  actions: number;
+  levelsCompleted: number;
+  levelCount: number;
+  /** levels advanced per action (action efficiency) */
+  actionEfficiency: number;
+  /** fraction of the offered action space actually probed (exploration efficiency) */
+  explorationEfficiency: number;
+  /** recoveries per failed action (resilience) */
+  recoveryRate: number;
+  finishedAt: string;
+}
+
+export interface Arc3MetricsReport {
+  plays: number;
+  totalActions: number;
+  totalLevelsCompleted: number;
+  meanActionEfficiency: number;
+  meanExplorationEfficiency: number;
+  meanRecoveryRate: number;
+  perPlay: Arc3PlayMetrics[];
+}
+
+/** ARC-005: aggregate the blueprint's action/exploration efficiency and
+ *  recovery metrics over recorded ARC-AGI-3 plays (trajectories + episodic
+ *  summaries). Honest on empty: null, never zeros-that-lie. */
+export async function arc3Metrics(home: string, limit = 100): Promise<Arc3MetricsReport | null> {
+  const trajectories = (await loadTrajectories(home, limit)).filter((t) => t.environment.id === 'arc3');
+  if (trajectories.length === 0) return null;
+  const perPlay: Arc3PlayMetrics[] = [];
+  for (const traj of trajectories) {
+    const actionTypes = new Set(traj.steps.map((s) => s.action.type));
+    const failures = traj.steps.filter((s) => s.outcome === 'failure').length;
+    const levels = traj.goal?.description?.match(/game ([\w-]+)/)?.[1];
+    perPlay.push({
+      trajectoryId: traj.id,
+      gameId: levels,
+      actions: traj.metrics.actions,
+      // levels come from the episodic summary written at close; the trajectory
+      // itself records actions — levels default 0 when the summary is absent
+      levelsCompleted: 0,
+      levelCount: 0,
+      actionEfficiency: Number((0 / Math.max(1, traj.metrics.actions)).toFixed(3)),
+      explorationEfficiency: Number((actionTypes.size / 7).toFixed(3)),
+      recoveryRate: failures ? Number((traj.metrics.recoveryCount / failures).toFixed(3)) : 0,
+      finishedAt: traj.endedAt ?? traj.startedAt,
+    });
+  }
+  // enrich with episodic summaries ("ARC3 PLAY game: L/N levels in M actions")
+  const mem = new (await import('./memory.ts')).CognitiveMemory(home);
+  await mem.load();
+  const summaries = mem.retrieve({ layer: 'episodic', text: 'ARC3 PLAY', limit: 200 });
+  for (const p of perPlay) {
+    const s = summaries.find((e) => (e.payload as { trajectoryId?: string } | undefined)?.trajectoryId === p.trajectoryId);
+    if (!s) continue;
+    const m = s.content.match(/([\w-]+): (\d+)\/(\d+) levels in (\d+) actions/);
+    if (!m) continue;
+    p.gameId = m[1];
+    p.levelsCompleted = Number(m[2]);
+    p.levelCount = Number(m[3]);
+    p.actionEfficiency = Number((Number(m[2]) / Math.max(1, Number(m[4]))).toFixed(3));
+  }
+  const avg = (pick: (p: Arc3PlayMetrics) => number): number => Number((perPlay.reduce((s, p) => s + pick(p), 0) / perPlay.length).toFixed(3));
+  return {
+    plays: perPlay.length,
+    totalActions: perPlay.reduce((s, p) => s + p.actions, 0),
+    totalLevelsCompleted: perPlay.reduce((s, p) => s + p.levelsCompleted, 0),
+    meanActionEfficiency: avg((p) => p.actionEfficiency),
+    meanExplorationEfficiency: avg((p) => p.explorationEfficiency),
+    meanRecoveryRate: avg((p) => p.recoveryRate),
+    perPlay,
+  };
+}
+
 /* ---- context advisor (blueprint M3: the planner consumes the world model) ---- */
 
 /** Compact world-model digest for the SYSTEM PROMPT. The model sees which

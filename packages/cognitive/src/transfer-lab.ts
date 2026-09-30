@@ -191,7 +191,7 @@ export async function runTransferExperiment(
     samplesWith: withArm.totalActions,
     samplesWithout: withoutArm.totalActions,
   };
-  return {
+  const report: TransferExperimentReport = {
     sourceEnv: opts.sourceEnv,
     targetEnv: opts.targetEnv,
     runsPerArm,
@@ -208,4 +208,15 @@ export async function runTransferExperiment(
         ? Number((withoutArm.meanBrier - withArm.meanBrier).toFixed(4))
         : undefined,
   };
+  // experiments persist (RD-009 matrix data source) — best-effort, never blocks
+  if (opts.record !== false) {
+    try {
+      const { appendFile, mkdir } = await import('node:fs/promises');
+      const { join: j } = await import('node:path');
+      const dir = j(home, 'cognitive');
+      await mkdir(dir, { recursive: true });
+      await appendFile(j(dir, 'transfer.jsonl'), JSON.stringify({ at: new Date().toISOString(), ...report }) + '\n', 'utf8');
+    } catch { /* persistence is best-effort */ }
+  }
+  return report;
 }

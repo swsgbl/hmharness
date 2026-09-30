@@ -791,6 +791,18 @@ export async function startServer(opts: { port: number; host?: string; version?:
         }
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/transfer') {
+        try {
+          const { readFile } = await import('node:fs/promises');
+          const { join: j } = await import('node:path');
+          const text = await readFile(join(home, 'cognitive', 'transfer.jsonl'), 'utf8');
+          const experiments = text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l)).slice(-50);
+          json(res, 200, { experiments });
+        } catch {
+          json(res, 200, { experiments: [] });
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/cognitive/team') {
         try {
           const { teamLog, liveTopologySnapshot } = await import('@hmharness/agent');

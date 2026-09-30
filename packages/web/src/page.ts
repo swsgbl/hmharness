@@ -567,6 +567,7 @@ export const PAGE = `<!doctype html>
         <div class="setbox"><h3 class="sec">目标漂移检测</h3><div id="cog-drift" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">技能候选（历史挖掘）</h3><div id="cog-skills" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">多智能体（治理审计）</h3><div id="cog-team" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">迁移矩阵（对照实验）</h3><div id="cog-transfer" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹回放（RD-010）</h3><div id="cog-replay" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">轨迹库（Episodic）</h3><div id="cog-traj" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">进化审计（不可变）</h3><div id="cog-audit" class="hint">加载中…</div></div>
@@ -1458,6 +1459,21 @@ ${uiLiteSource()}
         document.getElementById('cog-team').innerHTML = html;
       }).catch(function () {
         document.getElementById('cog-team').innerHTML = '<div class="hint">加载失败</div>';
+      });
+      // transfer matrix: every recorded controlled experiment as a cell
+      api('/api/cognitive/transfer').then(function (r) { return r.json(); }).then(function (dd) {
+        var exps = dd.experiments || [];
+        var el = document.getElementById('cog-transfer');
+        if (!exps.length) { el.innerHTML = '<div class="hint">暂无实验——hmh cognitive transfer --run 后自动记录（双臂对照+校准差）</div>'; return; }
+        var html = exps.slice(-8).reverse().map(function (e) {
+          var cls = e.verdict === 'positive' ? 'ok' : e.verdict === 'negative' ? 'err' : 'tb';
+          var cal = e.calibrationDelta !== undefined && e.calibrationDelta > 0 ? ' <small>校准 +' + e.calibrationDelta + '</small>' : '';
+          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + e.sourceEnv + ' → ' + e.targetEnv + ' ' + e.verdict + '</span> ' +
+            '<small>' + e.actionOverlap.length + ' 重叠动作</small>' + cal + '</div>';
+        }).join('');
+        el.innerHTML = html + '<div class="hint" style="margin-top:4px">正迁移=源知识改善目标预测；无重叠=诚实不构成检验</div>';
+      }).catch(function () {
+        document.getElementById('cog-transfer').innerHTML = '<div class="hint">加载失败</div>';
       });
       // trajectory replay viewer (RD-010): pick a run, inspect every step
       api('/api/cognitive/trajectories').then(function (r) { return r.json(); }).then(function (dd) {

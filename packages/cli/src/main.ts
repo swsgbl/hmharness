@@ -930,9 +930,22 @@ flags:
       return;
     }
     if (sub === 'bench') {
-      // BENCH seed: uniform metrics over recorded runs
+      // BENCH seed + ARC-005: uniform metrics over recorded runs; ARC variant
+      // adds action/exploration efficiency + recovery per play
+      const benchEnv = rest.find((a) => a.startsWith('--env='))?.slice(6) ?? 'terminal';
+      if (benchEnv === 'arc3') {
+        const { arc3Metrics } = await import('@hmharness/cognitive');
+        const r = await arc3Metrics(homeDir());
+        if (!r) { stdout.write('（尚无 ARC 对局——hmh cognitive play --env=arc3 后再来）\n'); return; }
+        stdout.write(`ARC-AGI-3 指标 · ${r.plays} 次对局 · 共 ${r.totalActions} 动作 · 过关 ${r.totalLevelsCompleted}\n`);
+        stdout.write(`  动作效率 ${r.meanActionEfficiency}（关/动作）· 探索效率 ${r.meanExplorationEfficiency}（动作空间覆盖/7）· 恢复率 ${r.meanRecoveryRate}\n`);
+        for (const p of r.perPlay.slice(-5)) {
+          stdout.write(`  ${p.trajectoryId.slice(0, 30).padEnd(32)} ${String(p.actions).padStart(3)} 动作 ${p.levelsCompleted}/${p.levelCount} 关 · 效率 ${p.actionEfficiency}\n`);
+        }
+        return;
+      }
       const { benchFromTrajectories } = await import('@hmharness/cognitive');
-      const report = await benchFromTrajectories(homeDir());
+      const report = await benchFromTrajectories(homeDir(), benchEnv);
       if (!report) { stdout.write('（尚无轨迹——跑几次任务后再来）\n'); return; }
       const a = report.aggregate;
       stdout.write(`GeneralBench 种子报告 · ${report.environmentId} · ${report.runs} 次运行\n`);
