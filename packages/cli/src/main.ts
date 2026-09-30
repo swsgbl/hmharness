@@ -1177,9 +1177,18 @@ flags:
         }
         return;
       }
+      if (rest.includes('--task')) {
+        // §26 in the WORKING domain: verifiable terminal mini-tasks, same
+        // model, digest on vs HMH_NO_COGNITIVE=1 — result-level harness delta
+        const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
+        const { runTaskAblation } = await import('./ablate-task.ts');
+        const { homeDir: hd } = await import('@hmharness/kernel');
+        await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1);
+        return;
+      }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--game=<id前缀>] [--steps=N] | --stats\n');
-        stdout.write(DIM('  双臂对照: 认知层(世界模型信念+经验教训) vs 裸提示词; 结果落 cognitive/ablation.jsonl\n'));
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] | --stats\n');
+        stdout.write(DIM('  --env=arc3: ARC 域(上限测量); --task: terminal 域(工作范围测量); 结果落 cognitive/ablation.jsonl\n'));
         return;
       }
       const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);

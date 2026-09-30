@@ -162,8 +162,11 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
     retrieveInsights(home, task, { workspace: opts.workspace ?? undefined }),
     // blueprint M3: the world model feeds the planner — which tools history
     // trusts/distrusts lands in the system prompt (empty until ≥3 steps of
-    // evidence exist, so cold starts see nothing)
-    import('@hmharness/cognitive').then((m) => m.buildContextDigest(home)).catch(() => ''),
+    // evidence exist, so cold starts see nothing). HMH_NO_COGNITIVE=1 strips
+    // it — the ablation arm for §26's harness-contribution measurement.
+    process.env.HMH_NO_COGNITIVE === '1'
+      ? Promise.resolve('')
+      : import('@hmharness/cognitive').then((m) => m.buildContextDigest(home)).catch(() => ''),
   ]);
   let canaryBlock = '';
   let canaryNames: string[] = [];
