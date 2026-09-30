@@ -47,13 +47,15 @@ export async function runArc3Ablation(
     at: new Date().toISOString(),
     game: gameId,
     steps: opts.steps,
-    withCognitive: { levels: withCognitive.levelsCompleted, actions: withCognitive.actions, trajectoryId: withCognitive.trajectoryId },
-    bare: { levels: bare.levelsCompleted, actions: bare.actions, trajectoryId: bare.trajectoryId },
+    withCognitive: { levels: withCognitive.levelsCompleted, actions: withCognitive.actions, distinctActions: withCognitive.distinctActions, trajectoryId: withCognitive.trajectoryId },
+    bare: { levels: bare.levelsCompleted, actions: bare.actions, distinctActions: bare.distinctActions, trajectoryId: bare.trajectoryId },
     harnessDeltaLevels: withCognitive.levelsCompleted - bare.levelsCompleted,
+    harnessDeltaDiversity: withCognitive.distinctActions - bare.distinctActions,
   };
   await mkdir(join(home, 'cognitive'), { recursive: true }).catch(() => undefined);
   await appendFile(join(home, 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
   write(`\n结论 · 认知层 ${withCognitive.levelsCompleted} 关 vs 裸提示词 ${bare.levelsCompleted} 关 → harness 净贡献 ${record.harnessDeltaLevels >= 0 ? '+' : ''}${record.harnessDeltaLevels} 关\n`);
+  write(`  动作多样性 认知层 ${withCognitive.distinctActions} 种 vs 裸 ${bare.distinctActions} 种（关卡持平时行为差异信号）\n`);
   write(`（样本=${opts.steps} 步/臂，单次实验；多次运行后 cognitive/ablation.jsonl 聚合更可靠）\n`);
 }
 
@@ -61,7 +63,7 @@ export async function runArc3Play(
   write: (s: string) => void,
   opts: { game?: string; steps: number; vision?: boolean; bare?: boolean; quiet?: boolean },
   deps: { home: () => string; loadConfig: () => Promise<unknown>; resolveProvider: (cfg: unknown, route: string) => { baseUrl: string; apiKey: string; model: string } | undefined },
-): Promise<{ trajectoryId: string; levelsCompleted: number; levelCount: number; actions: number } | null> {
+): Promise<{ trajectoryId: string; levelsCompleted: number; levelCount: number; actions: number; distinctActions: number } | null> {
   const home = deps.home();
   const { Arc3RestBridge, Arc3Environment, renderFramePng } = await import('@hmharness/environments');
   const { TrajectoryRecorder, TrajectoryStore, CognitiveMemory } = await import('@hmharness/cognitive');
@@ -159,6 +161,7 @@ export async function runArc3Play(
   const score = await env.evaluate();
   const traj = rec.finish(Number(score.metrics.levelsCompleted ?? 0) > state0.levelsCompleted);
   await new TrajectoryStore(home).append(traj);
+  const distinctActions = new Set(traj.steps.map((s) => s.action.type)).size;
   const mem = new CognitiveMemory(home);
   await mem.load();
   await mem.write({
@@ -182,5 +185,6 @@ export async function runArc3Play(
     levelsCompleted: Number(score.metrics.levelsCompleted ?? 0),
     levelCount: Number(score.metrics.levelCount ?? 0),
     actions: Number(score.metrics.actions ?? opts.steps),
+    distinctActions,
   };
 }

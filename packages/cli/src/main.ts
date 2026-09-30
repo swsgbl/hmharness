@@ -1155,8 +1155,30 @@ flags:
     if (sub === 'ablate') {
       // blueprint §26 final question, measured: same model, same game —
       // how much does the cognitive layer contribute vs a bare prompt?
+      const { readFile } = await import('node:fs/promises');
+      const { join: j } = await import('node:path');
+      if (rest.includes('--stats')) {
+        try {
+          const text = await readFile(j(homeDir(), 'cognitive', 'ablation.jsonl'), 'utf8');
+          const rows = text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as { harnessDeltaLevels: number; harnessDeltaDiversity?: number; steps: number; game: string });
+          if (rows.length === 0) { stdout.write('（暂无消融记录——先跑 hmh cognitive ablate --env=arc3）\n'); return; }
+          const avg = (pick: (r: (typeof rows)[number]) => number): number => {
+            const vals = rows.map(pick).filter((v) => Number.isFinite(v));
+            return vals.length ? Number((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2)) : Number.NaN;
+          };
+          stdout.write(`消融聚合 · ${rows.length} 次实验 · 平均 ${avg((r) => r.steps)} 步/臂\n`);
+          stdout.write(`  关卡净贡献均值 ${avg((r) => r.harnessDeltaLevels)} · 动作多样性净贡献均值 ${avg((r) => r.harnessDeltaDiversity ?? Number.NaN)}\n`);
+          const pos = rows.filter((r) => r.harnessDeltaLevels > 0).length;
+          const neg = rows.filter((r) => r.harnessDeltaLevels < 0).length;
+          stdout.write(`  关卡贡献分布: 正 ${pos} / 持平 ${rows.length - pos - neg} / 负 ${neg}\n`);
+          stdout.write(DIM('  关卡持平是常态(ARC 难度);多样性与后续关卡增益随样本累积显现\n'));
+        } catch {
+          stdout.write('（暂无消融记录——先跑 hmh cognitive ablate --env=arc3）\n');
+        }
+        return;
+      }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--game=<id前缀>] [--steps=N]\n');
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--game=<id前缀>] [--steps=N] | --stats\n');
         stdout.write(DIM('  双臂对照: 认知层(世界模型信念+经验教训) vs 裸提示词; 结果落 cognitive/ablation.jsonl\n'));
         return;
       }
