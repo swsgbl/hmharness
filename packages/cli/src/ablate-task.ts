@@ -91,9 +91,18 @@ async function poolOf(difficulty: 'easy' | 'mid' | 'hard' | 'bench', home: () =>
  * harness output was merely verbose. Same instrument, same reading.)
  */
 async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string; error?: string }> {
-  const prev = process.env.HMH_NO_COGNITIVE;
-  if (bare) process.env.HMH_NO_COGNITIVE = '1';
-  else delete process.env.HMH_NO_COGNITIVE;
+  const prevCog = process.env.HMH_NO_COGNITIVE;
+  const prevCtx = process.env.HMH_NO_CONTEXT;
+  if (bare) {
+    // full ablation: strip the tool-reliability digest AND the experience
+    // layer (memory + task-relevant lessons) — v0.22.3 showed the digest
+    // alone has no effect; the live hypothesis is the value lives in lessons
+    process.env.HMH_NO_COGNITIVE = '1';
+    process.env.HMH_NO_CONTEXT = '1';
+  } else {
+    delete process.env.HMH_NO_COGNITIVE;
+    delete process.env.HMH_NO_CONTEXT;
+  }
   let finalText = '';
   try {
     const { runAgentTask, buildRegistry } = await import('@hmharness/agent');
@@ -119,8 +128,10 @@ async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<
     // experiment and lose every arm's data
     return { ok: false, output: finalText, error: String(err).slice(0, 120) };
   } finally {
-    if (prev === undefined) delete process.env.HMH_NO_COGNITIVE;
-    else process.env.HMH_NO_COGNITIVE = prev;
+    if (prevCog === undefined) delete process.env.HMH_NO_COGNITIVE;
+    else process.env.HMH_NO_COGNITIVE = prevCog;
+    if (prevCtx === undefined) delete process.env.HMH_NO_CONTEXT;
+    else process.env.HMH_NO_CONTEXT = prevCtx;
   }
 }
 

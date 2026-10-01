@@ -151,7 +151,14 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
   }
 
   const [memory, skills, insights, cognitive] = await Promise.all([
-    retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
+    // HMH_NO_CONTEXT=1 strips the harness EXPERIENCE layer (memory +
+    // task-relevant insights) — the full-ablation arm for §26. The v0.22.3
+    // reading showed tool-reliability digest alone has no result effect;
+    // the live hypothesis is that the VALUE lives in the lessons layer,
+    // which was present in BOTH arms of every ablation so far.
+    process.env.HMH_NO_CONTEXT === '1'
+      ? Promise.resolve('')
+      : retrieveMemory(home, task, { workspace: opts.workspace ?? undefined, embedding: opts.embedding }),
     listSkills(home),
     // 2026-09-27 plan A: experience retrieval - the K most RELEVANT past
     // insights for THIS task (bigram similarity, recency tiebreak) instead
@@ -159,7 +166,9 @@ export async function contextPack(task: string, sessionId?: string, opts: { work
     // surfaces that lesson instead of five unrelated recent rows.
     // Plan C: cross-project lessons stay retrievable but carry their
     // origin stamp ([来自项目:X]) so the model can weigh them.
-    retrieveInsights(home, task, { workspace: opts.workspace ?? undefined }),
+    process.env.HMH_NO_CONTEXT === '1'
+      ? Promise.resolve('')
+      : retrieveInsights(home, task, { workspace: opts.workspace ?? undefined }),
     // blueprint M3: the world model feeds the planner — which tools history
     // trusts/distrusts lands in the system prompt (empty until ≥3 steps of
     // evidence exist, so cold starts see nothing). HMH_NO_COGNITIVE=1 strips
