@@ -89,7 +89,7 @@ async function poolOf(difficulty: 'easy' | 'mid' | 'hard' | 'bench', home: () =>
  * assertions — a measurement artifact that misread "model fails" when the
  * harness output was merely verbose. Same instrument, same reading.)
  */
-async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string }> {
+async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string; error?: string }> {
   const prev = process.env.HMH_NO_COGNITIVE;
   if (bare) process.env.HMH_NO_COGNITIVE = '1';
   else delete process.env.HMH_NO_COGNITIVE;
@@ -98,7 +98,7 @@ async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<
     const { runAgentTask, buildRegistry } = await import('@hmharness/agent');
     const { loadConfig } = await import('@hmharness/kernel');
     const { reg } = await buildRegistry({ mcp: false });
-    const result = await Promise.race([
+    await Promise.race([
       runAgentTask({
         task,
         registry: reg,
@@ -111,8 +111,12 @@ async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<
       if (!finalText) throw err;
       return undefined;
     });
-    void result;
     return { ok: true, output: finalText };
+  } catch (err) {
+    // a crashed run is a FAILED run (honest reading): record it and keep the
+    // ablation alive — one transient provider 400 must not kill the whole
+    // experiment and lose every arm's data
+    return { ok: false, output: finalText, error: String(err).slice(0, 120) };
   } finally {
     if (prev === undefined) delete process.env.HMH_NO_COGNITIVE;
     else process.env.HMH_NO_COGNITIVE = prev;
@@ -137,7 +141,8 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
       withOk += aHit ? 1 : 0;
       bareOk += bHit ? 1 : 0;
       details.push({ label: t.label, with: aHit, bare: bHit });
-      write(`  ${t.label.padEnd(24)} 认知 ${aHit ? GREEN('✓') : RED('✗')} · 裸 ${bHit ? GREEN('✓') : RED('✗')}\n`);
+      const crash = a.error || b.error ? DIM(`  ⚠ ${String(a.error ?? b.error).slice(0, 70)}`) : '';
+      write(`  ${t.label.padEnd(24)} 认知 ${aHit ? GREEN('✓') : RED('✗')} · 裸 ${bHit ? GREEN('✓') : RED('✗')}${crash}\n`);
     }
   }
   const record = {
