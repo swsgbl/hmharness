@@ -211,6 +211,67 @@ export async function arc3Metrics(home: string, limit = 100): Promise<Arc3Metric
   };
 }
 
+/* ---- calibration report (the §26-proven valuable dimension, first-class) ---- */
+
+export interface CalibrationRow {
+  actionType: string;
+  predictions: number;
+  meanError: number;
+  /** 1 - meanError: how trustworthy the model's instinct on this action is */
+  reliability: number;
+}
+
+export interface CalibrationReport {
+  totalSteps: number;
+  predictedSteps: number;
+  overallMeanError: number | null;
+  overallReliability: number | null;
+  rows: CalibrationRow[];
+}
+
+/** The crown-jewel metric made first-class: per-action prediction calibration
+ *  over the whole trajectory store — the dimension where the harness's value
+ *  is PROVEN (+0.4166 transfer); this surfaces it for the CLI and panel. */
+export async function calibrationReport(home: string, topN = 12): Promise<CalibrationReport> {
+  const trajectories = await loadTrajectories(home, 500);
+  const byType = new Map<string, { n: number; err: number }>();
+  let total = 0;
+  let predicted = 0;
+  let errSum = 0;
+  for (const traj of trajectories) {
+    for (const s of traj.steps) {
+      total++;
+      if (!s.prediction) continue;
+      predicted++;
+      const actual = s.outcome === 'success' ? 1 : 0;
+      const err = Math.abs(s.prediction.confidence - actual);
+      errSum += err;
+      const t = s.action.type;
+      const agg = byType.get(t) ?? { n: 0, err: 0 };
+      agg.n++;
+      agg.err += err;
+      byType.set(t, agg);
+    }
+  }
+  const rows: CalibrationRow[] = [...byType.entries()]
+    .map(([actionType, v]) => ({
+      actionType,
+      predictions: v.n,
+      meanError: Number((v.err / v.n).toFixed(3)),
+      reliability: Number((1 - v.err / v.n).toFixed(3)),
+    }))
+    .sort((a, b) => b.predictions - a.predictions)
+    .slice(0, topN);
+  const overallMeanError = predicted ? Number((errSum / predicted).toFixed(3)) : null;
+  return {
+    totalSteps: total,
+    predictedSteps: predicted,
+    overallMeanError,
+    overallReliability: overallMeanError === null ? null : Number((1 - overallMeanError).toFixed(3)),
+    rows,
+  };
+}
+
 /* ---- context advisor (blueprint M3: the planner consumes the world model) ---- */
 
 /** Compact world-model digest for the SYSTEM PROMPT. The model sees which

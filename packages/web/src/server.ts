@@ -812,6 +812,15 @@ export async function startServer(opts: { port: number; host?: string; version?:
         }
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/cognitive/calibration') {
+        try {
+          const { calibrationReport } = await import('@hmharness/cognitive');
+          json(res, 200, await calibrationReport(home));
+        } catch (err) {
+          json(res, 500, { error: String(err).slice(0, 200) });
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/cognitive') {
         // research dashboard seed (blueprint RD-001..008): read-only status
         // of the cognitive subsystems — memory layers, trajectory store,

@@ -1225,8 +1225,23 @@ flags:
       }, { home: hd, loadConfig: lc, resolveProvider: rp as never });
       return;
     }
+    if (sub === 'calibration') {
+      // the §26-proven valuable dimension, first-class: per-action prediction
+      // calibration — where the harness's value actually lives (+0.4166)
+      const { calibrationReport } = await import('@hmharness/cognitive');
+      const r = await calibrationReport(homeDir());
+      if (r.predictedSteps === 0) { stdout.write('（尚无带预测的轨迹——探索/迁移实验会自动记录预测）\n'); return; }
+      stdout.write(`校准报告 · ${r.predictedSteps}/${r.totalSteps} 步带预测 · 总体平均误差 ${r.overallMeanError}（可靠度 ${r.overallReliability}）\n`);
+      stdout.write('  动作类型                 预测数   平均误差   可靠度\n');
+      for (const row of r.rows) {
+        const bar = '█'.repeat(Math.round(row.reliability * 10)).padEnd(10, '░');
+        stdout.write(`  ${row.actionType.padEnd(24)}${String(row.predictions).padStart(4)}   ${row.meanError.toFixed(3).padStart(7)}   ${bar} ${row.reliability.toFixed(2)}\n`);
+      }
+      stdout.write(DIM('  可靠度=1-平均误差:harness 认知层的实证价值所在(校准维+0.4166,全谱系唯一正读数)\n'));
+      return;
+    }
     if (sub !== 'status') {
-      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|drift|skills|explore|transfer|team|learn|replay|export|purge|play|ablate — 认知子系统与世界模型\n');
+      stdout.write('用法: hmh cognitive status|world-model|diagnose|bench|calibration|drift|skills|explore|transfer|team|learn|replay|export|purge|play|ablate — 认知子系统与世界模型\n');
       return;
     }
     const { cognitiveStatus, formatCognitiveStatus } = await import('@hmharness/cognitive');

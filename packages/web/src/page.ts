@@ -564,6 +564,7 @@ export const PAGE = `<!doctype html>
       <div id="cog-body">
         <div class="setbox"><h3 class="sec">五层记忆</h3><div id="cog-memory" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">世界模型（轨迹回放）</h3><div id="cog-world" class="hint">加载中…</div></div>
+        <div class="setbox"><h3 class="sec">校准报告（实证价值所在）</h3><div id="cog-calib" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">目标漂移检测</h3><div id="cog-drift" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">技能候选（历史挖掘）</h3><div id="cog-skills" class="hint">加载中…</div></div>
         <div class="setbox"><h3 class="sec">多智能体（治理审计）</h3><div id="cog-team" class="hint">加载中…</div></div>
@@ -1402,6 +1403,19 @@ ${uiLiteSource()}
       } else {
         worldEl.innerHTML = '<div class="hint">暂无信念——任务轨迹积累后自动生成（预测先行=无泄漏回放）</div>';
       }
+      // calibration report (§26-proven dimension, first-class)
+      api('/api/cognitive/calibration').then(function (r) { return r.json(); }).then(function (c) {
+        var el = document.getElementById('cog-calib');
+        if (!c.predictedSteps) { el.innerHTML = '<div class="hint">尚无带预测的轨迹——探索/迁移实验自动记录预测</div>'; return; }
+        var rows = (c.rows || []).slice(0, 6).map(function (row) {
+          var cls = row.reliability >= 0.75 ? 'ok' : row.reliability >= 0.5 ? 'tb' : 'err';
+          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + row.actionType + '</span> 可靠度 ' + (row.reliability * 100).toFixed(0) + '% <small>×' + row.predictions + ' 预测</small></div>';
+        }).join('');
+        el.innerHTML = '<div class="hint" style="margin-bottom:4px">总体 ' + (c.overallReliability * 100).toFixed(1) + '% 可靠（' + c.predictedSteps + '/' + c.totalSteps + ' 步带预测）</div>' + rows +
+          '<div class="hint" style="margin-top:4px">校准维=harness 实证价值所在（迁移 +0.4166，全谱系唯一正读数）</div>';
+      }).catch(function () {
+        document.getElementById('cog-calib').innerHTML = '<div class="hint">加载失败</div>';
+      });
       document.getElementById('cog-traj').innerHTML =
         '<span class="ob ' + (d.trajectories ? 'ok' : 'none') + '">' + (d.trajectories || 0) + ' 条轨迹</span>' +
         '<div class="hint" style="margin-top:6px">' + (d.trajectories ? '每次 agent 任务自动记录工具动作/结果/耗时（episodic 层）' : '任务运行后自动生成') + '</div>';
