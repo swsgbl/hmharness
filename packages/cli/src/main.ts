@@ -1178,25 +1178,26 @@ flags:
         return;
       }
       if (rest.includes('--task')) {
-        // §26 in the WORKING domain: verifiable terminal mini-tasks, same
-        // model, digest on vs HMH_NO_COGNITIVE=1 — result-level harness delta.
-        // --difficulty selects the band; --calibrate bare-runs first (admission
-        // to the measurable band = 20-80% bare failure, not author intuition).
+        // §26 in the WORKING domain: verifiable tasks, same model, digest on
+        // vs HMH_NO_COGNITIVE=1 — result-level harness delta.
+        // --difficulty=bench uses the REAL evolution corpus (116 cases with
+        // the structured assertion engine) — the natural failure-rate source.
         const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
-        const difficulty = rest.includes('--difficulty=hard') ? 'hard' : rest.includes('--difficulty=mid') ? 'mid' : 'easy';
+        const difficulty = rest.includes('--difficulty=bench') ? 'bench' : rest.includes('--difficulty=hard') ? 'hard' : rest.includes('--difficulty=mid') ? 'mid' : 'easy';
+        const filter = rest.find((a) => a.startsWith('--filter='))?.slice(9);
         const { runTaskAblation, runBareCalibration } = await import('./ablate-task.ts');
         const { homeDir: hd } = await import('@hmharness/kernel');
         if (rest.includes('--calibrate')) {
           const probes = Number(rest.find((a) => a.startsWith('--probes='))?.slice(9) ?? 2);
-          await runBareCalibration((s) => stdout.write(s), difficulty, Number.isFinite(probes) ? Math.min(Math.max(probes, 1), 4) : 2);
+          await runBareCalibration((s) => stdout.write(s), difficulty, Number.isFinite(probes) ? Math.min(Math.max(probes, 1), 4) : 2, hd, filter);
           return;
         }
-        await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1, difficulty);
+        await runTaskAblation((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 5) : 1, difficulty, filter);
         return;
       }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid|hard] [--calibrate [--probes=N]] | --stats\n');
-        stdout.write(DIM('  --calibrate: 裸臂定标(准入带=裸失败率20-80%); --difficulty=hard: 跨文件聚合带; 结果落 cognitive/ablation.jsonl\n'));
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid|hard|bench] [--filter=前缀] [--calibrate [--probes=N]] | --stats\n');
+        stdout.write(DIM('  --difficulty=bench: evolution 真实语料(结构化断言); --calibrate: 裸臂定标(准入带=裸失败率20-80%)\n'));
         return;
       }
       const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);

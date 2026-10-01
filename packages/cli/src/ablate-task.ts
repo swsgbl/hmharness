@@ -3,16 +3,19 @@
  *
  * ARC ablation measures the CEILING (models fail there, harness gain is not
  * measurable yet — honest zero). This one measures the WORKING RANGE: on
- * verifiable terminal mini-tasks where the model is competent, does the
- * cognitive context (tool-reliability digest) change task success?
+ * verifiable terminal tasks where the model is competent, does the cognitive
+ * context (tool-reliability digest) change task success?
  *
  *   arm A (cognitive): normal runner (digest injected when evidence exists)
  *   arm B (bare):      HMH_NO_COGNITIVE=1 strips the digest
  *
- * Same model, same task text, deterministic exact-match verification.
- * Results append to cognitive/ablation.jsonl (type: 'terminal-task').
+ * Difficulty bands: easy/mid/hard (author-designed, all measured FLOOR) and
+ * `bench` — REAL corpus cases from evolution's bench with the structured
+ * assertion engine (matchCase), the natural 20-80% failure-rate sample
+ * source. Calibration (`--calibrate`) gates admission to the measurable
+ * band before any ablation spends runtime. Results append to
+ * cognitive/ablation.jsonl (type: 'terminal-task').
  */
-import { spawn } from 'node:child_process';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -20,56 +23,105 @@ const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const RED = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 
+interface AblateTask {
+  text: string;
+  label: string;
+  check: (output: string) => boolean;
+}
+
+const bySubstring = (expect: string) => (output: string): boolean => output.includes(expect);
+
 /** deterministic, verifiable mini-tasks (exact substring must appear) */
-const TASKS: Array<{ text: string; expect: string; label: string }> = [
-  { text: '用 read_file 读取 G:/hmharness/package.json，只回复 "name" 字段的精确值，不要其他文字。', expect: 'hmharness', label: 'field-extract' },
-  { text: '用 read_file 读取 G:/hmharness/README.md 的第一行，只回复该行内容。', expect: '#', label: 'first-line' },
-  { text: '用 run_command 执行 node -e "console.log(21*2)"，只回复输出数字。', expect: '42', label: 'compute' },
-  { text: '用 list_dir 列出 G:/hmharness/packages 下名为 kernel 的目录是否存在，只回复 是 或 否。', expect: '是', label: 'exists-check' },
+const TASKS: AblateTask[] = [
+  { text: '用 read_file 读取 G:/hmharness/package.json，只回复 "name" 字段的精确值，不要其他文字。', label: 'field-extract', check: bySubstring('hmharness') },
+  { text: '用 read_file 读取 G:/hmharness/README.md 的第一行，只回复该行内容。', label: 'first-line', check: bySubstring('#') },
+  { text: '用 run_command 执行 node -e "console.log(21*2)"，只回复输出数字。', label: 'compute', check: bySubstring('42') },
+  { text: '用 list_dir 列出 G:/hmharness/packages 下名为 kernel 的目录是否存在，只回复 是 或 否。', label: 'exists-check', check: bySubstring('是') },
 ];
 
 /**
- * HARD band: cross-file aggregation and format transforms — models slip
- * here more often. Expected values verified against the repo at authoring.
+ * MID band: multi-step extraction (author-designed; measured FLOOR — kept
+ * for the difficulty-spectrum record, not for measurable gain).
  */
-const HARD_TASKS: Array<{ text: string; expect: string; label: string }> = [
-  { text: '分别读取 G:/hmharness/packages/kernel/src/index.ts 和 G:/hmharness/packages/agent/src/index.ts 两个文件，统计两个文件中包含 export 的行数总和，只回复该数字。', expect: '29', label: 'cross-file-count' },
-  { text: '读取 G:/hmharness/packages/web/package.json，只回复 dependencies 中 qrcode 这一项的精确版本约束字符串（含符号），不要其他文字。', expect: '^1.5.4', label: 'dep-constraint' },
-  { text: '统计 G:/hmharness/packages/cognitive/src/__tests__ 和 G:/hmharness/packages/environments/src/__tests__ 两个目录中 .test.ts 结尾文件的总个数，只回复数字。', expect: '9', label: 'cross-dir-count' },
-  { text: '读取 G:/hmharness/package.json 的 version 字段，把其中的点全部换成短横线后回复结果，不要其他文字。', expect: '0-21-3', label: 'version-dashes' },
+const MID_TASKS: AblateTask[] = [
+  { text: '用 read_file 读取 G:/hmharness/packages/kernel/src/index.ts，统计包含 export 的行数，只回复该数字。', label: 'count-export', check: bySubstring('16') },
+  { text: '读取 G:/hmharness/packages/cli/package.json，按字母序只列出全部 @hmharness 开头的依赖名，逗号分隔不要空格。', label: 'sorted-deps', check: bySubstring('@hmharness/agent,@hmharness/cognitive,@hmharness/domain-harmony,@hmharness/domain-ops,@hmharness/environments,@hmharness/evaluation,@hmharness/evolution,@hmharness/kernel,@hmharness/observability,@hmharness/sandbox,@hmharness/web') },
+  { text: '读取 G:/hmharness/package.json 的 version 字段，计算 主版本+次版本+修订版 三个数字之和，只回复数字。', label: 'version-sum', check: bySubstring('23') },
+  { text: '用 list_dir 查看 G:/hmharness/packages/cognitive/src/__tests__ 目录，统计其中 .test.ts 结尾的文件个数，只回复数字。', label: 'count-tests', check: bySubstring('5') },
 ];
 
-function poolOf(difficulty: 'easy' | 'mid' | 'hard'): Array<{ text: string; expect: string; label: string }> {
-  return difficulty === 'hard' ? HARD_TASKS : difficulty === 'mid' ? MID_TASKS : TASKS;
-}
-const MID_TASKS: Array<{ text: string; expect: string; label: string }> = [
-  { text: '用 read_file 读取 G:/hmharness/packages/kernel/src/index.ts，统计包含 export 的行数，只回复该数字。', expect: '16', label: 'count-export' },
-  { text: '读取 G:/hmharness/packages/cli/package.json，按字母序只列出全部 @hmharness 开头的依赖名，逗号分隔不要空格。', expect: '@hmharness/agent,@hmharness/cognitive,@hmharness/domain-harmony,@hmharness/domain-ops,@hmharness/environments,@hmharness/evaluation,@hmharness/evolution,@hmharness/kernel,@hmharness/observability,@hmharness/sandbox,@hmharness/web', label: 'sorted-deps' },
-  { text: '读取 G:/hmharness/package.json 的 version 字段，计算 主版本+次版本+修订版 三个数字之和，只回复数字。', expect: '23', label: 'version-sum' },
-  { text: '用 list_dir 查看 G:/hmharness/packages/cognitive/src/__tests__ 目录，统计其中 .test.ts 结尾的文件个数，只回复数字。', expect: '5', label: 'count-tests' },
+/**
+ * HARD band: cross-file aggregation (author-designed; measured FLOOR).
+ */
+const HARD_TASKS: AblateTask[] = [
+  { text: '分别读取 G:/hmharness/packages/kernel/src/index.ts 和 G:/hmharness/packages/agent/src/index.ts 两个文件，统计两个文件中包含 export 的行数总和，只回复该数字。', label: 'cross-file-count', check: bySubstring('29') },
+  { text: '读取 G:/hmharness/packages/web/package.json，只回复 dependencies 中 qrcode 这一项的精确版本约束字符串（含符号），不要其他文字。', label: 'dep-constraint', check: bySubstring('^1.5.4') },
+  { text: '统计 G:/hmharness/packages/cognitive/src/__tests__ 和 G:/hmharness/packages/environments/src/__tests__ 两个目录中 .test.ts 结尾文件的总个数，只回复数字。', label: 'cross-dir-count', check: bySubstring('9') },
+  { text: '读取 G:/hmharness/package.json 的 version 字段，把其中的点全部换成短横线后回复结果，不要其他文字。', label: 'version-dashes', check: bySubstring('0-21-3') },
 ];
 
-function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string }> {
-  return new Promise((resolve) => {
-    const child = spawn('npx', ['tsx', 'packages/cli/src/main.ts', '--yes', task], {
-      cwd: 'G:/hmharness',
-      shell: true,
-      env: { ...process.env, ...(bare ? { HMH_NO_COGNITIVE: '1' } : {}) },
-    });
-    let out = '';
-    const timer = setTimeout(() => child.kill(), timeoutMs);
-    child.stdout?.on('data', (d: Buffer) => (out += d.toString()));
-    child.stderr?.on('data', (d: Buffer) => (out += d.toString()));
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ ok: code === 0, output: out });
-    });
-  });
+/** BENCH band: real corpus cases with the structured assertion engine. */
+async function benchPool(home: string, filter?: string, limit = 8): Promise<AblateTask[]> {
+  const { listCases, matchCase } = await import('@hmharness/evolution');
+  const cases = await listCases(home);
+  return cases
+    .filter((c) => !c.holdout)
+    .filter((c) => (filter ? c.name.startsWith(filter) : true))
+    .slice(0, limit)
+    .map((c) => ({
+      text: c.prompt,
+      label: `bench:${c.name}`,
+      check: (out: string) => matchCase(out, c).pass,
+    }));
 }
 
-export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' | 'hard' = 'easy'): Promise<void> {
+async function poolOf(difficulty: 'easy' | 'mid' | 'hard' | 'bench', home: () => string, filter?: string): Promise<AblateTask[]> {
+  if (difficulty === 'bench') return benchPool(home(), filter);
+  if (difficulty === 'hard') return HARD_TASKS;
+  if (difficulty === 'mid') return MID_TASKS;
+  return TASKS;
+}
+
+/**
+ * One agent run IN-PROCESS, capturing the FINAL reply text — the exact same
+ * extraction the bench gate uses. (The earlier subprocess version captured
+ * raw stdout: thinking blocks + session lines + ANSI noise broke expect-exact
+ * assertions — a measurement artifact that misread "model fails" when the
+ * harness output was merely verbose. Same instrument, same reading.)
+ */
+async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string }> {
+  const prev = process.env.HMH_NO_COGNITIVE;
+  if (bare) process.env.HMH_NO_COGNITIVE = '1';
+  else delete process.env.HMH_NO_COGNITIVE;
+  let finalText = '';
+  try {
+    const { runAgentTask, buildRegistry } = await import('@hmharness/agent');
+    const { loadConfig } = await import('@hmharness/kernel');
+    const { reg } = await buildRegistry({ mcp: false });
+    const result = await Promise.race([
+      runAgentTask({
+        task,
+        registry: reg,
+        cfg: await loadConfig(),
+        yes: true,
+        events: { onFinal: (r: { text: string }) => { finalText = r.text; } },
+      } as never),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('ablate run timeout')), timeoutMs)),
+    ]).catch((err: unknown) => {
+      if (!finalText) throw err;
+      return undefined;
+    });
+    void result;
+    return { ok: true, output: finalText };
+  } finally {
+    if (prev === undefined) delete process.env.HMH_NO_COGNITIVE;
+    else process.env.HMH_NO_COGNITIVE = prev;
+  }
+}
+
+export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' | 'hard' | 'bench' = 'easy', filter?: string): Promise<void> {
   const homeDir = home();
-  const pool = poolOf(difficulty);
+  const pool = await poolOf(difficulty, home, filter);
   write(`Terminal 域消融 · ${difficulty} 难度 · ${pool.length} 个可验证任务 × ${runs} 轮 × 双臂（§26 工作域测量）\n`);
   let withOk = 0;
   let bareOk = 0;
@@ -80,12 +132,12 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
       total += 1;
       const a = await runOnce(t.text, false, 240_000);
       const b = await runOnce(t.text, true, 240_000);
-      const aHit = a.output.includes(t.expect);
-      const bHit = b.output.includes(t.expect);
+      const aHit = t.check(a.output);
+      const bHit = t.check(b.output);
       withOk += aHit ? 1 : 0;
       bareOk += bHit ? 1 : 0;
       details.push({ label: t.label, with: aHit, bare: bHit });
-      write(`  ${t.label.padEnd(14)} 认知 ${aHit ? GREEN('✓') : RED('✗')} · 裸 ${bHit ? GREEN('✓') : RED('✗')}\n`);
+      write(`  ${t.label.padEnd(24)} 认知 ${aHit ? GREEN('✓') : RED('✗')} · 裸 ${bHit ? GREEN('✓') : RED('✗')}\n`);
     }
   }
   const record = {
@@ -110,18 +162,18 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
  * actual failure rate. Admission to the measurable band is 20-80% bare
  * failure — the author's intuition about difficulty is not the instrument.
  */
-export async function runBareCalibration(write: (s: string) => void, difficulty: 'easy' | 'mid' | 'hard', probes: number): Promise<void> {
-  const pool = poolOf(difficulty);
+export async function runBareCalibration(write: (s: string) => void, difficulty: 'easy' | 'mid' | 'hard' | 'bench', probes: number, home: () => string, filter?: string): Promise<void> {
+  const pool = await poolOf(difficulty, home, filter);
   write(`裸臂定标 · ${difficulty} 难度 · ${pool.length} 任务 × ${probes} 次裸跑（准入带=失败率 20%-80%）\n`);
   for (const t of pool) {
     let fails = 0;
     for (let i = 0; i < probes; i++) {
       const r = await runOnce(t.text, true, 240_000);
-      if (!r.output.includes(t.expect)) fails += 1;
+      if (!t.check(r.output)) fails += 1;
     }
     const rate = Number((fails / probes).toFixed(2));
     const band = rate === 0 ? '地板（剔除）' : rate >= 1 ? '天花板（剔除）' : rate >= 0.2 && rate <= 0.8 ? '可测带 ✓' : '边缘';
-    write(`  ${t.label.padEnd(18)} 裸失败率 ${Math.round(rate * 100)}% → ${band}\n`);
+    write(`  ${t.label.padEnd(24)} 裸失败率 ${Math.round(rate * 100)}% → ${band}\n`);
   }
   write(DIM('  定标纪律:只有可测带任务进消融池;地板/天花板任务测不出处理效应\n'));
 }
