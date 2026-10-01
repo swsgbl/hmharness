@@ -210,18 +210,27 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
  *
  * The compounding effect = compounded − fresh on the SAME tasks in the SAME
  * home. Recorded to cognitive/ablation.jsonl (type: 'compounding').
+ *
+ * Order-effect control (--control): a SECOND isolated home runs the target
+ * pool twice with NO training in between — its second-run delta is the pure
+ * order effect (task familiarity, position). The true compounding effect =
+ * experimental delta − control delta.
  */
 export async function runCompoundExperiment(
   write: (s: string) => void,
   home: () => string,
-  opts: { targetFilter: string; trainFilter: string; trainCount: number },
+  opts: { targetFilter: string; trainFilter: string; trainCount: number; control?: boolean },
 ): Promise<void> {
   const { mkdtemp, copyFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const realHome = home();
-  const tempHome = await mkdtemp(join(tmpdir(), 'hmh-compound-'));
-  // providers/config so the agent can actually run inside the temp home
-  await copyFile(join(realHome, 'config.json'), join(tempHome, 'config.json')).catch(() => undefined);
+
+  const mkHome = async (): Promise<string> => {
+    const h = await mkdtemp(join(tmpdir(), 'hmh-compound-'));
+    await copyFile(join(realHome, 'config.json'), join(h, 'config.json')).catch(() => undefined);
+    return h;
+  };
+  const tempHome = await mkHome();
 
   const prevHome = process.env.HMH_HOME;
   process.env.HMH_HOME = tempHome;
@@ -254,7 +263,34 @@ export async function runCompoundExperiment(
     write('—— 复利臂（同目标任务，带积累经验）——\n');
     const compounded = await runPool(targets);
 
+    // order-effect control: SECOND isolated home, targets twice, NO training
+    let control: { first: { pass: number; total: number; crashes: number }; second: { pass: number; total: number; crashes: number }; orderDelta: number | null } | undefined;
+    if (opts.control) {
+      const controlHome = await mkHome();
+      process.env.HMH_HOME = controlHome;
+      try {
+        write('—— 顺序对照臂（第二个隔离家·无训练·纯顺序效应）——\n');
+        write('  [第一次]\n');
+        const cFirst = await runPool(targets);
+        write('  [第二次·无训练间隔]\n');
+        const cSecond = await runPool(targets);
+        const cClean = Math.min(cFirst.total - cFirst.crashes, cSecond.total - cSecond.crashes);
+        control = {
+          first: { pass: cFirst.pass, total: cFirst.total, crashes: cFirst.crashes },
+          second: { pass: cSecond.pass, total: cSecond.total, crashes: cSecond.crashes },
+          orderDelta: cClean ? Number(((cSecond.pass - cFirst.pass) / cClean).toFixed(3)) : null,
+        };
+        write(`  顺序效应 ${control.first.pass}/${control.first.total} → ${control.second.pass}/${control.second.total} = ${control.orderDelta === null ? 'N/A' : (control.orderDelta * 100).toFixed(1) + '%'}\n`);
+      } finally {
+        await rm(controlHome, { recursive: true, force: true }).catch(() => undefined);
+        process.env.HMH_HOME = tempHome;
+      }
+    }
+
     const cleanTotal = Math.min(fresh.total - fresh.crashes, compounded.total - compounded.crashes);
+    const expDelta = cleanTotal ? Number(((compounded.pass - fresh.pass) / cleanTotal).toFixed(3)) : null;
+    // true compounding = experimental delta MINUS the order effect it shares
+    const netCompounding = expDelta !== null && control?.orderDelta != null ? Number((expDelta - control.orderDelta).toFixed(3)) : null;
     const record = {
       at: new Date().toISOString(),
       type: 'compounding',
@@ -263,11 +299,15 @@ export async function runCompoundExperiment(
       trainedCount: trained.pass,
       fresh: { pass: fresh.pass, total: fresh.total, crashes: fresh.crashes },
       compounded: { pass: compounded.pass, total: compounded.total, crashes: compounded.crashes },
-      compoundingDelta: cleanTotal ? Number(((compounded.pass - fresh.pass) / cleanTotal).toFixed(3)) : null,
+      compoundingDelta: expDelta,
+      control,
+      netCompounding,
     };
     await appendFile(join(realHome, 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
-    write(`结论 · 复利臂 ${compounded.pass}/${compounded.total} vs 新鲜臂 ${fresh.pass}/${fresh.total} → 跨任务复利效应 ${record.compoundingDelta === null ? 'N/A' : (record.compoundingDelta * 100).toFixed(1) + '%'}\n`);
-    write(DIM(`（训练 ${trained.pass}/${trained.total} 过;⚡ 认知${fresh.crashes + compounded.crashes};同一隔离家内前后对照=复利效应的干净测量）\n`));
+    write(`结论 · 实验 ${fresh.pass}/${fresh.total}→${compounded.pass}/${compounded.total}（Δ${expDelta === null ? 'N/A' : (expDelta * 100).toFixed(1) + '%'}）`);
+    if (control) write(` − 顺序效应${control.orderDelta === null ? 'N/A' : (control.orderDelta * 100).toFixed(1) + '%'} = 净复利 ${netCompounding === null ? 'N/A' : (netCompounding * 100).toFixed(1) + '%'}\n`);
+    else write(' → 未控顺序效应（加 --control 分离）\n');
+    write(DIM(`（训练 ${trained.pass}/${trained.total} 过;⚡ 实验${fresh.crashes + compounded.crashes}/对照${(control?.first.crashes ?? 0) + (control?.second.crashes ?? 0)}）\n`));
   } finally {
     if (prevHome === undefined) delete process.env.HMH_HOME;
     else process.env.HMH_HOME = prevHome;

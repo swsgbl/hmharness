@@ -1189,7 +1189,8 @@ flags:
         const { homeDir: hd } = await import('@hmharness/kernel');
         if (rest.includes('--compound')) {
           // cross-task compounding (the v0.22.4 pivot): arms differ in
-          // TRAINING HISTORY inside an isolated home, not in prompt content
+          // TRAINING HISTORY inside an isolated home, not in prompt content.
+          // --control adds a no-training second home to strip order effects.
           const targetFilter = rest.find((a) => a.startsWith('--target='))?.slice(9) ?? 'cjk';
           const trainFilter = rest.find((a) => a.startsWith('--trainer='))?.slice(10) ?? 'train';
           const trainCount = Number(rest.find((a) => a.startsWith('--train='))?.slice(8) ?? 4);
@@ -1197,6 +1198,7 @@ flags:
             targetFilter,
             trainFilter,
             trainCount: Number.isFinite(trainCount) ? Math.min(Math.max(trainCount, 1), 8) : 4,
+            control: rest.includes('--control'),
           });
           return;
         }
