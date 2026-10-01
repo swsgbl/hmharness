@@ -198,6 +198,84 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
 }
 
 /**
+ * Cross-task compounding experiment (the v0.22.4 pivot): the experience layer
+ * can only pay off AFTER tasks accumulate lessons — so the arms differ in
+ * TRAINING HISTORY, not in prompt content. Design:
+ *
+ *   temp home (zero experience, config copied for providers)
+ *     1. fresh arm: run the target pool          → baseline pass rate
+ *     2. training:  run K training tasks (different bench slice) — each run
+ *        records an insight automatically (the runner always does)
+ *     3. compounded arm: run the target pool again → post-training pass rate
+ *
+ * The compounding effect = compounded − fresh on the SAME tasks in the SAME
+ * home. Recorded to cognitive/ablation.jsonl (type: 'compounding').
+ */
+export async function runCompoundExperiment(
+  write: (s: string) => void,
+  home: () => string,
+  opts: { targetFilter: string; trainFilter: string; trainCount: number },
+): Promise<void> {
+  const { mkdtemp, copyFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const realHome = home();
+  const tempHome = await mkdtemp(join(tmpdir(), 'hmh-compound-'));
+  // providers/config so the agent can actually run inside the temp home
+  await copyFile(join(realHome, 'config.json'), join(tempHome, 'config.json')).catch(() => undefined);
+
+  const prevHome = process.env.HMH_HOME;
+  process.env.HMH_HOME = tempHome;
+  try {
+    // cases live in the REAL home's bench corpus; only the RUNTIME state
+    // (insights/memory) is isolated in tempHome
+    const targets = await benchPool(realHome, opts.targetFilter, 6);
+    const trainPool = await benchPool(realHome, opts.trainFilter, opts.trainCount);
+    write(`跨任务复利实验 · 目标 ${opts.targetFilter}×${targets.length} · 训练 ${opts.trainFilter}×${trainPool.length} · 隔离家 ${tempHome.slice(-12)}\n`);
+
+    const runPool = async (pool: AblateTask[]): Promise<{ pass: number; total: number; crashes: number; labels: string[] }> => {
+      let pass = 0;
+      let crashes = 0;
+      const labels: string[] = [];
+      for (const t of pool) {
+        const r = await runOnce(t.text, false, 240_000);
+        const v = verdictOf(r, t.check);
+        if (v === 'crash') crashes += 1;
+        else if (v === 'pass') pass += 1;
+        labels.push(`${t.label}:${v}`);
+        write(`  ${t.label.padEnd(24)} ${v === 'pass' ? GREEN('✓') : v === 'wrong' ? RED('✗') : YELLOW('⚡')}\n`);
+      }
+      return { pass, total: pool.length, crashes, labels };
+    };
+
+    write('—— 新鲜臂（零经验）——\n');
+    const fresh = await runPool(targets);
+    write('—— 训练期（经验自动积累 insights）——\n');
+    const trained = await runPool(trainPool);
+    write('—— 复利臂（同目标任务，带积累经验）——\n');
+    const compounded = await runPool(targets);
+
+    const cleanTotal = Math.min(fresh.total - fresh.crashes, compounded.total - compounded.crashes);
+    const record = {
+      at: new Date().toISOString(),
+      type: 'compounding',
+      targetFilter: opts.targetFilter,
+      trainFilter: opts.trainFilter,
+      trainedCount: trained.pass,
+      fresh: { pass: fresh.pass, total: fresh.total, crashes: fresh.crashes },
+      compounded: { pass: compounded.pass, total: compounded.total, crashes: compounded.crashes },
+      compoundingDelta: cleanTotal ? Number(((compounded.pass - fresh.pass) / cleanTotal).toFixed(3)) : null,
+    };
+    await appendFile(join(realHome, 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
+    write(`结论 · 复利臂 ${compounded.pass}/${compounded.total} vs 新鲜臂 ${fresh.pass}/${fresh.total} → 跨任务复利效应 ${record.compoundingDelta === null ? 'N/A' : (record.compoundingDelta * 100).toFixed(1) + '%'}\n`);
+    write(DIM(`（训练 ${trained.pass}/${trained.total} 过;⚡ 认知${fresh.crashes + compounded.crashes};同一隔离家内前后对照=复利效应的干净测量）\n`));
+  } finally {
+    if (prevHome === undefined) delete process.env.HMH_HOME;
+    else process.env.HMH_HOME = prevHome;
+    await rm(tempHome, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
  * Bare-arm calibration (the v0.21.3 lesson, implemented): BEFORE an ablation
  * claims a band is measurable, run each candidate task bare and measure its
  * actual failure rate. Admission to the measurable band is 20-80% bare

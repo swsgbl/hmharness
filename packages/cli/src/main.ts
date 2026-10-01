@@ -1185,8 +1185,21 @@ flags:
         const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
         const difficulty = rest.includes('--difficulty=bench') ? 'bench' : rest.includes('--difficulty=hard') ? 'hard' : rest.includes('--difficulty=mid') ? 'mid' : 'easy';
         const filter = rest.find((a) => a.startsWith('--filter='))?.slice(9);
-        const { runTaskAblation, runBareCalibration } = await import('./ablate-task.ts');
+        const { runTaskAblation, runBareCalibration, runCompoundExperiment } = await import('./ablate-task.ts');
         const { homeDir: hd } = await import('@hmharness/kernel');
+        if (rest.includes('--compound')) {
+          // cross-task compounding (the v0.22.4 pivot): arms differ in
+          // TRAINING HISTORY inside an isolated home, not in prompt content
+          const targetFilter = rest.find((a) => a.startsWith('--target='))?.slice(9) ?? 'cjk';
+          const trainFilter = rest.find((a) => a.startsWith('--trainer='))?.slice(10) ?? 'train';
+          const trainCount = Number(rest.find((a) => a.startsWith('--train='))?.slice(8) ?? 4);
+          await runCompoundExperiment((s) => stdout.write(s), hd, {
+            targetFilter,
+            trainFilter,
+            trainCount: Number.isFinite(trainCount) ? Math.min(Math.max(trainCount, 1), 8) : 4,
+          });
+          return;
+        }
         if (rest.includes('--calibrate')) {
           const probes = Number(rest.find((a) => a.startsWith('--probes='))?.slice(9) ?? 2);
           await runBareCalibration((s) => stdout.write(s), difficulty, Number.isFinite(probes) ? Math.min(Math.max(probes, 1), 4) : 2, hd, filter);
@@ -1196,8 +1209,8 @@ flags:
         return;
       }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=easy|mid|hard|bench] [--filter=前缀] [--calibrate [--probes=N]] | --stats\n');
-        stdout.write(DIM('  --difficulty=bench: evolution 真实语料(结构化断言); --calibrate: 裸臂定标(准入带=裸失败率20-80%)\n'));
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=..] [--filter=前缀] [--calibrate] | --compound [--target=cjk --trainer=train --train=4] | --stats\n');
+        stdout.write(DIM('  --compound: 跨任务复利(隔离家,训练前后同目标任务对照); --difficulty=bench: evolution 真实语料\n'));
         return;
       }
       const steps = Number(rest.find((a) => a.startsWith('--steps='))?.slice(8) ?? 5);
