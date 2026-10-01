@@ -58,6 +58,10 @@ export interface ExplorationContext {
   worldModel: WorldModel;
   goalKeywords?: string[];
   hypotheses: HypothesisRegistry;
+  /** calibration-targeted exploration (§26 finding→product): per-action
+   *  1−reliability from the trajectory store; poorly-calibrated actions get
+   *  a score BOOST — the model's prediction error IS the information gain */
+  calibrationBias?: Record<string, number>;
 }
 
 export interface ExplorationOutcome {
@@ -115,12 +119,16 @@ function stateFeatures(state: unknown, prefix = ''): string[] {
 }
 
 export class UcbExplorationPolicy implements ExplorationPolicy {
-  constructor(private weights: Required<NonNullable<ExplorationRunOptions['weights']>> = {
-    uncertainty: 0.35,
-    information: 0.25,
-    goal: 0.25,
-    risk: 0.15,
-  }) {}
+  constructor(
+    private weights: Required<NonNullable<ExplorationRunOptions['weights']>> = {
+      uncertainty: 0.35,
+      information: 0.25,
+      goal: 0.25,
+      risk: 0.15,
+    },
+    /** calibration weight: 0 = pure UCB, >0 boosts poorly-predicted actions */
+    private calibrationWeight = 0.2,
+  ) {}
 
   async informationGain(action: Action, state: { uncertaintyByAction: Record<string, number> }): Promise<number> {
     // actions of an uncertain type carry more information: resolving high
@@ -150,10 +158,14 @@ export class UcbExplorationPolicy implements ExplorationPolicy {
       const goalRelevance = this.goalScore(spec, ctx.goalKeywords ?? []);
       const risk = this.risk(probe) + (spec.irreversible ? 0.4 : 0);
       if (risk > opts.riskTolerance) continue; // EXP-007 safe exploration
+      // calibration targeting: the model's prediction error on this action
+      // type is direct evidence that probing it teaches the world model
+      const calBias = ctx.calibrationBias?.[spec.type] ?? 0;
       const score =
         this.weights.uncertainty * uncertainty +
         this.weights.information * info +
-        this.weights.goal * goalRelevance -
+        this.weights.goal * goalRelevance +
+        this.calibrationWeight * calBias -
         this.weights.risk * risk;
       candidates.push({ spec, score });
     }

@@ -25,6 +25,8 @@ export interface ExploreOptions {
   goalKeywords?: string[];
   /** the concrete environment to explore (host wires the adapter) */
   env?: Environment;
+  /** calibration-targeting weight (0 disables; default 0.2) */
+  calibrationWeight?: number;
 }
 
 export interface ExploreSummary {
@@ -64,12 +66,21 @@ export async function runExploration(home: string, opts: ExploreOptions = {}): P
   const rec = new TrajectoryRecorder(`trj-explore-${Date.now().toString(36)}`, `explore-${environmentId}`, { id: env.id, version: env.version }, { id: 'goal-explore', description: 'reduce uncertainty about the environment affordances' });
   const obs = await env.reset({});
 
-  const engine = new ExplorationEngine(new UcbExplorationPolicy());
+  // calibration targeting (§26 finding→product): actions the model predicts
+  // POORLY get an exploration boost — prediction error is information gain
+  let calibrationBias: Record<string, number> | undefined;
+  try {
+    const { calibrationReport } = await import('./analysis.ts');
+    const cal = await calibrationReport(home);
+    calibrationBias = Object.fromEntries(cal.rows.map((r) => [r.actionType, 1 - r.reliability]));
+  } catch { /* bias is best-effort; plain UCB still works */ }
+
+  const engine = new ExplorationEngine(new UcbExplorationPolicy(undefined, opts.calibrationWeight ?? 0.2));
   const result = await engine.run({
     maxActions,
     maxCost,
     riskTolerance,
-    ctx: { observation: obs, worldModel: wm, hypotheses, goalKeywords: opts.goalKeywords },
+    ctx: { observation: obs, worldModel: wm, hypotheses, goalKeywords: opts.goalKeywords, calibrationBias },
     act: async (action) => {
       const prediction = wm.predict({ action });
       const started = Date.now();
