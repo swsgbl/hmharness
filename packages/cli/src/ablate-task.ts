@@ -22,6 +22,7 @@ import { join } from 'node:path';
 const GREEN = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const RED = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const YELLOW = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
 interface AblateTask {
   text: string;
@@ -123,6 +124,18 @@ async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<
   }
 }
 
+/** A run's outcome, signal-separated: a crash (timeout/rate-limit/provider)
+ *  is INFRASTRUCTURE noise, not the model answering wrong — mixing them
+ *  poisons the effect estimate (the -8.3% artifact). Crash = the run did
+ *  not complete (r.ok === false) regardless of whether a partial onFinal
+ *  reply exists — a timed-out arm is a crash even when it had replied. */
+type RunVerdict = 'pass' | 'wrong' | 'crash';
+
+export function verdictOf(r: { ok: boolean; output: string; error?: string }, check: (out: string) => boolean): RunVerdict {
+  if (!r.ok) return 'crash'; // run died (timeout / rate-limit / provider error)
+  return check(r.output) ? 'pass' : 'wrong';
+}
+
 export async function runTaskAblation(write: (s: string) => void, home: () => string, runs: number, difficulty: 'easy' | 'mid' | 'hard' | 'bench' = 'easy', filter?: string): Promise<void> {
   const homeDir = home();
   const pool = await poolOf(difficulty, home, filter);
@@ -130,19 +143,28 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
   let withOk = 0;
   let bareOk = 0;
   let total = 0;
-  const details: Array<{ label: string; with: boolean; bare: boolean }> = [];
+  let withCrash = 0;
+  let bareCrash = 0;
+  let cleanPairs = 0; // pairs where BOTH arms produced a reply (model-vs-model)
+  const details: Array<{ label: string; with: string; bare: string }> = [];
   for (let r = 1; r <= runs; r++) {
     for (const t of pool) {
       total += 1;
       const a = await runOnce(t.text, false, 240_000);
       const b = await runOnce(t.text, true, 240_000);
-      const aHit = t.check(a.output);
-      const bHit = t.check(b.output);
-      withOk += aHit ? 1 : 0;
-      bareOk += bHit ? 1 : 0;
-      details.push({ label: t.label, with: aHit, bare: bHit });
-      const crash = a.error || b.error ? DIM(`  ⚠ ${String(a.error ?? b.error).slice(0, 70)}`) : '';
-      write(`  ${t.label.padEnd(24)} 认知 ${aHit ? GREEN('✓') : RED('✗')} · 裸 ${bHit ? GREEN('✓') : RED('✗')}${crash}\n`);
+      const av = verdictOf(a, t.check);
+      const bv = verdictOf(b, t.check);
+      if (av === 'crash') withCrash += 1;
+      if (bv === 'crash') bareCrash += 1;
+      if (av !== 'crash' && bv !== 'crash') {
+        cleanPairs += 1;
+        withOk += av === 'pass' ? 1 : 0;
+        bareOk += bv === 'pass' ? 1 : 0;
+      }
+      details.push({ label: t.label, with: av, bare: bv });
+      const mark = (v: RunVerdict): string => (v === 'pass' ? GREEN('✓') : v === 'wrong' ? RED('✗') : YELLOW('⚡'));
+      const note = av === 'crash' || bv === 'crash' ? DIM(`  ⚡ ${String(a.error ?? b.error).slice(0, 60)}`) : '';
+      write(`  ${t.label.padEnd(24)} 认知 ${mark(av)} · 裸 ${mark(bv)}${note}\n`);
     }
   }
   const record = {
@@ -150,15 +172,18 @@ export async function runTaskAblation(write: (s: string) => void, home: () => st
     type: 'terminal-task',
     difficulty,
     runs,
-    withCognitive: { pass: withOk, total },
-    bare: { pass: bareOk, total },
-    harnessDelta: Number(((withOk - bareOk) / total).toFixed(3)),
+    // clean stats: only pairs where both arms answered (model-vs-model)
+    withCognitive: { pass: withOk, total: cleanPairs },
+    bare: { pass: bareOk, total: cleanPairs },
+    crashes: { withArm: withCrash, bareArm: bareCrash },
+    harnessDelta: cleanPairs ? Number(((withOk - bareOk) / cleanPairs).toFixed(3)) : null,
     details,
   };
   await mkdir(join(homeDir, 'cognitive'), { recursive: true }).catch(() => undefined);
   await appendFile(join(homeDir, 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
-  write(`结论 · 认知层 ${withOk}/${total} vs 裸 ${bareOk}/${total} → harness 结果层净贡献 ${(record.harnessDelta * 100).toFixed(1)}%\n`);
-  write(DIM('（ARC 域测上限=诚实零;本域测工作范围=模型胜任区的结果增益）\n'));
+  write(`结论 · 认知层 ${withOk}/${cleanPairs} vs 裸 ${bareOk}/${cleanPairs}（干净对 ${cleanPairs}/${total}，⚡基础设施中断 认知${withCrash}/裸${bareCrash} 已剔除）`);
+  write(record.harnessDelta === null ? ' → 干净对不足，无读数\n' : ` → harness 结果层净贡献 ${(record.harnessDelta * 100).toFixed(1)}%\n`);
+  write(DIM('（⚡=超时/限流/provider 错误：非模型答错，混入会污染效应估计——v0.22.2 教训）\n'));
 }
 
 /**
@@ -174,7 +199,7 @@ export async function runBareCalibration(write: (s: string) => void, difficulty:
     let fails = 0;
     for (let i = 0; i < probes; i++) {
       const r = await runOnce(t.text, true, 240_000);
-      if (!t.check(r.output)) fails += 1;
+      if (!r.ok || !t.check(r.output)) fails += 1; // a crashed probe counts as a bare failure (infrastructure, not model-competence — note it in the band reading)
     }
     const rate = Number((fails / probes).toFixed(2));
     const band = rate === 0 ? '地板（剔除）' : rate >= 1 ? '天花板（剔除）' : rate >= 0.2 && rate <= 0.8 ? '可测带 ✓' : '边缘';
