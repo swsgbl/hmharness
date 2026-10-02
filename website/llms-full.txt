@@ -1,6 +1,6 @@
 # hmharness 完整知识库（llms-full.txt）
 
-> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-10-02，npm 包 @hmharness/cli 0.23.12。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
+> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-10-03，npm 包 @hmharness/cli 0.23.13。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
 
 ## hmharness 是什么
 
@@ -10,7 +10,7 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 
 ## 核心事实速查
 
-- npm 包：@hmharness/cli，当前 0.23.12；单仓 13 包（含 cognitive + environments）；内核 0 运行时依赖；666 个单元测试 CI 全绿才允许发版
+- npm 包：@hmharness/cli，当前 0.23.13；单仓 13 包（含 cognitive + environments）；内核 0 运行时依赖；671 个单元测试 CI 全绿才允许发版
 - 平台：Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证）；macOS/Linux 社区支持
 - 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放、认知面板十区+学习曲线），zh/en 双语
 - 独立声明：与华为、开放原子开源基金会无隶属/合作/背书关系；净室重写，不继承任何上游运行时能力

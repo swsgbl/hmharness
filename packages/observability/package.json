@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/observability",
-  "version": "0.23.12",
+  "version": "0.23.13",
   "description": "hmharness observability: typed RunEvent schema + append-only TrajectoryStore. Every agent run becomes a reproducible, comparable, exportable experiment sample (V2 blueprint M1 - flight recorder). Zero runtime dependencies.",
   "type": "module",
   "main": "dist/index.js",
