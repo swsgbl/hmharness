@@ -9,11 +9,12 @@
  * environment/session — MEM-007). Everything here is best-effort: cognitive
  * recording must never break a task run.
  */
-import { TrajectoryStore, TrajectoryRecorder, CognitiveMemory, type Action } from '@hmharness/cognitive';
+import { TrajectoryStore, TrajectoryRecorder, CognitiveMemory, loadTrajectories, type Action } from '@hmharness/cognitive';
 
 interface OpenCall {
   action: Action;
   startedAt: number;
+  prediction?: { claim: string; confidence: number };
 }
 
 export class CognitiveRunRecorder {
@@ -23,6 +24,10 @@ export class CognitiveRunRecorder {
   private seq = 0;
   private failures = 0;
   private successes = 0;
+  /** per-action-type success EMA seeded from history — lets EVERY regular
+   *  task step carry a prediction, feeding the calibration dimension (the
+   *  §26-proven value) from 115/3043 steps toward full coverage */
+  private beliefs = new Map<string, { rate: number; n: number }>();
 
   constructor(
     private home: string,
@@ -32,6 +37,36 @@ export class CognitiveRunRecorder {
   ) {
     this.store = new TrajectoryStore(home);
     this.rec = new TrajectoryRecorder(`trj-${sessionId}-${Date.now().toString(36)}`, sessionId, { id: 'terminal', version: '1.0.0' }, { id: `goal-${sessionId}`, description: task });
+    // seed beliefs from recent history (best-effort, never blocks a task)
+    void this.seedBeliefs().catch(() => undefined);
+  }
+
+  private async seedBeliefs(): Promise<void> {
+    const trajectories = await loadTrajectories(this.home, 200);
+    const table = new Map<string, { sum: number; n: number }>();
+    for (const traj of trajectories) {
+      for (const s of traj.steps) {
+        const t = s.action.type;
+        const agg = table.get(t) ?? { sum: 0, n: 0 };
+        agg.sum += s.outcome === 'success' ? 1 : 0;
+        agg.n += 1;
+        table.set(t, agg);
+      }
+    }
+    for (const [t, v] of table) this.beliefs.set(t, { rate: v.sum / v.n, n: v.n });
+  }
+
+  private predict(type: string): { claim: string; confidence: number } | undefined {
+    const b = this.beliefs.get(type);
+    if (!b) return undefined; // unseen tool: no prediction beats a fake one
+    return { claim: `${type} succeeds ~${Math.round(b.rate * 100)}% (n=${b.n})`, confidence: Number(b.rate.toFixed(3)) };
+  }
+
+  private learn(type: string, success: boolean): void {
+    const b = this.beliefs.get(type) ?? { rate: success ? 1 : 0, n: 0 };
+    b.rate = (b.rate * b.n + (success ? 1 : 0)) / (b.n + 1);
+    b.n += 1;
+    this.beliefs.set(type, b);
   }
 
   /** loop onToolCall: open a step for this tool invocation */
@@ -40,6 +75,7 @@ export class CognitiveRunRecorder {
     this.open.set(key, {
       action: { id: key, type: toolName, args: clip(args), reason: 'agent loop tool call' },
       startedAt: Date.now(),
+      prediction: this.predict(toolName),
     });
   }
 
@@ -48,11 +84,14 @@ export class CognitiveRunRecorder {
     for (const [key, open] of this.open) {
       if (!key.startsWith(`${toolName}#`)) continue;
       this.open.delete(key);
+      const success = !isError;
       if (isError) this.failures += 1; else this.successes += 1;
+      this.learn(toolName, success);
       this.rec.record({
         action: open.action,
         outcome: isError ? 'failure' : 'success',
         evidence: [],
+        prediction: open.prediction,
         durationMs: Date.now() - open.startedAt,
       });
       return;
@@ -63,6 +102,7 @@ export class CognitiveRunRecorder {
       action: { id: `${toolName}#${++this.seq}`, type: toolName, args: {}, reason: 'tool result without recorded call' },
       outcome: isError ? 'failure' : 'success',
       evidence: [],
+      prediction: this.predict(toolName),
     });
   }
 
