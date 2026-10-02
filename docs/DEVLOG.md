@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-10-03(十七) · W8 WM 2.0 第一片:结构化状态增量(681/681)
+
+**动机**:复审 P1——世界模型停在"动作成功率预测",缺 02 文档
+要求的 Action→PredictedDelta→Observation→ActualDelta→PredictionError
+结构化闭环。
+
+**关键决策**:
+- stateDiff:任意环境状态对象的结构化 diff(增/删/改键+稳定
+  shape 签名),内容无关、确定性;
+- predictDelta:按动作类型学**模态 shape**(该动作通常触碰哪些
+  状态键)+历史一致率;未见过=诚实 unknown;
+- update() 自动 diff stateBefore/After 入史;绑定了 predictionId
+  的 shape 预测随 transition 落地结算,deltaAccuracy 滚动追踪
+  结构化预测准确度——与结果预测同一套评分纪律。
+
+**实测证据**:681/681 全绿(+2:diff 三态正确性/模态学习 3 例
+confidence=1/未见过 unknown/命中=1.0/异形=0.5 的评分账)。首版
+测试漏在 transition 传 predictionId——开放预测永不结算,acc=0
+被抓;补上即绿。
+
+**教训**:"预测先行"的账要好记:每个预测都必须有**到达结算
+现场的路径**(predictionId 要跟着 transition 走),否则准确度
+是 0/0 的沉默谎报。
+
+---
+
 ## 2026-10-03(十六) · W6 LSP 工具入册+W4 快照三分类(679/679)
 
 **动机**:12 周计划 W6(LSP agent 工具)与 W4(环境 snapshot/restore
