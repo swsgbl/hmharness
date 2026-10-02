@@ -1134,6 +1134,35 @@ flags:
       stdout.write(`  轨迹 ${exp.trajectoryCount} 条 · 记忆 ${exp.memoryLineCount} 行 · 进化审计 ${exp.auditLineCount} 行 · 多智能体日志 ${exp.multiAgentJsonl.split('\n').filter((l) => l.trim()).length} 行\n`);
       return;
     }
+    if (sub === 'summary') {
+      // crowd loop: anonymous, content-free aggregate for sharing (opt-in;
+      // no task text/paths/args — only per-action stats + coarse fingerprint)
+      const { writeCrowdSummary } = await import('@hmharness/cognitive');
+      const out = rest.find((a) => a.startsWith('--out='))?.slice(6);
+      const { file, summary } = await writeCrowdSummary(homeDir(), out);
+      const fp = summary.fingerprint;
+      stdout.write(`匿名经验摘要 → ${file}\n`);
+      stdout.write(`  指纹 ${fp.os}/${fp.arch}/node${fp.nodeMajor}/${fp.shell} · ${summary.trajectoryCount} 条轨迹 · ${summary.stats.length} 个动作统计\n`);
+      stdout.write(DIM('  内容零泄露:仅动作类型×成功率×耗时统计,无任务文本/路径/参数;可安全分享到社区或 issue\n'));
+      return;
+    }
+    if (sub === 'absorb') {
+      // crowd loop: merge someone else's summary into local priors
+      // (fingerprint-matched, deduped; local evidence always dominates)
+      // sub stays in rest for this command family: the file is the first
+      // non-flag argument AFTER the subcommand word itself
+      const file = rest.slice(1).find((a) => !a.startsWith('-'));
+      if (!file) {
+        stdout.write('用法: hmh cognitive absorb <crowd-summary.json> — 吸收他人匿名经验为本机先验(指纹须匹配)\n');
+        return;
+      }
+      const { absorbCrowdSummary } = await import('@hmharness/cognitive');
+      const r = await absorbCrowdSummary(homeDir(), file);
+      if (!r.ok) { stdout.write(`吸收失败: ${r.error}\n`); return; }
+      if (r.skipped) { stdout.write(`跳过: ${r.skipped}\n`); return; }
+      stdout.write(`已吸收 ${r.absorbed} 条动作统计为本机先验(本地经验始终优先;见 cognitive/summary 的 Crowd experience 行)\n`);
+      return;
+    }
     if (sub === 'purge') {
       // §18 data governance: delete ONLY the cognitive store, explicit token
       const confirm = rest.find((a) => a.startsWith('--confirm='))?.slice(10) ?? '';

@@ -28,3 +28,4 @@ export * from './transfer-lab.ts';
 export * from './abstract-actions.ts';
 export * from './learning-loop.ts';
 export * from './governance.ts';
+export * from './crowd.ts';

@@ -347,6 +347,25 @@ export async function buildContextDigest(home: string, maxChars = 500): Promise<
     if (trusted.length > 0) {
       lines.push(`Reliable tools: ${trusted.slice(0, 3).map((b) => b.actionType).join(', ')}.`);
     }
+    // crowd loop: for actions THIS machine has barely seen (<2 samples), the
+    // crowd prior is real information — a second user's win32/x64 experience
+    // with a tool beats a blind guess. Local evidence always dominates.
+    try {
+      const { loadCrowdPriors } = await import('./crowd.ts');
+      const priors = await loadCrowdPriors(home);
+      if (priors.sources.length > 0) {
+        const localN = new Map(wm.beliefs.map((b) => [b.actionType, b.evidenceCount]));
+        const crowdKnown = Object.entries(priors.priors)
+          .filter(([key, p]) => key.endsWith('|' + key.split('|')[1]) && p.n >= 5)
+          .map(([key, p]) => ({ action: key.split('|')[1]!, n: p.n, rate: p.successRate }))
+          .filter((c) => (localN.get(c.action) ?? 0) < 2)
+          .sort((a, b) => b.n - a.n)
+          .slice(0, 3);
+        if (crowdKnown.length > 0) {
+          lines.push(`Crowd experience on similar machines: ${crowdKnown.map((c) => `${c.action} ~${Math.round(c.rate * 100)}%(n=${c.n})`).join(', ')}.`);
+        }
+      }
+    } catch { /* crowd line is additive chrome */ }
     const { opportunities } = await diagnoseOpportunities(home);
     const opp = opportunities[0];
     if (opp) lines.push(`Learning focus right now: ${opp.signal.slice(0, 120)}.`);
