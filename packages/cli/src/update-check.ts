@@ -7,7 +7,7 @@
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 const REGISTRY = 'https://registry.npmjs.org/-/package/@hmharness/cli/dist-tags';
 // 5 minutes for auto-update mode (fresh enough to catch new releases same-session);
@@ -132,13 +132,24 @@ export function boardHomeFromDistDir(distDir: string): string {
   return at > 0 ? d.slice(0, at) : '/';
 }
 
-/** Platform-correct launcher for `npm install -g @hmharness/cli@<v>`.
+/** Platform-correct launcher for installing @hmharness/cli@<v>.
+ *
+ *  Preferred on EVERY platform: run npm's own cli.js through node directly
+ *  (`node <npm>/bin/npm-cli.js install -g ...`). No .cmd shim, no shell -
+ *  and therefore nothing that can flash a console window: on Windows the
+ *  cmd.exe route hid ITS console (windowsHide) but npm.cmd's own node child
+ *  still opened a visible window on real machines (repro: MainWindowHandle
+ *  != 0 titled "npm install @hmharness/cli@..." - T27's first attempt).
  *  Pure; tested. */
-export function buildUpdateCommand(platform: string, version: string): UpdateLaunch {
+export function buildUpdateCommand(platform: string, version: string, execPath: string = process.execPath): UpdateLaunch {
   const installArgs = ['install', '-g', '@hmharness/cli@' + version, '--registry=https://registry.npmjs.org/', '--no-fund', '--no-audit'];
+  const npmCli = join(dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  try {
+    if (existsSync(npmCli)) return { file: execPath, args: [npmCli, ...installArgs], shellEscaped: false };
+  } catch { /* fall through to the shim routes */ }
   if (platform === 'win32') {
-    // Node >= 18.20 throws EINVAL when spawning .cmd shims without a shell -
-    // route through cmd.exe explicitly
+    // fallback: Node >= 18.20 throws EINVAL spawning .cmd shims without a
+    // shell - route through cmd.exe explicitly (still windowsHide'd)
     return { file: 'cmd.exe', args: ['/d', '/s', '/c', 'npm ' + installArgs.join(' ')], shellEscaped: true };
   }
   return { file: 'npm', args: installArgs, shellEscaped: false };

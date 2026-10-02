@@ -1,17 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildUpdateCommand, isSafeUpdateCommand, updateEnvFacts, autoUpdate, checkForUpdate } from '../update-check.ts';
 
-test('buildUpdateCommand: win32 routes through cmd.exe (Node 18.20+ refuses bare .cmd spawn), POSIX execs npm directly', () => {
-  const w = buildUpdateCommand('win32', '0.18.5');
-  assert.equal(w.file, 'cmd.exe');
-  assert.deepEqual(w.args, ['/d', '/s', '/c', 'npm install -g @hmharness/cli@0.18.5 --registry=https://registry.npmjs.org/ --no-fund --no-audit']);
-  const p = buildUpdateCommand('linux', '0.18.5');
-  assert.equal(p.file, 'npm');
-  assert.equal(p.shellEscaped, false);
+test('buildUpdateCommand: prefers node+npm-cli.js directly (no shim, no shell - nothing can flash a window); cmd.exe only as the win32 fallback', async () => {
+  // a node layout that bundles npm (the normal install): execPath's dir has
+  // node_modules/npm/bin/npm-cli.js -> run it THROUGH node, no cmd.exe
+  const home = await mkdtemp(join(tmpdir(), 'hmh-npmcli-'));
+  const execDir = join(home, 'bin');
+  await mkdir(join(execDir, 'node_modules', 'npm', 'bin'), { recursive: true });
+  await writeFile(join(execDir, 'node.exe'), '', 'utf8');
+  await writeFile(join(execDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'), '// npm\n', 'utf8');
+  try {
+    const direct = buildUpdateCommand('win32', '0.18.5', join(execDir, 'node.exe'));
+    assert.equal(direct.file, join(execDir, 'node.exe'), 'runs npm through the SAME node, no shim');
+    assert.equal(direct.shellEscaped, false, 'no shell anywhere in the chain');
+    assert.ok(direct.args[0]!.endsWith('npm-cli.js'));
+    assert.ok(direct.args.includes('@hmharness/cli@0.18.5'));
+
+    // no bundled npm next to the executable -> platform fallbacks
+    const w = buildUpdateCommand('win32', '0.18.5', join(home, 'nowhere-node.exe'));
+    assert.equal(w.file, 'cmd.exe');
+    assert.deepEqual(w.args, ['/d', '/s', '/c', 'npm install -g @hmharness/cli@0.18.5 --registry=https://registry.npmjs.org/ --no-fund --no-audit']);
+    assert.equal(w.shellEscaped, true);
+    const p = buildUpdateCommand('linux', '0.18.5', join(home, 'nowhere-node'));
+    assert.equal(p.file, 'npm');
+    assert.equal(p.shellEscaped, false);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
 test('isSafeUpdateCommand: installs of the cli pass; destructive or foreign commands fail', () => {
@@ -60,7 +79,20 @@ test('autoUpdate: installer starts -> SILENT success (T27), lock written, no DEP
       },
     });
     assert.equal(spawned.length, 1);
-    assert.equal(spawned[0].file, 'cmd.exe', 'win32 test host uses the shell escape');
+    // with a bundled npm next to node (every normal install), the updater
+    // runs node+npm-cli.js directly - the shim-free route that cannot flash
+    // a console window; exotic layouts fall back per buildUpdateCommand
+    const { existsSync } = await import('node:fs');
+    const { dirname, join: j } = await import('node:path');
+    const directPossible = existsSync(j(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'));
+    if (directPossible) {
+      assert.equal(spawned[0].file, process.execPath, 'direct npm-cli.js route through the running node');
+      assert.ok(spawned[0].args[0]!.endsWith('npm-cli.js'));
+    } else if (process.platform === 'win32') {
+      assert.equal(spawned[0].file, 'cmd.exe', 'fallback shim route when npm is not bundled');
+    } else {
+      assert.equal(spawned[0].file, 'npm');
+    }
     assert.equal(saidFail.length, 0, 'T27: a started install says NOTHING - the version change lands silently');
     const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
     assert.equal(lock.to, '9.9.9');

@@ -96,6 +96,7 @@ test('autoUpdate standard path: silent on success, windowsHide, lock written', a
     assert.equal(spawns.length, 1, 'exactly one installer spawn');
     assert.equal(spawns[0]!.opts.windowsHide, true, 'T27: detached cmd.exe/npm must be hidden');
     assert.equal(spawns[0]!.opts.detached, true);
+    assert.notEqual(spawns[0]!.cmd, 'cmd.exe', 'T27 v2: no shim route when npm-cli.js is reachable - run node+npm-cli.js directly');
     const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
     assert.equal(lock.to, '9.9.9');
     assert.equal(lock.via, undefined, 'standard path has no via marker');
