@@ -143,13 +143,14 @@ hmh cognitive world-model       # 信念表 + 校准 + 规划门（可信/存疑
 hmh cognitive calibration       # 每动作预测可靠度（harness 实证价值所在）
 hmh cognitive calibration --trend --env=terminal   # 自进化学习曲线
 hmh cognitive explore --env=harmonyos              # 校准导向探索
+hmh cognitive explore --env=browser --cdp=http://127.0.0.1:9222   # CDP 探索（无头调试浏览器）
 hmh cognitive transfer --run --source=terminal --target=harmonyos  # 迁移实验
 hmh cognitive play --env=arc3 --steps=10           # LLM 视觉实玩 ARC-AGI-3
 hmh cognitive replay latest      # 逐步回放任意轨迹（含模型推理）
 hmh cognitive diagnose | learn   # 学习机会诊断 | harness 层学习环
 ```
 
-每次任务自动落认知轨迹（工具动作+预测+结果+耗时）；世界模型从历史学习并反哺系统提示；探索引擎优先探测模型预测最差的动作（预测误差=信息增益）；校准可靠度随使用提升——**"越用越准"有学习曲线为证**（terminal/harmonyos 双环境 improving）。
+每次任务自动落认知轨迹（工具动作+预测+结果+耗时，按工具归因到 browser/desktop/harmonyos/terminal 各环境）；世界模型从历史学习并反哺系统提示；探索引擎优先探测模型预测最差的动作（预测误差=信息增益）；校准可靠度随使用提升——**"越用越准"有学习曲线为证**（terminal/harmonyos/browser 三环境 improving，desktop 完美校准 flat 1.00）。
 
 ## 仓库结构
 

@@ -35,6 +35,7 @@ export function browserActBridge(execute: ToolExecute, opts?: { cdpBase?: string
         // visible-browser workflow: coordinate click through the desktop trio
         return done(await execute('desktop_click', { x: Number(action.args.x ?? 0), y: Number(action.args.y ?? 0) }));
       case 'type':
+      case 'type-text':
         return done(await execute('desktop_type', { text: String(action.args.text ?? '') }));
       default:
         return { outcome: 'failure', error: { code: 'E_UNKNOWN_ACTION', message: `unknown browser action ${action.type}` } };

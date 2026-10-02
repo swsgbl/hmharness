@@ -3,23 +3,40 @@
  *
  * Bridges the LIVE agent loop into the Cognitive OS: every tool call becomes
  * a cognitive trajectory step (action type = tool name, reason = the loop's
- * own event context), and at task end the trajectory lands in the episodic
- * store (HMH_HOME/cognitive/trajectories/) PLUS an episodic memory index
- * entry with full provenance (source/provenance/confidence/timestamp/
- * environment/session — MEM-007). Everything here is best-effort: cognitive
- * recording must never break a task run.
+ * own event context), and at task end the trajectories land in the episodic
+ * store (HMH_HOME/cognitive/trajectories/) PLUS episodic memory index
+ * entries with full provenance (source/provenance/confidence/timestamp/
+ * environment/session — MEM-007). Steps are attributed to their REAL
+ * environment by tool name (browser_, desktop_ and harmony_ prefixed tools
+ * feed their own curves) so per-env calibration trends grow from genuine
+ * usage. Everything here is best-effort: cognitive recording must never
+ * break a task run.
  */
-import { TrajectoryStore, TrajectoryRecorder, CognitiveMemory, loadTrajectories, type Action } from '@hmharness/cognitive';
+import { TrajectoryStore, TrajectoryRecorder, CognitiveMemory, loadTrajectories, type Action, type CognitiveTrajectory } from '@hmharness/cognitive';
 
 interface OpenCall {
   action: Action;
   startedAt: number;
   prediction?: { claim: string; confidence: number };
+  env: string;
+}
+
+/** tool name → environment id. Calibration trends group by environment, so
+ *  a browser_open step filed under "terminal" would silently pollute the
+ *  terminal curve and starve the browser one. harmony_ops_* stays terminal:
+ *  radar/brief are network reads, not device actions. */
+export function envForTool(toolName: string): string {
+  if (toolName.startsWith('browser_')) return 'browser';
+  if (toolName.startsWith('desktop_')) return 'desktop';
+  if (toolName.startsWith('harmony_') && !toolName.startsWith('harmony_ops_')) return 'harmonyos';
+  return 'terminal';
 }
 
 export class CognitiveRunRecorder {
-  private rec: TrajectoryRecorder;
   private store: TrajectoryStore;
+  /** one recorder per environment actually touched in this run */
+  private recs = new Map<string, TrajectoryRecorder>();
+  private envTools = new Map<string, number>();
   private open = new Map<string, OpenCall>();
   private seq = 0;
   private failures = 0;
@@ -31,12 +48,11 @@ export class CognitiveRunRecorder {
 
   constructor(
     private home: string,
-    task: string,
-    sessionId: string,
-    private cwd: string,
+    private task: string,
+    private sessionId: string,
+    _cwd: string,
   ) {
     this.store = new TrajectoryStore(home);
-    this.rec = new TrajectoryRecorder(`trj-${sessionId}-${Date.now().toString(36)}`, sessionId, { id: 'terminal', version: '1.0.0' }, { id: `goal-${sessionId}`, description: task });
     // seed beliefs from recent history (best-effort, never blocks a task)
     void this.seedBeliefs().catch(() => undefined);
   }
@@ -69,6 +85,26 @@ export class CognitiveRunRecorder {
     this.beliefs.set(type, b);
   }
 
+  private recFor(env: string): TrajectoryRecorder {
+    // created lazily at RESULT time: calls that never returned must not
+    // leave empty trajectories behind
+    let rec = this.recs.get(env);
+    if (!rec) {
+      rec = new TrajectoryRecorder(
+        `trj-${this.sessionId}-${Date.now().toString(36)}-${env}`,
+        this.sessionId,
+        { id: env, version: '1.0.0' },
+        { id: `goal-${this.sessionId}`, description: this.task },
+      );
+      this.recs.set(env, rec);
+    }
+    return rec;
+  }
+
+  private countEnv(env: string): void {
+    this.envTools.set(env, (this.envTools.get(env) ?? 0) + 1);
+  }
+
   /** loop onToolCall: open a step for this tool invocation */
   call(toolName: string, args: Record<string, unknown>): void {
     const key = `${toolName}#${++this.seq}`;
@@ -76,6 +112,7 @@ export class CognitiveRunRecorder {
       action: { id: key, type: toolName, args: clip(args), reason: 'agent loop tool call' },
       startedAt: Date.now(),
       prediction: this.predict(toolName),
+      env: envForTool(toolName),
     });
   }
 
@@ -87,7 +124,8 @@ export class CognitiveRunRecorder {
       const success = !isError;
       if (isError) this.failures += 1; else this.successes += 1;
       this.learn(toolName, success);
-      this.rec.record({
+      this.countEnv(open.env);
+      this.recFor(open.env).record({
         action: open.action,
         outcome: isError ? 'failure' : 'success',
         evidence: [],
@@ -98,7 +136,9 @@ export class CognitiveRunRecorder {
     }
     // result without a matching open call (e.g. preflight rejection): still
     // record it so denials are visible in the trajectory
-    this.rec.record({
+    const env = envForTool(toolName);
+    this.countEnv(env);
+    this.recFor(env).record({
       action: { id: `${toolName}#${++this.seq}`, type: toolName, args: {}, reason: 'tool result without recorded call' },
       outcome: isError ? 'failure' : 'success',
       evidence: [],
@@ -106,28 +146,34 @@ export class CognitiveRunRecorder {
     });
   }
 
-  /** task end: persist trajectory + episodic memory index entry */
+  /** task end: persist one trajectory per touched environment + an episodic
+   *  memory entry each; the primary (busiest) trajectory id is returned */
   async finish(success: boolean, meta: { turns: number; toolUses: number; task: string }): Promise<{ trajectoryId: string } | null> {
     try {
-      const traj = this.rec.finish(success);
-      // recovery heuristic: a success step that follows a failure step was
-      // already counted by TrajectoryRecorder; metrics carry it
-      const written = await this.store.append(traj);
-      if (!written.ok) return null;
+      const written: Array<{ env: string; traj: CognitiveTrajectory }> = [];
+      for (const [env, rec] of this.recs) {
+        const traj = rec.finish(success);
+        const w = await this.store.append(traj);
+        if (w.ok) written.push({ env, traj });
+      }
+      if (written.length === 0) return null;
       const mem = new CognitiveMemory(this.home);
       await mem.load();
-      await mem.write({
-        layer: 'episodic',
-        content: `${success ? 'OK' : 'FAIL'} ${meta.toolUses} tools/${meta.turns} turns: ${meta.task.slice(0, 120)}`,
-        payload: { trajectoryId: traj.id, tools: meta.toolUses, turns: meta.turns, successes: this.successes, failures: this.failures },
-        source: 'agent-run',
-        provenance: `trajectory:${traj.id}`,
-        confidence: success ? 0.9 : 0.6,
-        environment: 'terminal',
-        session: traj.sessionId,
-        tags: ['run', success ? 'ok' : 'fail'],
-      });
-      return { trajectoryId: traj.id };
+      for (const { traj } of written) {
+        await mem.write({
+          layer: 'episodic',
+          content: `${success ? 'OK' : 'FAIL'} ${traj.environment.id}:${this.envTools.get(traj.environment.id) ?? traj.metrics.actions} tools/${meta.turns} turns: ${meta.task.slice(0, 120)}`,
+          payload: { trajectoryId: traj.id, tools: this.envTools.get(traj.environment.id) ?? traj.metrics.actions, turns: meta.turns, successes: this.successes, failures: this.failures },
+          source: 'agent-run',
+          provenance: `trajectory:${traj.id}`,
+          confidence: success ? 0.9 : 0.6,
+          environment: traj.environment.id,
+          session: traj.sessionId,
+          tags: ['run', success ? 'ok' : 'fail', traj.environment.id],
+        });
+      }
+      const primary = [...written].sort((a, b) => b.traj.metrics.actions - a.traj.metrics.actions)[0]!;
+      return { trajectoryId: primary.traj.id };
     } catch {
       return null; // cognitive recording is best-effort, never fatal
     }

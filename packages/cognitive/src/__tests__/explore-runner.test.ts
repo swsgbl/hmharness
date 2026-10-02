@@ -5,10 +5,48 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runExploration } from '../explore-runner.ts';
 import { MemoryEnvironment } from '../registry.ts';
+import { UcbExplorationPolicy } from '../exploration.ts';
+import type { ActionSpec } from '../protocol.ts';
 
 async function tmpHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'cog-explore-'));
 }
+
+test('exploration: probe args are well-formed for the arg role (url/selector/path)', async () => {
+  // a malformed probe (url='probe') measures arg synthesis, not the env:
+  // every E_BAD_ACTION failure would pollute the calibration curve
+  const policy = new UcbExplorationPolicy();
+  const obs = {
+    environmentId: 'x',
+    timestamp: new Date().toISOString(),
+    state: {},
+    availableActions: [
+      { id: 'navigate', type: 'navigate', description: 'open url', argsSchema: { url: 'string' }, cost: 1 },
+      { id: 'click', type: 'click', description: 'click', argsSchema: { selector: 'string' }, cost: 1 },
+      { id: 'write', type: 'write-file', description: 'write', argsSchema: { path: 'string', content: 'string' }, cost: 1 },
+    ] satisfies ActionSpec[],
+  };
+  // minimal context: empty world model + no hypotheses entries
+  const { WorldModel } = await import('../world-model.ts');
+  const { HypothesisRegistry } = await import('../exploration.ts');
+  const ctx = {
+    observation: obs,
+    worldModel: new WorldModel('x'),
+    hypotheses: new HypothesisRegistry(),
+  };
+  const a1 = await policy.selectAction(ctx, { maxActions: 1, maxCost: 10, riskTolerance: 0.6 });
+  const args1 = a1?.args as Record<string, string>;
+  assert.ok(/^https?:\/\//.test(args1.url ?? args1.selector ?? args1.path ?? ''), 'url-like probe must be http(s)');
+  // all three specs' probes are well-formed
+  for (const spec of obs.availableActions) {
+    const chosen = await policy.selectAction({ ...ctx, observation: { ...obs, availableActions: [spec] } }, { maxActions: 1, maxCost: 10, riskTolerance: 0.6 });
+    const args = chosen?.args as Record<string, string>;
+    assert.match(args.url ?? args.selector ?? 'probe', /^(https?:\/\/|a$|probe(\.txt)?$|probe$)/);
+    if (spec.argsSchema.url) assert.equal(args.url, 'https://example.com');
+    if (spec.argsSchema.selector) assert.equal(args.selector, 'a');
+    if (spec.argsSchema.path) assert.equal(args.path, 'probe.txt');
+  }
+});
 
 test('explore-runner: probes unknown affordances, lands trajectory + episodic index', async () => {
   const home = await tmpHome();

@@ -142,7 +142,7 @@ footer li{list-style:none;margin:6px 0}
 
 <section id="cognitive" style="padding-top:20px"><div class="wrap">
   <h2 class="sec" data-i18n="cog_title">认知层 — harness 从经验中学习，有学习曲线为证</h2>
-  <p class="secdesc" data-i18n="cog_lead">世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>双环境学习曲线均测出 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。</p>
+  <p class="secdesc" data-i18n="cog_lead">世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>四环境曲线全有读数,三环境 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。</p>
   <div class="cards">
     <div class="card"><div class="ic">🌐</div><h3 data-i18n="cg1_h">世界模型与校准</h3><p data-i18n="cg1_p">信念表(每动作成功率)+ 预测置信 + 误差聚类 + 可解释修订;每个任务步自动带预测,校准报告按动作列可靠度 — 迁移双臂实验证明 harness 净贡献 <b>+0.4166</b>(LLM 未参与)。</p></div>
     <div class="card"><div class="ic">🎮</div><h3 data-i18n="cg2_h">ARC-AGI-3 官方桥</h3><p data-i18n="cg2_p">官方 REST API 全桥(cookie 亲和/scorecard/ACTION1-7);帧渲染为图像,视觉模型看帧推理选动作,模型原话随 reasoning 入档;记分卡+行动效率/探索效率指标。</p></div>
@@ -317,7 +317,7 @@ const I18N = {
     c9_h: '国际化 & 多厂商', c9_p: 'zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。',
     c10_h: '模型感知上下文工程', c10_p: '上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。',
     cog_title: '认知层 — harness 从经验中学习，有学习曲线为证',
-    cog_lead: '世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>双环境学习曲线均测出 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。',
+    cog_lead: '世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>四环境曲线全有读数,三环境 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。',
     cg1_h: '世界模型与校准', cg1_p: '信念表(每动作成功率)+ 预测置信 + 误差聚类 + 可解释修订;每个任务步自动带预测,校准报告按动作列可靠度 — 迁移双臂实验证明 harness 净贡献 <b>+0.4166</b>(LLM 未参与)。',
     cg2_h: 'ARC-AGI-3 官方桥', cg2_p: '官方 REST API 全桥(cookie 亲和/scorecard/ACTION1-7);帧渲染为图像,视觉模型看帧推理选动作,模型原话随 reasoning 入档;记分卡+行动效率/探索效率指标。',
     cg3_h: '跨环境迁移', cg3_p: '显式抽象动作层(writeFile→@write / hdc-install→@install);双臂对照实验(源环境信念播种 vs 空白,同预算只差知识);迁移矩阵面板。',
@@ -364,7 +364,7 @@ const I18N = {
     c9_h: 'i18n & Multi-Provider', c9_p: 'Bilingual zh/en UI and system prompts (<code>--locale=en</code>); any OpenAI-compatible provider, routed per purpose (chat / vision / evolve / bench).',
     c10_h: 'Model-Aware Context Engineering', c10_p: 'A context-window registry scales the compaction budget to each model (128K = the legacy default; unknown models unchanged). Long sessions get a rolling digest (evicted content is distilled, not dropped); workspace-scoped memory; optional embedding hybrid retrieval.',
     cog_title: 'Cognitive Layer — the harness learns from experience, learning curves included',
-    cog_lead: 'The world model learns from every task\u2019s tool trajectories and feeds the system prompt back; the exploration engine probes the actions the model predicts worst (prediction error = information gain); calibration reliability improves with use — <b>both environment learning curves measure improving</b>. Not a claim: it\u2019s the output of <code>hmh cognitive calibration --trend</code>.',
+    cog_lead: 'The world model learns from every task\u2019s tool trajectories and feeds the system prompt back; the exploration engine probes the actions the model predicts worst (prediction error = information gain); calibration reliability improves with use — <b>all four environments have curve readings, three of them improving</b>. Not a claim: it\u2019s the output of <code>hmh cognitive calibration --trend</code>.',
     cg1_h: 'World Model & Calibration', cg1_p: 'Belief table (per-action success rate) + prediction confidence + error clustering + explainable revision; every task step carries a prediction automatically, and the calibration report lists per-action reliability — the two-arm transfer experiment proved a harness net contribution of <b>+0.4166</b> (no LLM involved).',
     cg2_h: 'ARC-AGI-3 Official Bridge', cg2_p: 'Full bridge to the official REST API (cookie affinity / scorecards / ACTION1-7); frames rendered to images so a vision model sees, reasons and picks actions — the model\u2019s own words archived with each action as reasoning; scorecards plus action/exploration-efficiency metrics.',
     cg3_h: 'Cross-Environment Transfer', cg3_p: 'An explicit abstract-action layer (writeFile→@write / hdc-install→@install); two-arm controlled experiments (source-environment belief seeding vs blank, same budget, only knowledge differs); a transfer-matrix panel.',

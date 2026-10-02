@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-10-02(七) · browser/desktop 曲线首读:四个环境全部有读数(650/650)
+
+**动机**:§26 后方向第二条——browser/desktop 适配器在但轨迹薄,
+曲线从未有读数;先发现更深的洞:agent 会话的轨迹**硬编码 env=
+terminal**,浏览器/桌面工具步一直在污染 terminal 曲线、饿死自己的。
+
+**关键决策**:
+- 录制器按工具名归因环境(browser_→browser / desktop_→desktop /
+  harmony_非ops→harmonyos / 其余 terminal),一次混合任务按环境拆成
+  多条轨迹+多条 episodic 索引,各带各的溯源;
+- CdpActBridge(environments/cdp-act.ts):Node 22 内置 WebSocket 的
+  零依赖 CDP 动作桥(navigate/click/type-text→Runtime.evaluate),
+  **生命周期钉住一个页目标**(实测 /json 顺序跨调用不稳定,不钉住
+  会在 about:blank 与被探索页之间漂移——元素明明存在却 E_NO_MATCH);
+  导航后 await load 事件再返回,动作测页面不测网络时延;
+- 探针良构化:defaultArgs 不再给所有字符串参数填字面量 'probe'
+  (url='probe' 全 E_BAD_ACTION=测参数合成不测环境),按参数角色给
+  https://example.com / 'a' / 'probe.txt';
+- CLI explore 接 browser 环境(可达性检查+启动提示);
+  bridges.ts 的 type-text 分支补齐(此前 actionSpecs 与 switch 不一致);
+  面板 sparkline 扩到四环境。
+
+**实测证据**(无头 Chrome --headless=new --remote-debugging-port=9222,
+一次性 profile,不碰用户默认浏览器):
+- **browser 首读:+37.6% improving**(0.46→0.73→0.79→0.87→0.83,
+  n=12/桶,6 轮探索×10 动作;navigate 信念 0.65→0.93×10)
+- **desktop 首读:1.00 全程 flat**——desktop_screenshot 是确定性
+  工具从不失败,信念秒收敛,完美校准本就无学习可言
+- **terminal 曲线同时更干净**:按环境归因后 browser/desktop 步
+  不再混入
+- 两条仪器伪影轨迹剔除在先(坏探针轮/tab 漂移轮),喂食数据全部
+  来自修复后的仪器
+- 650/650 全绿(+7 测试:归因×2、cdpExpression×4、探针良构×1)
+
+**教训**:
+- 第四环境 desktop 的 flat-1.00 是**正确的读数**:确定性工具完美
+  可预测,曲线的形状来自环境真实变异(browser 探索结果有输有赢
+  →真学习曲线)。读数无价值≠测量无价值。
+- CDP /json 的目标顺序跨调用不稳定——多 tab 场景必须钉住驱动目标,
+  否则失败测的是"哪个 tab"而不是"页面里有没有这个元素"。
+- 挂死进程(收尾模型调用)杀掉后任务轨迹**仍然落盘**——desktop 两批
+  喂食 3+2 个任务超时被杀,25 个预测步一个不少:挂点在 finish() 之后
+  的进程退出阶段,录制先于挂死完成(与喂厚轮第 3 任务现象一致,
+  本次用步数对账坐实)。
+
+---
+
 ## 2026-10-02(六) · 校准曲线喂厚:真任务让 improving 读数更硬(643/643)
 
 **动机**:§26 定案后方向第一条——曲线是测量,读数要靠真实使用喂厚;

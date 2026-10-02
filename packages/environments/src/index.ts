@@ -17,3 +17,5 @@ export type { Arc3Frame, Arc3Game } from './arc3-rest.ts';
 export { renderFramePng, gridSummary, ARC3_PALETTE } from './arc3-render.ts';
 export { browserActBridge, desktopActBridge } from './bridges.ts';
 export type { ToolExecute } from './bridges.ts';
+export { CdpActBridge, cdpExpression } from './cdp-act.ts';
+export type { CdpActBridgeOptions } from './cdp-act.ts';

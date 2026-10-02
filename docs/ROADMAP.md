@@ -9,7 +9,7 @@
 | 单任务·提示层 | 三重消融(仅摘要/完整/全裸,三态判决+干净对) | **0**(工具可靠性统计与经验层对单任务结果均无净效应) |
 | 跨任务·复利层 | 隔离家前后对照+顺序对照第三臂 | **0**(净复利=实验Δ−顺序Δ=0) |
 | **预测质量·校准维** | 迁移双臂实验 | **+0.4166**(唯一持续为正;LLM 未参与=纯 harness 净贡献) |
-| **自进化学习曲线** | 按环境分组时间桶 | **terminal +8.3%~+39.8% improving,harmonyos +11.7% improving(双环境一致)** |
+| **自进化学习曲线** | 按环境分组时间桶 | **四环境全有读数:terminal +8.3%~+39.8%、harmonyos +11.7%、browser +37.6%(无头 CDP 探索)均 improving;desktop 1.00 flat=确定性工具完美校准** |
 
 **科学定论**:harness 认知层的实证价值在**让模型更准地预期世界**(校准/迁移),
 而非替模型答题(通过率)。产品化闭环:校准报告(可见)→校准导向探索(可指挥)
@@ -44,9 +44,13 @@ terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机�
 TrajectoryRecorder、evolution2 治理壳、CognitiveMemory 溯源写入、
 browser/desktop act 桥、ARC3 REST adapter、研究面板——**已全部落地并收官**
 (2026-10-02)。门面六层(README 中英/ROADMAP/官网/llms.txt/llms-full.txt/
-FAQ 十三问)同步完成。当前方向:①用真实任务把校准曲线喂厚(读数带 n,
-improving 判定阈值 ±5% 不动);②browser/desktop 环境的学习曲线首读
-(适配器在、轨迹薄);③投稿 Awesome-Self-Evolving-Agents(等作者点头)。
+FAQ 十三问)同步完成;**browser/desktop 曲线首读已取得(2026-10-02 晚):
+browser +37.6% improving(6 轮无头 Chrome CDP 探索)、desktop 1.00 flat
+(确定性工具秒收敛=完美校准)**,四环境全部有读数;agent 会话轨迹改为
+按工具归因环境。当前方向:①用真实任务把校准曲线喂厚(读数带 n,
+improving 判定阈值 ±5% 不动);②desktop 曲线待引入可失败动作
+(desktop_click/type)后才有形状可言;③投稿 Awesome-Self-Evolving-Agents
+(等作者点头)。
 
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 

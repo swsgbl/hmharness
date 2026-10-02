@@ -1,14 +1,58 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CognitiveRunRecorder } from '../cognitive-recorder.ts';
+import { CognitiveRunRecorder, envForTool } from '../cognitive-recorder.ts';
 import { parseSkillContract, auditEvolutionOutcome, checkCanaryRewardHacking, enforceContractGate } from '@hmharness/evolution';
 
 async function tmpHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'cogrun-'));
 }
+
+test('cognitive-run-recorder: tool steps are attributed to their real environment', () => {
+  assert.equal(envForTool('browser_open'), 'browser');
+  assert.equal(envForTool('desktop_screenshot'), 'desktop');
+  assert.equal(envForTool('desktop_click'), 'desktop');
+  assert.equal(envForTool('harmony_build'), 'harmonyos');
+  assert.equal(envForTool('harmony_install'), 'harmonyos');
+  // ops radar reads the ecosystem over HTTP — not a device action
+  assert.equal(envForTool('harmony_ops_radar_scan'), 'terminal');
+  assert.equal(envForTool('write_file'), 'terminal');
+  assert.equal(envForTool('run_command'), 'terminal');
+});
+
+test('cognitive-run-recorder: one mixed run lands one trajectory PER environment', async () => {
+  const home = await tmpHome();
+  const rec = new CognitiveRunRecorder(home, 'open the site and note the title', 'ses-77', 'G:/proj');
+  rec.call('browser_open', { url: 'https://example.com' });
+  rec.result('browser_open', 'opened', false);
+  rec.call('desktop_screenshot', {});
+  rec.result('desktop_screenshot', 'shot-1.png', false);
+  rec.call('desktop_screenshot', {});
+  rec.result('desktop_screenshot', 'shot-2.png', false);
+  rec.call('write_file', { path: 'title.txt', content: 'Example Domain' });
+  rec.result('write_file', 'written', false);
+  const done = await rec.finish(true, { turns: 4, toolUses: 4, task: 'open the site and note the title' });
+  assert.ok(done);
+  const files = (await readdir(join(home, 'cognitive', 'trajectories'))).filter((f) => f.endsWith('.jsonl'));
+  assert.equal(files.length, 3);
+  const envs = new Set<string>();
+  for (const f of files) {
+    const traj = JSON.parse((await readFile(join(home, 'cognitive', 'trajectories', f), 'utf8')).trim());
+    envs.add(traj.environment.id);
+    if (traj.environment.id === 'browser') assert.equal(traj.steps.length, 1);
+    if (traj.environment.id === 'desktop') assert.equal(traj.steps.length, 2);
+    if (traj.environment.id === 'terminal') assert.equal(traj.steps.length, 1);
+  }
+  assert.deepEqual([...envs].sort(), ['browser', 'desktop', 'terminal']);
+  // episodic index: one entry per environment, each tagged with its env
+  const memLines = (await readFile(join(home, 'cognitive', 'memory', 'memory.jsonl'), 'utf8')).split('\n').filter((l) => l.trim());
+  assert.equal(memLines.length, 3);
+  const memEnvs = memLines.map((l) => JSON.parse(l).environment).sort();
+  assert.deepEqual(memEnvs, ['browser', 'desktop', 'terminal']);
+  await rm(home, { recursive: true, force: true });
+});
 
 test('cognitive-run-recorder: tool calls become trajectory steps + episodic index', async () => {
   const home = await tmpHome();

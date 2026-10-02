@@ -185,11 +185,22 @@ export class UcbExplorationPolicy implements ExplorationPolicy {
   }
 }
 
+/** probe values must be WELL-FORMED for the arg's role: a malformed probe
+ *  (url='probe') measures arg synthesis, not the environment — every
+ *  resulting failure would be an artifact polluting the calibration curve. */
+function probeValue(key: string): string {
+  const k = key.toLowerCase();
+  if (k.includes('url') || k === 'href') return 'https://example.com';
+  if (k.includes('selector')) return 'a';
+  if (k.includes('path') || k.includes('file')) return 'probe.txt';
+  return 'probe';
+}
+
 function defaultArgs(spec: ActionSpec): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   const schema = spec.argsSchema ?? {};
   for (const [k, v] of Object.entries(schema)) {
-    args[k] = typeof v === 'string' && v.includes('string') ? 'probe' : null;
+    args[k] = typeof v === 'string' && v.includes('string') ? probeValue(k) : null;
   }
   return args;
 }

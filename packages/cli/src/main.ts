@@ -998,12 +998,25 @@ flags:
       await mkdir(scratch, { recursive: true });
       try {
         const { runExploration } = await import('@hmharness/cognitive');
-        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge } = await import('@hmharness/environments');
+        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge, BrowserEnvironment, CdpActBridge } = await import('@hmharness/environments');
         let env;
         if (envId === 'harmonyos') env = new HarmonyOsEnvironment({ timeoutMs: 20_000 });
         else if (envId === 'arc3') env = new Arc3Environment({ bridge: new Arc3RestBridge() });
         else if (envId === 'terminal') env = new TerminalEnvironment({ workspaceDir: scratch, timeoutMs: 15_000 });
-        if (!env) { stdout.write(`环境 '${envId}' 暂不支持 headless 探索（terminal | harmonyos | arc3）\n`); return; }
+        else if (envId === 'browser') {
+          // CDP-native act bridge — explore an OWNED debug browser, never the
+          // user's default one. Launch e.g.:
+          //   chrome --headless=new --remote-debugging-port=9222 --user-data-dir=<tmp> about:blank
+          const cdpBase = rest.find((a) => a.startsWith('--cdp='))?.slice(6) ?? 'http://127.0.0.1:9222';
+          const bridge = new CdpActBridge({ cdpBase });
+          if (!(await bridge.up())) {
+            stdout.write(`环境 browser 需要可达的 CDP 调试浏览器（${cdpBase}）。\n`);
+            stdout.write(DIM('  启动示例: chrome --headless=new --remote-debugging-port=9222 --user-data-dir=<临时目录> about:blank\n'));
+            return;
+          }
+          env = new BrowserEnvironment({ cdpBase, act: (a, tabId) => bridge.act(a, tabId) });
+        }
+        if (!env) { stdout.write(`环境 '${envId}' 暂不支持 headless 探索（terminal | harmonyos | arc3 | browser）\n`); return; }
         const summary = await runExploration(home, {
           environmentId: envId,
           maxActions: Number.isFinite(actions) ? Math.min(Math.max(actions, 1), 20) : 6,

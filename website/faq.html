@@ -17,7 +17,7 @@
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
   "softwareVersion": "0.23.7",
-  "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化、认知层（世界模型/五层记忆/校准维，双环境学习曲线 improving）与 MCP 双向生态。",
+  "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化、认知层（世界模型/五层记忆/校准维，三环境学习曲线 improving）与 MCP 双向生态。",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://opensource.org/licenses/MIT",
   "programmingLanguage": "TypeScript, Node.js",
@@ -93,7 +93,7 @@
     {
       "@type": "Question",
       "name": "hmharness 的认知层是什么？harness 真的从经验中学习吗？",
-      "acceptedAnswer": { "@type": "Answer", "text": "认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习（信念表 EMA + 预测先行 + 误差聚类）并反哺系统提示，五层记忆（working/episodic/semantic/procedural/world）只增不删带溯源，另有目标系统、探索引擎、技能编译与进化治理，15 条 hmh cognitive 子命令全部可用。消融 11 轮的研究定论：单任务提示层 0、跨任务复利 0、校准维 +0.4166（唯一持续为正，LLM 未参与 = 纯 harness 净贡献）、学习曲线 terminal +8.3%~+39.8% 与 harmonyos +11.7% 均 improving。harness 的实证价值在让模型更准地预期世界，而非替模型答题。" }
+      "acceptedAnswer": { "@type": "Answer", "text": "认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习（信念表 EMA + 预测先行 + 误差聚类）并反哺系统提示，五层记忆（working/episodic/semantic/procedural/world）只增不删带溯源，另有目标系统、探索引擎、技能编译与进化治理，15 条 hmh cognitive 子命令全部可用。消融 11 轮的研究定论：单任务提示层 0、跨任务复利 0、校准维 +0.4166（唯一持续为正，LLM 未参与 = 纯 harness 净贡献）、学习曲线四环境全有读数——terminal +8.3%~+39.8%、harmonyos +11.7%、browser +37.6%（无头 Chrome CDP 探索）均 improving，desktop 1.00 flat（确定性工具完美校准）。harness 的实证价值在让模型更准地预期世界，而非替模型答题。" }
     },
     {
       "@type": "Question",
@@ -197,7 +197,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <h2><a class="qn" href="#self-evolution">Q7</a>hmharness 的「自进化」是真的吗？</h2>
   <div class="tldr">机制真实、效果诚实：技能晋升要过双门禁（A/B 双样本基准 + 防背题保留门）再进金丝雀（20% 会话对照），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月公开数据集的结论是——零统计可靠晋升（门在正确拒绝噪声），但自暴露并修复了 7+8+0 个生产缺陷，月 3 首次出现跨尺度稳定正效应（真实但小）。</div>
   <p>逐月事实：月 1 修复 7 个生产缺陷、零晋升；月 2 修复 8 个、门持续拒绝；月 3（2026-09-15 复盘）零生产缺陷、程序史首个 REJECT 行动判定、首个跨 4 报告 ×3 复现的正效应——恰好 1 个中文精确输出案例，不足以过 10% 门。「越用越聪明」尚未被证实，被证实的是门与审计面在正确工作；全部判定记录、被拒候选与原始日志<a href="evidence/">原样公开</a>。代码级自进化默认关闭，只允许改 <code>packages/*/src/*.ts</code>、永禁内核循环。</p>
-  <p>认知维度补充（2026-09 更新）：0.23.x 系列把「学习」拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% 均 improving（<code>hmh cognitive calibration --trend</code> 可复现），迁移实验中校准差 +0.4166 为纯 harness 净贡献（LLM 未参与）。详见 <a href="#cognitive-what">Q11</a>。</p>
+  <p>认知维度补充（2026-09/10 更新）：0.23.x 系列把「学习」拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7%、browser +37.6%（无头 Chrome CDP 探索）均 improving，desktop 1.00 flat 是确定性工具的完美校准（<code>hmh cognitive calibration --trend</code> 可复现），迁移实验中校准差 +0.4166 为纯 harness 净贡献（LLM 未参与）。详见 <a href="#cognitive-what">Q11</a>。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-month3-final-review.md">SELFFEED 月 3 终局复盘</a> · <a href="evidence/ds-2026-09/">首月数据集</a></p>
 </section>
 
@@ -224,9 +224,9 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 
 <section class="qa" id="cognitive-what">
   <h2><a class="qn" href="#cognitive-what">Q11</a>hmharness 的认知层是什么？harness 真的从经验中学习吗？</h2>
-  <div class="tldr">认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习并反哺系统提示；校准可靠度随使用提升——<b>双环境学习曲线均测出 improving</b>。这不是宣称，是 <code>hmh cognitive calibration --trend --env=terminal</code> 的输出。</div>
+  <div class="tldr">认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习并反哺系统提示；校准可靠度随使用提升——<b>四环境曲线全有读数，三环境 improving</b>。这不是宣称，是 <code>hmh cognitive calibration --trend --env=terminal</code> 的输出。</div>
   <p>认知层包含世界模型（信念表+预测置信+误差聚类）、五层记忆（working/episodic/semantic/procedural/world，只增不删+溯源）、目标系统（图谱/分解/漂移检测）、探索引擎（不确定性×信息增益×校准导向）、技能编译（经验→可验证技能→门禁晋升）、进化 2.0 治理（候选契约/序贯门禁/reward-hacking 检测）。15 条 <code>hmh cognitive</code> 子命令全部可用。</p>
-  <p>研究定论（消融 11 轮）：单任务提示层 0 / 跨任务复利 0 / <b>校准维 +0.4166</b>（唯一持续为正，LLM 未参与 = 纯 harness 净贡献） / 学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% improving。harness 的实证价值在让模型更准地预期世界，而非替模型答题。</p>
+  <p>研究定论（消融 11 轮）：单任务提示层 0 / 跨任务复利 0 / <b>校准维 +0.4166</b>（唯一持续为正，LLM 未参与 = 纯 harness 净贡献） / 学习曲线四环境全有读数——terminal +8.3%~+39.8%、harmonyos +11.7%、browser +37.6%（无头 Chrome CDP 探索）均 improving，desktop 1.00 flat（确定性工具完美校准）。harness 的实证价值在让模型更准地预期世界，而非替模型答题。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP §26 研究终局表</a> · <a href="./#cognitive">官网认知层节</a></p>
 </section>
 

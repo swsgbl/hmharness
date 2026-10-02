@@ -31,7 +31,7 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 - 单任务·提示层：0（工具可靠性统计与经验层对单任务结果均无净效应）
 - 跨任务·复利层：0（隔离家前后对照+顺序对照第三臂）
 - 校准维：+0.4166（唯一持续为正；迁移双臂实验，LLM 未参与 = 纯 harness 净贡献）
-- 学习曲线：terminal +8.3%~+39.8% improving，harmonyos +11.7% improving（双环境一致，`hmh cognitive calibration --trend --env=terminal` 的输出）
+- 学习曲线（四环境全有读数）：terminal +8.3%~+39.8%、harmonyos +11.7%、browser +37.6%（无头 Chrome CDP 探索 6 轮）均 improving；desktop 1.00 flat——desktop_screenshot 是确定性工具从不失败，完美校准本就无学习可言（`hmh cognitive calibration --trend --env=browser` 的输出）
 - 一句话：harness 的实证价值在**让模型更准地预期世界**（校准/迁移），而非替模型答题（通过率）。
 
 **环境适配器**：terminal（原生）/ harmonyos（hdc 桥）/ browser（CDP）/ desktop / ARC-AGI-3（官方 REST API 全桥——X-API-Key 认证 + AWSALB cookie 亲和 + ACTION1-7 + scorecard；帧渲染为图像后视觉模型看帧推理选动作，模型原话随 reasoning 入档）。
@@ -68,7 +68,7 @@ hmharness 的自进化有严格门禁：洞察挖掘 → 技能提案 → 训练
 - 月 1：零"统计可靠"晋升（门在正确拒绝噪声）；协议自暴露并修复 7 个生产缺陷
 - 月 2：修复 8 个生产缺陷；门持续拒绝噪声
 - 月 3（2026-09-15 复盘）：零生产缺陷（仪器已稳）；程序史首个 REJECT 行动判定；首个跨尺度稳定正效应——真实但小（恰好 1 个中文精确输出案例，跨 4 报告 ×3 复现）；99 个 bench 案例、89 条高质量轨迹、12 份实验报告
-一句话："越用越聪明"在传统维度（技能晋升/通过率）尚未证实；**在认知维度（校准可靠度/预测质量）已测出双环境 improving 学习曲线**。每次判定记录、被拒候选与原始日志原样公开在证据页。
+一句话："越用越聪明"在传统维度（技能晋升/通过率）尚未证实；**在认知维度（校准可靠度/预测质量）已测出三环境 improving 学习曲线（terminal/harmonyos/browser），desktop 为 1.00 flat 的完美校准**。每次判定记录、被拒候选与原始日志原样公开在证据页。
 
 ## ARC-AGI-3 是用来训练大模型吗
 
