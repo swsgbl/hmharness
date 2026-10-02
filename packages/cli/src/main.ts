@@ -1094,6 +1094,49 @@ flags:
       }
       return;
     }
+    if (sub === 'slice') {
+      // review P0-2/P0-3: run ONE real task through the full cognitive
+      // pipeline (observe/goal/plan/act/evaluate/learn). act = a REAL agent
+      // run in a subprocess; --check=<command> = INDEPENDENT evaluator
+      // (claim-blind: it inspects the workspace, never the agent output).
+      const task = rest.slice(1).find((a) => !a.startsWith('-'));
+      const check = rest.find((a) => a.startsWith('--check='))?.slice(8);
+      if (!task) {
+        stdout.write('用法: hmh cognitive slice "任务" [--check="验证命令"] — 认知纵切片:观察→目标→计划→执行→独立评估→学习\n');
+        stdout.write(DIM('  --check 的命令只看工作区不看 agent 输出(claim-blind);exit 0=PASS。省略时用结构性检查并如实标注\n'));
+        return;
+      }
+      const { runVerticalSlice, formatSliceReport, independentEvaluator } = await import('@hmharness/cognitive');
+      const sliceCwd = rest.find((a) => a.startsWith('--cwd='))?.slice(6) ?? process.cwd();
+      const { spawnSync } = await import('node:child_process');
+      const report = await runVerticalSlice({
+        home: homeDir(),
+        cwd: sliceCwd,
+        task,
+        act: async () => {
+          // REAL execution: this CLI as a subprocess (its recorder lands the
+          // trajectory + episodic index exactly like any user task)
+          const r = spawnSync(process.execPath, [process.argv[1]!, task, '--yes'], {
+            cwd: sliceCwd, encoding: 'utf8', timeout: 300_000,
+            env: { ...process.env, NO_COLOR: '1' },
+          });
+          const out = (r.stdout || '') + (r.stderr || '');
+          const claim = `[exit ${r.status}${r.signal ? '/' + r.signal : ''}] ` + out.trim().split('\n').filter(Boolean).slice(-3).join(' | ').slice(0, 240);
+          return { completed: r.status === 0, claim: claim || '(no output)' };
+        },
+        evaluate: check
+          ? independentEvaluator(async (_task: string, cwd: string) => {
+              // shell:true lets node do the platform-correct escaping; a raw
+              // cmd.exe /s /c form eats embedded quotes and breaks node -e
+              const r = spawnSync(check, { cwd, encoding: 'utf8', timeout: 120_000, shell: true });
+              const reason = ((r.stdout || '') + (r.stderr || '')).trim().split('\n').filter(Boolean).slice(-2).join(' | ').slice(0, 200);
+              return { pass: r.status === 0, reasons: [r.status === 0 ? 'check command exited 0' : `check exited ${r.status}: ${reason || '(no output)'}`] };
+            })
+          : undefined,
+      });
+      stdout.write(formatSliceReport(report) + '\n');
+      return;
+    }
     if (sub === 'learn') {
       // blueprint M8 live: diagnose -> train memory-target opportunities ->
       // entries land with provenance; promotion continues via evolve bench.

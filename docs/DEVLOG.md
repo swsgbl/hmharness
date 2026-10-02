@@ -4,6 +4,54 @@
 
 ---
 
+## 2026-10-03(十五) · P0-2/P0-3 认知纵切片+P1 LSP 包核心(679/679)
+
+**动机**:复审三 P0 的其余两个——认知闭环只存在于横向模块、
+evaluator 与 agent 自评不分;P1 的 LSP 完全缺席。
+
+**关键决策**:
+- **slice.ts(纵切片)**:Observe(工作区快照)→Goal(propose/adopt)
+  →Plan(WM digest+众包先验)→Act(宿主桥接真实 agent 执行)
+  →**Evaluate(独立裁决)**→Learn(WM 重放+记忆**键定独立裁决**)。
+  六段全留证据;agent 自评只记录、永不作为学步依据。
+- **P0-3 独立 evaluator 契约**:IndependentEvaluator 的 run() 签名
+  **只收 task+cwd**——claim-blind 是类型层面的墙(评估器想看 agent
+  的自评都拿不到);省略评估器时回退"结构性检查"并如实降置信
+  (0.6),绝不冒充独立判断。
+- **CLI `cognitive slice "任务" --check="验证命令"`**:act=真实
+  子进程 agent 运行;check=独立验证命令(shell:true——cmd /s /c
+  会吃内嵌引号,node -e 全废,实测坐实)。
+- **@hmharness/lsp 包(W5 核心)**:protocol(LSP3.18 子集+分帧
+  解码器)/process-manager(cwd 绑定工作区+**环境清洗白名单**+
+  重启预算+超时)/client(初始化握手→请求→诊断推送路由)/
+  registry(PATH 发现,来源=PATH,绝不自动下载;ArkTS 社区 server
+  明确标注 unofficial)/tools(Tier-0 五只读工具,diagnostics 全部
+  标注 source:lsp=反馈非证明)。根构建/测试链接入(加包双查
+  清单铁律执行)。
+
+**实测证据**:
+- **真机纵切片六段全绿**:真任务"创建 answer.txt 内容 42"→真
+  agent 子进程完成→独立 check exit 0→PASS(independent)→学步
+  键定;
+- 切片测试证明**独立裁决抓谎**:act 声称"完美完成"但文件内容
+  错,独立评估判 FAIL,学步记录 FAIL 而非 agent 的"成功";
+- LSP 679/679 全绿(+5:分帧增量解码/环境清洗掉密钥/假 server
+  全生命周期 initialize→didOpen→诊断推送→hover/def/refs/symbols
+  →shutdown/未知方法诚实报错/重启预算拒拍);
+- 真机假 server 全生命周期过;**真 server 握手 NOT VERIFIED**
+  (本机 rust-analyzer 为 rustup shim 且工具链缺组件——环境事实,
+  非客户端缺陷,已记录)。
+
+**教训**:
+- 独立性的最强形态是**签名级隔离**:评估器拿不到 claim,比"约定
+  不看"硬一个数量级。
+- 重启预算差一错的真根因是"exit 清引用→下次 start 数不到重启
+  次数"——状态计数要挂在**不会被动清零**的轴上(spawn 总数)。
+- cmd.exe /s /c 吃引号是 Windows 逃不掉的坑;spawnSync 用
+  shell:true 让 node 做平台正确的转义。
+
+---
+
 ## 2026-10-03(十四) · P0-1 RLM sandbox:eval 移出主进程(671/671)
 
 **动机**:新复审报告(2026-10-03,md 版存 local-docs/hmh-desktop/)的
