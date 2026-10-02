@@ -105,13 +105,25 @@ export class EnvironmentRegistry {
       if (!['success', 'failure', 'unknown'].includes(r.outcome)) throw new Error('invalid outcome');
       if (r.outcome === 'failure' && !r.error) throw new Error('failure without structured error');
     });
+    await step('snapshot-class', async () => {
+      // Snapshot/Restore v2: every environment declares what its snapshot
+      // MEANS; observational ones must not be treated as rewindable by
+      // callers (the hash-divergence check below is advisory for them).
+      const cls = (env as Environment).snapshotClass;
+      if (!['deterministic', 'forkable', 'observational'].includes(cls ?? '')) {
+        throw new Error(`snapshotClass must be declared (got ${String(cls)})`);
+      }
+    });
     await step('snapshot+restore', async () => {
       const snap = await env.snapshot();
       if (typeof snap.stateHash !== 'string' || !snap.stateHash) throw new Error('snapshot.stateHash required');
       await env.restore(snap);
       const after = await env.snapshot();
       if (after.stateHash !== stableHash(snap.payload) && after.stateHash !== snap.stateHash) {
-        // hash drift after immediate restore means restore is not faithful
+        // hash drift after immediate restore means restore is not faithful.
+        // For observational environments this is EXPECTED (restore is a
+        // no-op); only deterministic/forkable worlds must replay exactly.
+        if (env.snapshotClass === 'observational') return;
         failures.push('snapshot/restore: stateHash diverged right after restore');
       }
     });
@@ -141,6 +153,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
 export class MemoryEnvironment implements Environment {
   id: string;
   version = '1.0.0';
+  snapshotClass = 'deterministic' as const; // in-memory scratch world: restore replays exactly
   private state: Record<string, unknown> = {};
   private stepCount = 0;
 

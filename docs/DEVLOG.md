@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-10-03(十六) · W6 LSP 工具入册+W4 快照三分类(679/679)
+
+**动机**:12 周计划 W6(LSP agent 工具)与 W4(环境 snapshot/restore
+v2)——LSP 包有了但模型看不到;环境的快照语义未声明,观察型恢复
+假装可回滚。
+
+**关键决策**:
+- **W6**:nativeRegistry 按"PATH 上有真 server 才注册"条件挂载
+  五只 lsp_* 工具(无 server 的机器不背死工具);发现结果模块级
+  缓存(每次 spawn 不重探 PATH);ProcessManager 增 killSync 挂
+  process exit——宿主猝死时语言服务器子进程不得变孤儿。首版把
+  注册写成异步 fire-and-forget(注册表被快照前工具可能没落位,
+  竞态),当场改回静态导入+同步发现。
+- **W4**:Environment 协议新增必填 `snapshotClass`
+  (deterministic/forkable/observational)——terminal=确定性
+  (scratch 工作区可精确重放)、memory=确定性、harmonyos/browser/
+  desktop/arc3=**观察型**(真实世界不可回滚,restore 只做审计);
+  conformance 新增 snapshot-class 检查;观察型环境的 hash 漂移
+  从"失败"改为"预期",确定性环境仍必须精确重放。
+
+**实测证据**:679/679 全绿(六个适配器全过新 conformance);
+**W6 真机探针:注册表 58 工具含 lsp_diagnostics/hover/definition/
+symbols/references**(本机 rust-analyzer shim 可发现即注册;组件
+缺失的服务器被调用时会诚实报错——健康预检留待下轮)。
+
+**教训**:
+- 条件注册必须**同步完成**——注册表是快照语义,异步补注册是
+  竞态;可选能力用静态导入+同步探测,别用 fire-and-forget。
+- "能不能 restore"不该是布尔值——三类语义把"可回滚/可分叉/
+  仅观察"分开,测试断言才能各得其所。
+
+---
+
 ## 2026-10-03(十五) · P0-2/P0-3 认知纵切片+P1 LSP 包核心(679/679)
 
 **动机**:复审三 P0 的其余两个——认知闭环只存在于横向模块、

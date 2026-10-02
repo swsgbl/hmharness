@@ -26,6 +26,14 @@ interface ManagedClient {
 /** One live client per server for the lifetime of the context. */
 const clients = new Map<string, ManagedClient>();
 
+/** Sync last-resort kill on process exit (async shutdown may not run when
+ *  the host dies); children must never outlive the agent process. */
+if (typeof process !== 'undefined') {
+  process.once('exit', () => {
+    for (const [, mc] of clients) mc.manager.killSync();
+  });
+}
+
 async function clientFor(server: DiscoveredServer, workspaceRoot: string): Promise<ManagedClient> {
   const existing = clients.get(server.id);
   if (existing) return existing;

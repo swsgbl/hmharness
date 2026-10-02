@@ -99,6 +99,14 @@ export class ProcessManager {
       try { proc.kill(); } catch { clearTimeout(killTimer); resolve(); }
     });
   }
+
+  /** Synchronous last-resort kill (process 'exit' hook: async cleanup will
+   *  not run there). Never spawns; kills the live child if any. */
+  killSync(): void {
+    const proc = this.proc;
+    this.proc = null;
+    if (proc) { try { proc.kill('SIGKILL'); } catch { /* gone */ } }
+  }
 }
 
 /** Discover a server binary from PATH (explicit, never auto-downloaded —

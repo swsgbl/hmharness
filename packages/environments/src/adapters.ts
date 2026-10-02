@@ -40,6 +40,7 @@ interface CdpTab {
 export class BrowserEnvironment implements Environment {
   id = 'browser';
   version = '1.0.0';
+  snapshotClass = 'observational' as const; // live page/tab state cannot be rewound via CDP
   private tabs: CdpTab[] = [];
   private history: Array<{ url: string; at: string }> = [];
 
@@ -140,6 +141,7 @@ export interface DesktopEnvOptions {
 export class DesktopEnvironment implements Environment {
   id = 'desktop';
   version = '1.0.0';
+  snapshotClass = 'observational' as const; // UI state is not restorable (divergence audit only)
   private windows: Array<{ title: string; pid: number }> = [];
 
   constructor(private opts: DesktopEnvOptions = {}) {}
@@ -235,6 +237,7 @@ interface Arc3Session {
 export class Arc3Environment implements Environment {
   id = 'arc3';
   version = '1.0.0';
+  snapshotClass = 'observational' as const; // a live ARC game cannot be rewound
   private session: Arc3Session | null = null;
 
   constructor(private opts: Arc3EnvOptions = {}) {}

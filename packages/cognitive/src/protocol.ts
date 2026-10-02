@@ -89,6 +89,17 @@ export interface EnvironmentScore {
 export interface Environment {
   id: string;
   version: string;
+  /**
+   * Snapshot semantics (review 02 doc, Snapshot/Restore v2). Every
+   * environment MUST declare what its snapshot/restore actually means:
+   *  - deterministic: restore() returns the environment to the exact
+   *    snapshotted state (in-memory scratch worlds)
+   *  - forkable: state copies into independent branches (RLM-style)
+   *  - observational: the snapshot is an OBSERVATION for audit/diff only;
+   *    restore() cannot rewind the real world and must not pretend to
+   *    (browsers, desktops, devices, live games)
+   */
+  snapshotClass: 'deterministic' | 'forkable' | 'observational';
   capabilities(): Promise<Capability[]>;
   reset(opts?: ResetOptions): Promise<Observation>;
   observe(): Promise<Observation>;

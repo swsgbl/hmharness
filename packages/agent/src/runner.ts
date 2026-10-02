@@ -33,6 +33,7 @@ import { extractFeatures, routeDecision, recordRoutingOutcome } from '@hmharness
 import { appendMemory, listSkills, readInsights, readNotes, recentInsights, retrieveInsights, recordInsight, redactSecrets, retrieveMemory, skillsToPrompt, sessionGetsCanary, canaryWatermark, listCanary, workspaceForCwd, type EmbeddingProvider } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
+import { discoverServers, lspTools } from '@hmharness/lsp';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -53,9 +54,20 @@ export function toServerConfig(c: McpServerImport): McpServerConfig {
  */
 export const spawnBase: { current?: SpawnBase } = {};
 
-export function nativeRegistry(depth: number): Registry {
+export function nativeRegistry(depth: number, opts: { lsp?: boolean; workspaceRoot?: string } = {}): Registry {
   const reg = new Registry();
   reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
+  // W6: LSP Tier-0 code-intelligence tools — registered ONLY when a real
+  // server is discoverable on PATH; a machine with no language servers
+  // must not carry dead tools. Discovery is synchronous (memoized PATH
+  // probe) so the registry is complete when this function returns.
+  if (opts.lsp !== false) {
+    try {
+      if (discoverServers().length > 0) {
+        reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd() }));
+      }
+    } catch { /* lsp optional: never block tool assembly */ }
+  }
   if (depth < MAX_SPAWN_DEPTH) {
     // blueprint M10: every spawn_agent is governed by the live topology
     // (role contract + shared budget + immutable multi-agent.jsonl audit);

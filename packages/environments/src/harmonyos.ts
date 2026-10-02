@@ -22,6 +22,7 @@ export interface HarmonyOsEnvOptions {
 export class HarmonyOsEnvironment implements Environment {
   id = 'harmonyos';
   version = '1.0.0';
+  snapshotClass = 'observational' as const; // a real device cannot be rewound
   private readonly hdc: string;
   private readonly timeoutMs: number;
   private lastStates: Array<{ at: string; devices: number; frontApp?: string }> = [];

@@ -45,14 +45,18 @@ export interface DiscoveredServer extends ServerSpec {
   official: boolean;
 }
 
-/** Discover available first-batch servers on THIS machine (PATH only). */
-export function discoverServers(): DiscoveredServer[] {
+/** Discover available first-batch servers on THIS machine (PATH only).
+ *  Memoized — the registry is probed per tool assembly and per spawn. */
+let discoveryCache: DiscoveredServer[] | null = null;
+export function discoverServers(force = false): DiscoveredServer[] {
+  if (!force && discoveryCache) return discoveryCache;
   const out: DiscoveredServer[] = [];
   for (const k of KNOWN) {
     const path = which(k.command);
     if (!path) continue;
     out.push({ id: k.id, command: path, args: k.args, source: 'PATH', languages: k.languages, official: k.official !== false });
   }
+  discoveryCache = out;
   return out;
 }
 

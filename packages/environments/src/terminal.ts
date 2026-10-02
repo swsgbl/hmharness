@@ -31,6 +31,7 @@ export interface TerminalEnvOptions {
 export class TerminalEnvironment implements Environment {
   id = 'terminal';
   version = '1.0.0';
+  snapshotClass = 'deterministic' as const; // scratch workspace state fully replays
   private cwd = '';
   private lastOutputs: string[] = [];
   private actionCounter = 0;
