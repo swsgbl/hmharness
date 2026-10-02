@@ -1601,7 +1601,8 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       void autoUpdate({
         home,
         current,
-        say: (latest) => rt.addText(t.tuiAutoUpdating(latest), 'dim'),
+        // settled design T27: success is fully silent (no popup window via
+        // windowsHide, no transcript line) - only a failed install speaks
         sayFail: (why) => rt.addText(t.tuiAutoUpdateFailed(why), 'dim'),
       });
     }

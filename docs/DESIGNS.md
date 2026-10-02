@@ -35,6 +35,8 @@
 | T24 | **队列断路器**(长周期会话审计发现):任务死于**永久性厂商认证/余额错误**(HTTP 401/402/403,kernel `isProviderAuthError` 直发+重试耗尽两种消息形态)时,队列**停止放行**——剩余任务原地保留(可见/可删/可 /queue clear),修好密钥或 /model 换路由后重新提交;后续任务成功即自动复位锁存。TUI 与 Web 泵同一语义 | 一张未付账单不应把整队任务都标死;2026-10-02 会话审计:402 余额耗尽时队列逐个烧穿 | 本轮 | ✅ 生效 |
 | T25 | **断点记忆**(tui-pending.json):TUI 把"正在跑的任务+队列"随每次变化写入 HMH_HOME(尽力而为 IO,损坏降级为无);**优雅退出清除,异常死亡留存**;下次启动检测到残留→显示一次性召回提示(指向 /resume 审计续接),显示即清除。转录本体永远在 rollout——此文件只是线程指针 | 长周期(5-9 小时)会话因崩溃/断电丢掉"我在干什么"的最后一英里;队列与运行任务原本只活在进程内存 | 本轮 | ✅ 生效 |
 | T26 | **resume 有界载入**:/resume 载入时立即按模型预算 compactMessages(等价于 loop 下一轮必做的压缩,只是提前)——/usage、fork 副本与内存占用从第一轮就诚实;rollout 文件永远保全量(审计) | 会话审计:2.4MB 会话 resume 后内存 history 全量膨胀,预算语义只靠 loop 兜底 | 本轮 | ✅ 生效 |
+| T27 | **后台静默更新**:所有更新 spawn(标准层/AI 修复层/板级层)一律 detached+`windowsHide: true`——**绝不弹可见控制台窗口**;成功**零提示**(TUI 头部版本号下次启动自会变化,细节全在 update.log);锁竞争静默跳过;仅"安装器连启动都失败且 AI 修复也失败"才一行 dim 提示;`tui.autoUpdate=false` 退回纯提示模式不变 | 用户实诉:每次更新都弹窗体验差(根因=detached cmd.exe 无 windowsHide);成功即宣称"已更新"也曾不诚实(spawnStarted 只证明启动) | 本轮 | ✅ 生效 |
+| T28 | **板级更新通道(第 0 层)**:检测板级布局 `<home>/.local/hmharness/node_modules/@hmharness/cli/dist`(install-kaihongos.cjs 产物)→ 自动更新直接用**随包发布的板级安装器**(`board/install-kaihongos.cjs`,幂等、registry 解析+离线兜底钉、staged-verify-swap、启动器三落点)以运行中 node 执行,绕过 npm 与 AI 白名单;板上无 npm、白名单结构上不可能通过板级命令——两层兜底的板端盲区由此封闭;**无需单独分叉版本,主包即支持板** | 实机:板上 updating.lck 残留 to:0.23.7、板上 0.21.0、无 npm;kaihongos-board 分支的安装器收编进主包并刷新兜底钉 | 本轮 | ✅ 生效 |
 
 ## Web(浏览器端)
 

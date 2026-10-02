@@ -42,9 +42,9 @@ function mockSpawnOnce(err: boolean) {
   }
 }
 
-test('autoUpdate: installer starts -> says success, closes the log handle (no DEP0137 leak)', async () => {
+test('autoUpdate: installer starts -> SILENT success (T27), lock written, no DEP0137 leak', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-smartupd-'));
-  let said: string[] = [];
+  let saidFail: string[] = [];
   let spawned: Array<{ file: string; args: string[] }> = [];
   const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
   try {
@@ -53,7 +53,7 @@ test('autoUpdate: installer starts -> says success, closes the log handle (no DE
       home,
       current: '0.1.0',
       now: Date.now(),
-      say: (l) => said.push(l),
+      sayFail: (l) => saidFail.push(l),
       spawnImpl: (file, args) => {
         spawned.push({ file, args });
         return { unref: () => {}, on: () => {} };
@@ -61,7 +61,9 @@ test('autoUpdate: installer starts -> says success, closes the log handle (no DE
     });
     assert.equal(spawned.length, 1);
     assert.equal(spawned[0].file, 'cmd.exe', 'win32 test host uses the shell escape');
-    assert.ok(said[0].includes('9.9.9'));
+    assert.equal(saidFail.length, 0, 'T27: a started install says NOTHING - the version change lands silently');
+    const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
+    assert.equal(lock.to, '9.9.9');
   } finally {
     await rm(home, { recursive: true, force: true });
   }
@@ -69,7 +71,6 @@ test('autoUpdate: installer starts -> says success, closes the log handle (no DE
 
 test('autoUpdate: spawn fails -> AI repair proposes a safe command and it runs', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-smartupd2-'));
-  let said: string[] = [];
   const spawned: Array<{ file: string; args: string[] }> = [];
   const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
   try {
@@ -78,7 +79,6 @@ test('autoUpdate: spawn fails -> AI repair proposes a safe command and it runs',
       home,
       current: '0.1.0',
       now: Date.now(),
-      say: (l) => said.push(l),
       spawnImpl: (file, args) => {
         spawned.push({ file, args });
         const first = spawned.length === 1; // standard launch errors out
@@ -89,7 +89,8 @@ test('autoUpdate: spawn fails -> AI repair proposes a safe command and it runs',
     assert.equal(spawned.length, 2, 'standard launch + AI-repaired launch');
     assert.equal(spawned[1].file, 'cmd.exe');
     assert.ok(spawned[1].args.at(-1)?.includes('@hmharness/cli@9.9.9'));
-    assert.ok(said[0].includes('AI 修复安装'));
+    const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
+    assert.equal(lock.via, 'ai-repair', 'the repair leaves its provenance in the lock file');
   } finally {
     await rm(home, { recursive: true, force: true });
   }
@@ -106,7 +107,6 @@ test('autoUpdate: unsafe AI proposal is refused, failure surfaces honestly', asy
       home,
       current: '0.1.0',
       now: Date.now(),
-      say: () => {},
       sayFail: (l) => failed.push(l),
       spawnImpl: () => {
         spawned.push({ file: 'x' });

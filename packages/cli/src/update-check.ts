@@ -6,6 +6,7 @@
  * never nagging offline, results cached for a day.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REGISTRY = 'https://registry.npmjs.org/-/package/@hmharness/cli/dist-tags';
@@ -77,31 +78,58 @@ export async function notifyUpdate(home: string, current: string, say: (line: st
   } catch { /* never surface update-check failures */ }
 }
 
-/** Background self-update (product direction 2026-09-21: zero-action updates,
- *  notify only; 2026-09-25 redesign: SMART update).
+/** Background self-update (product direction 2026-09-21: zero-action updates;
+ *  2026-09-25 redesign: SMART update; 2026-10-02 T27/T28: fully silent +
+ *  board channel).
  *
  *  The old version hard-coded `spawn('npm', ...)` - which (a) silently fails
  *  on Windows since Node 18.20 refuses to spawn .cmd shims without a shell,
- *  while the UI still claimed "已在后台自动更新", and (b) leaked the log
- *  FileHandle (DEP0137 GC-close warnings on every startup).
+ *  while the UI still claimed "已在后台自动更新", (b) leaked the log
+ *  FileHandle (DEP0137 GC-close warnings on every startup), and (c) opened a
+ *  VISIBLE console window for every background install (the "update popup").
  *
- *  The smart design adapts instead of hard-coding:
+ *  The design adapts instead of hard-coding, three layers deep:
+ *   0. board installs (KaihongOS/OpenHarmony, <home>/.local/hmharness
+ *      layout, NO npm) update through the SHIPPED board installer script -
+ *      deterministic, idempotent, registry-driven with offline pins (T28);
  *   1. buildUpdateCommand() picks the launcher per platform (cmd.exe shell
- *      escape on win32, direct exec elsewhere) - the SAME JS runs everywhere,
- *      no per-OS program;
+ *      escape on win32, direct exec elsewhere) - the SAME JS runs everywhere;
  *   2. if the standard install fails to even start, aiRepairUpdate() asks the
  *      user's configured chat model for ONE corrective install command based
- *      on the real error + environment facts (nvm/fnm/pnpm global dirs,
- *      permission quirks - the long tail no static table covers), validates
- *      it against an allow/deny filter and runs it detached. That is the
- *      "AI-driven" layer: the model adapts to the machine, not our code.
- *  A lock file keeps concurrent hmh instances from racing one install. */
+ *      on the real error + environment facts, validates it against an
+ *      allow/deny filter and runs it detached. That is the "AI-driven" layer:
+ *      the model adapts to the machine, not our code.
+ *  Every spawn is detached + windowsHide (T27): updates are INVISIBLE -
+ *  success says nothing (the header version changes on the next launch),
+ *  only a failed install may print one dim line. A lock file keeps
+ *  concurrent hmh instances from racing one install. */
 
 export interface UpdateLaunch {
   file: string;
   args: string[];
   /** shell:true semantics are needed when the package manager is a .cmd shim */
   shellEscaped: boolean;
+}
+
+/** True when the CLI runs from a KaihongOS/OpenHarmony board layout
+ *  (<home>/.local/hmharness/node_modules/@hmharness/cli/dist) - the layout
+ *  scripts/board/install-kaihongos.cjs creates. npm does not exist there and
+ *  the npm-shaped AI-repair whitelist can never produce a legal board
+ *  command, so updates take the deterministic board-installer path instead
+ *  (settled design T28). Pure; tested. */
+export function isBoardInstall(distDir: string): boolean {
+  const d = distDir.replace(/\\/g, '/').replace(/\/+$/, '');
+  return /\/\.local\/hmharness\/node_modules\/@hmharness\/cli\/dist$/.test(d);
+}
+
+/** The board home for a board-layout dist dir ('' when not a board install).
+ *  <home> is the segment BEFORE /.local/hmharness - exactly what the
+ *  installer's --home flag wants. Pure; tested. */
+export function boardHomeFromDistDir(distDir: string): string {
+  if (!isBoardInstall(distDir)) return '';
+  const d = distDir.replace(/\\/g, '/');
+  const at = d.indexOf('/.local/hmharness/');
+  return at > 0 ? d.slice(0, at) : '/';
 }
 
 /** Platform-correct launcher for `npm install -g @hmharness/cli@<v>`.
@@ -148,7 +176,7 @@ export async function aiRepairUpdate(opts: {
   error: string;
   version: string;
   chatImpl?: (prompt: string) => Promise<string>;
-  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
+  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
   logFd: number;
 }): Promise<string | null> {
   try {
@@ -171,7 +199,7 @@ export async function aiRepairUpdate(opts: {
     const spawnFn = opts.spawnImpl ?? (await import('node:child_process')).spawn;
     const plat = opts.platform;
     const child = plat === 'win32'
-      ? spawnFn('cmd.exe', ['/d', '/s', '/c', cmd], { detached: true, stdio: ['ignore', opts.logFd, opts.logFd], cwd: opts.home })
+      ? spawnFn('cmd.exe', ['/d', '/s', '/c', cmd], { detached: true, stdio: ['ignore', opts.logFd, opts.logFd], cwd: opts.home, windowsHide: true })
       : spawnFn(cmd.split(' ')[0], cmd.split(' ').slice(1), { detached: true, stdio: ['ignore', opts.logFd, opts.logFd], cwd: opts.home });
     child.unref();
     return cmd;
@@ -194,14 +222,19 @@ export function spawnStarted(child: { on: (ev: string, fn: () => void) => void }
 export async function autoUpdate(opts: {
   home: string;
   current: string;
-  say: (line: string) => void;
+  /** failure notice only - success is SILENT by design (T27): the new
+   *  version announces itself in the TUI header on the next launch */
   sayFail?: (line: string) => void;
-  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
+  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
   now?: number;
   aiChat?: (prompt: string) => Promise<string>;
+  /** override the running dist dir (tests inject a board layout) */
+  distDir?: string;
+  /** registry fetch injection (tests stay hermetic) */
+  fetchImpl?: typeof fetch;
 }): Promise<void> {
   try {
-    const info = await checkForUpdate({ home: opts.home, current: opts.current, now: opts.now });
+    const info = await checkForUpdate({ home: opts.home, current: opts.current, now: opts.now, ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}) });
     if (!info) return;
     const { open } = await import('node:fs/promises');
     const lockFile = join(opts.home, 'updating.lck');
@@ -209,29 +242,56 @@ export async function autoUpdate(opts: {
     try {
       const prev = JSON.parse(await readFile(lockFile, 'utf8')) as { time: number };
       if (now - prev.time < 10 * 60_000) {
-        opts.say?.(info.latest + ' (another hmh is already updating)');
-        return;
+        return; // another hmh is already updating - silent (T27)
       }
     } catch { /* no lock */ }
     await mkdir(opts.home, { recursive: true });
     const log = await open(join(opts.home, 'update.log'), 'a');
     try {
-      const launch = buildUpdateCommand(process.platform, info.latest);
       const spawnFn = opts.spawnImpl ?? (await import('node:child_process')).spawn;
+      // Layer 0 (settled design T28): KaihongOS/OpenHarmony board installs
+      // have no npm and no package manager the AI whitelist could ever
+      // target - the SHIPPED board installer is the only correct updater.
+      // It is idempotent, resolves versions from the registry (offline
+      // fallback pins inside), stages + verifies + swaps, and rewrites the
+      // launcher. Everything runs detached and hidden; success is silent.
+      const distDir = opts.distDir ?? join(import.meta.dirname ?? '.', '');
+      if (isBoardInstall(distDir)) {
+        const script = join(distDir, '..', 'board', 'install-kaihongos.cjs');
+        const bhome = boardHomeFromDistDir(distDir);
+        if (bhome && existsSync(script)) {
+          const child = spawnFn(process.execPath, [script, '--home=' + bhome], {
+            detached: true,
+            stdio: ['ignore', log.fd, log.fd],
+            cwd: opts.home,
+            windowsHide: true, // never flash a console window (T27)
+          });
+          child.unref();
+          await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest, via: 'board-installer' }), 'utf8');
+          const started = await spawnStarted(child);
+          if (!started) throw new Error('board installer failed to start');
+          return; // silent success (T27)
+        }
+        opts.sayFail?.('board install: updater script missing');
+        return;
+      }
+      const launch = buildUpdateCommand(process.platform, info.latest);
       const child = spawnFn(launch.file, launch.args, {
         detached: true,
         stdio: ['ignore', log.fd, log.fd],
         cwd: opts.home,
+        windowsHide: true, // detached cmd.exe/npm MUST NOT open a visible window (T27)
       });
       child.unref();
       await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest }), 'utf8');
       const started = await spawnStarted(child);
       if (!started) throw new Error('installer failed to start');
-      opts.say(info.latest);
+      // silent success (T27): no notice - the header version changes on the
+      // next launch; every detail is in update.log if anyone needs it
     } catch (err) {
       // SMART layer: let the user's own model adapt to this machine
       const errText = String(err).slice(0, 400);
-      const distDir = join(import.meta.dirname ?? '.', '');
+      const distDir = opts.distDir ?? join(import.meta.dirname ?? '.', '');
       const ran = await aiRepairUpdate({
         home: opts.home,
         platform: process.platform,
@@ -245,7 +305,6 @@ export async function autoUpdate(opts: {
       });
       if (ran) {
         await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest, via: 'ai-repair', cmd: ran }), 'utf8');
-        opts.say(info.latest + ' (AI 修复安装)');
       } else {
         opts.sayFail?.(errText.slice(0, 80));
       }

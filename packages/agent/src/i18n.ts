@@ -147,7 +147,6 @@ export interface Strings {
   opsHint: string;
   tuiLongOutputHint: (tool: string, lines: number) => string;
   tuiUserFolded: (hidden: number) => string;
-  tuiAutoUpdating: (v: string) => string;
   tuiAutoUpdateFailed: (why: string) => string;
   tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
   tuiPassRate: (pct: string) => string;
@@ -307,7 +306,6 @@ const zh: Strings = {
   opsHint: '更多操作:/ops scan 立即扫描并生成今日简报 · /ops brief 查看最近简报',
   tuiLongOutputHint: (tool, lines) => `⎿ ${tool} 输出 ${lines} 行(已折叠) · 按 z 展开最后一条 · Ctrl+T 看全文`,
   tuiUserFolded: (hidden) => `(…还有 ${hidden} 行已折叠 · Ctrl+T 看全文)`,
-  tuiAutoUpdating: (v) => `⤴ 发现新版本 ${v}，已在后台自动更新，下次启动 hmh 生效`,
   tuiAutoUpdateFailed: (why) => `⤴ 自动更新未能开始(${why})，下次再试;或手动: npm i -g @hmharness/cli@latest`,
   tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,
@@ -462,7 +460,6 @@ const en: Strings = {
   opsHint: 'more: /ops scan pull upstream + write today brief · /ops brief latest brief',
   tuiLongOutputHint: (tool, lines) => `⎿ ${tool} produced ${lines} lines (folded) · z expands the last cell · Ctrl+T full transcript`,
   tuiUserFolded: (hidden) => `(…${hidden} more lines folded · Ctrl+T full transcript)`,
-  tuiAutoUpdating: (v) => `⤴ new version ${v} - updating in the background, effective on next launch`,
   tuiAutoUpdateFailed: (why) => `⤴ auto-update could not start (${why}); or manually: npm i -g @hmharness/cli@latest`,
   tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,

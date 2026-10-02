@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkForUpdate, cmpSemver } from '../update-check.ts';
+import { checkForUpdate, cmpSemver, isBoardInstall, boardHomeFromDistDir, autoUpdate } from '../update-check.ts';
 import { renderStats, type PkgStat } from '../npm-stats.ts';
 
 test('cmpSemver: numeric per-component ordering (not lexicographic)', () => {
@@ -66,4 +66,70 @@ test('renderStats: aligned table, absent values as dash, honesty footnote', () =
   assert.match(out, /@hmharness\/cli\s+36\s+208\s+208/);
   assert.match(out, /@hmharness\/web\s+-\s+22\s+22/);
   assert.match(out, /downloads, not users/);
+});
+
+/* ------------- T27/T28: silent background updates + board channel ------------- */
+
+test('isBoardInstall / boardHomeFromDistDir: KaihongOS board layout detection', () => {
+  const board = '/data/local/home/.local/hmharness/node_modules/@hmharness/cli/dist';
+  assert.equal(isBoardInstall(board), true);
+  assert.equal(boardHomeFromDistDir(board), '/data/local/home');
+  // windows-style separators normalize
+  assert.equal(isBoardInstall('C:\\b\\.local\\hmharness\\node_modules\\@hmharness\\cli\\dist'), true);
+  assert.equal(boardHomeFromDistDir('C:\\b\\.local\\hmharness\\node_modules\\@hmharness\\cli\\dist'), 'C:/b');
+  // npm-global and source layouts are NOT board installs
+  assert.equal(isBoardInstall('/usr/lib/node_modules/@hmharness/cli/dist'), false);
+  assert.equal(isBoardInstall('G:/hmharness/packages/cli/src'), false);
+  assert.equal(boardHomeFromDistDir('/usr/lib/node_modules/@hmharness/cli/dist'), '');
+});
+
+test('autoUpdate standard path: silent on success, windowsHide, lock written', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-silent-'));
+  const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
+  const spawns: Array<{ cmd: string; args: string[]; opts: { windowsHide?: boolean; detached?: boolean } }> = [];
+  const spawnImpl = ((cmd: string, args: string[], opts: { windowsHide?: boolean; detached?: boolean }) => {
+    spawns.push({ cmd, args, opts });
+    return { unref: () => {}, on: () => {} };
+  }) as unknown as NonNullable<Parameters<typeof autoUpdate>[0]['spawnImpl']>;
+  try {
+    await autoUpdate({ home, current: '0.2.0', sayFail: () => { throw new Error('sayFail must not fire on success'); }, spawnImpl, now: Date.now(), fetchImpl });
+    assert.equal(spawns.length, 1, 'exactly one installer spawn');
+    assert.equal(spawns[0]!.opts.windowsHide, true, 'T27: detached cmd.exe/npm must be hidden');
+    assert.equal(spawns[0]!.opts.detached, true);
+    const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
+    assert.equal(lock.to, '9.9.9');
+    assert.equal(lock.via, undefined, 'standard path has no via marker');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('autoUpdate board path: runs the SHIPPED installer with --home, silent, lock via board-installer', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-board-'));
+  // fabricate the board layout: <bhome>/.local/hmharness/node_modules/@hmharness/cli/{dist,board}
+  const bhome = join(home, 'bhome');
+  const cliPkg = join(bhome, '.local', 'hmharness', 'node_modules', '@hmharness', 'cli');
+  const distDir = join(cliPkg, 'dist');
+  await mkdir(distDir, { recursive: true });
+  await mkdir(join(cliPkg, 'board'), { recursive: true });
+  await writeFile(join(cliPkg, 'board', 'install-kaihongos.cjs'), '#!/usr/bin/env node\n// stub\n', 'utf8');
+  const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
+  const spawns: Array<{ cmd: string; args: string[]; opts: { windowsHide?: boolean } }> = [];
+  const spawnImpl = ((cmd: string, args: string[], opts: { windowsHide?: boolean }) => {
+    spawns.push({ cmd, args, opts });
+    return { unref: () => {}, on: () => {} };
+  }) as unknown as NonNullable<Parameters<typeof autoUpdate>[0]['spawnImpl']>;
+  try {
+    await autoUpdate({ home, current: '0.21.0', sayFail: () => { throw new Error('sayFail must not fire when the board path starts'); }, spawnImpl, distDir, now: Date.now(), fetchImpl });
+    assert.equal(spawns.length, 1, 'board path spawns the installer, never npm');
+    assert.equal(spawns[0]!.cmd, process.execPath, 'runs on the RUNNING node (board node.bin)');
+    const scriptArg = spawns[0]!.args.find((a) => a.endsWith('install-kaihongos.cjs'));
+    assert.ok(scriptArg, 'invokes the shipped board installer script');
+    assert.ok(spawns[0]!.args.some((a) => a === '--home=' + bhome.replace(/\\/g, '/')), 'passes the derived board home: ' + JSON.stringify(spawns[0]!.args));
+    const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
+    assert.equal(lock.via, 'board-installer');
+    assert.equal(lock.to, '9.9.9');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
