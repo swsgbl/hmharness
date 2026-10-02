@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-10-03(十四) · P0-1 RLM sandbox:eval 移出主进程(671/671)
+
+**动机**:新复审报告(2026-10-03,md 版存 local-docs/hmh-desktop/)的
+P0 首条——rlm.ts 用 `new Function` 在主进程执行任意 JS,全局作用域
+可及 process/动态 import,所谓"隔离墙"只是预算计数。核实属实后
+本轮落地 worker 沙箱。
+
+**关键决策**:rlm-sandbox.ts——每次 eval 起新 worker_threads Worker:
+- 崩溃隔离(throw/OOM 不伤宿主);
+- 超时终止(worker.terminate() 杀死死循环,非软等待);
+- **秘密不继承**:worker 以 `env: {}` 创建,宿主 API 密钥永不带入
+  (RLM-002 纪律的代码化);
+- 内存上限(resourceLimits 256MB old/64MB young);
+- process/require 在 eval 作用域遮蔽为 undefined;
+- 载荷经 workerData 结构化克隆(无消息竞态)。
+诚实边界写入注释:worker 是**遏制边界不是密码学沙箱**,对抗恶意
+能力提升是 Capability OS 层的职责。RLMRuntime.eval 改走沙箱,
+签名/预算/fork/checkpoint 语义不变;头注释同步去浮夸化。
+
+**实测证据**:671/671 全绿(+5:死循环 800ms 被杀且宿主存活/
+throw 隔离为 E_EVAL/**宿主 secret 探针确认 worker env 为空**/
+运行时 round-trip 含治理冻结与崩溃后可用/async await)。首版踩坑:
+worker 源码启动即读 workerData 但载荷只 postMessage 了——
+workerData 必须在构造参数传(8 测试齐挂一因,修后全绿)。
+
+**教训**:
+- "隔离墙"三个字不能靠注释成立——复审抓的正是注释与实现的落差;
+  墙必须由进程边界/终止权/环境清洗这些 OS 级原语构成。
+- 严格模式下 `(function(){return this})()` 是 undefined——探针本身
+  也会骗人,断言要允许"够不到"也算安全。
+
+---
+
 ## 2026-10-02(十三) · 群体回路成环:经验包合并器+种子包+仓库约定(666/666)
 
 **动机**:第一片给了贡献单元(匿名摘要)与吸收端(absorb),但

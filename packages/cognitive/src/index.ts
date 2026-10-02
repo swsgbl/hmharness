@@ -15,6 +15,8 @@ export * from './world-model.ts';
 export * from './goal.ts';
 export * from './exploration.ts';
 export * from './rlm.ts';
+export { runSandboxedEval } from './rlm-sandbox.ts';
+export type { SandboxResult, SandboxOptions } from './rlm-sandbox.ts';
 export * from './memory.ts';
 export * from './skill-compiler.ts';
 export * from './continual.ts';

@@ -3,13 +3,15 @@
  *
  * A programmable cognitive workbench: context, memory snippets, environment
  * state, predictions, subagent handles and validators are ADDRESSABLE
- * VARIABLES the (host) program composes. `eval` runs host-supplied code
- * against those variables — the runtime provides isolation walls, resource
- * accounting, checkpoints and forks; it does NOT allow hidden unsafe
- * self-modification: eval code can only touch workspace variables, never
- * the runtime's own governance state (RLM-008).
+ * VARIABLES the (host) program composes. Eval code runs in a SANDBOXED
+ * WORKER (rlm-sandbox.ts, review P0-1 2026-10-03): crash containment,
+ * timeout termination, secret-free env, memory caps. The runtime provides
+ * budget accounting, checkpoints and forks; it does NOT allow hidden
+ * unsafe self-modification: eval code can only touch workspace variables,
+ * never the runtime's own governance state (RLM-008).
  */
 import { stableHash } from './protocol.ts';
+import { runSandboxedEval } from './rlm-sandbox.ts';
 
 export type RLMValue = unknown;
 
@@ -103,8 +105,10 @@ export class RLMRuntime {
     return Object.keys(this.vars);
   }
 
-  /** RLM-003. Recursive call: eval code can spawn nested evals and read
-   *  other variables, but through THIS runtime so accounting holds. */
+  /** RLM-003 / review P0-1. Eval runs in a SANDBOXED WORKER per call: crash
+   *  containment, timeout termination, secret-free env, memory caps (see
+   *  rlm-sandbox.ts). Budget checks stay in the host; ctx is frozen inside
+   *  the worker so governance state (meta) cannot be mutated from eval. */
   async eval(code: string, ctx?: Partial<RLMContext>): Promise<RLMResult> {
     const started = Date.now();
     const budget = this.materializeBudget();
@@ -115,23 +119,20 @@ export class RLMRuntime {
       return { ok: false, error: { code: 'E_BUDGET_WALL', message: `wall-clock budget exhausted (${budget.maxWallMs}ms)` }, durationMs: 0, budget };
     }
     this._evals += 1;
-    const meta = Object.freeze({ evalsUsed: this._evals, subagentsUsed: this.subagents.length, checkpointCount: this.checkpoints.length });
-    const sandbox: RLMContext = Object.freeze({ vars: this.vars, meta, ...ctx });
-    try {
-      const fn = new Function('ctx', `"use strict";\n${code}`) as (c: RLMContext) => unknown;
-      const value = fn(sandbox);
-      const resolved = value instanceof Promise ? await value : value;
-      this.log.push(`eval ok (${Date.now() - started}ms)`);
-      return { ok: true, value: resolved, durationMs: Date.now() - started, budget: this.materializeBudget() };
-    } catch (err) {
-      this.log.push(`eval fail: ${String(err).slice(0, 120)}`);
-      return {
-        ok: false,
-        error: { code: 'E_EVAL', message: err instanceof Error ? err.message : String(err) },
-        durationMs: Date.now() - started,
-        budget: this.materializeBudget(),
-      };
+    const meta = { evalsUsed: this._evals, subagentsUsed: this.subagents.length, checkpointCount: this.checkpoints.length };
+    const merged: Record<string, unknown> = ctx?.vars ? { ...ctx.vars } : { ...this.vars };
+    const r = await runSandboxedEval(code, merged, meta, { timeoutMs: Math.min(15_000, Math.max(1_000, budget.maxWallMs - budget.used.wallMs)) });
+    if (r.ok) {
+      this.log.push(`eval ok (${r.durationMs}ms)`);
+      return { ok: true, value: r.value, durationMs: Date.now() - started, budget: this.materializeBudget() };
     }
+    this.log.push(`eval fail: ${r.error?.code} ${String(r.error?.message).slice(0, 80)}`);
+    return {
+      ok: false,
+      error: r.error ?? { code: 'E_EVAL', message: 'unknown sandbox failure' },
+      durationMs: Date.now() - started,
+      budget: this.materializeBudget(),
+    };
   }
 
   /** RLM-004/005. Checkpoint the whole workspace (vars + log + budget). */
