@@ -1228,7 +1228,21 @@ flags:
     if (sub === 'calibration') {
       // the §26-proven valuable dimension, first-class: per-action prediction
       // calibration — where the harness's value actually lives (+0.4166)
-      const { calibrationReport } = await import('@hmharness/cognitive');
+      const { calibrationReport, calibrationTrend } = await import('@hmharness/cognitive');
+      if (rest.includes('--trend')) {
+        // the learning curve: reliability over time = measurable self-evolution
+        const t = await calibrationTrend(homeDir());
+        if (!t.buckets.length) { stdout.write('（预测样本不足——多跑任务/探索后自动积累）\n'); return; }
+        stdout.write(`校准趋势 · ${t.buckets.length} 个时间桶 · ${t.verdict}\n`);
+        for (const b of t.buckets) {
+          const bar = '█'.repeat(Math.round(b.reliability * 10)).padEnd(10, '░');
+          stdout.write(`  ${b.at.slice(0, 16)}  ${bar} ${b.reliability.toFixed(2)}  (n=${b.predictions})\n`);
+        }
+        const deltaText = t.reliabilityDelta === null ? 'N/A' : (t.reliabilityDelta >= 0 ? '+' : '') + (t.reliabilityDelta * 100).toFixed(1) + '%';
+        const verdictText = t.verdict === 'improving' ? 'harness 在自我改进（可测的自进化证据）' : t.verdict === 'degrading' ? '退化中，需要诊断' : '平坦/样本内波动';
+        stdout.write('可靠度变化 ' + deltaText + ' —— ' + verdictText + '\n');
+        return;
+      }
       const r = await calibrationReport(homeDir());
       if (r.predictedSteps === 0) { stdout.write('（尚无带预测的轨迹——探索/迁移实验会自动记录预测）\n'); return; }
       stdout.write(`校准报告 · ${r.predictedSteps}/${r.totalSteps} 步带预测 · 总体平均误差 ${r.overallMeanError}（可靠度 ${r.overallReliability}）\n`);

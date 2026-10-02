@@ -272,6 +272,56 @@ export async function calibrationReport(home: string, topN = 12): Promise<Calibr
   };
 }
 
+/* ---- calibration trend: the self-evolution learning curve ---- */
+
+export interface TrendBucket {
+  /** bucket label (ISO date of its first trajectory) */
+  at: string;
+  predictions: number;
+  meanError: number;
+  reliability: number;
+}
+
+export interface CalibrationTrend {
+  buckets: TrendBucket[];
+  /** first→last reliability change: positive = the harness IS learning to
+   *  predict better — the measurable self-evolution evidence */
+  reliabilityDelta: number | null;
+  verdict: 'improving' | 'flat' | 'degrading' | 'insufficient';
+}
+
+/** The learning curve of the cognitive OS: calibration reliability over
+ *  chronological time buckets. If reliability rises, the harness's world
+ *  model is genuinely improving from its own experience — self-evolution
+ *  made measurable on the dimension where the harness's value is proven. */
+export async function calibrationTrend(home: string, bucketCount = 5): Promise<CalibrationTrend> {
+  const trajectories = await loadTrajectories(home, 500);
+  const predicted = trajectories
+    .flatMap((t) => t.steps.filter((s) => s.prediction).map((s) => ({ at: t.startedAt, err: Math.abs(s.prediction!.confidence - (s.outcome === 'success' ? 1 : 0)) })))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  if (predicted.length < bucketCount * 2) {
+    return { buckets: [], reliabilityDelta: null, verdict: 'insufficient' };
+  }
+  const size = Math.floor(predicted.length / bucketCount);
+  const buckets: TrendBucket[] = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const slice = predicted.slice(i * size, i === bucketCount - 1 ? undefined : (i + 1) * size);
+    if (!slice.length) continue;
+    const meanError = slice.reduce((s, x) => s + x.err, 0) / slice.length;
+    buckets.push({
+      at: slice[0]!.at,
+      predictions: slice.length,
+      meanError: Number(meanError.toFixed(3)),
+      reliability: Number((1 - meanError).toFixed(3)),
+    });
+  }
+  const first = buckets[0]?.reliability;
+  const last = buckets[buckets.length - 1]?.reliability;
+  const reliabilityDelta = first !== undefined && last !== undefined ? Number((last - first).toFixed(3)) : null;
+  const verdict: CalibrationTrend['verdict'] = reliabilityDelta === null ? 'insufficient' : reliabilityDelta > 0.05 ? 'improving' : reliabilityDelta < -0.05 ? 'degrading' : 'flat';
+  return { buckets, reliabilityDelta, verdict };
+}
+
 /* ---- context advisor (blueprint M3: the planner consumes the world model) ---- */
 
 /** Compact world-model digest for the SYSTEM PROMPT. The model sees which
