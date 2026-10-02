@@ -293,10 +293,16 @@ export interface CalibrationTrend {
 /** The learning curve of the cognitive OS: calibration reliability over
  *  chronological time buckets. If reliability rises, the harness's world
  *  model is genuinely improving from its own experience — self-evolution
- *  made measurable on the dimension where the harness's value is proven. */
-export async function calibrationTrend(home: string, bucketCount = 5): Promise<CalibrationTrend> {
+ *  made measurable on the dimension where the harness's value is proven.
+ *
+ *  Mixed-distribution guard (2026-10-02 lesson): exploration phases probe
+ *  unfamiliar actions ON PURPOSE, so their predictions are bad by design —
+ *  bucketing them with task-phase predictions reads "task mix changed", not
+ *  "learning changed". envFilter restricts to ONE environment's curve. */
+export async function calibrationTrend(home: string, bucketCount = 5, envFilter?: string): Promise<CalibrationTrend> {
   const trajectories = await loadTrajectories(home, 500);
   const predicted = trajectories
+    .filter((t) => (envFilter ? t.environment.id === envFilter : true))
     .flatMap((t) => t.steps.filter((s) => s.prediction).map((s) => ({ at: t.startedAt, err: Math.abs(s.prediction!.confidence - (s.outcome === 'success' ? 1 : 0)) })))
     .sort((a, b) => a.at.localeCompare(b.at));
   if (predicted.length < bucketCount * 2) {

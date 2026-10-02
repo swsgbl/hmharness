@@ -1230,10 +1230,13 @@ flags:
       // calibration — where the harness's value actually lives (+0.4166)
       const { calibrationReport, calibrationTrend } = await import('@hmharness/cognitive');
       if (rest.includes('--trend')) {
-        // the learning curve: reliability over time = measurable self-evolution
-        const t = await calibrationTrend(homeDir());
-        if (!t.buckets.length) { stdout.write('（预测样本不足——多跑任务/探索后自动积累）\n'); return; }
-        stdout.write(`校准趋势 · ${t.buckets.length} 个时间桶 · ${t.verdict}\n`);
+        // the learning curve: reliability over time = measurable self-evolution.
+        // --env=<id> isolates ONE environment (mixed-distribution guard:
+        // exploration buckets probe unfamiliar actions on purpose)
+        const trendEnv = rest.find((a) => a.startsWith('--env='))?.slice(6);
+        const t = await calibrationTrend(homeDir(), 5, trendEnv);
+        if (!t.buckets.length) { stdout.write('（预测样本不足——多跑任务/探索后自动积累' + (trendEnv ? `，或 ${trendEnv} 环境无带预测轨迹` : '') + '）\n'); return; }
+        stdout.write(`校准趋势 · ${trendEnv ? `环境 ${trendEnv} · ` : ''}${t.buckets.length} 个时间桶 · ${t.verdict}\n`);
         for (const b of t.buckets) {
           const bar = '█'.repeat(Math.round(b.reliability * 10)).padEnd(10, '░');
           stdout.write(`  ${b.at.slice(0, 16)}  ${bar} ${b.reliability.toFixed(2)}  (n=${b.predictions})\n`);
