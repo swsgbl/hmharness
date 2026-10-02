@@ -47,6 +47,8 @@ export interface WorldModelSummary {
   beliefs: Array<{ actionType: string; confidence: number; evidenceCount: number; claim: string }>;
   plannerGate: { trusted: string[]; untrusted: string[]; unknown: string[] };
   calibration: { resolved: number; meanError: number | undefined };
+  /** WM 2.0: structured delta-prediction accuracy (shape predictions) */
+  deltaAccuracy: { checked: number; hits: number; accuracy: number | undefined };
   trajectoriesReplayed: number;
   stepsReplayed: number;
 }
@@ -82,6 +84,7 @@ export function summarizeWorldModel(wm: WorldModel, trajectoriesReplayed: number
       .sort((a, b) => b.evidenceCount - a.evidenceCount),
     plannerGate: wm.plannerConfidence(0.6),
     calibration: wm.calibration(),
+    deltaAccuracy: wm.deltaAccuracy(),
     trajectoriesReplayed,
     stepsReplayed,
   };

@@ -43,10 +43,26 @@ function which(cmd: string): string | null {
 export interface DiscoveredServer extends ServerSpec {
   languages: string[];
   official: boolean;
+  /** probe result: a shim whose toolchain lacks the component (e.g. rustup
+   *  without rust-analyzer installed) fails --version and must not register */
+  healthy: boolean;
+  unhealthyReason?: string;
+}
+
+/** Cheap health probe: `--version` must exit 0 within 5s. A PATH shim whose
+ *  toolchain lacks the component (rustup without rust-analyzer installed)
+ *  fails here — better an absent tool than a dead one registered. */
+function healthProbe(command: string, args: string[]): { healthy: boolean; reason?: string } {
+  const r = spawnSync(command, [...args, '--version'], { encoding: 'utf8', timeout: 5_000, windowsHide: true });
+  if (r.status === 0) return { healthy: true };
+  const tail = ((r.stderr || '') + (r.stdout || '')).trim().split('\n').filter(Boolean).slice(-1)[0] ?? '';
+  return { healthy: false, reason: `--version probe failed (exit ${r.status}): ${tail.slice(0, 120)}` };
 }
 
 /** Discover available first-batch servers on THIS machine (PATH only).
- *  Memoized — the registry is probed per tool assembly and per spawn. */
+ *  Memoized — the registry is probed per tool assembly and per spawn.
+ *  Health-probed: broken shims are returned with healthy=false so callers
+ *  can skip registering them (discovery stays honest about what exists). */
 let discoveryCache: DiscoveredServer[] | null = null;
 export function discoverServers(force = false): DiscoveredServer[] {
   if (!force && discoveryCache) return discoveryCache;
@@ -54,7 +70,8 @@ export function discoverServers(force = false): DiscoveredServer[] {
   for (const k of KNOWN) {
     const path = which(k.command);
     if (!path) continue;
-    out.push({ id: k.id, command: path, args: k.args, source: 'PATH', languages: k.languages, official: k.official !== false });
+    const probe = k.id === 'arkts-community' ? { healthy: true } : healthProbe(path, k.args);
+    out.push({ id: k.id, command: path, args: k.args, source: 'PATH', languages: k.languages, official: k.official !== false, healthy: probe.healthy, unhealthyReason: probe.reason });
   }
   discoveryCache = out;
   return out;

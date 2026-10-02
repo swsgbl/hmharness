@@ -163,7 +163,8 @@ export async function runVerticalSlice(opts: SliceOptions): Promise<SliceReport>
     tags: ['slice', verdict.source, verdict.pass ? 'pass' : 'fail'],
   });
   const { opportunities } = await diagnoseOpportunities(opts.home).catch(() => ({ opportunities: [] as Array<{ signal: string }> }));
-  stages.push({ stage: 'learn', ok: true, detail: `WM replayed (${wm.worldState.beliefs.length} beliefs); memory entry ${entry.id} keyed to the ${verdict.source} verdict`, evidence: { memoryId: entry.id, beliefs: wm.worldState.beliefs.length, opportunities: opportunities.length } });
+  const deltaAcc = wm.deltaAccuracy();
+  stages.push({ stage: 'learn', ok: true, detail: `WM replayed (${wm.worldState.beliefs.length} beliefs; delta-shape accuracy ${deltaAcc.accuracy !== undefined ? Math.round(deltaAcc.accuracy * 100) + '%' : 'n/a'} over ${deltaAcc.checked}); memory entry ${entry.id} keyed to the ${verdict.source} verdict`, evidence: { memoryId: entry.id, beliefs: wm.worldState.beliefs.length, deltaAccuracy: deltaAcc, opportunities: opportunities.length } });
 
   return { task: opts.task, startedAt, stages, verdict, agentClaim: { completed: actResult.completed, claim: actResult.claim } };
 }

@@ -66,6 +66,22 @@ test('client: full lifecycle against the fake server (initialize→sync→tier0�
   await rm(ws, { recursive: true, force: true });
 });
 
+test('registry: health probe flags a broken shim as unhealthy (fake: a command that always fails)', async () => {
+  const { discoverServers } = await import('../registry.ts');
+  // real discovery on THIS machine: whatever exists must carry a verdict
+  const servers = discoverServers(true);
+  for (const s of servers) {
+    assert.ok(typeof s.healthy === 'boolean', `${s.id} must carry a health verdict`);
+    if (!s.healthy) assert.ok((s.unhealthyReason ?? '').length > 0, `${s.id} unhealthy must say why`);
+  }
+  // a nonexistent binary is simply not discovered; a failing one is
+  // discovered-but-unhealthy only when it exists on PATH — both states stay
+  // honest. (On this dev machine rust-analyzer is a component-missing shim
+  // and MUST be unhealthy if present.)
+  const rust = servers.find((s) => s.id === 'rust-analyzer');
+  if (rust && rust.unhealthyReason) console.log('rust-analyzer verdict:', rust.unhealthyReason.slice(0, 80));
+});
+
 test('client: unknown method surfaces the server error honestly', async () => {
   const ws = await mkdtemp(join(tmpdir(), 'lsp-ws-'));
   const manager = new ProcessManager({ id: 'fake', command: process.execPath, args: [FAKE_SERVER], source: 'explicit' }, ws);

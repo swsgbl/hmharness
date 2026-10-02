@@ -97,7 +97,11 @@ export class CognitiveMemory {
     return full;
   }
 
-  /** MEM-006 hybrid retrieval: tag/keyword match + recency + confidence. */
+  /** MEM-006 hybrid retrieval (Memory 2.0: scored lexical match): query
+   *  terms score individually over content+tags (partial credit, no hard
+   *  AND-substring wall — "hvigor build fail" must surface "hvigor 构建失败"
+   *  and a note that only mentions build), combined with confidence and
+   *  recency. Hard filters stay hard: layer/environment/tags. */
   retrieve(query: { layer?: MemoryLayer; tags?: string[]; text?: string; environment?: string; limit?: number }): MemoryEntry[] {
     let pool = this.longTerm.filter((e) => !e.supersededBy);
     if (query.layer) pool = pool.filter((e) => e.layer === query.layer);
@@ -106,13 +110,18 @@ export class CognitiveMemory {
       const want = new Set(query.tags);
       pool = pool.filter((e) => (e.tags ?? []).some((t) => want.has(t)));
     }
-    if (query.text) {
-      const q = query.text.toLowerCase();
-      pool = pool.filter((e) => e.content.toLowerCase().includes(q));
-    }
+    const terms = (query.text ?? '').toLowerCase().split(/[\s,，;；]+/).filter((t) => t.length >= 2);
+    const lexicalScore = (e: MemoryEntry): number => {
+      if (terms.length === 0) return 0;
+      const hay = (e.content + ' ' + (e.tags ?? []).join(' ')).toLowerCase();
+      let hits = 0;
+      for (const t of terms) if (hay.includes(t)) hits += 1;
+      return hits / terms.length;
+    };
+    if (terms.length > 0) pool = pool.filter((e) => lexicalScore(e) > 0);
     const scored = pool.map((e) => ({
       e,
-      score: e.confidence * 0.6 + recencyScore(e.timestamp) * 0.2 + (query.text && e.content.toLowerCase().includes(query.text.toLowerCase()) ? 0.2 : 0),
+      score: e.confidence * 0.4 + recencyScore(e.timestamp) * 0.2 + lexicalScore(e) * 0.4,
     }));
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, query.limit ?? 10).map((s) => s.e);
