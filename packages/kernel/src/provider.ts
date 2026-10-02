@@ -31,6 +31,18 @@ function transientHint(msg: string): string {
   return '';
 }
 
+/** Permanent provider-side auth/payment failures: 401 (bad key), 402
+ *  (balance exhausted), 403 (forbidden). These fail EVERY subsequent task
+ *  identically, so task queues must stop draining when one lands - burning
+ *  the whole queue into the same 402 marks N tasks failed for one unpaid
+ *  bill. Frontends keep the queued items and let the user fix the cause.
+ *  Matches both throw shapes: the direct `provider: HTTP 402: ...` and the
+ *  retry-exhaustion wrapper `provider: failed after N attempts (...): HTTP
+ *  402 ...`; the `provider:` anchor keeps unrelated tool errors out. */
+export function isProviderAuthError(msg: string): boolean {
+  return /provider:[\s\S]*HTTP 40[123]\b/.test(msg);
+}
+
 /** Parse a Retry-After header into a delay in ms (MDN: exactly two legal
  *  forms - delta-seconds or HTTP-date), clamped to [0, 120s]. Returns 0 when
  *  absent/illegal (caller falls back to exponential backoff). Deliberately

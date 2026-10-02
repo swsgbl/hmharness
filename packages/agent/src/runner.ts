@@ -509,7 +509,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         // write drains - awaiting first made model.responded land AFTER
         // run.completed in the timeline
         traj.emit('model.responded', 'agent', { contentChars: m.content?.length ?? 0, toolCalls: m.tool_calls?.length ?? 0 });
-        await session.assistant(m.content ?? null, m.tool_calls);
+        await session.assistant(m.content ?? null, m.tool_calls, chatProvider.model);
       },
     },
   }).catch((err: unknown) => {

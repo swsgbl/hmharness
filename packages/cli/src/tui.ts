@@ -13,11 +13,12 @@
 import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
 import { formatRow, initialPickerState, pickerKey, reducePicker, toolbarLine, visibleRows, type PickerState } from './resume-picker.ts';
+import { savePending, loadPending, clearPending } from './tui-state.ts';
 
 /** installed version, shown in the TUI header (v0.4.0) so users always
  *  know which build they are talking to - resolves in both src/ and dist/ */
@@ -1572,6 +1573,17 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   rt.setModelChoices(listProviders(cfg).map((v) => ({ name: v.name, desc: `${v.model}${v.purposes.length ? ' (' + v.purposes.join('/') + ')' : ''}` })));
   rt.setModes(autoApprove); // always-visible badge, ask mode included
   rt.addText(t.tuiWelcome(chatModel), 'dim');
+  // crash recall (断点记忆): a leftover tui-pending.json means the previous
+  // process died with work in flight. The transcript survives in the rollout;
+  // this is the pointer so the thread is not silently lost. Shown once.
+  {
+    const pend = await loadPending(home);
+    if (pend && (pend.runningTask || pend.queue.length > 0)) {
+      const shown = pend.runningTask || pend.queue[0] || '';
+      rt.addText(t.tuiPendingNote(shown.slice(0, 80), pend.runningTask ? pend.queue.length : Math.max(0, pend.queue.length - 1)), 'dim');
+    }
+    await clearPending(home);
+  }
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
   // update reminder: cached (1/day) registry check, resolved async into the
   // transcript via addText (frame-safe); offline stays silent
@@ -1631,6 +1643,27 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   let planMode = false;
   /** /copy source: the last completed assistant text */
   let lastAiText = '';
+  /** circuit-breaker latch: set when a task dies on a PERMANENT provider
+   *  auth/balance error (401/402/403). The queue stops draining - every
+   *  remaining task would fail identically against an unpaid bill. */
+  let authErrorHit = false;
+
+  /** Crash-safe pending-task memory (settled design T25): what the TUI was
+   *  doing at any moment, persisted so an abnormal exit (crash, terminal
+   *  close, power loss) can show a recall notice on the next start. Graceful
+   *  quit clears it. */
+  const syncPending = (runningTask: string | null): void => {
+    if (runningTask || taskQueue.length > 0) {
+      void savePending(home, {
+        runningTask: runningTask ?? '',
+        queue: [...taskQueue],
+        sessionId: currentSessionId,
+        savedAt: new Date().toISOString(),
+      });
+    } else {
+      void clearPending(home);
+    }
+  };
 
   async function runShellBang(cmd: string): Promise<void> {
     // B3: `! command` runs the local shell through the SAME gate as the
@@ -1676,6 +1709,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     if (taskRunning) {
       taskQueue.push(line);
       rt.setQueued(taskQueue.length);
+      syncPending(null); // queue grew while a task runs - persist the new depth
       rt.addText(`📋 queued: "${line.slice(0, 60)}${line.length > 60 ? '…' : ''}" (${taskQueue.length} waiting)`, 'dim');
       return;
     }
@@ -1780,16 +1814,29 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     let task: string | undefined = firstTask;
     let first = true;
     while (task) {
+      syncPending(task);
       await runSingleTask(task, first ? forkFrom : undefined, first ? forkResume : undefined);
       first = false;
+      // circuit breaker (settled design T24): a permanent provider
+      // auth/balance error means every queued task would fail the same way -
+      // hold the queue for the user instead of burning through it
+      if (authErrorHit && taskQueue.length > 0) {
+        rt.setQueued(taskQueue.length);
+        rt.addText(t.tuiQueueHeld(taskQueue.length), 'dim');
+        syncPending(null);
+        return;
+      }
       task = taskQueue.shift();
       rt.setQueued(taskQueue.length);
+      syncPending(task ?? null);
       if (task) rt.addText(`▶ next queued: "${task.slice(0, 60)}${task.length > 60 ? '…' : ''}"`, 'dim');
     }
     taskRunning = false;
+    syncPending(null);
   }
 
   async function runSingleTask(line: string, forkFrom?: string, forkResume?: ChatMessage[]): Promise<void> {
+    authErrorHit = false; // fresh latch per task attempt
     rt.addUser(line);
     // the folded echo hides everything past line 2 - keep the full prompt
     // retrievable in the Ctrl+T replay
@@ -1893,6 +1940,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     } catch (err) {
       rt.setBusy(false);
       currentInject = null;
+      authErrorHit = isProviderAuthError(String(err));
       rt.addText(String(err), 'err');
       // Recovery First (docx TUI 专项): every task failure names the next step
       // instead of leaving a bare stack - retry is one up-arrow away
@@ -1908,7 +1956,12 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   async function resumeInto(file: string): Promise<void> {
     const tr = await loadTranscript(file);
     if (!tr || tr.messages.length === 0) { rt.addText(t.cmdResumeNotFound(tr?.id ?? file), 'err'); return; }
-    history = tr.messages;
+    // bounded resume (settled design T26): the rollout keeps everything
+    // forever (audit), but the in-memory thread is compacted to the model
+    // budget immediately - the loop would do this on the next call anyway;
+    // doing it here keeps /usage, fork copies and memory footprint honest
+    // from the first turn
+    history = compactMessages(tr.messages, adaptiveContextChars(resolveProvider(cfg, 'chat')));
     currentSessionId = tr.id;
     rt.clearScreen();
     // long sessions render from the tail so the visible window stays usable
@@ -1947,6 +2000,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
         const n = taskQueue.length;
         taskQueue.length = 0;
         rt.setQueued(0);
+        syncPending(null);
         rt.addText(n > 0 ? 'cleared ' + n + ' queued task(s)' : 'queue was already empty', 'dim');
         return;
       }
@@ -2463,6 +2517,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   process.off('SIGINT', sigCleanup);
   process.off('SIGTERM', sigCleanup);
   process.off('SIGHUP', sigCleanup);
+  // graceful exit: whatever was pending was deliberately abandoned (the
+  // crash-recall notice must NOT fire on a clean quit)
+  await clearPending(home);
   for (const c of clients) c.close();
   stdout.write('\n');
 }

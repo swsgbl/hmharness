@@ -16,7 +16,7 @@ import { networkInterfaces } from 'node:os';
 import {
   homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
-  saveProvider, deleteProvider, patchConfig, getGoal, setGoal,
+  saveProvider, deleteProvider, patchConfig, getGoal, setGoal, isProviderAuthError,
   findSessionFile, listSessions, exportSessionMarkdown, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
 } from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
@@ -267,6 +267,11 @@ export async function startServer(opts: { port: number; host?: string; version?:
   // send button doubles as the stop button, so the queue itself needs no
   // commands - it is visible in the UI and interruptible per item.
   const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }> = [];
+  /** circuit-breaker latch: the last finished task died on a PERMANENT
+   *  provider auth/balance error (401/402/403). The pump stops draining -
+   *  every queued task would fail identically. A later successful (or
+   *  differently-failing) task resets the latch inside runOne. */
+  let lastAuthError = false;
   let currentAbort: AbortController | null = null;
   let pendingApproval: PendingApproval | null = null;
   const sseClients = new Set<ServerResponse>();
@@ -361,6 +366,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
   // drifted every time the direct path changed. One runOne + one pump.
   const runOne = async (item: { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }, fromQueue = false): Promise<void> => {
     busy = true;
+    lastAuthError = false; // fresh latch per task attempt
     currentAbort = new AbortController();
     // this task runs INSIDE its session's thread (deepseek-harness semantics:
     // the session owns the state; the runner never sees a global thread)
@@ -445,6 +451,10 @@ export async function startServer(opts: { port: number; host?: string; version?:
       // the result itself already fanned out via onFinal; nothing to return
       void result;
     } catch (err) {
+      // circuit breaker (see lastAuthError): latch permanent auth/balance
+      // failures so the pump holds the remaining queue instead of draining
+      // every task into the same 402
+      lastAuthError = isProviderAuthError(String(err));
       broadcast('error', { message: String(err).slice(0, 400), sessionId: sid });
     } finally {
       try { if (process.cwd() !== prevCwd) process.chdir(prevCwd); } catch { /* best effort */ }
@@ -458,6 +468,15 @@ export async function startServer(opts: { port: number; host?: string; version?:
   };
   const pump = async (): Promise<void> => {
     while (!busy && taskQueue.length > 0) {
+      // circuit breaker (settled design T24, TUI parity): the previous task
+      // died on a permanent provider auth/balance error - hold the queue
+      // (items stay visible/deletable) until a subsequent task succeeds or
+      // the user switches route
+      if (lastAuthError) {
+        broadcast('line', { text: `⛔ provider auth/balance error - queue held (${taskQueue.length} task(s)); fix the key/balance or switch provider, then resubmit`, sessionId: activeSessionId ?? '' });
+        broadcastQueue();
+        return;
+      }
       const next = taskQueue.shift();
       if (!next) break;
       broadcastQueue();

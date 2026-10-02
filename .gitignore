@@ -40,3 +40,5 @@ audit-doc.txt
 .scan.txt
 # runtime agent workspaces (created by test/demo runs, never source)
 projects/
+# scratch session-log analysis workspace (user-side research, never source)
+.audit/

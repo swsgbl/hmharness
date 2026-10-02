@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { listProviders, resolveProvider } from '../types.ts';
-import { endpoint } from '../provider.ts';
+import { endpoint, isProviderAuthError } from '../provider.ts';
 import { homeDir, loadConfig, setChatRoute, defaultConfig, upsertProvider, deleteProvider } from '../config.ts';
 
 test('endpoint: any /vN suffix is complete; bare bases get /v1 appended', () => {
@@ -79,6 +79,19 @@ test('setChatRoute persists routing.chat, keeps other fields, rejects unknown na
 
 // keep homeDir referenced so the import stays meaningful in all environments
 void homeDir;
+
+test('isProviderAuthError: 401/402/403 latch the queue breaker; transient classes do not', () => {
+  // real message shapes thrown by chat(): `provider: HTTP <status>: <body>`
+  assert.equal(isProviderAuthError('Error: provider: HTTP 402: {"error":{"message":"Insufficient Balance"}}'), true);
+  assert.equal(isProviderAuthError('provider: HTTP 401: unauthorized'), true);
+  assert.equal(isProviderAuthError('provider: HTTP 403: forbidden'), true);
+  // everything a queue SHOULD keep draining through
+  assert.equal(isProviderAuthError('provider: HTTP 429 (rate limited): slow down'), false);
+  assert.equal(isProviderAuthError('provider: HTTP 500: internal'), false);
+  assert.equal(isProviderAuthError('provider: HTTP 404: no such route'), false);
+  assert.equal(isProviderAuthError('TypeError: terminated'), false);
+  assert.equal(isProviderAuthError('provider: failed after 6 attempts (https://x/v1): fetch failed'), false);
+});
 
 test('upsertProvider: insert, replace-with-key-preservation, validation', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-upsert-'));

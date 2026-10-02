@@ -32,6 +32,9 @@
 | T20 | **M5 TUI 项**(B11/B12/B13/B14):`/statusline <tpl>` 自定义底栏({model}/{cwd}/{skills}/{mode}/{queue}/{version},config.json tui.statusline,未知占位符原样显示);**Ctrl+G** 外部编辑器编辑草稿($EDITOR/notepad,临时文件往返);**/keymap <action>=<key>** 重映射 inject/historySearch/transcript/externalEdit/interrupt(parseKeySpec 白名单,config.json tui.keymap,默认键不变);**帧率/脏区**(B13):dirty-flag 渲染架构已在——无事不重绘,spinner 仅 busy 期间 tick,无需改动 | 对标 codex /statusline、Ctrl+G、/keymap、frame_rate_limiter;B13 由既有架构满足 | 53042cc | ✅ 生效 |
 | T21 | **鼠标滚轮全终端直通**(0.14.10,**已被 T23 复案推翻**):SGR 鼠标上报自启动常开 | ~~多系统实测滚轮失效~~ 常开捕获同时杀死了所有终端的原生划选复制 | 17cf0d4 | ⛔ 复案 |
 | T22 | **括号粘贴模式**:?2004h 自启动常开——多行粘贴经 sanitizePaste(剥 200~/201~ 标记与转义序列,换行折叠为空格,262144 字符上限)作为**一条可审输入**插入光标处,绝不逐行自动提交;粘贴体跨 stdin 分片累积(pasteBuf);带外字节(标记前/后)走正常按键路径 | 终端粘贴多行时原始 \r 会逐行触发提交=误执行多任务;各主流终端(Windows Terminal/VTE/Konsole/xterm)均支持 ?2004h | 本轮 | ✅ 生效 |
+| T24 | **队列断路器**(长周期会话审计发现):任务死于**永久性厂商认证/余额错误**(HTTP 401/402/403,kernel `isProviderAuthError` 直发+重试耗尽两种消息形态)时,队列**停止放行**——剩余任务原地保留(可见/可删/可 /queue clear),修好密钥或 /model 换路由后重新提交;后续任务成功即自动复位锁存。TUI 与 Web 泵同一语义 | 一张未付账单不应把整队任务都标死;2026-10-02 会话审计:402 余额耗尽时队列逐个烧穿 | 本轮 | ✅ 生效 |
+| T25 | **断点记忆**(tui-pending.json):TUI 把"正在跑的任务+队列"随每次变化写入 HMH_HOME(尽力而为 IO,损坏降级为无);**优雅退出清除,异常死亡留存**;下次启动检测到残留→显示一次性召回提示(指向 /resume 审计续接),显示即清除。转录本体永远在 rollout——此文件只是线程指针 | 长周期(5-9 小时)会话因崩溃/断电丢掉"我在干什么"的最后一英里;队列与运行任务原本只活在进程内存 | 本轮 | ✅ 生效 |
+| T26 | **resume 有界载入**:/resume 载入时立即按模型预算 compactMessages(等价于 loop 下一轮必做的压缩,只是提前)——/usage、fork 副本与内存占用从第一轮就诚实;rollout 文件永远保全量(审计) | 会话审计:2.4MB 会话 resume 后内存 history 全量膨胀,预算语义只靠 loop 兜底 | 本轮 | ✅ 生效 |
 
 ## Web(浏览器端)
 

@@ -49,6 +49,12 @@ export interface Strings {
   // fullscreen TUI
   tuiNeedsTty: string;
   tuiWelcome: (model: string) => string;
+  /** queue circuit breaker (TUI): a permanent provider auth/balance error
+   *  (HTTP 401/402/403) holds the remaining queue instead of draining it */
+  tuiQueueHeld: (waiting: number) => string;
+  /** crash-recall notice (TUI startup): the previous process died with a
+   *  task in flight or tasks queued; the rollout audit survives in /resume */
+  tuiPendingNote: (task: string, queued: number) => string;
   tuiApproval: string;
   tuiApprove: string;
   tuiDeny: string;
@@ -223,6 +229,8 @@ const zh: Strings = {
   viewingNote: '正在查看历史会话',
   tuiNeedsTty: 'hmh tui 需要交互终端(raw mode)。非交互环境请用:hmh "任务"(一次性)或 hmh web(浏览器)。',
   tuiWelcome: (model) => `hmh tui · ${model} · 输入 / 查看命令 · 直接输入任务回车运行`,
+  tuiQueueHeld: (waiting) => `⛔ 厂商认证/余额错误(HTTP 401/402/403)——队列暂停，保留 ${waiting} 个任务未执行。修复密钥/余额或 /model 换路由后重新提交即可。`,
+  tuiPendingNote: (task, queued) => `⟲ 上次异常退出时有未完成任务: "${task}"${queued > 0 ? `（另有 ${queued} 个排队）` : ''}。对话审计可用 /resume 续接；重发可直接输入该任务。`,
   tuiApproval: '⚠ 审批',
   tuiApprove: '批准',
   tuiDeny: '拒绝',
@@ -376,6 +384,8 @@ const en: Strings = {
   viewingNote: 'viewing a past session',
   tuiNeedsTty: 'hmh tui needs an interactive terminal (raw mode). Non-interactive: use hmh "task" (one-shot) or hmh web (browser).',
   tuiWelcome: (model) => `hmh tui · ${model} · type / for commands · type a task and press Enter to run`,
+  tuiQueueHeld: (waiting) => `⛔ provider auth/balance error (HTTP 401/402/403) - queue PAUSED, ${waiting} task(s) held. Fix the key/balance or /model to switch route, then resubmit.`,
+  tuiPendingNote: (task, queued) => `⟲ the previous session died with work pending: "${task}"${queued > 0 ? ` (+${queued} queued)` : ''}. Audit/continue via /resume; resubmit by retyping the task.`,
   tuiApproval: '⚠ approval',
   tuiApprove: 'Approve',
   tuiDeny: 'Deny',

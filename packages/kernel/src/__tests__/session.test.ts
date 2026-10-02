@@ -55,6 +55,27 @@ test('Session appends events to its jsonl file', async () => {
   }
 });
 
+test('assistant events record the responding model (mid-session route switches stay auditable)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-sess-model-'));
+  try {
+    const s = Session.create(dir, 'cwd', 'glm-5.3');
+    await s.user('hi');
+    await s.assistant('from the default route', undefined, 'glm-5.3');
+    await s.assistant('after /model switch', undefined, 'deepseek-flash');
+    await s.assistant('legacy caller without a model');
+    const raw = await readFile(s.file, 'utf8');
+    const assistants = raw.trim().split('\n')
+      .map((l) => JSON.parse(l) as { t: string; model?: string })
+      .filter((e) => e.t === 'assistant');
+    assert.equal(assistants.length, 3);
+    assert.equal(assistants[0]!.model, 'glm-5.3');
+    assert.equal(assistants[1]!.model, 'deepseek-flash', 'a mid-session switch is visible per-event');
+    assert.equal(assistants[2]!.model, undefined, 'omitting the model keeps legacy events shape-identical');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('new rollouts land in date-nested dirs with git context in session_meta', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'hmh-sess3-'));
   try {

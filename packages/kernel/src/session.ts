@@ -18,7 +18,7 @@ import type { ChatMessage } from './types.ts';
 export type SessionEvent =
   | { t: 'session/start'; id: string; time: string; cwd: string; model: string; git?: { branch?: string; commit?: string }; forkedFrom?: string }
   | { t: 'user'; time: string; text: string }
-  | { t: 'assistant'; time: string; text: string | null; tool_calls?: unknown[] }
+  | { t: 'assistant'; time: string; text: string | null; tool_calls?: unknown[]; model?: string }
   | { t: 'tool'; time: string; name: string; output: string; isError: boolean }
   | { t: 'approval'; time: string; tool: string; granted: boolean }
   | { t: 'final'; time: string; text: string; turns: number; toolUses: number };
@@ -123,8 +123,10 @@ export class Session {
   user(text: string): Promise<void> {
     return this.append({ t: 'user', time: new Date().toISOString(), text });
   }
-  assistant(text: string | null, toolCalls?: unknown[]): Promise<void> {
-    return this.append({ t: 'assistant', time: new Date().toISOString(), text, ...(toolCalls ? { tool_calls: toolCalls } : {}) });
+  /** `model` (when known) lands on the event so mid-session route switches
+   *  stay auditable - the rollout is the record of WHO said WHAT. */
+  assistant(text: string | null, toolCalls?: unknown[], model?: string): Promise<void> {
+    return this.append({ t: 'assistant', time: new Date().toISOString(), text, ...(toolCalls ? { tool_calls: toolCalls } : {}), ...(model ? { model } : {}) });
   }
   tool(name: string, output: string, isError: boolean): Promise<void> {
     return this.append({ t: 'tool', time: new Date().toISOString(), name, output, isError });
