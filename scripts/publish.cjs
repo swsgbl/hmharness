@@ -5,8 +5,9 @@
  * then:  node scripts/publish.cjs
  *
  * Order is load-bearing (each package installs its deps on publish):
- * kernel -> observability -> evolution -> domain-harmony -> domain-ops ->
- * agent -> web -> cli -> codexhost-bridge
+ * kernel -> observability -> evaluation -> sandbox -> cognitive ->
+ * environments -> evolution -> domain-harmony -> domain-ops -> agent ->
+ * web -> cli -> codexhost-bridge
  * Every package publishes with --access public (scoped packages default to
  * restricted) and --registry npmjs (this machine's .npmrc points at
  * npmmirror, which is read-only).
@@ -19,7 +20,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const DRY = process.argv.includes('--dry-run');
 const onlyIndex = process.argv.indexOf('--only');
 const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;
@@ -157,6 +158,28 @@ for (const name of ONLY ? [ONLY] : ORDER) {
     console.log('OK @hmharness/' + name);
   } catch (err) {
     console.error('FAILED @hmharness/' + name + ' - stopping the ordered set here.');
+    process.exit(1);
+  }
+}
+// 3. post-publish registry inventory (grace for CDN propagation): a 2xx
+//    from the publish endpoint does NOT mean the version RESOLVES yet -
+//    today two packages printed OK while fresh installs hit ETARGET for
+//    minutes. Retry each package for up to ~3 min, then fail loudly: a
+//    silent OK here ships an uninstallable dependency set.
+if (!DRY) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const targets = (ONLY ? [ONLY] : ORDER).map((n) => ({ n, v: JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', n, 'package.json'), 'utf8')).version }));
+  const missing = new Set(targets.map((t) => t.n));
+  for (let round = 1; round <= 6 && missing.size > 0; round++) {
+    if (round > 1) { console.log('registry propagation grace ' + (round - 1) + '/5 - waiting 30s for: ' + [...missing].join(', ')); await sleep(30_000); }
+    for (const t of targets) {
+      if (!missing.has(t.n)) continue;
+      if (await versionExistsOnNpm('@hmharness/' + t.n, t.v)) { missing.delete(t.n); console.log('verified on npm: @hmharness/' + t.n + '@' + t.v); }
+    }
+  }
+  if (missing.size > 0) {
+    console.error('\n!!! NOT RESOLVABLE on ' + REG + ' after ~3 min grace: ' + [...missing].map((n) => '@hmharness/' + n).join(', '));
+    console.error('    Fresh installs of dependents will hit ETARGET. Republish those packages (npm publish -w @hmharness/<name>) or wait and re-verify.');
     process.exit(1);
   }
 }
