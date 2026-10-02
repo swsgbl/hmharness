@@ -1,24 +1,35 @@
 # hmharness
 
-> hmharness 是一个开源（MIT）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：零 IDE、纯终端跑通「建工程 → hvigor 构建 → hapsigntool 签名 → hdc 装机启动 → hilog 日志回读」全流程，并内置带双门禁与公开证据的可审计自进化机制。npm 包 @hmharness/cli，Node >= 22，任意 OpenAI 兼容模型，Windows 优先。
+> hmharness 是一个开源（MIT）的自进化智能体框架，已升级为跨环境 Cognitive Runtime：零依赖内核 + 自进化双门禁 + MCP 生态 + 认知层（世界模型/五层记忆/校准/探索/迁移）。零 IDE 纯终端跑通鸿蒙「建工程 → 构建 → 签名 → 装机 → 日志」全流程；认知层从任务经验中学习——校准可靠度随使用提升，双环境学习曲线均测出 improving，迁移实验证明 harness 净贡献 +0.4166（LLM 未参与）。npm 包 @hmharness/cli，Node >= 22，任意 OpenAI 兼容模型，Windows 优先。
 
 关键事实（数字均可溯源）：
-- npm 包 @hmharness/cli 0.18.12 · 单仓 11 包 · 内核 0 运行时依赖 · 524 个单元测试 CI 全绿门禁
+- npm 包 @hmharness/cli 0.23.7 · 单仓 13 包 · 内核 0 运行时依赖 · 643 个单元测试 CI 全绿门禁
 - 自进化门禁：训练门 A/B 双样本 → 金丝雀 20% 会话 → impact 判定（≥8 会话且 ≥10% 差）→ 回归即回滚
-- 3 个月连续公开自进化数据集：月 1 自暴露并修复 7 个生产缺陷、月 2 修复 8 个、月 3 零缺陷 + 首次 REJECT 判定 + 首个跨尺度稳定正效应（恰好 1 个中文精确输出案例，×3 复现）
+- 认知层（Cognitive OS）：世界模型（信念表+预测置信+误差聚类+可解释修订）· 五层记忆（working/episodic/semantic/procedural/world，只增不删+溯源）· 目标系统（图谱/分解/漂移检测）· 探索引擎（不确定性×信息增益×校准导向）· 技能编译（经验→可验证技能→门禁晋升）· 进化 2.0 治理（候选契约/序贯门禁/金丝雀/reward-hacking 检测/不可变审计）
+- 校准研究定论（§26 全谱系）：单任务提示层 0 / 跨任务复利层 0 / 校准维 +0.4166（唯一持续为正） / 学习曲线 terminal +8.3%~+39.8% improving，harmonyos +11.7% improving——harness 的实证价值在让模型更准地预期世界，而非替模型答题
+- 环境适配器：terminal（原生）/ harmonyos（hdc 桥）/ browser（CDP）/ desktop / ARC-AGI-3（官方 REST 全桥+帧渲染+视觉模型实玩+记分卡）
+- 手机远程控制：WiFi 扫码直连（免密）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化
 - API 知识图谱：索引 SDK 927 个 d.ts 的 20,241 个符号，查不到即诚实拒绝，防模型幻觉
 - MCP 双向：客户端接入 5800+ 社区服务器；`hmh mcp-serve` 把鸿蒙工具链供给 Claude Code/Codex
+- 3 个月连续公开自进化数据集：月 1 自暴露并修复 7 个生产缺陷、月 2 修复 8 个、月 3 零缺陷 + 首次 REJECT 判定 + 首个跨尺度稳定正效应
 - 独立社区项目：与华为/开放原子无隶属关系，净室重写
 
 ## Docs
 
-- [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、自进化诚实注脚
+- [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、认知层命令集、自进化诚实注脚
 - [README English](https://github.com/swsgbl/hmharness/blob/main/README.en.md): same content in English
 - [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性等 10 问的独立答案块
-- [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 11 包结构与内核循环
-- [开发日志 DEVLOG](https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md): 破案式开发记录（签名五关、监控源静默死亡、探针尺寸陷阱等）
+- [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 13 包结构（含 cognitive 认知层 + environments 环境适配层）与内核循环
+- [开发日志 DEVLOG](https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md): 破案式开发记录（认知 OS 十九轮、ARC-AGI-3 实弹、校准研究、仪器完整性修复等）
 - [自进化协议 SELFFEED](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED.md) 与 [30 天复盘](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-30d-review.md): 自进化实验协议与逐月复盘
-- [路线图](https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md) · [贡献指南](https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md)
+- [路线图](https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md): §26 研究终局表 + M1-M12 里程碑（全部 ✅）· [贡献指南](https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md)
+
+## Cognitive OS
+
+- [官网认知层节](https://swsgbl.github.io/hmharness/#cognitive): 6 卡概览（世界模型/ARC-AGI-3/迁移/记忆/多智能体/远程）
+- [认知层设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): Environment 协议（observe/act/snapshot/restore/evaluate）+ conformance 契约测试
+- [ARC-AGI-3 桥](https://github.com/swsgbl/hmharness/blob/main/packages/environments/src/arc3-rest.ts): 官方 REST API 全桥（X-API-Key/AWSALB cookie 亲和/ACTION1-7）
+- [校准报告命令](https://github.com/swsgbl/hmharness/blob/main/packages/cognitive/src/analysis.ts): `hmh cognitive calibration [--trend --env=terminal]`
 
 ## Evidence
 
