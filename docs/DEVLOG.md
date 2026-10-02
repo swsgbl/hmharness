@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-10-02(九) · 三重验收连环抓真 bug:CI 依赖残留/上报盲区/面板启动崩溃(650/650)
+
+**动机**:发布后例行三验(CI/全局安装/面板视觉)——三道各抓到一个
+真问题,全部当场修复。
+
+**关键决策与实测**:
+- **CI 构建炸**:cli 声明依赖 @hmharness/environments@0.23.7 但工作区
+  已是 0.23.8——版本不匹配时 npm 不做工作区链接、从注册表装旧包
+  (无 CdpActBridge)。本地能过纯粹是旧 node_modules 链接还在。
+  修复:10 个 package.json 的包间依赖同步升版(升版脚本从此改
+  version+deps 两处)。
+- **失败上报盲区**:preflight 对 npm test 失败只打最后 3000 字符,
+  node:test 的 "not ok" 在流中段——一天的 flaky 取证全被这个尾巴
+  吞掉。修复:失败时专抽 not ok 块;ci.yml 加 tee+失败摘录步;
+  preflight ORDER 补上 cognitive/environments(13 包集)。
+- **面板启动崩溃**(视觉验收抓到):空会话侧栏首渲染时 renderSessions
+  读 `L.none2` 而 locale 还没取回(var L=null)——异常炸断整个启动
+  链,认知面板永远"加载中"。修复:LABELS 定义后立即 L=LABELS.zh
+  兜底。**修后四环境 sparkline 真实渲染**:browser 柱形 13→23 上升、
+  desktop 28 满平顶、harmonyos 20→24(DOM 断言柱形高度+截图存档);
+  全局 0.23.8 安装版冒烟 browser 曲线命令可读。
+- bd0d303 CI **全绿**(12m22s)。
+
+**教训**:
+- 三道验收缺一不可:CI 抓依赖残留(本地增量 node_modules 掩盖),
+  视觉抓启动崩溃(DOM 断言抓不到时序),发布验证抓传播。
+- "本地能过"是最危险的绿:工作区链接的增量状态与全新安装是两个
+  世界——发版前必须假设用户是全新安装。
+
+---
+
 ## 2026-10-02(八) · v0.23.8 发布:四环境曲线版本(650/650)
 
 **动机**:browser/desktop 曲线轮的代码已双推(0.23.8,db073eb),

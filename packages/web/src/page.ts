@@ -866,6 +866,10 @@ ${uiLiteSource()}
            cmdOk:'command output', cmdHelp:'commands', searchAt:'type @ to search workspace files…',
            webCmds: { '/help':'list web commands', '/clear':'clear screen, new thread', '/status':'model/locale/queue state', '/model':'list/switch chat route', '/lang':'switch locale zh/en', '/yolo':'toggle hands-free approvals', '/providers':'detect local providers', '/tools':'list all tools', '/skills':'list skills', '/mcp':'list MCP servers', '/ops':'harmony toolchain check', '/ops scan':'ecosystem radar scan', '/resume':'revisit sessions in the sidebar', '/web':'show the web address', '/exit':'how to quit' } }
   };
+  // boot default until /api/config confirms the locale: render* callbacks
+  // (sessions, cognitive panel...) can fire BEFORE setLabels() runs, and an
+  // unguarded L.none2 on the empty-sessions path crashed the whole bootstrap
+  L = LABELS.zh;
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
     document.title = L.title;
