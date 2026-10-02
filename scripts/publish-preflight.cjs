@@ -1,6 +1,7 @@
 /**
  * Publish preflight (scripts/publish-preflight.cjs)
- * npm publish in this repo is an EIGHT-package ordered set: kernel ->
+ * npm publish in this repo is a THIRTEEN-package ordered set: kernel ->
+ * observability -> evaluation -> sandbox -> cognitive -> environments ->
  * evolution -> domain-harmony -> domain-ops -> agent -> web -> cli ->
  * codexhost-bridge. This
  * script verifies everything npm pack/publish would complain about,
@@ -21,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const packages = requested.length ? requested : ORDER;
 let failures = 0;
@@ -37,7 +38,18 @@ if (!process.argv.includes('--skip-tests')) {
       execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000 });
       console.log('  ' + cmd + ': ok');
     } catch (e) {
-      fail(cmd + ' failed - refusing to publish a broken build:\n' + String(e.stdout || e.stderr || '').slice(-3000));
+      // surface the FAILING TESTS, not just the output tail: node:test emits
+      // "not ok N - name" mid-stream, which a tail-only dump silently loses
+      // (this exact blind spot hid a flaky test from CI forensics for a day)
+      const out = String(e.stdout || '') + String(e.stderr || '');
+      const lines = out.split('\n');
+      const blocks = [];
+      lines.forEach((l, i) => {
+        if (/^\s*not ok /.test(l) || /^# fail [1-9]/.test(l)) {
+          blocks.push(lines.slice(Math.max(0, i - 2), i + 16).join('\n'));
+        }
+      });
+      fail(cmd + ' failed - refusing to publish a broken build:\n' + (blocks.length ? blocks.join('\n----\n') : out.slice(-3000)));
     }
   }
 }

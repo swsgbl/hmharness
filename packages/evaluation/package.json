@@ -15,8 +15,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.7",
-    "@hmharness/observability": "0.23.7"
+    "@hmharness/kernel": "0.23.8",
+    "@hmharness/observability": "0.23.8"
   },
   "files": [
     "dist"

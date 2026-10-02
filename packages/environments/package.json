@@ -26,7 +26,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.7",
-    "@hmharness/cognitive": "0.23.7"
+    "@hmharness/kernel": "0.23.8",
+    "@hmharness/cognitive": "0.23.8"
   }
 }

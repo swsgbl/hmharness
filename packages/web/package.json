@@ -15,11 +15,11 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/agent": "0.23.7",
-    "@hmharness/cognitive": "0.23.7",
-    "@hmharness/domain-ops": "0.23.7",
-    "@hmharness/evolution": "0.23.7",
-    "@hmharness/kernel": "0.23.7",
+    "@hmharness/agent": "0.23.8",
+    "@hmharness/cognitive": "0.23.8",
+    "@hmharness/domain-ops": "0.23.8",
+    "@hmharness/evolution": "0.23.8",
+    "@hmharness/kernel": "0.23.8",
     "qrcode": "^1.5.4"
   },
   "files": [

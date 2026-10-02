@@ -23,10 +23,28 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - name: unit tests
-        run: npm test
+        run: npm test 2>&1 | tee test-output.log
       - name: built CLI smoke (no model needed)
         run: node packages/cli/dist/main.js skills
       - name: npm publish preflight (ordered-set check, never publishes)
-        run: node scripts/publish-preflight.cjs
+        run: node scripts/publish-preflight.cjs 2>&1 | tee preflight-output.log
+      - name: test failure excerpts (flaky forensics)
+        if: failure()
+        shell: pwsh
+        run: |
+          foreach ($f in @('test-output.log','preflight-output.log')) {
+            if (Test-Path $f) {
+              $lines = Get-Content $f
+              $i = 0
+              foreach ($l in $lines) {
+                if ($l -match '^\s*not ok' -or $l -match '^# fail [1-9]' -or $l -match 'FAIL ') {
+                  Write-Host "=== $f line $i ==="
+                  $lines[[Math]::Max(0,$i-2)..[Math]::Min($lines.Count-1,$i+25)] | Write-Host
+                }
+                $i++
+              }
+            }
+          }
+          exit 0
       - name: website guard (inline JS syntax + zh/en i18n symmetry + install cmd)
         run: node scripts/check-website.cjs
