@@ -198,3 +198,50 @@ export async function absorbCrowdSummary(home: string, summaryFile: string): Pro
 export async function loadCrowdPriors(home: string): Promise<CrowdPriors> {
   return readPriors(home);
 }
+
+/* ---------------- pack merging (community aggregation) ---------------- */
+
+/** Merge multiple crowd summaries into ONE pack for a fingerprint class
+ *  (what a community publishes per environment, e.g. crowd/win32-x64.json):
+ *  per-action stats are weighted by n, fingerprints must all be mutually
+ *  compatible, and the pack carries the merged n so absorbers can weight it
+ *  against their local evidence. The pack uses the summary format so
+ *  `absorb` consumes it unchanged. */
+export function mergeCrowdSummaries(summaries: CrowdSummary[]): { ok: true; pack: CrowdSummary } | { ok: false; error: string } {
+  const valid = summaries.filter((s) => s && s.kind === 'hmharness-crowd-summary' && Array.isArray(s.stats) && s.fingerprint);
+  if (valid.length === 0) return { ok: false, error: 'no valid crowd summaries to merge' };
+  const base = valid[0]!.fingerprint;
+  for (const s of valid) {
+    if (!fingerprintCompatible(base, s.fingerprint)) {
+      return { ok: false, error: `fingerprint class mismatch: refusing to mix ${s.fingerprint.os}/${s.fingerprint.arch} into ${base.os}/${base.arch} pack` };
+    }
+  }
+  const table = new Map<string, { n: number; ok: number; ms: number }>();
+  for (const s of valid) {
+    for (const st of s.stats) {
+      const key = `${st.environmentId}|${st.actionType}`;
+      const agg = table.get(key) ?? { n: 0, ok: 0, ms: 0 };
+      agg.n += st.n;
+      agg.ok += st.successRate * st.n;
+      agg.ms += st.meanDurationMs * st.n;
+      table.set(key, agg);
+    }
+  }
+  const stats: CrowdStat[] = [...table.entries()]
+    .map(([key, v]) => {
+      const [environmentId, actionType] = key.split('|');
+      return { environmentId, actionType, n: v.n, successRate: Number((v.ok / v.n).toFixed(3)), meanDurationMs: Math.round(v.ms / v.n) };
+    })
+    .sort((a, b) => b.n - a.n);
+  return {
+    ok: true,
+    pack: {
+      kind: 'hmharness-crowd-summary',
+      version: 1,
+      fingerprint: base,
+      generatedAt: `pack-${new Date().toISOString()}`,
+      trajectoryCount: valid.reduce((s, x) => s + x.trajectoryCount, 0),
+      stats,
+    },
+  };
+}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { crowdSummary, writeCrowdSummary, absorbCrowdSummary, loadCrowdPriors, environmentFingerprint, fingerprintCompatible } from '../crowd.ts';
+import { crowdSummary, writeCrowdSummary, absorbCrowdSummary, loadCrowdPriors, environmentFingerprint, fingerprintCompatible, mergeCrowdSummaries, type CrowdSummary } from '../crowd.ts';
 import { TrajectoryStore, TrajectoryRecorder, type CognitiveTrajectory } from '../index.ts';
 
 async function tmpHome(): Promise<string> {
@@ -99,6 +99,29 @@ test('crowd: absorb merges priors, refuses mismatched fingerprints, dedupes sour
   assert.equal(r4.ok, false);
   await rm(donor, { recursive: true, force: true });
   await rm(home, { recursive: true, force: true });
+});
+
+test('crowd: merged packs weight by n and refuse fingerprint-class mixing', () => {
+  const mine = environmentFingerprint();
+  const mk = (rate: number, n: number): CrowdSummary => ({
+    kind: 'hmharness-crowd-summary', version: 1, fingerprint: { ...mine }, generatedAt: `t-${rate}-${n}`, trajectoryCount: n,
+    stats: [{ environmentId: 'terminal', actionType: 'run_command', n, successRate: rate, meanDurationMs: 100 }],
+  });
+  // (0.5, n=10) + (1.0, n=30) -> weighted 0.875
+  const merged = mergeCrowdSummaries([mk(0.5, 10), mk(1.0, 30)]);
+  assert.equal(merged.ok, true);
+  const stat = merged.pack.stats.find((s) => s.actionType === 'run_command')!;
+  assert.equal(stat.n, 40);
+  assert.equal(stat.successRate, 0.875);
+  assert.equal(merged.pack.trajectoryCount, 40);
+  // a foreign-class summary is refused, not averaged in
+  const foreign = mk(0.9, 5);
+  foreign.fingerprint = { ...mine, os: mine.os === 'win32' ? 'linux' : 'win32' };
+  const refused = mergeCrowdSummaries([mk(1, 5), foreign]);
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /mismatch/);
+  // empty input refuses honestly
+  assert.equal(mergeCrowdSummaries([]).ok, false);
 });
 
 test('crowd: absorbed prior file is content-free too', async () => {

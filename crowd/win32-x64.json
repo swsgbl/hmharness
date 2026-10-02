@@ -1,0 +1,322 @@
+{
+ "kind": "hmharness-crowd-summary",
+ "version": 1,
+ "fingerprint": {
+  "os": "win32",
+  "arch": "x64",
+  "nodeMajor": 22,
+  "shell": "cmd"
+ },
+ "generatedAt": "2026-10-02T15:55:17.899Z",
+ "trajectoryCount": 419,
+ "stats": [
+  {
+   "environmentId": "terminal",
+   "actionType": "run_command",
+   "n": 2129,
+   "successRate": 0.813,
+   "meanDurationMs": 4189
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "read_file",
+   "n": 420,
+   "successRate": 0.938,
+   "meanDurationMs": 217
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "write_file",
+   "n": 357,
+   "successRate": 0.944,
+   "meanDurationMs": 18
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION1",
+   "n": 99,
+   "successRate": 0.98,
+   "meanDurationMs": 1522
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "edit_file",
+   "n": 81,
+   "successRate": 0.901,
+   "meanDurationMs": 2
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "list_dir",
+   "n": 58,
+   "successRate": 0.966,
+   "meanDurationMs": 22
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION6",
+   "n": 58,
+   "successRate": 1,
+   "meanDurationMs": 1157
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "type-text",
+   "n": 40,
+   "successRate": 0.875,
+   "meanDurationMs": 13
+  },
+  {
+   "environmentId": "harmonyos",
+   "actionType": "hdc-shell",
+   "n": 37,
+   "successRate": 1,
+   "meanDurationMs": 7
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "see_image",
+   "n": 35,
+   "successRate": 1,
+   "meanDurationMs": 20613
+  },
+  {
+   "environmentId": "desktop",
+   "actionType": "desktop_screenshot",
+   "n": 30,
+   "successRate": 1,
+   "meanDurationMs": 353
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "remember",
+   "n": 23,
+   "successRate": 1,
+   "meanDurationMs": 2
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_devices",
+   "n": 16,
+   "successRate": 1,
+   "meanDurationMs": 253
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "mcp_officecli_officecli",
+   "n": 15,
+   "successRate": 0.6,
+   "meanDurationMs": 105
+  },
+  {
+   "environmentId": "harmonyos",
+   "actionType": "hdc-aa-start",
+   "n": 14,
+   "successRate": 0,
+   "meanDurationMs": 58
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "web_search",
+   "n": 13,
+   "successRate": 0,
+   "meanDurationMs": 10244
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION3",
+   "n": 13,
+   "successRate": 1,
+   "meanDurationMs": 998
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "rlm_workspace",
+   "n": 12,
+   "successRate": 0.917,
+   "meanDurationMs": 1
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "spawn_agent",
+   "n": 11,
+   "successRate": 1,
+   "meanDurationMs": 78500
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "command",
+   "n": 11,
+   "successRate": 0,
+   "meanDurationMs": 23
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "navigate",
+   "n": 10,
+   "successRate": 1,
+   "meanDurationMs": 67
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "click",
+   "n": 10,
+   "successRate": 1,
+   "meanDurationMs": 17
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_vm_qemu",
+   "n": 9,
+   "successRate": 0.556,
+   "meanDurationMs": 325
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_api_lookup",
+   "n": 9,
+   "successRate": 0.444,
+   "meanDurationMs": 89
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_logs",
+   "n": 8,
+   "successRate": 1,
+   "meanDurationMs": 202
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION2",
+   "n": 7,
+   "successRate": 1,
+   "meanDurationMs": 1993
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "mcp_web-reader_webReader",
+   "n": 5,
+   "successRate": 0.8,
+   "meanDurationMs": 13872
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION4",
+   "n": 4,
+   "successRate": 1,
+   "meanDurationMs": 552
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "mcp_web-search-prime_web_search_prime",
+   "n": 3,
+   "successRate": 1,
+   "meanDurationMs": 3106
+  },
+  {
+   "environmentId": "harmonyos",
+   "actionType": "hdc-install",
+   "n": 3,
+   "successRate": 0,
+   "meanDurationMs": 84
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "mcp_anysearch_search",
+   "n": 2,
+   "successRate": 1,
+   "meanDurationMs": 6268
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_launch",
+   "n": 2,
+   "successRate": 1,
+   "meanDurationMs": 107
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "mcp_anysearch_extract",
+   "n": 2,
+   "successRate": 0.5,
+   "meanDurationMs": 7978
+  },
+  {
+   "environmentId": "harmonyos",
+   "actionType": "harmony_devices",
+   "n": 2,
+   "successRate": 1,
+   "meanDurationMs": 63
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "cognitive_query",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 3
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "desktop_screenshot",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 302
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_emulator_list",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 403
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_emulator_start",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 25657
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_sign",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 703
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "harmony_install",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 234
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "web_fetch",
+   "n": 1,
+   "successRate": 0,
+   "meanDurationMs": 10491
+  },
+  {
+   "environmentId": "desktop",
+   "actionType": "desktop_type",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 258
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "writeFile",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 1
+  },
+  {
+   "environmentId": "arc3",
+   "actionType": "ACTION7",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 0
+  }
+ ]
+}
