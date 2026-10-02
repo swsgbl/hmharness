@@ -1,19 +1,44 @@
 # hmharness 完整知识库（llms-full.txt）
 
-> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-09-27，npm 包 @hmharness/cli 0.18.12。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
+> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-10-02，npm 包 @hmharness/cli 0.23.7。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
 
 ## hmharness 是什么
 
-hmharness 是一个开源（MIT 协议）的鸿蒙（HarmonyOS/OpenHarmony）开发智能体框架。用户在终端用一句话即可完成鸿蒙应用开发全流程：参数化工程脚手架 → hvigor 构建 → hapsigntool 签名 → hdc 安装启动 → hilog 日志回读，全程不打开 DevEco Studio、不需要登录华为账号、可接任意 OpenAI 兼容模型。它同时内置可审计的自进化机制（技能学习带双门禁与公开证据）和 MCP 双向生态（客户端 + 服务器）。
+hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级为跨环境 Cognitive Runtime。三层能力：(1) 鸿蒙开发全流程——终端一句话完成建工程→构建→签名→装机→日志，不打开 DevEco Studio；(2) 可审计自进化——技能学习带双门禁与公开证据；(3) 认知层——世界模型从任务经验中学习并反哺决策，校准可靠度随使用提升，有学习曲线为证。
 
 安装：`npm install -g @hmharness/cli`（Node >= 22），初始化 `hmh init`，配置任意 OpenAI 兼容端点后 `hmh "任务"` 直接运行。MIT 协议，免费开源。
 
 ## 核心事实速查
 
-- npm 包：@hmharness/cli，当前 0.18.12；单仓 11 包；内核 0 运行时依赖；524 个单元测试 CI 全绿才允许发版
+- npm 包：@hmharness/cli，当前 0.23.7；单仓 13 包（含 cognitive + environments）；内核 0 运行时依赖；643 个单元测试 CI 全绿才允许发版
 - 平台：Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证）；macOS/Linux 社区支持
-- 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放），zh/en 双语
+- 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放、认知面板十区+学习曲线），zh/en 双语
 - 独立声明：与华为、开放原子开源基金会无隶属/合作/背书关系；净室重写，不继承任何上游运行时能力
+
+## 认知层（Cognitive OS）
+
+认知层是 hmharness 区别于普通 Agent 框架的核心增量：把学习对象、环境状态、世界模型、目标和探索变成可测量的一等公民。
+
+**世界模型**：每个动作类型维护信念表（EMA 成功率）+ 预测置信度；预测与实际自动比较（误差聚类）；修订只添加 correction 规则、永不静默改写信念（可解释）。每个任务步自动带预测，模型的原话随 reasoning 入档。
+**五层记忆**：working（任务内）/ episodic（轨迹）/ semantic（规则）/ procedural（技能）/ world（环境），只增不删 + 完整溯源（来源/会话/环境/时间）；矛盾检测打标待审；`hmh cognitive export` 单文件全量导出、`purge` 显式确认删除。
+**目标系统**：目标图谱/分解/打分/漂移检测；intrinsic 目标只能提案、高影响目标必须显式审批。
+**探索引擎**：不确定性 × 信息增益 × 目标相关性 − 风险的 UCB 策略 + 校准导向（模型预测最差的动作优先探测——预测误差 = 信息增益）；假设可证伪。
+**进化 2.0 治理**：候选契约（假设/预期/回归声明/holdout/transfer/回滚缺一不可）→ 序贯 SPRT 门禁（train 样本永不决策）→ 金丝雀 → reward-hacking 检测 → 不可变审计。
+**多智能体治理**：spawn_agent 全部走角色契约拓扑 + 共享预算 + 跨进程不可变审计。
+**校准报告**：`hmh cognitive calibration` 按动作列预测可靠度——harness 实证价值所在。
+
+**校准研究定论（§26 全谱系，消融 11 轮）**：
+- 单任务·提示层：0（工具可靠性统计与经验层对单任务结果均无净效应）
+- 跨任务·复利层：0（隔离家前后对照+顺序对照第三臂）
+- 校准维：+0.4166（唯一持续为正；迁移双臂实验，LLM 未参与 = 纯 harness 净贡献）
+- 学习曲线：terminal +8.3%~+39.8% improving，harmonyos +11.7% improving（双环境一致，`hmh cognitive calibration --trend --env=terminal` 的输出）
+- 一句话：harness 的实证价值在**让模型更准地预期世界**（校准/迁移），而非替模型答题（通过率）。
+
+**环境适配器**：terminal（原生）/ harmonyos（hdc 桥）/ browser（CDP）/ desktop / ARC-AGI-3（官方 REST API 全桥——X-API-Key 认证 + AWSALB cookie 亲和 + ACTION1-7 + scorecard；帧渲染为图像后视觉模型看帧推理选动作，模型原话随 reasoning 入档）。
+
+**跨环境迁移**：显式抽象动作层（writeFile→@write / hdc-install→@install / run_command→@run）；双臂对照实验（源环境信念播种 vs 空白，同预算只差知识）；迁移矩阵面板。
+
+**认知命令集**（15 条）：`hmh cognitive status | world-model | calibration [--trend --env=] | diagnose | bench | drift | skills | explore | transfer | team | learn | replay | export | purge | play`。
 
 ## 零 IDE 的鸿蒙全流程怎么做
 
@@ -43,7 +68,15 @@ hmharness 的自进化有严格门禁：洞察挖掘 → 技能提案 → 训练
 - 月 1：零"统计可靠"晋升（门在正确拒绝噪声）；协议自暴露并修复 7 个生产缺陷
 - 月 2：修复 8 个生产缺陷；门持续拒绝噪声
 - 月 3（2026-09-15 复盘）：零生产缺陷（仪器已稳）；程序史首个 REJECT 行动判定；首个跨尺度稳定正效应——真实但小（恰好 1 个中文精确输出案例，跨 4 报告 ×3 复现）；99 个 bench 案例、89 条高质量轨迹、12 份实验报告
-一句话："越用越聪明"尚未被证实；被证实的是门与审计面在正确工作，且缺陷率降到零。每次判定记录、被拒候选与原始日志原样公开在证据页。
+一句话："越用越聪明"在传统维度（技能晋升/通过率）尚未证实；**在认知维度（校准可靠度/预测质量）已测出双环境 improving 学习曲线**。每次判定记录、被拒候选与原始日志原样公开在证据页。
+
+## ARC-AGI-3 是用来训练大模型吗
+
+不是。hmharness 的权重从不更新（微调走独立轨道，已收官）；ARC-AGI-3 是**外部考官**——衡量"固定模型 + 认知层"的组合在未知环境的表现。harness 的净贡献可以完全分离：迁移双臂实验中 LLM 完全未参与，校准差 +0.4166 是纯框架增量。学习环只走 harness 层（记忆/技能/工作流/世界模型），模型权重更新有更高证据门槛（0.95）且不通过 ARC 进行。
+
+## 手机远程控制
+
+`hmh web start --exposure=lan --token-gen` 后网页 📱 图标打开配对窗口：WiFi 模式扫码直连免密（同网段信任）；互联网模式走 cloudflared 免费隧道（自动下载/自启动/死亡自动重启）+ 6 位配对密码；配对会话持久化（服务器重启不重扫），断线自动重连。
 
 ## 与 DevEco Studio / DevEco Code 的关系
 
@@ -51,7 +84,7 @@ hmharness 的自进化有严格门禁：洞察挖掘 → 技能提案 → 训练
 
 ## 安全与审批
 
-deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒绝（DENY 红线永驻，已批准模式不能覆盖）；进化提案过防投毒筛选；会话全量追加式审计；`hmh state backup|restore` 进化状态快照恢复；MCP 模式下宿主负责问用户、server 侧硬墙永驻。
+deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒绝（DENY 红线永驻，已批准模式不能覆盖）；进化提案过防投毒筛选；会话全量追加式审计；`hmh state backup|restore` 进化状态快照恢复；MCP 模式下宿主负责问用户、server 侧硬墙永驻。认知层遵守同样纪律：高影响目标必须审批、模型更新有最高证据门槛、进化无法触碰安全配置。
 
 ## 生态雷达与运维
 
