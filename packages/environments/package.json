@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/environments",
-  "version": "0.23.7",
+  "version": "0.23.8",
   "description": "HMH Cognitive OS environment adapters: Terminal (native), HarmonyOS (via domain-harmony), Browser/Desktop (via host automation bridge), ARC3 (external adapter). Every adapter implements the @hmharness/cognitive Environment protocol and must pass the shared conformance test.",
   "type": "module",
   "main": "dist/index.js",
