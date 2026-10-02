@@ -20,11 +20,56 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'evolution', 'domain-harmony', 'domain-ops', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'evolution', 'domain-harmony', 'domain-ops', 'lsp', 'agent', 'web', 'cli', 'codexhost-bridge'];
 const DRY = process.argv.includes('--dry-run');
 const onlyIndex = process.argv.indexOf('--only');
 const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;
 const REG = 'https://registry.npmjs.org';
+
+// 0a. dependency-coverage preflight: every @hmharness/* dependency of every
+// package in the set must itself be IN the set - a dep on an unpublished
+// package breaks installs for every user (0.23.14 lesson: agent depended on
+// @hmharness/lsp, which had never been published -> npm install E404).
+{
+  const bad = [];
+  for (const name of ORDER) {
+    let pkg;
+    try { pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name, 'package.json'), 'utf8')); } catch { bad.push(name + ': package.json unreadable'); continue; }
+    for (const dep of Object.keys(pkg.dependencies ?? {})) {
+      if (dep.startsWith('@hmharness/') && !ORDER.includes(dep.slice('@hmharness/'.length))) {
+        bad.push(name + ' depends on ' + dep + ' which is NOT in the publish set');
+      }
+    }
+  }
+  if (bad.length) {
+    console.error('dependency-coverage preflight FAILED:');
+    for (const b of bad) console.error('  ' + b);
+    process.exit(1);
+  }
+  console.log('dependency-coverage preflight ok: every intra-set dep is publishable');
+}
+
+// 0b. keep the board installer's offline FALLBACK_PINS in lockstep with this
+// release (they are the offline fallback ONLY - online installs resolve the
+// real versions; stale pins would silently downgrade an offline board).
+{
+  const cliPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'cli', 'package.json'), 'utf8'));
+  const v = cliPkg.version;
+  const pins = "const FALLBACK_PINS = {\n"
+    + `  cli: '${v}', web: '${v}', agent: '${v}', kernel: '${v}',\n`
+    + `  sandbox: '${v}', evolution: '${v}', 'domain-ops': '${v}',\n`
+    + `  evaluation: '${v}', observability: '${v}', 'domain-harmony': '${v}',\n`
+    + '};';
+  let touched = 0;
+  for (const inst of [path.join(ROOT, 'scripts', 'install-kaihongos.cjs'), path.join(ROOT, 'packages', 'cli', 'board', 'install-kaihongos.cjs')]) {
+    try {
+      const src = fs.readFileSync(inst, 'utf8');
+      const next = src.replace(/const FALLBACK_PINS = \{[\s\S]*?\};/, pins);
+      if (next !== src) { fs.writeFileSync(inst, next); touched++; }
+    } catch { /* twin missing is not release-blocking */ }
+  }
+  console.log(touched > 0 ? 'board installer FALLBACK_PINS synced to ' + v : 'board installer pins already at ' + v);
+}
 
 // 0. preflight first - never publish a broken set
 console.log('--- preflight ---');

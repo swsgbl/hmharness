@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/cognitive",
-  "version": "0.23.14",
+  "version": "0.23.15",
   "description": "hmharness Cognitive OS core: Environment protocol, World Model, Goal system, Exploration, RLM runtime, five-layer memory, Skill Compiler, Continual Learning control plane, Evolution 2.0 governance, Multi-Agent topology, Transfer lab and GeneralBench schema. Cognitive strategy layer per the HMH Cognitive OS blueprint (2026-09).",
   "type": "module",
   "main": "dist/index.js",
@@ -26,6 +26,6 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.14"
+    "@hmharness/kernel": "0.23.15"
   }
 }
