@@ -814,8 +814,13 @@ export async function startServer(opts: { port: number; host?: string; version?:
       }
       if (req.method === 'GET' && url.pathname === '/api/cognitive/calibration') {
         try {
-          const { calibrationReport } = await import('@hmharness/cognitive');
-          json(res, 200, await calibrationReport(home));
+          const { calibrationReport, calibrationTrend } = await import('@hmharness/cognitive');
+          const env = url.searchParams.get('env') ?? undefined;
+          if (url.searchParams.get('trend') === '1') {
+            json(res, 200, await calibrationTrend(home, 5, env));
+          } else {
+            json(res, 200, await calibrationReport(home));
+          }
         } catch (err) {
           json(res, 500, { error: String(err).slice(0, 200) });
         }

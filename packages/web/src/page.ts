@@ -1416,6 +1416,27 @@ ${uiLiteSource()}
       }).catch(function () {
         document.getElementById('cog-calib').innerHTML = '<div class="hint">加载失败</div>';
       });
+      // per-environment learning curves (the measurable self-evolution evidence)
+      Promise.all([
+        api('/api/cognitive/calibration?trend=1&env=terminal').then(function (r) { return r.json(); }),
+        api('/api/cognitive/calibration?trend=1&env=harmonyos').then(function (r) { return r.json(); }).catch(function () { return { buckets: [] }; }),
+      ]).then(function (trends) {
+        var el = document.getElementById('cog-calib');
+        if (!el) return;
+        var html = '';
+        [['terminal', trends[0]], ['harmonyos', trends[1]]].forEach(function (pair) {
+          var name = pair[0], t = pair[1];
+          if (!t || !t.buckets || !t.buckets.length) return;
+          var cls = t.verdict === 'improving' ? 'ok' : t.verdict === 'degrading' ? 'err' : 'tb';
+          var spark = t.buckets.map(function (b) {
+            var h = Math.max(2, Math.round(b.reliability * 28));
+            return '<div style="display:inline-block;width:14px;margin-right:2px;background:var(--line);border-radius:2px 2px 0 0;height:' + h + 'px;vertical-align:bottom" title="' + b.at.slice(0, 10) + ' ' + (b.reliability * 100).toFixed(0) + '% (n=' + b.predictions + ')"></div>';
+          }).join('');
+          var delta = t.reliabilityDelta === null ? '' : (t.reliabilityDelta >= 0 ? ' +' : ' ') + (t.reliabilityDelta * 100).toFixed(1) + '%';
+          html += '<div style="margin:4px 0"><span class="ob ' + cls + '">' + name + '</span>' + spark + '<small>' + delta + ' ' + t.verdict + '</small></div>';
+        });
+        if (html) el.insertAdjacentHTML('beforeend', '<div class="hint" style="margin-top:6px">学习曲线（按环境，自进化实证）：</div>' + html);
+      }).catch(function () { /* curves are additive chrome */ });
       document.getElementById('cog-traj').innerHTML =
         '<span class="ob ' + (d.trajectories ? 'ok' : 'none') + '">' + (d.trajectories || 0) + ' 条轨迹</span>' +
         '<div class="hint" style="margin-top:6px">' + (d.trajectories ? '每次 agent 任务自动记录工具动作/结果/耗时（episodic 层）' : '任务运行后自动生成') + '</div>';
