@@ -1,6 +1,6 @@
 # hmharness
 
-**为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架。** 零依赖内核 + 自进化一等公民 + MCP 生态借力——不继承任何上游运行时能力，全部自持或经标准协议外借。
+**为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架，已升级为跨环境 Cognitive Runtime。** 零依赖内核 + 自进化一等公民 + MCP 生态借力 + 认知层（世界模型/校准/探索/迁移）——不继承任何上游运行时能力，全部自持或经标准协议外借。
 
 [English](README.en.md) · [![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@hmharness/cli?color=cb3837&label=npm%20%40hmharness%2Fcli)](https://www.npmjs.com/package/@hmharness/cli)
@@ -14,19 +14,22 @@
 | 领域 | 能力 |
 |---|---|
 | **智能体内核** | while 循环内核、任意 OpenAI 兼容厂商、流式输出（思考块）、上下文预算压缩、内核级审批门禁、追加式会话审计 |
+| **🧠 认知层** | **世界模型**（信念表+预测置信+误差聚类+可解释修订）、**五层记忆**（working/episodic/semantic/procedural/world，只增不删+溯源）、**目标系统**（图谱/分解/漂移检测/高影响审批）、**探索引擎**（不确定性×信息增益×校准导向，假设可证伪）、**RLM 工作区**（跨调用持久变量+checkpoint）、**技能编译**（经验→可验证技能→门禁晋升）、**学习控制平面**（九类对象，harness 优先）、**进化 2.0 治理**（候选契约/序贯门禁/金丝雀/reward-hacking 检测/不可变审计）、**多智能体治理**（角色契约/共享预算/跨进程审计）、**校准报告**（每动作预测可靠度——harness 实证价值所在，含自进化学习曲线） |
+| **🌐 环境适配** | terminal（原生）/ harmonyos（hdc 桥）/ browser（CDP）/ desktop（窗口枚举）/ **ARC-AGI-3**（官方 REST API 全桥+帧渲染+视觉模型实玩+记分卡） |
 | **鸿蒙原生域** | 工程脚手架（参数化多页面/多模块，一句话建任意结构）、hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 cjpm 构建、codelinter、**模拟器全生命周期管理（零 IDE）** |
-| **自进化** | 进化循环（洞察挖掘 → 提案 → 训练/保留双门禁 → 晋升自动快照 → 回滚）、技能三态生命周期、检索式长期记忆（带蒸馏）、定时进化、进化审计日志 |
+| **自进化** | 进化循环（洞察挖掘 → 提案 → 训练/保留双门禁 → 晋升自动快照 → 回滚）、技能三态生命周期、检索式长期记忆（带蒸馏）、定时进化、进化审计日志；**跨环境迁移**（显式抽象动作层+双臂对照实验，校准迁移证据 +0.4166） |
 | **生态借力** | MCP 客户端（stdio + HTTP，5800+ 社区服务器即插即用）、`hmh ops` 运维看家（生态雷达；AI 只起议，人批准才发布） |
-| **多智能体** | spawn_agent 子代理（全新上下文、深度上限、共享审批、审计前缀） |
-| **视觉** | see_image（任意视觉模型，多厂商降级链） |
-| **多前端** | CLI / REPL（斜杠命令）/ **全屏 TUI（斜杠面板、滚轮翻页）** / Web（浏览器流式、远程审批、会话回放、**工作区**） |
+| **多智能体** | spawn_agent 子代理（全新上下文、深度上限、共享审批、审计前缀）+ 角色契约拓扑治理 |
+| **视觉** | see_image（任意视觉模型，多厂商降级链）+ ARC-AGI-3 帧渲染视觉实玩（模型推理随 reasoning 入档） |
+| **多前端** | CLI / REPL（斜杠命令）/ **全屏 TUI（斜杠面板、滚轮翻页）** / Web（浏览器流式、远程审批、会话回放、**工作区、🧠 认知面板十区+学习曲线**） |
 | **国际化** | zh / en 双语界面与系统提示（`--locale=en`） |
 | **网络原生** | web_search（零密钥搜索）+ web_fetch（URL→可读文本）+ ssh_run（远程探测/运维，裸探测免审批）+ 浏览器自动化（browser_open+桌面视觉链） |
 | **桌面自动化** | desktop_screenshot / desktop_click / desktop_type——看→动→验闭环，全部审批门禁 |
 | **并行+即时反馈** | 多工具并发（审批保序）；三层反馈：错误即记→任务后即时反思入记忆→每 3 洞察自动进化轮；**代码级自进化**（沙箱分支+双样本门禁+git 回滚，永禁改内核循环；**默认关闭**，config 设 `evolution.autoPatch=true` 显式开启，且拒绝在脏工作树上运行） |
 | **编辑分级** | edit_file 按 Codex workspace-write 分级：工作区内免审批、**HMH_HOME（审批规则本身）永远审批**、工作区外审批 |
 | **会话管理** | 历史会话重命名/归档/删除（trash 可恢复），悬停操作 |
-| **状态安全** | `hmh state backup|restore`——进化状态（技能/记忆/日志）快照与恢复，restore 前自动停放当前状态 |
+| **状态安全** | `hmh state backup|restore`——进化状态（技能/记忆/日志）快照与恢复；**认知库导出/删除**（`cognitive export/purge`，数据治理） |
+| **📱 远程控制** | 手机配对（WiFi 扫码直连免密 + cloudflared 免费隧道互联网模式 + 6 位配对密码 + 自动重连） |
 
 > **关于"自进化"的诚实注脚**:canary→impact 统计管线已就绪(暴露组 vs 对照组,≥8 会话且 ≥10% 差才晋升);**首个 30 天生产数据集已发布并归档**——[首月证据数据集 /evidence/ds-2026-09](https://swsgbl.github.io/hmharness/evidence/ds-2026-09/),判定记录、被拒候选与原始日志原样公开,30 天复盘见 [docs/SELFFEED-30d-review.md](docs/SELFFEED-30d-review.md)。首月结论:30 天内零"统计可靠"晋升(门在拒绝噪声),但协议自暴露并修复了 7 个生产缺陷;"越用越聪明"仍未证实——被证实的是门与审计面在正确工作。
 >
@@ -132,15 +135,34 @@ harmony_cjpm_build/test · harmony_lint                  # 仓颉 / codelinter
 
 `hmh evolve` 一轮循环：读会话洞察 → 元模型提议候选技能（写入 drafts）→ **训练门** A/B 基准（回归即拒）→ 晋升（自动快照）→ **保留门** 晋升后复验（防背题；回归即回滚）→ 记忆蒸馏（只增不删的原始记录之上生成精炼层）→ 全程落 `evolution/log.jsonl`。安全约束：进化循环只写 `skills/` 与 `memory/`，无法触碰配置与安全设置。
 
+## 认知层（Cognitive OS）
+
+```bash
+hmh cognitive status             # 五层记忆/轨迹库/进化审计/环境注册表
+hmh cognitive world-model       # 信念表 + 校准 + 规划门（可信/存疑/未知）
+hmh cognitive calibration       # 每动作预测可靠度（harness 实证价值所在）
+hmh cognitive calibration --trend --env=terminal   # 自进化学习曲线
+hmh cognitive explore --env=harmonyos              # 校准导向探索
+hmh cognitive transfer --run --source=terminal --target=harmonyos  # 迁移实验
+hmh cognitive play --env=arc3 --steps=10           # LLM 视觉实玩 ARC-AGI-3
+hmh cognitive replay latest      # 逐步回放任意轨迹（含模型推理）
+hmh cognitive diagnose | learn   # 学习机会诊断 | harness 层学习环
+```
+
+每次任务自动落认知轨迹（工具动作+预测+结果+耗时）；世界模型从历史学习并反哺系统提示；探索引擎优先探测模型预测最差的动作（预测误差=信息增益）；校准可靠度随使用提升——**"越用越准"有学习曲线为证**（terminal/harmonyos 双环境 improving）。
+
 ## 仓库结构
 
 ```
 packages/
   kernel/          零依赖内核（注册表、循环、提供商、会话、配置、压缩、MCP 客户端）
+  cognitive/       认知层（环境协议、世界模型、目标、探索、五层记忆、技能编译、
+                   学习控制平面、进化 2.0 治理、多智能体、GeneralBench、迁移、校准）
+  environments/    环境适配器（terminal 原生、harmonyos、browser、desktop、ARC-AGI-3）
   evolution/       记忆·洞察·技能生命周期·基准（训练/保留）·进化循环
   domain-harmony/  鸿蒙域（设备、工具链、脚手架、构建、安装、运行、日志、仓颉、lint、模拟器）
   domain-ops/      运维看家（生态雷达、issue 流）
-  agent/           执行层（基础工具、系统提示、spawn、runner）
+  agent/           执行层（基础工具、系统提示、spawn、runner、认知记录器）
   cli/  web/       终端与浏览器双前端（同一事件协议）
 ```
 
