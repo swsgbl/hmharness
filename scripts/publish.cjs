@@ -26,6 +26,23 @@ const onlyIndex = process.argv.indexOf('--only');
 const ONLY = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;
 const REG = 'https://registry.npmjs.org';
 
+// 0a-0. no package in the set may be private: `npm publish` SKIPS private
+// workspaces with only a warning (the 0.23.15 lesson: lsp shipped as
+// "OK" while never reaching the registry, breaking every dependent install)
+{
+  const priv = [];
+  for (const name of ORDER) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name, 'package.json'), 'utf8'));
+      if (pkg.private === true) priv.push(name);
+    } catch { /* coverage check below reports unreadables */ }
+  }
+  if (priv.length) {
+    console.error('private-package preflight FAILED: ' + priv.join(', ') + ' must not declare "private": true');
+    process.exit(1);
+  }
+}
+
 // 0a. dependency-coverage preflight: every @hmharness/* dependency of every
 // package in the set must itself be IN the set - a dep on an unpublished
 // package breaks installs for every user (0.23.14 lesson: agent depended on

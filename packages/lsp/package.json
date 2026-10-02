@@ -1,7 +1,6 @@
 {
   "name": "@hmharness/lsp",
   "version": "0.23.15",
-  "private": true,
   "description": "hmharness LSP Client/Manager — drives external language servers (LSP 3.18 over stdio) for agent code intelligence. Client only: we never implement language servers.",
   "type": "module",
   "main": "dist/index.js",
