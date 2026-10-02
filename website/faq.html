@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、自进化真实性</title>
-<meta name="description" content="hmharness 十问十答：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？自进化是真的吗？每个答案附证据链接。">
+<title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
+<meta name="description" content="hmharness 十三问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -16,8 +16,8 @@
   "name": "hmharness",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
-  "softwareVersion": "0.18.12",
-  "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化与 MCP 双向生态。",
+  "softwareVersion": "0.23.7",
+  "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化、认知层（世界模型/五层记忆/校准维，双环境学习曲线 improving）与 MCP 双向生态。",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://opensource.org/licenses/MIT",
   "programmingLanguage": "TypeScript, Node.js",
@@ -68,7 +68,7 @@
     {
       "@type": "Question",
       "name": "hmharness 的自进化是真的吗？",
-      "acceptedAnswer": { "@type": "Answer", "text": "机制真实、效果诚实。技能晋升要过双门禁（A/B 双样本基准 + 保留门）再进金丝雀（20% 会话），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月的公开数据集显示：月 1 零统计可靠晋升（门在正确拒绝噪声）但自暴露修复 7 个生产缺陷；月 2 修复 8 个；月 3 零生产缺陷、首次 REJECT 判定、首个跨尺度稳定正效应（真实但小：恰好 1 个中文精确输出案例，×3 复现）。「越用越聪明」尚未证实，被证实的是门与审计在正确工作——全部判定记录与原始日志原样公开在证据页。" }
+      "acceptedAnswer": { "@type": "Answer", "text": "机制真实、效果诚实。技能晋升要过双门禁（A/B 双样本基准 + 保留门）再进金丝雀（20% 会话），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月的公开数据集显示：月 1 零统计可靠晋升（门在正确拒绝噪声）但自暴露修复 7 个生产缺陷；月 2 修复 8 个；月 3 零生产缺陷、首次 REJECT 判定、首个跨尺度稳定正效应（真实但小：恰好 1 个中文精确输出案例，×3 复现）。「越用越聪明」尚未证实，被证实的是门与审计在正确工作——全部判定记录与原始日志原样公开在证据页。补充（2026-09）：认知维度拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% 均 improving。" }
     },
     {
       "@type": "Question",
@@ -89,6 +89,21 @@
       "@type": "Question",
       "name": "hmharness 支持哪些系统和模型？",
       "acceptedAnswer": { "@type": "Answer", "text": "Windows 优先（鸿蒙工具链、模拟器、TUI 终端适配均在此验证）；macOS/Linux 社区支持。模型任意 OpenAI 兼容厂商均可：GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat / vision / evolve / bench 各走各的），密钥只存在本机 HMH_HOME。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 的认知层是什么？harness 真的从经验中学习吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习（信念表 EMA + 预测先行 + 误差聚类）并反哺系统提示，五层记忆（working/episodic/semantic/procedural/world）只增不删带溯源，另有目标系统、探索引擎、技能编译与进化治理，15 条 hmh cognitive 子命令全部可用。消融 11 轮的研究定论：单任务提示层 0、跨任务复利 0、校准维 +0.4166（唯一持续为正，LLM 未参与 = 纯 harness 净贡献）、学习曲线 terminal +8.3%~+39.8% 与 harmonyos +11.7% 均 improving。harness 的实证价值在让模型更准地预期世界，而非替模型答题。" }
+    },
+    {
+      "@type": "Question",
+      "name": "ARC-AGI-3 是用来训练大模型的吗？",
+      "acceptedAnswer": { "@type": "Answer", "text": "不是。hmharness 的模型权重从不更新（微调走独立轨道且已收官）；ARC-AGI-3 在这里充当外部考官——衡量固定模型 + 认知层的组合在未知环境中的表现。迁移双臂实验中 LLM 完全未参与，校准差 +0.4166 是纯框架增量，harness 的净贡献可以完全分离。学习环只走 harness 层（记忆/技能/工作流/世界模型），模型权重更新有 0.95 的最高证据门槛且不通过 ARC 进行。" }
+    },
+    {
+      "@type": "Question",
+      "name": "手机怎么远程控制 hmharness？",
+      "acceptedAnswer": { "@type": "Answer", "text": "两种模式：WiFi 扫码直连（免密，同网段信任，扫一次即记住配对的局域网 IP）与 cloudflared 免费隧道互联网模式（6 位配对密码，配对会话持久化——服务器重启不重扫，断线自动重连、隧道死亡自动重启）。hmh web start --exposure=lan --token-gen 启动后点网页 📱 图标打开配对窗口。手机端是完整 Web 前端，支持任意 OpenAI 兼容模型（含 GLM-5.3-flash 视觉模型看 ARC 游戏帧选动作）。" }
     }
   ]
 }
@@ -130,8 +145,8 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十问十答</h1>
-  <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
+  <h1>hmharness 十三问</h1>
+  <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
 </div></header>
 
 <main class="wrap">
@@ -139,7 +154,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 <section class="qa" id="what-is-hmharness">
   <h2><a class="qn" href="#what-is-hmharness">Q1</a>hmharness 是什么？</h2>
   <div class="tldr">hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
-  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 11 包、内核 0 运行时依赖、524 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
+  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 13 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、643 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="./">官网首页</a></p>
 </section>
 
@@ -182,6 +197,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <h2><a class="qn" href="#self-evolution">Q7</a>hmharness 的「自进化」是真的吗？</h2>
   <div class="tldr">机制真实、效果诚实：技能晋升要过双门禁（A/B 双样本基准 + 防背题保留门）再进金丝雀（20% 会话对照），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月公开数据集的结论是——零统计可靠晋升（门在正确拒绝噪声），但自暴露并修复了 7+8+0 个生产缺陷，月 3 首次出现跨尺度稳定正效应（真实但小）。</div>
   <p>逐月事实：月 1 修复 7 个生产缺陷、零晋升；月 2 修复 8 个、门持续拒绝；月 3（2026-09-15 复盘）零生产缺陷、程序史首个 REJECT 行动判定、首个跨 4 报告 ×3 复现的正效应——恰好 1 个中文精确输出案例，不足以过 10% 门。「越用越聪明」尚未被证实，被证实的是门与审计面在正确工作；全部判定记录、被拒候选与原始日志<a href="evidence/">原样公开</a>。代码级自进化默认关闭，只允许改 <code>packages/*/src/*.ts</code>、永禁内核循环。</p>
+  <p>认知维度补充（2026-09 更新）：0.23.x 系列把「学习」拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% 均 improving（<code>hmh cognitive calibration --trend</code> 可复现），迁移实验中校准差 +0.4166 为纯 harness 净贡献（LLM 未参与）。详见 <a href="#cognitive-what">Q11</a>。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-month3-final-review.md">SELFFEED 月 3 终局复盘</a> · <a href="evidence/ds-2026-09/">首月数据集</a></p>
 </section>
 
@@ -204,6 +220,28 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <div class="tldr">Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证），macOS/Linux 社区支持；模型任意 OpenAI 兼容厂商——GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat/vision/evolve/bench 各走各的），密钥只存本机。</div>
   <p>多厂商路由示例配置与上下文窗口自适应（压缩预算随模型窗口缩放）见 README「模型路由」一节。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 模型路由</a></p>
+</section>
+
+<section class="qa" id="cognitive-what">
+  <h2><a class="qn" href="#cognitive-what">Q11</a>hmharness 的认知层是什么？harness 真的从经验中学习吗？</h2>
+  <div class="tldr">认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习并反哺系统提示；校准可靠度随使用提升——<b>双环境学习曲线均测出 improving</b>。这不是宣称，是 <code>hmh cognitive calibration --trend --env=terminal</code> 的输出。</div>
+  <p>认知层包含世界模型（信念表+预测置信+误差聚类）、五层记忆（working/episodic/semantic/procedural/world，只增不删+溯源）、目标系统（图谱/分解/漂移检测）、探索引擎（不确定性×信息增益×校准导向）、技能编译（经验→可验证技能→门禁晋升）、进化 2.0 治理（候选契约/序贯门禁/reward-hacking 检测）。15 条 <code>hmh cognitive</code> 子命令全部可用。</p>
+  <p>研究定论（消融 11 轮）：单任务提示层 0 / 跨任务复利 0 / <b>校准维 +0.4166</b>（唯一持续为正，LLM 未参与 = 纯 harness 净贡献） / 学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% improving。harness 的实证价值在让模型更准地预期世界，而非替模型答题。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP §26 研究终局表</a> · <a href="./#cognitive">官网认知层节</a></p>
+</section>
+
+<section class="qa" id="arc-train">
+  <h2><a class="qn" href="#arc-train">Q12</a>ARC-AGI-3 是用来训练大模型的吗？</h2>
+  <div class="tldr">不是。hmharness 的权重从不更新（微调走独立轨道，已收官）；ARC-AGI-3 是<b>外部考官</b>——衡量"固定模型 + 认知层"的组合在未知环境的表现。harness 的净贡献可以完全分离。</div>
+  <p>证据：迁移双臂实验中 LLM 完全未参与，校准差 +0.4166 是纯框架增量。学习环只走 harness 层（记忆/技能/工作流/世界模型），模型权重更新有最高证据门槛（0.95）且不通过 ARC 进行。视觉实玩 ARC 游戏（帧渲染→模型推理→reasoning 入档）测的是"固定模型+harness"的联合表现，通过消融实验可分离 harness 贡献。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/environments/src/arc3-rest.ts">ARC-AGI-3 REST 桥源码</a></p>
+</section>
+
+<section class="qa" id="phone-remote">
+  <h2><a class="qn" href="#phone-remote">Q13</a>手机怎么远程控制 hmharness？</h2>
+  <div class="tldr">WiFi 扫码直连（免密，同网段信任）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化 + 断线自动重连。<code>hmh web start --exposure=lan --token-gen</code> 后网页 📱 图标打开配对窗口。</div>
+  <p>WiFi 模式手机扫二维码即连（服务器记住配对过的局域网 IP）；互联网模式自动下载 cloudflared 并启动免费 Quick Tunnel（死亡自动重启、意图持久化到 config）。配对会话持久化——服务器重启不重扫。支持任意 OpenAI 兼容模型（包括 GLM-5.3-flash 视觉模型看 ARC 游戏帧选动作）。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 手机远程控制</a></p>
 </section>
 
 </main>

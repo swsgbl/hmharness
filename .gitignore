@@ -38,3 +38,5 @@ audit-doc.txt
 .bump.cjs
 .publish.cjs
 .scan.txt
+# runtime agent workspaces (created by test/demo runs, never source)
+projects/
