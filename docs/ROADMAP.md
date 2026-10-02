@@ -1,5 +1,20 @@
 # hmharness 路线图
 
+## 认知 OS 研究结论(§26 全谱系,2026-10-02 定案)
+
+蓝图 §26 十个科研问题中"harness 增益几何"的完整答案(消融十一轮+校准产品化五轮):
+
+| 测量维度 | 方法 | 结果 |
+|---|---|---|
+| 单任务·提示层 | 三重消融(仅摘要/完整/全裸,三态判决+干净对) | **0**(工具可靠性统计与经验层对单任务结果均无净效应) |
+| 跨任务·复利层 | 隔离家前后对照+顺序对照第三臂 | **0**(净复利=实验Δ−顺序Δ=0) |
+| **预测质量·校准维** | 迁移双臂实验 | **+0.4166**(唯一持续为正;LLM 未参与=纯 harness 净贡献) |
+| **自进化学习曲线** | 按环境分组时间桶 | **terminal +8.3%~+39.8% improving,harmonyos +11.7% improving(双环境一致)** |
+
+**科学定论**:harness 认知层的实证价值在**让模型更准地预期世界**(校准/迁移),
+而非替模型答题(通过率)。产品化闭环:校准报告(可见)→校准导向探索(可指挥)
+→全量任务步预测(自动喂养)→学习曲线(实证)→面板日常展示。
+
 ## Cognitive OS 12 个月里程碑(2026-09 蓝图,2026-09-29 首批落地)
 
 依据《HMH_Cognitive_OS_AGI_实施蓝图_2026-09》§19/§24。执行顺序铁律(§28):
@@ -18,8 +33,8 @@
 | M8 | Continual Learning | learning control plane | ✅ 九类对象+harness 优先+模型高门槛 |
 | M9 | Self-Evolution 2.0 | prediction/holdout/canary/rollback | ✅ 候选契约+序贯门禁+审计+hacking 检测 |
 | M10 | Multi-Agent 2.0 | role topology/budget | ✅ 角色契约+共享黑板+心跳/取消/预算 |
-| M11 | GeneralBench + ARC | cross-env benchmark/replay | ◐ 统一指标+transfer lab 已建;ARC3 骨架待 SDK |
-| M12 | Transfer + Research | transfer matrix + dashboard | ◐ matrix 已建;/api/cognitive 种子;面板 UI 待做 |
+| M11 | GeneralBench + ARC | cross-env benchmark/replay | ✅ ARC3 官方 REST 桥+帧渲染+视觉实玩+ARC-005 指标+消融;统一指标+transfer lab |
+| M12 | Transfer + Research | transfer matrix + dashboard | ✅ 抽象动作层+双臂对照+校准迁移证据;认知面板十区+学习曲线;CLI 15 子命令 |
 
 **首批验收证据(2026-09-29)**:cognitive 47 测试+environments 10 测试全绿,
 terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机可用,
