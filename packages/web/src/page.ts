@@ -1426,11 +1426,12 @@ ${uiLiteSource()}
         api('/api/cognitive/calibration?trend=1&env=harmonyos').then(function (r) { return r.json(); }).catch(function () { return { buckets: [] }; }),
         api('/api/cognitive/calibration?trend=1&env=browser').then(function (r) { return r.json(); }).catch(function () { return { buckets: [] }; }),
         api('/api/cognitive/calibration?trend=1&env=desktop').then(function (r) { return r.json(); }).catch(function () { return { buckets: [] }; }),
+        api('/api/cognitive/calibration?trend=1&env=arc3').then(function (r) { return r.json(); }).catch(function () { return { buckets: [] }; }),
       ]).then(function (trends) {
         var el = document.getElementById('cog-calib');
         if (!el) return;
         var html = '';
-        [['terminal', trends[0]], ['harmonyos', trends[1]], ['browser', trends[2]], ['desktop', trends[3]]].forEach(function (pair) {
+        [['terminal', trends[0]], ['harmonyos', trends[1]], ['browser', trends[2]], ['desktop', trends[3]], ['arc3', trends[4]]].forEach(function (pair) {
           var name = pair[0], t = pair[1];
           if (!t || !t.buckets || !t.buckets.length) return;
           var cls = t.verdict === 'improving' ? 'ok' : t.verdict === 'degrading' ? 'err' : 'tb';
