@@ -1,6 +1,6 @@
 # hmharness
 
-**A self-evolving agent harness for HarmonyOS/OpenHarmony development.** Zero-dependency kernel + first-class self-evolution + MCP ecosystem borrow — every runtime capability is home-grown or absorbed via standard protocols, never inherited from a parent runtime.
+**A self-evolving agent harness for HarmonyOS development, upgraded to a cross-environment Cognitive Runtime.** Zero-dependency kernel + first-class self-evolution + MCP ecosystem borrow + a cognitive layer (world model / calibration / exploration / transfer) — every runtime capability is home-grown or absorbed via standard protocols, never inherited from a parent runtime.
 
 [![ci](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml/badge.svg)](https://github.com/swsgbl/hmharness/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@hmharness/cli?color=cb3837&label=npm%20%40hmharness%2Fcli)](https://www.npmjs.com/package/@hmharness/cli)
@@ -16,18 +16,21 @@
 | Area | Capability |
 |---|---|
 | **Agent kernel** | while-loop core, any OpenAI-compatible provider, streaming output with thinking blocks, context budget compression, kernel-level approval gate, append-only session audit |
+| **🧠 Cognitive layer** | **World model** (belief table + prediction confidence + error clustering + explainable revision), **five-layer memory** (working/episodic/semantic/procedural/world, append-only + provenance), **goal system** (graph/decompose/drift/high-impact approval), **exploration engine** (uncertainty x information gain x calibration-targeted, falsifiable hypotheses), **RLM workspace** (persistent variables + checkpoints), **skill compiler** (experience -> verifiable skills -> gated promotion), **learning control plane** (nine targets, harness-first), **evolution 2.0 governance** (candidate contracts / sequential gates / canary / reward-hacking detection / immutable audit), **multi-agent governance** (role contracts / shared budgets / cross-process audit), **calibration report** (per-action prediction reliability — the harness's empirically proven value, with self-evolution learning curves) |
+| **🌐 Environments** | terminal (native) / harmonyos (hdc bridge) / browser (CDP) / desktop / **ARC-AGI-3** (official REST bridge + frame rendering + vision-model play + scorecards) |
 | **HarmonyOS native domain** | Parameterized project scaffolding (multi-page, multi-module, one sentence → any structure), hvigor build, hdc install/launch/logs/uninstall, Cangjie cjpm build, codelinter. **Full emulator lifecycle management without an IDE** |
-| **Self-evolution** | Evolution loop (insight mining → proposals → training/holdout double gate → promotion with snapshots → rollback), three-state skill lifecycle, retrieval-based long-term memory, scheduled evolution, evolution audit log |
+| **Self-evolution** | Evolution loop (insight mining → proposals → training/holdout double gate → promotion with snapshots → rollback), three-state skill lifecycle, retrieval-based long-term memory, scheduled evolution, evolution audit log; **cross-environment transfer** (explicit abstract-action layer + two-arm controlled experiments, calibration transfer evidence +0.4166) |
 | **Ecosystem borrow** | MCP client (stdio + HTTP, 5800+ community servers plug-and-play), `hmh ops` keeper (ecosystem radar; AI only proposes, humans approve before publishing) |
-| **Multi-agent** | spawn_agent sub-agents (fresh context, depth limit, shared approvals, audited prefix) |
-| **Vision** | see_image (any vision model, multi-provider fallback) |
-| **Frontends** | CLI / REPL / fullscreen TUI (slash-command palette) / Web (browser streaming, remote approvals, session replay, workspaces) |
+| **Multi-agent** | spawn_agent sub-agents (fresh context, depth limit, shared approvals, audited prefix) + role-contract topology governance |
+| **Vision** | see_image (any vision model, multi-provider fallback) + ARC-AGI-3 frame-rendered vision play (model reasoning archived with each action) |
+| **Frontends** | CLI / REPL / fullscreen TUI (slash-command palette) / Web (browser streaming, remote approvals, session replay, workspaces, **🧠 cognitive panel with learning curves**) |
 | **i18n** | zh / en bilingual UI and system prompts (`--locale=en`) |
 | **Native web** | web_search (zero-key) + web_fetch (URL -> readable text) + browser automation (browser_open + desktop vision chain) |
 | **Desktop automation** | desktop_screenshot / desktop_click / desktop_type - the see-act-verify loop, approval-gated |
 | **Parallel + instant feedback** | concurrent tools (approvals ordered); 3-tier feedback: errors noted instantly -> per-task reflection into memory -> auto evolution every 3 insights; **code-level self-evolution** (sandbox branch + double-sample gate + git revert, kernel loop untouchable) |
 | **Session management** | rename / archive / delete (trash, recoverable) on the sidebar history |
-| **State safety** | `hmh state backup\|restore` - snapshot and recover the evolution state (skills / memory / logs); restore parks the current state first |
+| **State safety** | `hmh state backup\|restore` - snapshot and recover the evolution state; **cognitive store export/purge** (`cognitive export/purge`, data governance) |
+| **📱 Remote control** | phone pairing (WiFi scan-to-connect, passwordless + cloudflared free tunnel for internet mode + 6-digit pairing PIN + auto-reconnect) |
 
 > **Honest footnote on "self-evolving"**: the canary->impact statistics pipeline is in place (exposed vs control, promote only on >=8 sessions and >=10% delta), but the first 30-day production dataset is still being collected - verdicts, rejected candidates and raw logs are published verbatim on the [evidence page](https://swsgbl.github.io/hmharness/evidence/), protocol in [docs/SELFFEED.md](docs/SELFFEED.md). Until that dataset ships, "gets smarter with use" is a mechanism, not a proven fact.
 >
