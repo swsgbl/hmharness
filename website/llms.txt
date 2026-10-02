@@ -18,7 +18,7 @@
 
 - [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、认知层命令集、自进化诚实注脚
 - [README English](https://github.com/swsgbl/hmharness/blob/main/README.en.md): same content in English
-- [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性等 10 问的独立答案块
+- [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3 考什么、手机远程控制等 13 问的独立答案块
 - [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 13 包结构（含 cognitive 认知层 + environments 环境适配层）与内核循环
 - [开发日志 DEVLOG](https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md): 破案式开发记录（认知 OS 十九轮、ARC-AGI-3 实弹、校准研究、仪器完整性修复等）
 - [自进化协议 SELFFEED](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED.md) 与 [30 天复盘](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-30d-review.md): 自进化实验协议与逐月复盘

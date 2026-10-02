@@ -36,7 +36,7 @@
 >
 > **Platform status**: Windows-first (HarmonyOS toolchain, emulator, desktop automation and TUI terminal handling are all verified here); macOS/Linux is community-supported (the kernel and evolution loop are pure Node; domain tools degrade gracefully by availability).
 >
-> **Ten-question FAQ**: zero-IDE HarmonyOS development, command-line packaging & signing (hapsigntool localSign and the expired cert template), CI/CD, ArkTS API hallucination defense, and whether self-evolution is real — every answer cites its source: [website FAQ](https://swsgbl.github.io/hmharness/faq.html) (plus an [llms.txt](https://swsgbl.github.io/hmharness/llms.txt) as an AI-retrieval entry point).
+> **Thirteen-question FAQ**: zero-IDE HarmonyOS development, command-line packaging & signing (hapsigntool localSign and the expired cert template), CI/CD, ArkTS API hallucination defense, whether self-evolution is real, cognitive-layer learning curves, what ARC-AGI-3 actually tests, and phone remote control — every answer cites its source: [website FAQ](https://swsgbl.github.io/hmharness/faq.html) (plus an [llms.txt](https://swsgbl.github.io/hmharness/llms.txt) as an AI-retrieval entry point).
 
 ## Quick start
 

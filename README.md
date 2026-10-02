@@ -35,7 +35,7 @@
 >
 > **平台现状**:Windows 优先(鸿蒙工具链/模拟器/桌面自动化/TUI 终端适配均在此验证);macOS/Linux 为社区支持(核心内核与进化循环是纯 Node,域工具按可用性降级)。
 >
-> **十问十答**:零 IDE 开发鸿蒙、命令行打包签名(hapsigntool localSign 与过期证书模板)、CI/CD、防 ArkTS API 幻觉、自进化真实性——每条答案附证据出处:[官网 FAQ](https://swsgbl.github.io/hmharness/faq.html)(另有 [llms.txt](https://swsgbl.github.io/hmharness/llms.txt) 供 AI 检索入口)。
+> **十三问**:零 IDE 开发鸿蒙、命令行打包签名(hapsigntool localSign 与过期证书模板)、CI/CD、防 ArkTS API 幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3 考什么、手机远程控制——每条答案附证据出处:[官网 FAQ](https://swsgbl.github.io/hmharness/faq.html)(另有 [llms.txt](https://swsgbl.github.io/hmharness/llms.txt) 供 AI 检索入口)。
 
 ## 快速开始
 

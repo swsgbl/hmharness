@@ -40,10 +40,13 @@
 terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机可用,
 类型零错,全仓构建链纳入(13 包)。
 
-**下一步(蓝图 §25 Issue 池驱动)**:runner 事件流接 TrajectoryRecorder(每次
-任务自动落 episodic 轨迹)→ evolution/evolve 换用 evolution2 治理壳 →
-memory 写入走 CognitiveMemory(带溯源) → browser/desktop act 桥接 agent 工具 →
-ARC3 SDK 到位后启用 adapter → 研究面板 UI。
+**下一步(§26 定案后:放大校准维)**:首批 Issue 池五项——runner 事件流接
+TrajectoryRecorder、evolution2 治理壳、CognitiveMemory 溯源写入、
+browser/desktop act 桥、ARC3 REST adapter、研究面板——**已全部落地并收官**
+(2026-10-02)。门面六层(README 中英/ROADMAP/官网/llms.txt/llms-full.txt/
+FAQ 十三问)同步完成。当前方向:①用真实任务把校准曲线喂厚(读数带 n,
+improving 判定阈值 ±5% 不动);②browser/desktop 环境的学习曲线首读
+(适配器在、轨迹薄);③投稿 Awesome-Self-Evolving-Agents(等作者点头)。
 
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 
