@@ -1052,14 +1052,22 @@ flags:
       await mkdir(scratch, { recursive: true });
       try {
         const { runTransferExperiment } = await import('@hmharness/cognitive');
-        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge } = await import('@hmharness/environments');
+        const { TerminalEnvironment, HarmonyOsEnvironment, Arc3Environment, Arc3RestBridge, BrowserEnvironment, CdpActBridge } = await import('@hmharness/environments');
         const makeEnv = target === 'harmonyos'
           ? () => new HarmonyOsEnvironment({ timeoutMs: 20_000 })
           : target === 'arc3'
             ? () => new Arc3Environment({ bridge: new Arc3RestBridge() })
-            : target === 'terminal' ? () => new TerminalEnvironment({ workspaceDir: join(scratch, `t-${Date.now().toString(36)}`), timeoutMs: 15_000 })
+            : target === 'browser'
+              // transfer into the OWNED debug browser (never the default one);
+              // reuse the explore wiring: CDP base overridable via --cdp=
+              ? () => {
+                  const cdpBase = rest.find((a) => a.startsWith('--cdp='))?.slice(6) ?? 'http://127.0.0.1:9222';
+                  const bridge = new CdpActBridge({ cdpBase });
+                  return new BrowserEnvironment({ cdpBase, act: (a, tabId) => bridge.act(a, tabId) });
+                }
+              : target === 'terminal' ? () => new TerminalEnvironment({ workspaceDir: join(scratch, `t-${Date.now().toString(36)}`), timeoutMs: 15_000 })
             : null;
-        if (!makeEnv) { stdout.write(`目标环境 '${target}' 暂不支持（terminal | harmonyos | arc3）\n`); return; }
+        if (!makeEnv) { stdout.write(`目标环境 '${target}' 暂不支持（terminal | harmonyos | arc3 | browser）\n`); return; }
         const report = await runTransferExperiment(home, {
           sourceEnv: source,
           targetEnv: target,

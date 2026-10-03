@@ -446,11 +446,26 @@ export async function skillCandidatesFromHistory(home: string, opts?: { minRepea
   const compiler = new SkillCompiler();
   const trajectories = await loadTrajectories(home);
   const candidates = await compiler.compile(trajectories, opts);
-  return candidates.map((c) => ({
-    id: c.id,
-    name: c.name,
-    procedure: c.procedure.map((s) => s.ref),
-    evidenceTrajectories: c.evidence.length,
-    status: c.status,
+  // W10 wiring: n-gram workflow candidates join the SAME pool — they flow
+  // into the evolve bench pipeline (promotion gates) like any candidate;
+  // nothing here promotes anything (evaluator independence)
+  const { mineWorkflows } = await import('./skill-compiler.ts');
+  const workflows = mineWorkflows(trajectories, { minSupport: opts?.minRepeat ?? 2 });
+  const fromWorkflows = workflows.map((w) => ({
+    id: `wf-${w.steps.join('_')}`,
+    name: `workflow: ${w.steps.join(' → ')} (${w.environmentId})`,
+    procedure: w.steps,
+    evidenceTrajectories: w.support,
+    status: 'candidate' as const,
   }));
+  return [
+    ...candidates.map((c) => ({
+      id: c.id,
+      name: c.name,
+      procedure: c.procedure.map((s) => s.ref),
+      evidenceTrajectories: c.evidence.length,
+      status: c.status,
+    })),
+    ...fromWorkflows,
+  ];
 }
