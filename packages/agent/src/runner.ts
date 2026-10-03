@@ -66,7 +66,7 @@ export function nativeRegistry(depth: number, opts: { lsp?: boolean; workspaceRo
       // healthy-only: a PATH shim whose toolchain lacks the component would
       // register a tool that always errors — skip it, keep the registry honest
       if (discoverServers().some((s) => s.healthy)) {
-        reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd() }));
+        reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir() }));
       }
     } catch { /* lsp optional: never block tool assembly */ }
   }

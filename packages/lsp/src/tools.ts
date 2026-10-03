@@ -14,6 +14,9 @@ import type { Diagnostic } from './protocol.ts';
 
 export interface LspToolContext {
   workspaceRoot: string;
+  /** HMH_HOME — required by the source-trust guard (Capability OS slice);
+   *  when absent PATH servers are refused honestly */
+  home?: string;
 }
 
 interface ManagedClient {
@@ -34,9 +37,22 @@ if (typeof process !== 'undefined') {
   });
 }
 
-async function clientFor(server: DiscoveredServer, workspaceRoot: string): Promise<ManagedClient> {
+async function clientFor(server: DiscoveredServer, workspaceRoot: string, home?: string): Promise<ManagedClient> {
   const existing = clients.get(server.id);
   if (existing) return existing;
+  // Capability OS slice (03 方案 supply-chain guard): no binary executes
+  // without source trust + a matching sha256 pin. PATH servers need one-time
+  // `hmh lsp trust <id>`; DevEco-local auto-trusts WITH pinning; a changed
+  // binary is refused as tampering.
+  if (home) {
+    const { checkTrust } = await import('./trust.ts');
+    const verdict = await checkTrust(home, server);
+    if (!verdict.trusted) {
+      throw new Error(`lsp ${server.id} blocked by source trust: ${verdict.reason}`);
+    }
+  } else if (!server.origin.includes('DevEco-local')) {
+    throw new Error(`lsp ${server.id} blocked: PATH servers need one-time trust (hmh lsp trust ${server.id})`);
+  }
   const manager = new ProcessManager(server, workspaceRoot);
   const diagnostics = new Map<string, Diagnostic[]>();
   const client = new LspClient(manager.start(), {
@@ -83,7 +99,7 @@ export function lspTools(ctx: LspToolContext): Tool[] {
     const server = pick(file);
     if (!server) return { output: `no language server for ${file} (available: ${servers().map((s) => s.id).join(', ') || 'none on PATH'})`, isError: true };
     const abs = resolveFile(ctx, file);
-    const mc = await clientFor(server, ctx.workspaceRoot);
+    const mc = await clientFor(server, ctx.workspaceRoot, ctx.home);
     return { output: await fn(mc, fileToUri(abs)) };
   };
 

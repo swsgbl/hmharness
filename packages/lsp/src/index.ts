@@ -12,3 +12,4 @@ export { ProcessManager, scrubEnv, fromPath, type ServerSpec, type ManagedServer
 export { LspClient, type LspClientOptions } from './client.ts';
 export { discoverServers, serverForFile, fileToUri, type DiscoveredServer } from './registry.ts';
 export { lspTools, shutdownLsp, diagnosticsSummary, type LspToolContext } from './tools.ts';
+export { checkTrust, trustServer, untrustServer, listTrust, serverHash, trustPath, type TrustEntry, type TrustStore, type TrustVerdict } from './trust.ts';

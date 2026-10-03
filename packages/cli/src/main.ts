@@ -911,6 +911,43 @@ flags:
     await tui(yes, rest.includes('--no-web'));
     return;
   }
+  if (cmd === 'lsp') {
+    // LSP management surface (Capability OS first slice: source trust)
+    await initHome();
+    const sub = rest[0] ?? 'list';
+    const { discoverServers } = await import('@hmharness/lsp');
+    const { listTrust, trustServer, untrustServer } = await import('@hmharness/lsp');
+    if (sub === 'list') {
+      const servers = discoverServers(true);
+      const trusted = new Map((await listTrust(homeDir())).map((t) => [t.id, t]));
+      if (servers.length === 0) { stdout.write('（本机未发现任何 language server——PATH 与 DevEco 安装目录均无）\n'); return; }
+      for (const s of servers) {
+        const t = trusted.get(s.id);
+        const state = !t ? (s.origin.includes('DevEco-local') ? '自动信任(官方布局,首次使用钉哈希)' : '未信任(hmh lsp trust ' + s.id + ')') : `${t.autoTrusted ? '自动' : '手动'}信任@${t.trustedAt.slice(0, 10)} sha:${t.sha256.slice(0, 8)}…`;
+        stdout.write(`  ${s.healthy ? '✓' : '✗'} ${s.id.padEnd(16)} ${s.origin.padEnd(18)} ${s.official ? 'official' : 'COMMUNITY'} · ${state}\n`);
+        if (!s.healthy && s.unhealthyReason) stdout.write(DIM(`      ${s.unhealthyReason}\n`));
+      }
+      return;
+    }
+    if (sub === 'trust' || sub === 'untrust') {
+      const id = rest[1];
+      if (!id) { stdout.write(`用法: hmh lsp ${sub} <server-id>（见 hmh lsp list）\n`); return; }
+      if (sub === 'untrust') {
+        const ok = await untrustServer(homeDir(), id);
+        stdout.write(ok ? `已撤销 ${id} 的信任\n` : `${id} 本就未信任\n`);
+        return;
+      }
+      const server = discoverServers().find((s) => s.id === id);
+      if (!server) { stdout.write(`未发现 server '${id}'（hmh lsp list 查看可用项）\n`); return; }
+      const r = await trustServer(homeDir(), server);
+      if (!r.ok) { stdout.write(`信任失败: ${r.error}\n`); return; }
+      stdout.write(`已信任 ${id}（${server.origin}）· sha256 钉住 ${r.sha256!.slice(0, 16)}…\n`);
+      stdout.write(DIM('  二进制变更后将被拒绝执行(篡改检测);撤销: hmh lsp untrust ' + id + '\n'));
+      return;
+    }
+    stdout.write('用法: hmh lsp list | trust <id> | untrust <id> — 语言服务器发现与健康/信任状态\n');
+    return;
+  }
   if (cmd === 'cognitive') {
     // Cognitive OS (blueprint 2026-09): read-only status one-pager. The
     // subsystems are libraries first — they come alive when the agent loop
