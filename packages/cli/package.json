@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@hmharness/agent": "0.23.20",
+    "@hmharness/browser": "0.23.20",
     "@hmharness/cognitive": "0.23.20",
     "@hmharness/domain-harmony": "0.23.20",
     "@hmharness/domain-ops": "0.23.20",

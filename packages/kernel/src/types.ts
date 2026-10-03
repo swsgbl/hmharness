@@ -156,6 +156,18 @@ export interface HmhConfig {
      *  self-graded. */
     judge?: string;
   };
+  /** BrowserOS (AI browser) driving — the browser_* tool family. The
+   *  agent launches a DEDICATED instance (own profile under HMH_HOME,
+   *  loopback CDP only); the user's daily browser is never touched. */
+  browser?: {
+    /** explicit BrowserOS executable path (overrides discovery) */
+    executablePath?: string;
+    /** CDP port of the hmh-owned instance (default 9223) */
+    cdpPort?: number;
+    /** run the owned instance headless (default false — visible window,
+     *  watchable and loggable-into) */
+    headless?: boolean;
+  };
 }
 
 /** Resolve a purpose to a concrete provider config (routing > legacy fields).

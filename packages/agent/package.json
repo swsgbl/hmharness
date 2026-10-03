@@ -22,7 +22,8 @@
     "@hmharness/kernel": "0.23.20",
     "@hmharness/observability": "0.23.20",
     "@hmharness/sandbox": "0.23.20",
-    "@hmharness/lsp": "0.23.20"
+    "@hmharness/lsp": "0.23.20",
+    "@hmharness/browser": "0.23.20"
   },
   "files": [
     "dist"

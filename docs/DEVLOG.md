@@ -4,6 +4,153 @@
 
 ---
 
+## 2026-10-04(二十八) · BrowserOS 实战三轮修复:从"无法启动"到会话复用(703/703)
+
+**动机**:用户按步骤把 hmharness 加进 BrowserOS 助手面板后连环遇到
+三个真机问题,全部靠落盘证据定位(不猜)。
+
+**三轮修复**:
+1. **Unable to start**(启动失败):读 `~/.browseros/db/browseros.sqlite`
+   providers 表实锤——自定义 ACP 表单只有 Name+Command 两栏,用户把
+   js 路径填进了 working_directory 字段→宿主拉起裸 node。修正
+   command 为单行完整命令(node 用绝对路径,sidecar spawn 环境不保证
+   PATH 有 mise shims)。
+2. **"弹出第二个浏览器"**:agent 调 browser_* 时启动了 hmh 专属
+   实例(有头)——在 BrowserOS 内这是语义错位。修复:acp-serve 启动
+   读 `~/.browseros/server.json` 设 HMH_BROWSER_ATTACH=cdp_port,
+   browser_* 工具 attach 宿主真实标签页(用户登录态);attach 不可达
+   时拒绝回退弹窗。独立 CLI 场景保持专属实例两层设计不变。
+3. **每条消息弹一个新窗口**(16 个窗口累积):证据链=6 会话文件↔
+   8 孤儿进程↔6 连号窗口;协议实验证明 Target.createTarget 只开
+   标签→宿主行为。根因=agentCapabilities.loadSession:false→宿主
+   (acpx)每条消息新会话新进程,Agent Mode 为每个新会话配新窗口。
+   修复:ACP 会话 ID 直接=hmh rollout ID(Session.create),实现
+   session/load 恢复 transcript,声明 loadSession:true。两连发真机
+   验证:第二轮记得第一轮答案、进程 2→2、窗口零增长。
+
+**顺手交付**:BrowserOS 扩展 CDP Browser domain(getWindows/closeWindow)
+用于窗口清理(16→1);宿主 sidepanel 需 reload 才重握手新能力。
+
+**追加(窗口问题终局)**:loadSession 只保住了对话连续——窗口仍每条
+消息+1。终因:**宿主(acpx)给每个新 agent 连接分配独立工作区窗口
+(内含 newtab)**,消息间回收 agent 进程→每条消息新连接→新窗口;
+Agent/Chat Mode 无关(实验都弹)。协议层无法阻止,改为**回收**:
+acp-serve 连接 initialize 时基线=有内容窗口集合,每轮 settle 与断连
+时 closeWindow 所有"全空白(newtab/about:blank)"窗口——有内容者
+永不触碰。真机验证:基线 8→峰值 9→结束 **2**(连历史遗留空白窗
+一并清掉)。教训:**宿主行为改不了就别硬扛,把"阻止发生"换成
+"发生后回收",安全性用内容判据保底**。
+
+**对照实验与真人验证(round 28 追加二)**:用户关键观察"同窗口换
+Codex/Claude 不弹窗,hmh 必弹"指引差异点——解码宿主会话存档的
+agent_command 载荷:内置 agent=bun 长驻直跑(@agentclientprotocol/
+codex-acp 等,宿主认识,工作区复用);custom ACP=**cmd.exe /c 包装
++env:{}**(宿主视为外部进程,每连接给独立工作区窗口)。这是宿主
+侧策略,协议层无法让 custom 获得内置待遇。回收网四道时序
+(initialize 开局/turn settled/+2.5s 补扫/disconnect)补齐后,
+**真人操作流验证**(Win32 SendInput 真实点击+剪贴板粘贴+回车,
+非 JS 注入):发"你好"→窗口 1→peak 1→end 1,宿主本轮根本没开窗
+(日志无新 initialize=same pid 27612 复用,session/load 生效)。
+结论:定制 agent 的弹窗不可避免,但**四道回收网使窗口寿命≤一轮,
+且"开局清扫"会把上一条遗留的窗口在下一条消息发出瞬间清掉**——
+用户观感=最多瞬时闪过一个窗口,绝不累积。
+
+**教训**:
+1. "集成给用户"必须真人验收一轮——三连坑全部藏在协议之外
+   (表单形态/宿主语义/会话生命周期);
+2. 宿主落盘是最佳证物:sqlite providers/会话存档/进程清单三方
+   对照,根因无所遁形;
+3. ACP loadSession 不是可选项:没有它,宿主每条消息都是"新智能体"
+   ——Agent Mode 的窗口策略把这一点放大成窗口灾难。
+
+---
+
+**动机**:用户在 BrowserOS 助手设置页(AI & Agents,列着 Codex/Claude
+Code/hermes)问"为什么看不到 hmharness 智能体"——二十六轮只做了
+hmh→驱动→BrowserOS 方向;被宿主调用的反向(像 Claude Code 那样出现在
+面板里)才是用户预期。通道 = 面板上的 **Custom ACP agent**(Agent
+Client Protocol,2026 编码智能体互操作基线,npm 0.4.5)。
+
+**交付**:`hmh acp-serve`(packages/cli/src/acp-serve.ts)
+- 手写 ndjson JSON-RPC 2.0 over stdio(零依赖,同 LSP/MCP 立场),
+  wire 形状照官方 @zed-industries/agent-client-protocol 参考实现;
+- initialize(回显客户端版本)/session/new(宿主 cwd,校验回退)/
+  session/prompt/cancel/set_mode/authenticate;
+- 事件映射:onDelta(text/reasoning)→agent_message_chunk/
+  agent_thought_chunk,onToolCall/Result→tool_call(+title/kind
+  read|edit|execute)/tool_call_update;
+- **门控工具审批走 request_permission 往返——宿主的 Allow/Reject
+  按钮就是 hmh 的审批卡**(approval=auto 时跳过);
+- 会话续接:同一 ACP 会话多轮 prompt → resume rollout+transcript;
+  取消 → AbortSignal → stopReason cancelled(失败轮次也以诚实错误
+  消息收尾,不裸抛协议错误)。
+
+**实测证据**:
+- 702/702 绿(+4:握手/帧序列+续接/取消/允许-拒绝);
+- **真机 stdio 全链路 VERIFY PASS**(packages/cli/verify-acp.mts:
+  真子进程+真 provider,一轮 10.3s,思考块+消息块流式,精确回复
+  HMH-ACP-OK,stopReason end_turn);
+- 手动帧注入 initialize+session/new 秒回(顺带定位并修掉验证脚本
+  的微任务饿死等待 bug——"有旧帧就醒"会饿死事件循环,等待必须
+  绑定"下一条行")。
+
+**接入方法**(BrowserOS 面板 Custom ACP agent):
+`node G:\hmharness\packages\cli\dist\main.js acp-serve`(发版后
+`hmh acp-serve`);stdout 即协议,stdout 污染已全量改道 stderr。
+
+**教训**:
+1. "集成"是双向词——先问清用户要哪个方向,别默认"我驱动它";
+2. 等待 stdio 行的轮询必须绑定"新行到达",不能是"队列非空",
+   否则微任务风暴饿死事件循环(表现为 initialize 后假死);
+3. npm 包类型 = 活规范:拉官方包读参考实现,比散文规范快且准
+   (规范站 404/curl 被拦时尤其如此)。
+
+---
+
+**动机**:给智能体接 AI 浏览器 BrowserOS(browseros-ai/BrowserOS,
+Chromium 分支)。全网调研定控制面,再照 LSP 范式落地。
+
+**调研结论**(docs 级):BrowserOS 有三条外控面——常驻托管 CDP
+(127.0.0.1:9100)、官方 MCP(Streamable HTTP :9000,53 工具)、
+sidecar REST(:9200,未文档化)。**选原生 CDP**:零新依赖(仓库
+已讲 CDP)、不把 53 个 MCP 工具灌进模型上下文、不依赖未版本化
+REST;专属 profile,永不碰用户日常浏览器。
+
+**交付**:`packages/browser`(@hmharness/browser)
+- 发现:安装根+PATH+config 覆盖(`browser.executablePath`);
+- 信任:sha256 钉住 `HMH_HOME/cognitive/browser-trust.json`
+  (install-local/config 自动信任一次,PATH 需显式 `hmh browser
+  trust`,变更=拒绝并提示自更新重钉)——与 LSP 同一契约;
+- 生命周期:专属实例(`--remote-debugging-port=9223` +
+  `HMH_HOME/browser/profile`);Windows chrome 族"启动器让位"→
+  netstat 解析真实监听 pid 才能可靠停止;隐式 headless 自启随宿主
+  退杀,显式 start 常驻(可见窗口,`hmh browser stop` 关);
+- 驱动:持久 WS + 扁平 session 多标签;快照 stamp
+  `data-hmh-ref` 入 DOM(refs 稳定、DevTools 可见);
+- 智能体八件套:browser_navigate/snapshot/click/type/read/
+  scroll/screenshot/tabs,条件注册(未装机不挂死工具);
+- CLI:`hmh browser status|trust|untrust|start|stop|open`。
+
+**实测证据**:
+- 698/698 绿(+9 测试:信任钉往返/装机布局发现/表达式与回退);
+- **真 BrowserOS 全链路 VERIFY PASS**(本机实装,Chromium 151
+  基座):启动→CDP→导航→快照→点击→读取→输入→标签→截图→
+  信任钉→停止,十步全过(packages/browser/verify-browser.mts,
+  回环 http 确定性用例);
+- 外网 https 导航在本沙箱被拦(手启 Edge 同样卡,curl 走放行
+  通道)——驱动器语义已由回环+data:URL 验证,外网导航待非沙箱
+  环境复核,诚实标注。
+
+**教训**:
+1. 官方文档说可执行文件叫 BrowserOS.exe,实机装的是
+   `chrome.exe`——发现规则必须实机校准(桌面 .lnk 一解析即得);
+2. Windows chrome 族启动器会分离再拉真浏览器进程:子进程 pid
+   不可信,端口监听者才是停止/杀树的唯一可靠句柄;
+3. 沙箱放行 curl 但拦浏览器子进程外联——外网导航验证用回环
+   服务兜底,别拿卡死当驱动器 bug。
+
+---
+
 ## 2026-10-03(二十五) · P2 三臂阶梯首读:全阶梯确认"价值不在通过率"(689/689)
 
 **动机**:上轮建好的三臂阶梯仪器(NOT VERIFIED 待配额窗)——窗口

@@ -517,7 +517,15 @@ usage:
   hmh mcp-serve        run as an MCP stdio SERVER: expose harmony_* tools to
                         Claude Code / Codex / any MCP host
                         (host config: npx -y @hmharness/cli mcp-serve)
+  hmh acp-serve        run as an ACP stdio AGENT: the full hmharness agent
+                        inside ACP hosts (BrowserOS assistant panel's
+                        "Custom ACP agent", Zed, ...)
   hmh devices|check        direct tool run, no model
+  hmh lsp [list|trust|untrust <id>]   language servers: discovery +
+                           health + sha256 source trust (Capability OS)
+  hmh browser [status|trust|untrust|start|stop|open <url>]
+                           BrowserOS AI browser: discovery + trust +
+                           the dedicated instance browser_* tools drive
   hmh tools                list all registered tools (native + MCP)
   hmh mcp                  show configured MCP servers and their tools
   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
@@ -593,6 +601,16 @@ flags:
     const { serveMcp } = await import('./mcp-server.ts');
     await serveMcp();
     return; // serveMcp exits when stdin closes
+  }
+  if (cmd === 'acp-serve') {
+    // SERVER mode: be an Agent Client Protocol agent over stdio so ACP
+    // hosts (BrowserOS assistant panel "Custom ACP agent", Zed, ...) run
+    // the full hmharness agent natively in their chat UI. The host's
+    // Allow/Reject buttons become the approval card. stdout is the
+    // protocol - run this exactly as the host's agent command.
+    const { serveAcp } = await import('./acp-serve.ts');
+    await serveAcp();
+    return; // serveAcp exits when stdin closes
   }
   if (cmd === 'skills') {
     const home = homeDir();
@@ -946,6 +964,87 @@ flags:
       return;
     }
     stdout.write('用法: hmh lsp list | trust <id> | untrust <id> — 语言服务器发现与健康/信任状态\n');
+    return;
+  }
+  if (cmd === 'browser') {
+    // BrowserOS management surface: discovery + trust + the agent's
+    // dedicated driven instance (browser_* tool family lifecycle)
+    await initHome();
+    const sub = rest[0] ?? 'status';
+    const { discoverBrowsers, detectRunning, listBrowserTrust, trustBrowser, untrustBrowser, startBrowser, stopBrowser, ownedInstance, BROWSEROS_INSTALL_URL } = await import('@hmharness/browser');
+    if (sub === 'status' || sub === 'list') {
+      const found = discoverBrowsers(true);
+      if (found.length === 0) {
+        stdout.write(`（本机未发现 BrowserOS——安装目录与 PATH 均无；安装: ${BROWSEROS_INSTALL_URL}，或在 config.json 设 browser.executablePath）\n`);
+      }
+      const trusted = new Map((await listBrowserTrust(homeDir())).map((t) => [t.id, t]));
+      for (const b of found) {
+        const t = trusted.get(b.id);
+        const state = !t
+          ? (b.origin === 'install-local' || b.origin === 'config' ? '首次使用时自动信任(钉哈希)' : `未信任(hmh browser trust ${b.id})`)
+          : `${t.autoTrusted ? '自动' : '手动'}信任@${t.trustedAt.slice(0, 10)} sha:${t.sha256.slice(0, 8)}…`;
+        stdout.write(`  ${b.healthy ? '✓' : '✗'} ${b.id.padEnd(12)} ${b.origin.padEnd(14)} ${state}\n`);
+        stdout.write(DIM(`      ${b.command}${b.version ? ' · ' + b.version : ''}\n`));
+        if (!b.healthy && b.unhealthyReason) stdout.write(DIM(`      ${b.unhealthyReason}\n`));
+      }
+      const owned = await ownedInstance(homeDir());
+      if (owned && owned.reachable) {
+        stdout.write(`  hmh 专用实例运行中: pid ${owned.instance.pid} · CDP 127.0.0.1:${owned.instance.port}（智能体 browser_* 工具驱动它;停止: hmh browser stop）\n`);
+      } else {
+        stdout.write('  hmh 专用实例未运行（hmh browser start 启动;智能体首次使用 browser_* 工具时也会自动启动）\n');
+      }
+      const run = await detectRunning();
+      if (run.running) stdout.write(`  另检测到你的日常 BrowserOS 在运行: CDP :${run.cdpPort} · MCP :${run.mcpPort}（hmh 不驱动日常实例——专用实例独立运行）\n`);
+      return;
+    }
+    if (sub === 'trust' || sub === 'untrust') {
+      const id = rest[1];
+      if (!id) { stdout.write(`用法: hmh browser ${sub} <id>（见 hmh browser status）\n`); return; }
+      if (sub === 'untrust') {
+        const ok = await untrustBrowser(homeDir(), id);
+        stdout.write(ok ? `已撤销 ${id} 的信任\n` : `${id} 本就未信任\n`);
+        return;
+      }
+      const b = discoverBrowsers().find((x) => x.id === id);
+      if (!b) { stdout.write(`未发现浏览器 '${id}'（hmh browser status 查看可用项）\n`); return; }
+      const r = await trustBrowser(homeDir(), b);
+      if (!r.ok) { stdout.write(`信任失败: ${r.error}\n`); return; }
+      stdout.write(`已信任 ${id}（${b.origin}）· sha256 钉住 ${r.sha256!.slice(0, 16)}…\n`);
+      stdout.write(DIM('  BrowserOS 官方自更新会改变哈希——变更后需重新 trust;撤销: hmh browser untrust ' + id + '\n'));
+      return;
+    }
+    if (sub === 'start') {
+      const portArg = rest.find((a) => a.startsWith('--port='));
+      try {
+        const inst = await startBrowser(homeDir(), { port: portArg ? Number(portArg.slice(7)) : undefined });
+        stdout.write(`BrowserOS 已启动: pid ${inst.pid} · CDP 127.0.0.1:${inst.port} · 专属 profile ${inst.profileDir}\n`);
+        stdout.write(DIM('  智能体的 browser_* 工具驱动此实例;停止: hmh browser stop\n'));
+      } catch (err) {
+        stdout.write(`启动失败: ${String(err instanceof Error ? err.message : err).slice(0, 300)}\n`);
+      }
+      return;
+    }
+    if (sub === 'stop') {
+      const r = await stopBrowser(homeDir());
+      stdout.write(`${r.stopped ? '已停止' : '未停止'}: ${r.detail}\n`);
+      return;
+    }
+    if (sub === 'open') {
+      const url = rest[1];
+      if (!url || !/^https?:\/\//i.test(url)) { stdout.write('用法: hmh browser open <https-url>（启动专用实例并打开页面）\n'); return; }
+      try {
+        const inst = await startBrowser(homeDir());
+        const { CdpBrowser } = await import('@hmharness/browser');
+        const client = new CdpBrowser({ port: inst.port });
+        const targetId = await client.openTab(url);
+        await client.activateTab(targetId);
+        stdout.write(`已在专用实例打开: ${url}\n`);
+      } catch (err) {
+        stdout.write(`打开失败: ${String(err instanceof Error ? err.message : err).slice(0, 300)}\n`);
+      }
+      return;
+    }
+    stdout.write('用法: hmh browser status | trust <id> | untrust <id> | start [--port=N] | stop | open <url> — BrowserOS 发现/信任/生命周期\n');
     return;
   }
   if (cmd === 'cognitive') {

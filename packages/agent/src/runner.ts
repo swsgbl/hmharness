@@ -34,6 +34,7 @@ import { appendMemory, listSkills, readInsights, readNotes, recentInsights, retr
 import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
 import { discoverServers, lspTools } from '@hmharness/lsp';
+import { discoverBrowsers, browserTools } from '@hmharness/browser';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -54,7 +55,7 @@ export function toServerConfig(c: McpServerImport): McpServerConfig {
  */
 export const spawnBase: { current?: SpawnBase } = {};
 
-export function nativeRegistry(depth: number, opts: { lsp?: boolean; workspaceRoot?: string } = {}): Registry {
+export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: boolean; workspaceRoot?: string } = {}): Registry {
   const reg = new Registry();
   reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
   // W6: LSP Tier-0 code-intelligence tools — registered ONLY when a real
@@ -69,6 +70,18 @@ export function nativeRegistry(depth: number, opts: { lsp?: boolean; workspaceRo
         reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir() }));
       }
     } catch { /* lsp optional: never block tool assembly */ }
+  }
+  // BrowserOS browser_* family — same rule: only when a BrowserOS binary
+  // is discoverable + healthy. Trust is enforced at launch time (like lsp
+  // clientFor): an untrusted binary produces an actionable error, not a
+  // dead tool. The user's daily browser is never touched — tools drive a
+  // dedicated instance.
+  if (opts.browser !== false) {
+    try {
+      if (discoverBrowsers().some((b) => b.healthy)) {
+        reg.registerAll(browserTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir() }));
+      }
+    } catch { /* browser optional: never block tool assembly */ }
   }
   if (depth < MAX_SPAWN_DEPTH) {
     // blueprint M10: every spawn_agent is governed by the live topology

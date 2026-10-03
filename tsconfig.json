@@ -44,6 +44,9 @@
       ],
       "@hmharness/environments": [
         "packages/environments/src/index.ts"
+      ],
+      "@hmharness/browser": [
+        "packages/browser/src/index.ts"
       ]
     }
   },
