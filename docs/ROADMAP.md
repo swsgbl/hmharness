@@ -40,17 +40,19 @@
 terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机可用,
 类型零错,全仓构建链纳入(13 包)。
 
-**下一步(§26 定案后:放大校准维)**:首批 Issue 池五项——runner 事件流接
-TrajectoryRecorder、evolution2 治理壳、CognitiveMemory 溯源写入、
-browser/desktop act 桥、ARC3 REST adapter、研究面板——**已全部落地并收官**
-(2026-10-02)。门面六层(README 中英/ROADMAP/官网/llms.txt/llms-full.txt/
-FAQ 十三问)同步完成;**browser/desktop 曲线首读已取得(2026-10-02 晚):
-browser +37.6% improving(6 轮无头 Chrome CDP 探索)、desktop 1.00 flat
-(确定性工具秒收敛=完美校准)**,四环境全部有读数;agent 会话轨迹改为
-按工具归因环境。当前方向:①用真实任务把校准曲线喂厚(读数带 n,
-improving 判定阈值 ±5% 不动);②desktop 曲线待引入可失败动作
-(desktop_click/type)后才有形状可言;③投稿 Awesome-Self-Evolving-Agents
-(等作者点头)。
+**下一步(§26 定论后:全计划生产收官,2026-10-04)**:12 周复审计划
+(2026-10-03 文档)W1-W12 全部落点——三 P0 清零(RLM worker 沙箱/
+纵切片六段闭环+类型级 claim-blind 独立评估/evaluator 分离)、快照
+三分类、LSP Client/Manager 全栈(Tier-0/1 工具+健康预检+DevEco-local
+官方发现+真 clangd 19.1.7 全链 VERIFIED+来源信任 sha256 钉住)、
+WM2.0 结构化增量+deltaAccuracy、Memory2.0 计分检索、Skill2.0 n-gram
+工作流+反模式;**P2 三臂阶梯定案**(Model-only vs +Harness vs
++Cognitive OS:easy 4/4×3 地板、hard 0.5×3,阶梯差 0——通过率价值
+不在 harness,校准维 +0.4166 全阶梯独正);群体回路端到端(summary
+→merge→absorb --from);Capability OS 首片(供应链三要素)。
+npm 0.23.13→0.23.20 八连发,latest 生产可用。剩余开口全为外部:
+投稿(等作者)、bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在
+IDE JVM 内不可外部直驱)。
 
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 
