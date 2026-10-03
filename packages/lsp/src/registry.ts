@@ -2,13 +2,16 @@
  * @hmharness/lsp - server registry + discovery
  *
  * First-batch servers per the 03 方案: TypeScript/JavaScript, Pyright,
- * rust-analyzer, gopls, clangd. Discovery is PATH-ONLY and recorded with
- * provenance — automatic downloads are explicitly NOT done here (supply
- * chain; source allowlist + sha256 is the Capability OS layer's job).
- * ArkTS: prefer official/DevEco-local servers when present; community
- * servers are returned with an explicit `unofficial` flag.
+ * rust-analyzer, gopls, clangd. Discovery is PATH-ONLY plus DEVECO-LOCAL
+ * (the IDE ships a real clangd under tools/llvm/server/lsp — an official
+ * source we prefer over community downloads). Automatic downloads are
+ * explicitly NOT done here (supply chain; source allowlist + sha256 is the
+ * Capability OS layer's job). ArkTS: prefer official/DevEco-local servers
+ * when present; community servers are returned with an explicit
+ * `unofficial` flag.
  */
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import type { ServerSpec } from './process-manager.ts';
 
 interface KnownServer {
@@ -47,6 +50,27 @@ export interface DiscoveredServer extends ServerSpec {
    *  without rust-analyzer installed) fails --version and must not register */
   healthy: boolean;
   unhealthyReason?: string;
+  /** where this server came from: PATH | PATH-community | DevEco-local | DevEco-local-community */
+  origin: string;
+}
+
+/** DevEco Studio install roots to scan for bundled (official) servers. */
+export const DEVECO_ROOTS = [
+  'C:/Program Files/Huawei/DevEco Studio',
+  'D:/Program Files/Huawei/DevEco Studio',
+  process.env.LOCALAPPDATA ? process.env.LOCALAPPDATA + '/Huawei/DevEco Studio' : '',
+].filter(Boolean);
+
+/** well-known bundled-server layouts inside a DevEco install (03 方案:
+ *  优先发现 DevEco/SDK 本地服务,记录来源——绝不自动下载) */
+function devecoBundled(devecoRoots: string[]): Array<{ id: string; command: string; args: string[]; languages: string[]; official: boolean; origin: string }> {
+  const out: Array<{ id: string; command: string; args: string[]; languages: string[]; official: boolean; origin: string }> = [];
+  for (const root of devecoRoots) {
+    // clangd ships with the IDE's native toolchain (versioned per release)
+    const clangd = root + '/tools/llvm/server/lsp/win/clangd.exe';
+    if (existsSync(clangd)) out.push({ id: 'clangd', command: clangd, args: [], languages: ['c', 'cpp'], official: true, origin: 'DevEco-local' });
+  }
+  return out;
 }
 
 /** Cheap health probe: `--version` must exit 0 within 5s. A PATH shim whose
@@ -59,22 +83,36 @@ function healthProbe(command: string, args: string[]): { healthy: boolean; reaso
   return { healthy: false, reason: `--version probe failed (exit ${r.status}): ${tail.slice(0, 120)}` };
 }
 
-/** Discover available first-batch servers on THIS machine (PATH only).
+/** Discover available servers on THIS machine (PATH + DevEco-local).
  *  Memoized — the registry is probed per tool assembly and per spawn.
  *  Health-probed: broken shims are returned with healthy=false so callers
  *  can skip registering them (discovery stays honest about what exists). */
 let discoveryCache: DiscoveredServer[] | null = null;
-export function discoverServers(force = false): DiscoveredServer[] {
+export function discoverServers(force = false, opts: { devecoRoots?: string[] } = {}): DiscoveredServer[] {
   if (!force && discoveryCache) return discoveryCache;
   const out: DiscoveredServer[] = [];
+  const seen = new Map<string, DiscoveredServer>();
+  const push = (id: string, command: string, args: string[], languages: string[], official: boolean, origin: string, probe: boolean) => {
+    const h = probe ? healthProbe(command, args) : { healthy: true as const };
+    const entry: DiscoveredServer = { id, command, args, source: origin.includes('DevEco') ? 'explicit' : 'PATH', languages, official, healthy: h.healthy, unhealthyReason: (h as { reason?: string }).reason, origin };
+    // first (preferred) source wins per id: DevEco-local beats PATH beats community
+    const existing = seen.get(id);
+    if (!existing || (existing.origin.includes('community') && !origin.includes('community'))) {
+      seen.set(id, entry);
+    }
+  };
+  // PATH servers
   for (const k of KNOWN) {
     const path = which(k.command);
     if (!path) continue;
-    const probe = k.id === 'arkts-community' ? { healthy: true } : healthProbe(path, k.args);
-    out.push({ id: k.id, command: path, args: k.args, source: 'PATH', languages: k.languages, official: k.official !== false, healthy: probe.healthy, unhealthyReason: probe.reason });
+    push(k.id, path, k.args, k.languages, k.official !== false, k.official !== false ? 'PATH' : 'PATH-community', true);
   }
-  discoveryCache = out;
-  return out;
+  // DevEco-local bundled servers (official, no download ever)
+  for (const b of devecoBundled(opts.devecoRoots ?? DEVECO_ROOTS)) {
+    push(b.id, b.command, b.args, b.languages, b.official, b.origin, true);
+  }
+  discoveryCache = [...seen.values()];
+  return discoveryCache;
 }
 
 /** Pick the server responsible for a file uri/path by extension. */

@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-10-03(二十) · W7 DevEco 本地服务发现+真 server 全链路验证(686/686)
+
+**动机**:W7 ArkTS adapter 的实质=03 方案的"优先发现 DevEco/SDK
+本地服务并记录来源"——而 LSP 包自诞生起"真 server 验证"一直是
+NOT VERIFIED(本机唯一的 rust-analyzer 是缺组件 shim)。
+
+**关键决策**:发现层增加 **DevEco-local 官方源**——扫描 DevEco
+安装根的固定布局(tools/llvm/server/lsp/win/clangd.exe),来源
+记录 origin=DevEco-local+official;同 id 时 DevEco-local 优先于
+PATH 优先于社区;健康探测照常。绝不自动下载任何东西(供应链
+红线,来源白名单+hash 归 Capability OS 层)。
+
+**实测证据**:
+- 本机实锤:DevEco 自带 **clangd 19.1.7**
+  (tools/llvm/server/lsp/win);
+- **真 server 全链路 VERIFIED**(verify-clangd.mts):initialize
+  握手(serverInfo 真名真版本)→didOpen 一段故意缺分号的 C
+  代码→clangd **推送精确诊断"Expected ';' at end of declaration
+  (fix available)"**→hover 返回→干净关停;
+- 686/686 全绿(+1 DevEco 发现测试:注入假根布局验证来源优先级
+  与诚实缺席)。
+
+**教训**:
+- "没有 language server 可测"往往是没找对地方——IDE 发行版
+  自带真 server(DevEco 的 clangd),官方、离线、可验证,比下载
+  社区二进制干净一个数量级。
+- NOT VERIFIED 的清偿方式不是降低标准,而是找到能真正跑通
+  标准的环境。
+
+---
+
 ## 2026-10-03(十九) · W10 工作流归纳+反模式 与 LSP Tier-1(685/685)
 
 **动机**:W10——整序列精确匹配的技能挖掘泛化能力为零(三段共享
