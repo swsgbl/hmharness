@@ -1199,16 +1199,18 @@ flags:
     }
     if (sub === 'absorb') {
       // crowd loop: merge someone else's summary into local priors
-      // (fingerprint-matched, deduped; local evidence always dominates)
-      // sub stays in rest for this command family: the file is the first
-      // non-flag argument AFTER the subcommand word itself
+      // (fingerprint-matched, deduped; local evidence always dominates).
+      // Sources: a local file OR --from=<https-url> (e.g. the repo's crowd/
+      // directory — the one-command collective-loop entry).
       const file = rest.slice(1).find((a) => !a.startsWith('-'));
-      if (!file) {
-        stdout.write('用法: hmh cognitive absorb <crowd-summary.json> — 吸收他人匿名经验为本机先验(指纹须匹配)\n');
+      const from = rest.find((a) => a.startsWith('--from='))?.slice(7);
+      if (!file && !from) {
+        stdout.write('用法: hmh cognitive absorb <pack.json> | --from=<https-url> — 吸收他人匿名经验为本机先验(指纹须匹配)\n');
+        stdout.write(DIM('  --from 示例: --from=https://raw.githubusercontent.com/swsgbl/hmharness/main/crowd/win32-x64.json\n'));
         return;
       }
-      const { absorbCrowdSummary } = await import('@hmharness/cognitive');
-      const r = await absorbCrowdSummary(homeDir(), file);
+      const { absorbCrowdSummary, absorbCrowdUrl } = await import('@hmharness/cognitive');
+      const r = from ? await absorbCrowdUrl(homeDir(), from) : await absorbCrowdSummary(homeDir(), file!);
       if (!r.ok) { stdout.write(`吸收失败: ${r.error}\n`); return; }
       if (r.skipped) { stdout.write(`跳过: ${r.skipped}\n`); return; }
       stdout.write(`已吸收 ${r.absorbed} 条动作统计为本机先验(本地经验始终优先;见 cognitive/summary 的 Crowd experience 行)\n`);

@@ -145,6 +145,11 @@ export async function absorbCrowdSummary(home: string, summaryFile: string): Pro
   } catch (e) {
     return { ok: false, absorbed: 0, error: 'unreadable file: ' + String(e).slice(0, 80) };
   }
+  return absorbParsedSummary(home, summary);
+}
+
+/** Shared absorb path for file- and URL-sourced summaries. */
+async function absorbParsedSummary(home: string, summary: CrowdSummary): Promise<{ ok: boolean; absorbed: number; error?: string; skipped?: string }> {
   const mine = environmentFingerprint();
   if (!fingerprintCompatible(mine, summary.fingerprint)) {
     return { ok: false, absorbed: 0, skipped: `fingerprint mismatch: summary is ${summary.fingerprint.os}/${summary.fingerprint.arch}, this machine is ${mine.os}/${mine.arch}` };
@@ -191,6 +196,60 @@ export async function absorbCrowdSummary(home: string, summaryFile: string): Pro
     tags: ['crowd', 'priors'],
   }).catch(() => undefined);
   return { ok: true, absorbed };
+}
+
+/** Absorb a crowd pack from an https URL (e.g. the repo's crowd/ directory
+ *  on raw.githubusercontent). Guards: https-only, 10s timeout, 2MB size cap,
+ *  and the SAME content-free validation as local files — a fetched body is
+ *  untrusted input exactly like a shared file. Opt-in by construction: this
+ *  only runs when the user names the URL.
+ *  Transport fallback: Node's global fetch fails on some networks where curl
+ *  works (DNS resolution differences); on fetch failure we retry once via
+ *  the system curl with the SAME https-only URL. */
+export async function absorbCrowdUrl(home: string, url: string): Promise<{ ok: boolean; absorbed: number; error?: string; skipped?: string }> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, absorbed: 0, error: 'invalid URL' };
+  }
+  if (parsed.protocol !== 'https:') {
+    return { ok: false, absorbed: 0, error: 'https URLs only (no plain http, no file://)' };
+  }
+  let text: string | null = null;
+  let lastError = '';
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return { ok: false, absorbed: 0, error: `HTTP ${res.status}` };
+    const len = Number(res.headers.get('content-length') ?? '0');
+    if (len > 2_000_000) return { ok: false, absorbed: 0, error: `pack too large (${len} bytes > 2MB cap)` };
+    text = await res.text();
+  } catch (e) {
+    lastError = String(e).slice(0, 80);
+  }
+  if (text === null) {
+    // curl fallback (same https-only url; curl is stock on Win10+/Unix and
+    // resolves some networks' DNS differently than undici)
+    try {
+      const { spawnSync } = await import('node:child_process');
+      const r = spawnSync('curl', ['-s', '--max-time', '10', url], { encoding: 'utf8', timeout: 15_000, windowsHide: true });
+      if (r.status === 0 && r.stdout) text = r.stdout;
+      else lastError = `fetch failed (${lastError}); curl fallback failed (exit ${r.status})`;
+    } catch (e) {
+      lastError = `fetch failed (${lastError}); curl fallback unavailable: ${String(e).slice(0, 60)}`;
+    }
+  }
+  if (text === null) return { ok: false, absorbed: 0, error: 'fetch failed: ' + lastError };
+  if (text.length > 2_000_000) return { ok: false, absorbed: 0, error: 'pack too large (>2MB cap)' };
+  try {
+    const raw = JSON.parse(text) as CrowdSummary;
+    if (!raw || raw.kind !== 'hmharness-crowd-summary' || !Array.isArray(raw.stats) || !raw.fingerprint) {
+      return { ok: false, absorbed: 0, error: 'not a crowd summary (kind/version mismatch)' };
+    }
+    return await absorbParsedSummary(home, raw);
+  } catch (e) {
+    return { ok: false, absorbed: 0, error: 'unparseable body: ' + String(e).slice(0, 80) };
+  }
 }
 
 /** Load the local prior store for world-model seeding (used by the digest

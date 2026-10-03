@@ -7,29 +7,43 @@
   "nodeMajor": 22,
   "shell": "cmd"
  },
- "generatedAt": "2026-10-02T15:55:17.899Z",
- "trajectoryCount": 419,
+ "generatedAt": "2026-10-03T09:27:14.508Z",
+ "trajectoryCount": 445,
  "stats": [
   {
    "environmentId": "terminal",
    "actionType": "run_command",
-   "n": 2129,
-   "successRate": 0.813,
-   "meanDurationMs": 4189
+   "n": 2346,
+   "successRate": 0.819,
+   "meanDurationMs": 3912
   },
   {
    "environmentId": "terminal",
    "actionType": "read_file",
-   "n": 420,
-   "successRate": 0.938,
-   "meanDurationMs": 217
+   "n": 440,
+   "successRate": 0.941,
+   "meanDurationMs": 213
   },
   {
    "environmentId": "terminal",
    "actionType": "write_file",
-   "n": 357,
-   "successRate": 0.944,
+   "n": 395,
+   "successRate": 0.942,
    "meanDurationMs": 18
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "type-text",
+   "n": 108,
+   "successRate": 0.38,
+   "meanDurationMs": 7
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "edit_file",
+   "n": 102,
+   "successRate": 0.863,
+   "meanDurationMs": 2
   },
   {
    "environmentId": "arc3",
@@ -40,17 +54,10 @@
   },
   {
    "environmentId": "terminal",
-   "actionType": "edit_file",
-   "n": 81,
-   "successRate": 0.901,
-   "meanDurationMs": 2
-  },
-  {
-   "environmentId": "terminal",
    "actionType": "list_dir",
-   "n": 58,
-   "successRate": 0.966,
-   "meanDurationMs": 22
+   "n": 60,
+   "successRate": 0.95,
+   "meanDurationMs": 28
   },
   {
    "environmentId": "arc3",
@@ -58,13 +65,6 @@
    "n": 58,
    "successRate": 1,
    "meanDurationMs": 1157
-  },
-  {
-   "environmentId": "browser",
-   "actionType": "type-text",
-   "n": 40,
-   "successRate": 0.875,
-   "meanDurationMs": 13
   },
   {
    "environmentId": "harmonyos",
@@ -90,9 +90,16 @@
   {
    "environmentId": "terminal",
    "actionType": "remember",
-   "n": 23,
+   "n": 26,
    "successRate": 1,
    "meanDurationMs": 2
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "click",
+   "n": 20,
+   "successRate": 0.8,
+   "meanDurationMs": 9
   },
   {
    "environmentId": "terminal",
@@ -100,6 +107,13 @@
    "n": 16,
    "successRate": 1,
    "meanDurationMs": 253
+  },
+  {
+   "environmentId": "browser",
+   "actionType": "navigate",
+   "n": 16,
+   "successRate": 1,
+   "meanDurationMs": 42
   },
   {
    "environmentId": "terminal",
@@ -149,20 +163,6 @@
    "n": 11,
    "successRate": 0,
    "meanDurationMs": 23
-  },
-  {
-   "environmentId": "browser",
-   "actionType": "navigate",
-   "n": 10,
-   "successRate": 1,
-   "meanDurationMs": 67
-  },
-  {
-   "environmentId": "browser",
-   "actionType": "click",
-   "n": 10,
-   "successRate": 1,
-   "meanDurationMs": 17
   },
   {
    "environmentId": "terminal",
