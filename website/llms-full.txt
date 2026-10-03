@@ -31,6 +31,7 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 - 单任务·提示层：0（工具可靠性统计与经验层对单任务结果均无净效应）
 - 跨任务·复利层：0（隔离家前后对照+顺序对照第三臂）
 - 校准维：+0.4166（唯一持续为正；迁移双臂实验，LLM 未参与 = 纯 harness 净贡献）
+- 三臂阶梯（P2：Model-only vs Model+Harness vs Model+Cognitive OS，24 次真机运行）：easy 带 4/4×3 地板、hard 带（裸臂失败 50%）0.5×3，两阶梯差均 0——通过率价值不在 harness，全阶梯确认价值驻留校准维
 - 学习曲线（五环境全有读数）：terminal +5.9%、harmonyos +14.4%、browser +37.6%（无头 Chrome CDP 探索 6 轮）、arc3 +76.2%（ARC-AGI-3 LLM 实玩轨迹，样本薄 n=12/桶）均 improving；desktop 1.00 flat——desktop_screenshot 是确定性工具从不失败，完美校准本就无学习可言（`hmh cognitive calibration --trend --env=arc3` 的输出）
 - 一句话：harness 的实证价值在**让模型更准地预期世界**（校准/迁移），而非替模型答题（通过率）。
 

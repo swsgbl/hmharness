@@ -7,29 +7,36 @@
   "nodeMajor": 22,
   "shell": "cmd"
  },
- "generatedAt": "2026-10-03T09:27:14.508Z",
- "trajectoryCount": 445,
+ "generatedAt": "2026-10-03T15:23:34.691Z",
+ "trajectoryCount": 481,
  "stats": [
   {
    "environmentId": "terminal",
    "actionType": "run_command",
-   "n": 2346,
-   "successRate": 0.819,
-   "meanDurationMs": 3912
+   "n": 2784,
+   "successRate": 0.827,
+   "meanDurationMs": 4328
   },
   {
    "environmentId": "terminal",
    "actionType": "read_file",
-   "n": 440,
-   "successRate": 0.941,
-   "meanDurationMs": 213
+   "n": 523,
+   "successRate": 0.95,
+   "meanDurationMs": 181
   },
   {
    "environmentId": "terminal",
    "actionType": "write_file",
-   "n": 395,
-   "successRate": 0.942,
-   "meanDurationMs": 18
+   "n": 423,
+   "successRate": 0.946,
+   "meanDurationMs": 17
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "edit_file",
+   "n": 124,
+   "successRate": 0.879,
+   "meanDurationMs": 5
   },
   {
    "environmentId": "browser",
@@ -37,13 +44,6 @@
    "n": 108,
    "successRate": 0.38,
    "meanDurationMs": 7
-  },
-  {
-   "environmentId": "terminal",
-   "actionType": "edit_file",
-   "n": 102,
-   "successRate": 0.863,
-   "meanDurationMs": 2
   },
   {
    "environmentId": "arc3",
@@ -55,9 +55,9 @@
   {
    "environmentId": "terminal",
    "actionType": "list_dir",
-   "n": 60,
-   "successRate": 0.95,
-   "meanDurationMs": 28
+   "n": 68,
+   "successRate": 0.956,
+   "meanDurationMs": 26
   },
   {
    "environmentId": "arc3",
@@ -76,9 +76,16 @@
   {
    "environmentId": "terminal",
    "actionType": "see_image",
-   "n": 35,
+   "n": 36,
    "successRate": 1,
-   "meanDurationMs": 20613
+   "meanDurationMs": 22032
+  },
+  {
+   "environmentId": "terminal",
+   "actionType": "remember",
+   "n": 30,
+   "successRate": 1,
+   "meanDurationMs": 2
   },
   {
    "environmentId": "desktop",
@@ -86,13 +93,6 @@
    "n": 30,
    "successRate": 1,
    "meanDurationMs": 353
-  },
-  {
-   "environmentId": "terminal",
-   "actionType": "remember",
-   "n": 26,
-   "successRate": 1,
-   "meanDurationMs": 2
   },
   {
    "environmentId": "browser",
@@ -131,6 +131,13 @@
   },
   {
    "environmentId": "terminal",
+   "actionType": "rlm_workspace",
+   "n": 13,
+   "successRate": 0.923,
+   "meanDurationMs": 1
+  },
+  {
+   "environmentId": "terminal",
    "actionType": "web_search",
    "n": 13,
    "successRate": 0,
@@ -142,13 +149,6 @@
    "n": 13,
    "successRate": 1,
    "meanDurationMs": 998
-  },
-  {
-   "environmentId": "terminal",
-   "actionType": "rlm_workspace",
-   "n": 12,
-   "successRate": 0.917,
-   "meanDurationMs": 1
   },
   {
    "environmentId": "terminal",
@@ -200,6 +200,13 @@
    "meanDurationMs": 13872
   },
   {
+   "environmentId": "harmonyos",
+   "actionType": "harmony_devices",
+   "n": 4,
+   "successRate": 1,
+   "meanDurationMs": 61
+  },
+  {
    "environmentId": "arc3",
    "actionType": "ACTION4",
    "n": 4,
@@ -243,10 +250,10 @@
   },
   {
    "environmentId": "harmonyos",
-   "actionType": "harmony_devices",
+   "actionType": "harmony_vm_qemu",
    "n": 2,
    "successRate": 1,
-   "meanDurationMs": 63
+   "meanDurationMs": 607
   },
   {
    "environmentId": "terminal",
@@ -303,6 +310,13 @@
    "n": 1,
    "successRate": 1,
    "meanDurationMs": 258
+  },
+  {
+   "environmentId": "harmonyos",
+   "actionType": "harmony_emulator_list",
+   "n": 1,
+   "successRate": 1,
+   "meanDurationMs": 424
   },
   {
    "environmentId": "terminal",
