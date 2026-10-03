@@ -61,6 +61,22 @@ function handle(msg) {
     send({ jsonrpc: '2.0', id: msg.id, result: [{ uri: 'file:///fake/r1.ts', range: { start: { line: 1, character: 0 }, end: { line: 1, character: 4 } } }, { uri: 'file:///fake/r2.ts', range: { start: { line: 2, character: 0 }, end: { line: 2, character: 4 } } }] });
     return;
   }
+  if (msg.method === 'textDocument/implementation' && typeof msg.id === 'number') {
+    send({ jsonrpc: '2.0', id: msg.id, result: [{ uri: 'file:///fake/impl-a.ts', range: { start: { line: 9, character: 0 }, end: { line: 9, character: 6 } } }, { uri: 'file:///fake/impl-b.ts', range: { start: { line: 4, character: 0 }, end: { line: 4, character: 6 } } }] });
+    return;
+  }
+  if (msg.method === 'textDocument/prepareCallHierarchy' && typeof msg.id === 'number') {
+    send({ jsonrpc: '2.0', id: msg.id, result: [{ name: 'targetFn', kind: 12, uri: 'file:///fake/probe.ts', range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } }, selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 9 } } }] });
+    return;
+  }
+  if (msg.method === 'callHierarchy/incomingCalls' && typeof msg.id === 'number') {
+    send({ jsonrpc: '2.0', id: msg.id, result: [{ from: { name: 'callerOne', uri: 'file:///fake/c1.ts', range: { start: { line: 2, character: 0 }, end: { line: 3, character: 0 } } }, fromRanges: [{ start: { line: 2, character: 4 }, end: { line: 2, character: 13 } }] }, { from: { name: 'callerTwo', uri: 'file:///fake/c2.ts', range: { start: { line: 5, character: 0 }, end: { line: 6, character: 0 } } }, fromRanges: [{ start: { line: 5, character: 4 }, end: { line: 5, character: 13 } }] }] });
+    return;
+  }
+  if (msg.method === 'callHierarchy/outgoingCalls' && typeof msg.id === 'number') {
+    send({ jsonrpc: '2.0', id: msg.id, result: [{ to: { name: 'helperFn', uri: 'file:///fake/h.ts', range: { start: { line: 1, character: 0 }, end: { line: 2, character: 0 } } }, toRanges: [{ start: { line: 1, character: 2 }, end: { line: 1, character: 11 } }] }] });
+    return;
+  }
   if (msg.method === 'textDocument/documentSymbol' && typeof msg.id === 'number') {
     send({ jsonrpc: '2.0', id: msg.id, result: [{ name: 'mainFn', kind: 12, range: { start: { line: 0, character: 0 }, end: { line: 5, character: 0 } }, children: [{ name: 'inner', kind: 6, range: { start: { line: 1, character: 2 }, end: { line: 2, character: 2 } } }] }] });
     return;

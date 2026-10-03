@@ -112,6 +112,25 @@ export class LspClient {
     return this.request<DocumentSymbol[]>('textDocument/documentSymbol', { textDocument });
   }
 
+  /* ---------------- Tier-1 requests ---------------- */
+
+  implementation(textDocument: TextDocumentIdentifier, position: Position): Promise<Location | Location[] | null> {
+    return this.request<Location | Location[] | null>('textDocument/implementation', { textDocument, position });
+  }
+
+  /** call hierarchy: prepare the item at a position, then incoming/outgoing */
+  async prepareCallHierarchy(textDocument: TextDocumentIdentifier, position: Position): Promise<unknown> {
+    return this.request<unknown>('textDocument/prepareCallHierarchy', { textDocument, position });
+  }
+
+  callHierarchyIncoming(item: unknown): Promise<Array<{ from: unknown; fromRanges: Location['range'][] }>> {
+    return this.request('callHierarchy/incomingCalls', { item });
+  }
+
+  callHierarchyOutgoing(item: unknown): Promise<Array<{ to: unknown; toRanges: Location['range'][] }>> {
+    return this.request('callHierarchy/outgoingCalls', { item });
+  }
+
   async shutdown(): Promise<void> {
     try { await this.request('shutdown'); this.notify('exit'); } catch { /* best effort */ }
   }

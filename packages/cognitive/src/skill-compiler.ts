@@ -163,6 +163,91 @@ export class SkillCompiler {
   }
 }
 
+/* ---------------- Skill Compiler 2.0 (review W10): generalized workflow mining + failure anti-patterns ---------------- */
+
+export interface WorkflowCandidate {
+  /** the consecutive action-type n-gram (the workflow body) */
+  steps: string[];
+  /** distinct successful trajectories containing the n-gram */
+  support: number;
+  trajectoryIds: string[];
+  /** environment of the supporting episodes */
+  environmentId: string;
+}
+
+/** Mine frequent consecutive action n-grams (n within [nMin,nMax]) across
+ *  SUCCESSFUL trajectories, keeping only MAXIMAL ones (an n-gram fully
+ *  contained in a longer supported n-gram of the same episodes adds nothing).
+ *  This generalizes compile()'s exact full-sequence matching: a workflow
+ *  survives when one episode has an extra step somewhere. */
+export function mineWorkflows(experiences: CognitiveTrajectory[], opts: { minSupport?: number; nMin?: number; nMax?: number } = {}): WorkflowCandidate[] {
+  const minSupport = opts.minSupport ?? 2;
+  const nMin = opts.nMin ?? 2;
+  const nMax = opts.nMax ?? 4;
+  const table = new Map<string, { steps: string[]; trajs: Set<string>; env: string }>();
+  for (const traj of experiences) {
+    if (!traj.metrics.success) continue;
+    const seq = traj.steps.filter((s) => s.outcome === 'success').map((s) => s.action.type);
+    for (let n = nMin; n <= Math.min(nMax, seq.length); n++) {
+      for (let i = 0; i + n <= seq.length; i++) {
+        const gram = seq.slice(i, i + n);
+        const key = gram.join('|');
+        const agg = table.get(key) ?? { steps: gram, trajs: new Set<string>(), env: traj.environment.id };
+        agg.trajs.add(traj.id);
+        table.set(key, agg);
+      }
+    }
+  }
+  const supported = [...table.entries()]
+    .filter(([, v]) => v.trajs.size >= minSupport)
+    .map(([key, v]) => ({ key, steps: v.steps, support: v.trajs.size, trajectoryIds: [...v.trajs], environmentId: v.env }));
+  // maximality: drop grams whose key is a contiguous substring of a longer
+  // supported gram with support from a superset of episodes
+  const kept = supported.filter((c) => {
+    return !supported.some((d) => d !== c && d.steps.length > c.steps.length && d.key.includes(c.key) && d.support >= c.support);
+  });
+  return kept.sort((a, b) => b.steps.length - a.steps.length || b.support - a.support);
+}
+
+export interface AntiPattern {
+  /** the action-type sequence that reliably PRECEDES failure */
+  pattern: string[];
+  /** failed trajectories ending right after this sequence */
+  failures: number;
+  trajectoryIds: string[];
+  warning: string;
+}
+
+/** Mine failure anti-patterns: consecutive action runs that immediately
+ *  precede the END of FAILED trajectories. These become warnings attached to
+ *  skills (knowledge about what NOT to do), never procedures. */
+export function mineAntiPatterns(experiences: CognitiveTrajectory[], opts: { minFailures?: number; nMax?: number } = {}): AntiPattern[] {
+  const minFailures = opts.minFailures ?? 2;
+  const nMax = opts.nMax ?? 3;
+  const table = new Map<string, { steps: string[]; trajs: Set<string> }>();
+  for (const traj of experiences) {
+    if (traj.metrics.success) continue;
+    const seq = traj.steps.map((s) => s.action.type);
+    if (seq.length === 0) continue;
+    for (let n = 1; n <= Math.min(nMax, seq.length); n++) {
+      const gram = seq.slice(seq.length - n);
+      const key = gram.join('|');
+      const agg = table.get(key) ?? { steps: gram, trajs: new Set<string>() };
+      agg.trajs.add(traj.id);
+      table.set(key, agg);
+    }
+  }
+  const all = [...table.entries()]
+    .filter(([, v]) => v.trajs.size >= minFailures)
+    .map(([key, v]) => ({ key, steps: v.steps, failures: v.trajs.size, trajectoryIds: [...v.trajs] }));
+  // maximality (same rule as workflows): drop a gram fully contained in a
+  // longer supported gram — the longer one carries the actionable context
+  const kept = all.filter((c) => !all.some((d) => d !== c && d.steps.length > c.steps.length && d.key.endsWith(c.key) && d.failures >= c.failures));
+  return kept
+    .map((c): AntiPattern => ({ pattern: c.steps, failures: c.failures, trajectoryIds: c.trajectoryIds, warning: `avoid ${c.key}: preceded the failure end in ${c.failures} failed runs` }))
+    .sort((a, b) => b.failures - a.failures || b.pattern.length - a.pattern.length);
+}
+
 function longestSuccessfulRun(traj: CognitiveTrajectory): string[] {
   let best: string[] = [];
   let cur: string[] = [];

@@ -56,6 +56,17 @@ test('client: full lifecycle against the fake server (initialize→sync→tier0�
   assert.equal(Array.isArray(def) ? def[0]?.uri : def?.uri, 'file:///fake/def.ts');
   const refs = await client.references({ uri }, { line: 0, character: 6 });
   assert.equal(refs.length, 2);
+  // Tier-1: implementation + call hierarchy
+  const impls = await client.implementation({ uri }, { line: 0, character: 6 });
+  assert.equal(Array.isArray(impls) ? impls.length : 1, 2);
+  const item = await client.prepareCallHierarchy({ uri }, { line: 0, character: 6 });
+  const first = Array.isArray(item) ? item[0] : item;
+  const incoming = await client.callHierarchyIncoming(first);
+  assert.equal(incoming.length, 2);
+  assert.equal((incoming[0]!.from as { name?: string }).name, 'callerOne');
+  const outgoing = await client.callHierarchyOutgoing(first);
+  assert.equal(outgoing.length, 1);
+  assert.equal((outgoing[0]!.to as { name?: string }).name, 'helperFn');
   const syms = await client.documentSymbols({ uri });
   assert.equal(syms[0]?.name, 'mainFn');
   assert.equal(syms[0]?.children?.[0]?.name, 'inner');

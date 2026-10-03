@@ -156,5 +156,38 @@ export function lspTools(ctx: LspToolContext): Tool[] {
         });
       },
     },
+    {
+      name: 'lsp_implementation',
+      description: 'Find implementations of the interface/method at a position. Args: file, line (1-based), character (1-based)',
+      parameters: { type: 'object', properties: { file: { type: 'string' }, line: { type: 'number' }, character: { type: 'number' } }, required: ['file', 'line', 'character'] },
+      async execute(args) {
+        return withClient(String(args.file ?? ''), async (mc, uri) => {
+          const impls = await mc.client.implementation({ uri }, { line: Number(args.line ?? 1) - 1, character: Number(args.character ?? 1) - 1 });
+          if (!impls) return 'no implementations found';
+          const list = Array.isArray(impls) ? impls : [impls];
+          return `[${mc.server.id}] ${list.length} implementations\n` + list.slice(0, 10).map((l) => `${l.uri} L${l.range.start.line + 1}`).join('\n');
+        });
+      },
+    },
+    {
+      name: 'lsp_call_hierarchy',
+      description: 'Who calls this symbol, and what does it call (incoming/outgoing). Args: file, line (1-based), character (1-based), direction=incoming|outgoing',
+      parameters: { type: 'object', properties: { file: { type: 'string' }, line: { type: 'number' }, character: { type: 'number' }, direction: { type: 'string', description: 'incoming (who calls this) or outgoing (what this calls)' } }, required: ['file', 'line', 'character'] },
+      async execute(args) {
+        return withClient(String(args.file ?? ''), async (mc, uri) => {
+          const item = await mc.client.prepareCallHierarchy({ uri }, { line: Number(args.line ?? 1) - 1, character: Number(args.character ?? 1) - 1 });
+          if (!item || (Array.isArray(item) && item.length === 0)) return 'no call hierarchy item at position';
+          const first = Array.isArray(item) ? item[0] : item;
+          const dir = String(args.direction ?? 'incoming');
+          const calls = dir === 'outgoing' ? await mc.client.callHierarchyOutgoing(first) : await mc.client.callHierarchyIncoming(first);
+          const label = (x: unknown) => {
+            const it = x as { name?: string; uri?: string; range?: { start?: { line?: number } } };
+            return `${it.name ?? 'unknown'} ${it.uri ? it.uri + ' ' : ''}L${((it.range?.start?.line ?? 0) + 1)}`;
+          };
+          const side = (c: { from?: unknown; to?: unknown }) => (dir === 'outgoing' ? c.to : c.from);
+          return `[${mc.server.id}] ${dir} calls: ${calls.length}\n` + calls.slice(0, 10).map((c) => label(side(c as { from?: unknown; to?: unknown }))).join('\n');
+        });
+      },
+    },
   ];
 }
