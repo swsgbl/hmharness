@@ -1322,7 +1322,7 @@ flags:
         if (rest.includes('--ladder3')) {
           // P2 research ladder: Model-only vs Model+Harness vs Model+Cognitive
           // OS over the SAME tasks (04 doc 研究增强). Recorded as type:'ladder3'.
-          await runLadder3((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 3) : 1, difficulty === 'bench' || difficulty === 'hard' ? 'mid' : difficulty as 'easy' | 'mid');
+          await runLadder3((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 3) : 1, difficulty === 'bench' ? 'mid' : difficulty as 'easy' | 'mid' | 'hard');
           return;
         }
         if (rest.includes('--compound')) {

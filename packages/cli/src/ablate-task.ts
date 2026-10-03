@@ -104,10 +104,10 @@ async function poolOf(difficulty: 'easy' | 'mid' | 'hard' | 'bench', home: () =>
  */
 export type LadderArm = 'model-only' | 'model+harness' | 'model+cogOS';
 
-export async function runLadder3(write: (s: string) => void, home: () => string, runs = 1, difficulty: 'easy' | 'mid' = 'easy'): Promise<void> {
+export async function runLadder3(write: (s: string) => void, home: () => string, runs = 1, difficulty: 'easy' | 'mid' | 'hard' = 'easy'): Promise<void> {
   const { appendFile } = await import('node:fs/promises');
   const { join } = await import('node:path');
-  const pool = difficulty === 'mid' ? MID_TASKS : TASKS;
+  const pool = difficulty === 'hard' ? HARD_TASKS : difficulty === 'mid' ? MID_TASKS : TASKS;
   const armFlags: Record<LadderArm, { cog?: string; ctx?: string }> = {
     'model-only': { cog: '1', ctx: '1' },
     'model+harness': { cog: '1' },
