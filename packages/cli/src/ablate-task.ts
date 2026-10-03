@@ -90,6 +90,90 @@ async function poolOf(difficulty: 'easy' | 'mid' | 'hard' | 'bench', home: () =>
  * assertions — a measurement artifact that misread "model fails" when the
  * harness output was merely verbose. Same instrument, same reading.)
  */
+/**
+ * P2 research ladder (04 doc: Model-only vs Model+Harness vs Model+Cognitive OS).
+ * Three arms over the SAME tasks, one runner:
+ *   model-only    — both flags set (no cognitive digest, no experience layer;
+ *                   the agent keeps its tools — a toolless model cannot do
+ *                   these tasks at all, so this is the honest floor)
+ *   model+harness — experience layer ON, cognitive digest OFF
+ *                   (HMH_NO_COGNITIVE only)
+ *   model+cogOS   — everything on (the shipped default)
+ * Records to cognitive/ablation.jsonl as type:'ladder3' with per-arm pass
+ * rates and the two ladder deltas (harness-vs-only, cogOS-vs-harness).
+ */
+export type LadderArm = 'model-only' | 'model+harness' | 'model+cogOS';
+
+export async function runLadder3(write: (s: string) => void, home: () => string, runs = 1, difficulty: 'easy' | 'mid' = 'easy'): Promise<void> {
+  const { appendFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const pool = difficulty === 'mid' ? MID_TASKS : TASKS;
+  const armFlags: Record<LadderArm, { cog?: string; ctx?: string }> = {
+    'model-only': { cog: '1', ctx: '1' },
+    'model+harness': { cog: '1' },
+    'model+cogOS': {},
+  };
+  const tally: Record<LadderArm, { ok: number; n: number; crash: number }> = {
+    'model-only': { ok: 0, n: 0, crash: 0 },
+    'model+harness': { ok: 0, n: 0, crash: 0 },
+    'model+cogOS': { ok: 0, n: 0, crash: 0 },
+  };
+  write(`三臂阶梯（P2: Model-only vs Model+Harness vs Model+Cognitive OS）· ${difficulty} 带 · ${pool.length} 任务 × ${runs} 轮 × 3 臂\n`);
+  for (let r = 1; r <= runs; r++) {
+    for (const task of pool) {
+      for (const arm of ['model-only', 'model+harness', 'model+cogOS'] as LadderArm[]) {
+        const prevCog = process.env.HMH_NO_COGNITIVE;
+        const prevCtx = process.env.HMH_NO_CONTEXT;
+        const flags = armFlags[arm];
+        if (flags.cog) process.env.HMH_NO_COGNITIVE = flags.cog; else delete process.env.HMH_NO_COGNITIVE;
+        if (flags.ctx) process.env.HMH_NO_CONTEXT = flags.ctx; else delete process.env.HMH_NO_CONTEXT;
+        let out = '';
+        let crashed = false;
+        try {
+          const { runAgentTask, buildRegistry } = await import('@hmharness/agent');
+          const { loadConfig } = await import('@hmharness/kernel');
+          const { reg } = await buildRegistry({ mcp: false });
+          await Promise.race([
+            runAgentTask({
+              task: task.text,
+              registry: reg,
+              cfg: await loadConfig(),
+              yes: true,
+              events: { onFinal: (res: { text: string }) => { out = res.text; } },
+            } as never),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('ladder run timeout')), 240_000)),
+          ]).catch((err: unknown) => { if (!out) throw err; return undefined; });
+        } catch { crashed = true; }
+        // restore flags exactly
+        if (prevCog === undefined) delete process.env.HMH_NO_COGNITIVE; else process.env.HMH_NO_COGNITIVE = prevCog;
+        if (prevCtx === undefined) delete process.env.HMH_NO_CONTEXT; else process.env.HMH_NO_CONTEXT = prevCtx;
+        const pass = !crashed && task.check(out);
+        tally[arm].n += 1;
+        if (crashed) tally[arm].crash += 1;
+        if (pass) tally[arm].ok += 1;
+        write(`  r${r} ${task.label.padEnd(20)} ${arm.padEnd(13)} ${pass ? '✓' : crashed ? '⚡crash' : '✗'}\n`);
+      }
+    }
+  }
+  const rate = (a: LadderArm): number | undefined => (tally[a].n ? Number((tally[a].ok / tally[a].n).toFixed(3)) : undefined);
+  const deltaHarness = rate('model+harness') !== undefined && rate('model-only') !== undefined ? Number((rate('model+harness')! - rate('model-only')!).toFixed(3)) : undefined;
+  const deltaCognitive = rate('model+cogOS') !== undefined && rate('model+harness') !== undefined ? Number((rate('model+cogOS')! - rate('model+harness')!).toFixed(3)) : undefined;
+  write(`\n  通过率: model-only ${rate('model-only')} · model+harness ${rate('model+harness')} · model+cogOS ${rate('model+cogOS')}\n`);
+  write(`  阶梯差: harness−only ${deltaHarness} · cogOS−harness ${deltaCognitive}\n`);
+  const record = {
+    at: new Date().toISOString(),
+    type: 'ladder3',
+    difficulty,
+    runs,
+    tasks: pool.length,
+    tally,
+    rates: { 'model-only': rate('model-only'), 'model+harness': rate('model+harness'), 'model+cogOS': rate('model+cogOS') },
+    deltaHarness,
+    deltaCognitive,
+  };
+  await appendFile(join(home(), 'cognitive', 'ablation.jsonl'), JSON.stringify(record) + '\n', 'utf8').catch(() => undefined);
+}
+
 async function runOnce(task: string, bare: boolean, timeoutMs: number): Promise<{ ok: boolean; output: string; error?: string }> {
   const prevCog = process.env.HMH_NO_COGNITIVE;
   const prevCtx = process.env.HMH_NO_CONTEXT;

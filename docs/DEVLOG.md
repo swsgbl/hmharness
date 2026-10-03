@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-10-03(二十四) · 全计划审计+P2 三臂阶梯仪器(689/689,实验 NOT VERIFIED)
+
+**动机**:用户要求全面检查计划进度（含科研计划）。审计结论：12 周/
+蓝图/§26/门面全落，P2 研究增强里的**三臂阶梯**（Model-only vs
+Model+Harness vs Model+Cognitive OS）是唯一未建的实验仪器。
+
+**关键决策**：runLadder3——同任务×三臂一次跑全：
+- model-only=双 flag（无认知摘要无经验层，工具保留=诚实地板）
+- model+harness=仅 HMH_NO_COGNITIVE（经验层在，认知摘要关）
+- model+cogOS=出厂全开
+逐臂通过率+**两个阶梯差**（harness−only / cogOS−harness）落盘
+ablation.jsonl type:ladder3；CLI `cognitive ablate --task --ladder3`。
+
+**实测证据**：构建绿+689 全绿（既有套件）；**真机实验 NOT
+VERIFIED**——探测任务在配额窗口无响应，仪器就绪待下一窗口
+（诚实标注，不造数据）。
+
+**教训**：审计的价值在找"已建成但没人跑过的仪器"——三臂阶梯
+的两臂（bare/full）其实早就在，缺的只是中间臂与把它们组成
+阶梯的实验定义。
+
+---
+
 ## 2026-10-03(二十三) · Capability OS 首片:LSP 来源信任+哈希钉住(689/689)
 
 **动机**:03 方案的供应链防线("来源白名单/hash")一直标注为

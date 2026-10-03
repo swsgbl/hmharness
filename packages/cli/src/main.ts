@@ -1317,8 +1317,14 @@ flags:
         const rounds = Number(rest.find((a) => a.startsWith('--runs='))?.slice(7) ?? 1);
         const difficulty = rest.includes('--difficulty=bench') ? 'bench' : rest.includes('--difficulty=hard') ? 'hard' : rest.includes('--difficulty=mid') ? 'mid' : 'easy';
         const filter = rest.find((a) => a.startsWith('--filter='))?.slice(9);
-        const { runTaskAblation, runBareCalibration, runCompoundExperiment } = await import('./ablate-task.ts');
+        const { runTaskAblation, runBareCalibration, runCompoundExperiment, runLadder3 } = await import('./ablate-task.ts');
         const { homeDir: hd } = await import('@hmharness/kernel');
+        if (rest.includes('--ladder3')) {
+          // P2 research ladder: Model-only vs Model+Harness vs Model+Cognitive
+          // OS over the SAME tasks (04 doc 研究增强). Recorded as type:'ladder3'.
+          await runLadder3((s) => stdout.write(s), hd, Number.isFinite(rounds) ? Math.min(Math.max(rounds, 1), 3) : 1, difficulty === 'bench' || difficulty === 'hard' ? 'mid' : difficulty as 'easy' | 'mid');
+          return;
+        }
         if (rest.includes('--compound')) {
           // cross-task compounding (the v0.22.4 pivot): arms differ in
           // TRAINING HISTORY inside an isolated home, not in prompt content.
@@ -1343,7 +1349,7 @@ flags:
         return;
       }
       if (!rest.includes('--env=arc3')) {
-        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=..] [--filter=前缀] [--calibrate] | --compound [--target=cjk --trainer=train --train=4] | --stats\n');
+        stdout.write('用法: hmh cognitive ablate --env=arc3 [--steps=N] | --task [--runs=N] [--difficulty=..] [--filter=前缀] [--calibrate] | --compound [...] | --ladder3 [--runs=N] | --stats\n');
         stdout.write(DIM('  --compound: 跨任务复利(隔离家,训练前后同目标任务对照); --difficulty=bench: evolution 真实语料\n'));
         return;
       }
