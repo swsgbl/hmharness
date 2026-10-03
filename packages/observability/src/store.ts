@@ -41,12 +41,20 @@ export function jsonlTrajectoryStore(home: string): TrajectoryStore {
       try {
         head = JSON.parse(await readFile(join(dir, 'summary.json'), 'utf8')) as Omit<Trajectory, 'events'>;
       } catch {
-        // unfinished run: synthesize a head from the first event
-        const lines = (await readFile(join(dir, 'trajectory.jsonl'), 'utf8')).trim();
-        const first = lines ? (JSON.parse(lines.split('\n')[0]) as RunEvent) : null;
+        // unfinished run: synthesize a head from the first event. The
+        // recorder's opening event is run.created (NOT run.started — that
+        // mismatch made this fallback return an empty task forever, which
+        // surfaced as the CI flake whenever summary.json hadn't drained).
+        // A brand-new run may have NO files flushed yet — that is an empty
+        // head, not an error.
+        let first: RunEvent | null = null;
+        try {
+          const lines = (await readFile(join(dir, 'trajectory.jsonl'), 'utf8')).trim();
+          if (lines) first = JSON.parse(lines.split('\n')[0]) as RunEvent;
+        } catch { /* nothing flushed yet */ }
         head = {
           runId,
-          task: first?.type === 'run.started' ? String((first.payload as { task?: string })?.task ?? '') : '',
+          task: first?.type === 'run.created' ? String((first.payload as { task?: string })?.task ?? '') : '',
           startedAt: first?.ts ?? new Date().toISOString(),
           events: [],
         } as Omit<Trajectory, 'events'>;
