@@ -39,7 +39,7 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 
 **跨环境迁移**：显式抽象动作层（writeFile→@write / hdc-install→@install / run_command→@run）；双臂对照实验（源环境信念播种 vs 空白，同预算只差知识）；迁移矩阵面板。
 
-**认知命令集**（15 条）：`hmh cognitive status | world-model | calibration [--trend --env=] | diagnose | bench | drift | skills | explore | transfer | team | learn | replay | export | purge | play`。
+**认知命令集**（18 条 + 独立 hmh lsp 命令族）：`hmh cognitive status | world-model | calibration [--trend --env=] | diagnose | bench | drift | skills | explore | transfer | team | learn | replay | export | purge | play | ablate [--ladder3] | summary | absorb [--from=<url>] | slice`，另有 `hmh lsp list|trust|untrust`（语言服务器发现/健康/来源信任+sha256 钉住）。
 
 ## 零 IDE 的鸿蒙全流程怎么做
 

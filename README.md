@@ -150,6 +150,11 @@ hmh cognitive transfer --run --source=terminal --target=harmonyos  # 迁移实�
 hmh cognitive play --env=arc3 --steps=10           # LLM 视觉实玩 ARC-AGI-3
 hmh cognitive replay latest      # 逐步回放任意轨迹（含模型推理）
 hmh cognitive diagnose | learn   # 学习机会诊断 | harness 层学习环
+hmh cognitive slice "任务" --check="验证命令"    # 认知纵切片：观察→目标→计划→执行→独立评估→学习
+hmh cognitive ablate --task --ladder3            # 三臂阶梯实验（Model-only vs +Harness vs +Cognitive OS）
+hmh cognitive summary           # 匿名经验摘要（内容零泄露，可分享）
+hmh cognitive absorb --from=<https-url>          # 吸收群体经验包为本机先验（指纹匹配/本地优先）
+hmh lsp list | trust <id> | untrust <id>         # 语言服务器发现/健康/来源信任+sha256 钉住
 ```
 
 每次任务自动落认知轨迹（工具动作+预测+结果+耗时，按工具归因到 browser/desktop/harmonyos/terminal 各环境）；世界模型从历史学习并反哺系统提示；探索引擎优先探测模型预测最差的动作（预测误差=信息增益）；校准可靠度随使用提升——**"越用越准"有学习曲线为证**（五环境全有读数：terminal/harmonyos/browser/arc3 四环境 improving，desktop 完美校准 flat 1.00）。
