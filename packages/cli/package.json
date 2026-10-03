@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/cli",
-  "version": "0.23.20",
+  "version": "0.23.21",
   "description": "hmharness command line: one-shot tasks, an interactive REPL, a fullscreen TUI, the web frontend, and direct tool invocation.",
   "type": "module",
   "main": "dist/main.js",
@@ -44,19 +44,19 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/agent": "0.23.20",
-    "@hmharness/browser": "0.23.20",
-    "@hmharness/cognitive": "0.23.20",
-    "@hmharness/domain-harmony": "0.23.20",
-    "@hmharness/domain-ops": "0.23.20",
-    "@hmharness/environments": "0.23.20",
-    "@hmharness/evaluation": "0.23.20",
-    "@hmharness/evolution": "0.23.20",
-    "@hmharness/kernel": "0.23.20",
-    "@hmharness/observability": "0.23.20",
-    "@hmharness/sandbox": "0.23.20",
-    "@hmharness/web": "0.23.20",
+    "@hmharness/agent": "0.23.21",
+    "@hmharness/browser": "0.23.21",
+    "@hmharness/cognitive": "0.23.21",
+    "@hmharness/domain-harmony": "0.23.21",
+    "@hmharness/domain-ops": "0.23.21",
+    "@hmharness/environments": "0.23.21",
+    "@hmharness/evaluation": "0.23.21",
+    "@hmharness/evolution": "0.23.21",
+    "@hmharness/kernel": "0.23.21",
+    "@hmharness/observability": "0.23.21",
+    "@hmharness/sandbox": "0.23.21",
+    "@hmharness/web": "0.23.21",
     "qrcode": "^1.5.4",
-    "@hmharness/lsp": "0.23.20"
+    "@hmharness/lsp": "0.23.21"
   }
 }
