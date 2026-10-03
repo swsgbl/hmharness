@@ -55,6 +55,7 @@
     "@hmharness/observability": "0.23.20",
     "@hmharness/sandbox": "0.23.20",
     "@hmharness/web": "0.23.20",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "@hmharness/lsp": "0.23.20"
   }
 }
