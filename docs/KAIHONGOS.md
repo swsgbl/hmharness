@@ -154,3 +154,5 @@ node scripts/install-kaihongos.cjs            # 更新到最新（旧版自动�
 rm -rf /data/local/home/.local/hmharness      # 卸载本体
 mount -o remount,rw / && rm -f /system/bin/hmh /usr/local/bin/hmh && mount -o remount,ro /
 ```
+
+**自动更新（≥0.23.16）**：板上的 `hmh` 启动时检测到新版会自动调用随包发布的板级安装器在后台静默升级（不弹提示、不需要 npm）——手动重跑上面的安装命令只在离线兜底或想立即强制刷新时才需要。升级来源与结果记录在 `~/.hmharness/updating.lck`（`via: "board-installer"`）与 `update.log`。
