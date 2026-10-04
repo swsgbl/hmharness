@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { datasetHash, canonicalTaskSet, seededOrder, seedFromString, splitSet, holdoutDisciplineOK, buildRunReport, reportsComparable, type EvalTaskSet } from '../evalset.ts';
+import { datasetHash, canonicalTaskSet, seededOrder, seedFromString, splitSet, holdoutDisciplineOK, buildRunReport, reportsComparable, pairedSignificance, type EvalTaskSet } from '../evalset.ts';
 
 function mkSet(revision = 1): EvalTaskSet {
   return {
@@ -81,4 +81,50 @@ test('evalset: run report carries datasetHash+seed+split; mislabeled reports are
   const revised = mkSet(2);
   const revisedReport = buildRunReport(revised, { seed, split: 'train', arm: 'model+cogOS', perTask: trainReport.perTask });
   assert.equal(reportsComparable(trainReport, revisedReport), false, 'dataset revision change -> not comparable');
+});
+
+test('evalset: paired McNemar significance — refuses non-comparable, reads discordant pairs correctly', () => {
+  const set = mkSet();
+  const seed = seedFromString('sig-test');
+  // 8-task train arm shape for a decisive and an ambiguous comparison
+  const big = mkSet();
+  big.tasks = [
+    { id: 'a1', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a2', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a3', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a4', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a5', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a6', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a7', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+    { id: 'a8', prompt: 'p', assertion: { kind: 'expect-none', expect: '' } },
+  ];
+  const ids = big.tasks.map((t) => t.id);
+  const armA = buildRunReport(big, { seed, split: 'train', arm: 'A', perTask: ids.map((id) => ({ id, pass: true })) });
+  // arm B fails a1..a6 (6 discordant, all one way) — decisive
+  const armB = buildRunReport(big, { seed, split: 'train', arm: 'B', perTask: ids.map((id, i) => ({ id, pass: i >= 6 })) });
+  const decisive = pairedSignificance(armA, armB);
+  assert.equal(decisive.comparable, true);
+  assert.equal(decisive.discordant.armOnlyPassed, 6);
+  assert.equal(decisive.discordant.armBPassed, 0);
+  assert.equal(decisive.discordant.agreed, 2);
+  assert.ok(decisive.pValue! < 0.05, `6:0 discordant must be significant, got p=${decisive.pValue}`);
+  assert.equal(decisive.significant, true);
+  // ambiguous: each arm fails ONE DIFFERENT task (1:1 discordant) — a fair coin explains it
+  const armX = buildRunReport(big, { seed, split: 'train', arm: 'X', perTask: ids.map((id, i) => ({ id, pass: i !== 0 })) });
+  const armY = buildRunReport(big, { seed, split: 'train', arm: 'Y', perTask: ids.map((id, i) => ({ id, pass: i !== 1 })) });
+  const ambiguous = pairedSignificance(armX, armY);
+  assert.equal(ambiguous.discordant.armOnlyPassed + ambiguous.discordant.armBPassed, 2);
+  assert.ok(ambiguous.pValue! >= 0.05, '1:1 discordant must NOT be significant');
+  assert.equal(ambiguous.significant, false);
+  // identical reports: zero discordant -> p=1, not significant
+  const same = pairedSignificance(armA, armA);
+  assert.equal(same.pValue, 1);
+  assert.equal(same.significant, false);
+  // non-comparable is REFUSED with a reason and no verdict fields used
+  const otherSeed = buildRunReport(big, { seed: seed + 99, split: 'train', arm: 'A', perTask: armA.perTask });
+  const refused = pairedSignificance(armA, otherSeed);
+  assert.equal(refused.comparable, false);
+  assert.match(refused.refusalReason ?? '', /not comparable/);
+  assert.equal(refused.significant, undefined, 'no significance claim on refused comparisons');
+  void set;
 });

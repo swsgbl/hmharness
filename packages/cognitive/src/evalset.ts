@@ -149,3 +149,75 @@ export function buildRunReport(set: EvalTaskSet, opts: { seed: number; split: 't
     finishedAt: new Date().toISOString(),
   };
 }
+
+/* ---------------- paired statistical test (the audit's 统计检验) ---------------- */
+
+/** exact two-sided binomial p-value: P(X <= k) + P(X >= n-k) mirrored, n small */
+function binomTwoSidedP(n: number, k: number, p = 0.5): number {
+  const logChoose = (a: number, b: number): number => {
+    let s = 0;
+    for (let i = 1; i <= b; i++) s += Math.log(a - b + i) - Math.log(i);
+    return s;
+  };
+  const pmf = (i: number): number => Math.exp(logChoose(n, i) + i * Math.log(p) + (n - i) * Math.log(1 - p));
+  // observed tail + opposite tail at least as extreme (classic exact method)
+  const pk = pmf(k);
+  let sum = 0;
+  for (let i = 0; i <= n; i++) if (pmf(i) <= pk + 1e-12) sum += pmf(i);
+  return Math.min(1, Number(sum.toFixed(6)));
+}
+
+export interface SignificanceVerdict {
+  /** comparable precondition failed? then NOTHING else is filled */
+  comparable: boolean;
+  refusalReason?: string;
+  /** discordant pairs: only tasks where the two arms DISAGREE carry signal */
+  discordant: { armOnlyPassed: number; armBPassed: number; agreed: number };
+  /** exact McNemar two-sided p-value over the discordant pairs */
+  pValue?: number;
+  significant?: boolean;
+  /** the audit discipline: a fixed alpha, stated on every verdict */
+  alpha: 0.05;
+}
+
+/**
+ * McNemar exact test for two PAIRED arms on the same task set. Refuses
+ * non-comparable reports outright (datasetHash+seed+split must all match);
+ * significance = discordant pairs are lopsided enough that a fair coin
+ * would rarely produce them (exact binomial, no normal approximation —
+ * eval sets are small). This is the 统计检验 the audit demanded so a
+ * "7/10 vs 5/10" delta can never again be read as an effect.
+ */
+export function pairedSignificance(a: EvalRunReport, b: EvalRunReport): SignificanceVerdict {
+  if (!reportsComparable(a, b)) {
+    return {
+      comparable: false,
+      refusalReason: `reports are not comparable (datasetHash/seed/split must all match; got ${a.setId}@r${a.revision} seed ${a.seed} ${a.split} vs ${b.setId}@r${b.revision} seed ${b.seed} ${b.split})`,
+      discordant: { armOnlyPassed: 0, armBPassed: 0, agreed: 0 },
+      alpha: 0.05,
+    };
+  }
+  const bBy = new Map(b.perTask.map((r) => [r.id, r.pass]));
+  let armOnlyPassed = 0;
+  let armBPassed = 0;
+  let agreed = 0;
+  for (const t of a.perTask) {
+    const other = bBy.get(t.id);
+    if (other === undefined) continue; // unpaired task carries no signal
+    if (t.pass && !other) armOnlyPassed += 1;
+    else if (!t.pass && other) armBPassed += 1;
+    else agreed += 1;
+  }
+  const n = armOnlyPassed + armBPassed;
+  if (n === 0) {
+    return { comparable: true, discordant: { armOnlyPassed, armBPassed, agreed }, pValue: 1, significant: false, alpha: 0.05 };
+  }
+  const pValue = binomTwoSidedP(n, Math.min(armOnlyPassed, armBPassed));
+  return {
+    comparable: true,
+    discordant: { armOnlyPassed, armBPassed, agreed },
+    pValue,
+    significant: pValue < 0.05,
+    alpha: 0.05,
+  };
+}
