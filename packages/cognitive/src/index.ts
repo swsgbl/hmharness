@@ -32,3 +32,4 @@ export * from './learning-loop.ts';
 export * from './governance.ts';
 export * from './crowd.ts';
 export * from './slice.ts';
+export * from './mea.ts';

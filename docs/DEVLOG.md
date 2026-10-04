@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-10-04(二十九) · COG-MEA 长任务闭环:审计行动决议第一项(707/707)
+
+**动机**:2026-10-04 审计的"下一核心"——不要横向加 agent role,把
+既有角色纵串成 Manager→Fresh Executor→Read-only Auditor→Learner
+的长任务闭环。
+
+**关键决策**(mea.ts,全部 host 桥接可测):
+- **Manager**:分解任务为带验收标准的步骤(maxSteps);失败步有界
+  重试(maxAttemptsPerStep)+有界重规划(maxReplans,插入修订子步);
+- **Fresh Executor**:每步全新上下文——只见当前步+done/remaining
+  摘要,**永不见前步转录**(跨步零污染,测试钉死 digest 不漏
+  transcripts);
+- **Read-only Auditor**:claim-blind(与 slice 的独立评估器同一堵
+  类型级墙——签名只有 step,执行者自评永远进不来);
+- **Learner**:记忆**键定审计裁决**(complete/partial/budget-
+  exhausted),executor 自评仅记录无证据地位;循环后 WM 重放。
+
+**实测证据**:707/707 全绿(+4:全过路径记忆键定审计裁决+executor
+条目无证据地位/失败→两次重试→重规划插修订步→修订步过=partial/
+全败=budget-exhausted+重规划有界/第二步的 digest 只见 done 列表
+零转录泄漏)。
+
+**教训**:
+- MEA 的三个不变量:executor 新鲜(无转录)、auditor 盲(无 claim)、
+  learner 键审计(无自评)——每个都有测试钉住,缺一个闭环就退化为
+  自说自话。
+
+---
+
 ## 2026-10-04(二十八) · BrowserOS 实战三轮修复:从"无法启动"到会话复用(703/703)
 
 **动机**:用户按步骤把 hmharness 加进 BrowserOS 助手面板后连环遇到
@@ -54,6 +83,20 @@ codex-acp 等,宿主认识,工作区复用);custom ACP=**cmd.exe /c 包装
 结论:定制 agent 的弹窗不可避免,但**四道回收网使窗口寿命≤一轮,
 且"开局清扫"会把上一条遗留的窗口在下一条消息发出瞬间清掉**——
 用户观感=最多瞬时闪过一个窗口,绝不累积。
+
+**round 28 追加三(弹窗终版三层修复+一个悬案)**:①宿主对部分复用
+连接跳过 initialize→回收基线 null→四道 sweep 空转(日志"baseline
+unavailable")——修:基线懒初始化;②agent 调老工具 browser_open
+(cmd start→默认浏览器=BrowserOS)每调一次弹一个**内容窗**,回收
+判据不关内容窗(用户对照实验"内置不弹/custom 弹"的真正答案)——
+修:HMH_BROWSER_ATTACH 存在时 browser_open 改为宿主内导航当前
+标签;③残余 12 秒闪现(turn settle 才回收)——修:**常驻清扫器**
+(连接存活期每 2s 一扫),真人输入+500ms 采样验证:多窗口总时长
+**0ms**。悬案:抓到过一个 explorer 父级、裸启动的**独立 BrowserOS
+实例**(pid 41472,标题=面板,不在 9100 窗口宇宙,回收网盲区),
+单次出现后消失,无法断定来源;**决策:不做自动杀独立实例**(裸
+命令行与用户日常主进程无法区分,误杀=灾难),留给用户复现时
+带 pid 取证再定位。
 
 **教训**:
 1. "集成给用户"必须真人验收一轮——三连坑全部藏在协议之外
