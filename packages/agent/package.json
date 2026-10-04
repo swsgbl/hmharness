@@ -23,7 +23,8 @@
     "@hmharness/observability": "0.23.22",
     "@hmharness/sandbox": "0.23.22",
     "@hmharness/lsp": "0.23.22",
-    "@hmharness/browser": "0.23.22"
+    "@hmharness/browser": "0.23.22",
+    "@hmharness/extension": "0.23.22"
   },
   "files": [
     "dist"

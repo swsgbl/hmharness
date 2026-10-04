@@ -47,6 +47,9 @@
       ],
       "@hmharness/browser": [
         "packages/browser/src/index.ts"
+      ],
+      "@hmharness/extension": [
+        "packages/extension/src/index.ts"
       ]
     }
   },

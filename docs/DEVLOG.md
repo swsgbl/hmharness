@@ -4,6 +4,82 @@
 
 ---
 
+## 2026-10-04(三十六) · 浏览器扩展桥:主流浏览器接入用户的真实浏览器(746/746)
+
+**动机**:browser_* 家族只驱动 hmh 专属 BrowserOS 实例;用户的
+日常浏览器(Chrome/Edge/Brave/Firefox/Safari)对智能体是黑盒。
+全网调研 2026 主流方案(ChatGPT 桌面版↔扩展、Hubort 等)后落地:
+**本机回环服务 + 一次性短配对码**是桌面 agent↔浏览器扩展的收敛
+架构;MV3 是唯一现实目标(MV2 已死:Chrome 2024-25 退场,Firefox
+2025 完成,Firefox **有意不实现** `background.service_worker`——
+事件页 `background.scripts` 是它的形态)。
+
+**关键决策**(新包 `@hmharness/extension`,零运行时依赖):
+- **传输层 = 回环 HTTP + fetch 流读 SSE**:Chrome MV3 service
+  worker **没有 EventSource**,fetch 流读取是同时活在 Chrome SW、
+  Firefox 事件页、Safari 的**唯一单一代码路径**;不选 Chrome 原生
+  消息(各浏览器注册模型互不兼容,Safari 只能走 App 容器);
+- **ChatGPT 式配对**:`hmh extension pair` 出 8 位一次性码(5 分钟
+  TTL,base32 去易混淆字符),popup 输入换 32 字节 Bearer 令牌——
+  **令牌只落 sha256**,泄漏配对文件无法重放;错误码限流(5 次→
+  60s 锁,码与签发一起锁);
+- **安全姿态**(回环专属):仅绑 127.0.0.1;Host 头白名单拒 DNS
+  rebinding;Origin 必须是扩展协议或回环;线协议**只有结构化命令
+  (无任何 eval 面)**;扩展令牌与智能体通道密钥**互不可替代**;
+- **跨浏览器矩阵代码化**:chromium(service_worker+side_panel+
+  minimum_chrome_version 116)/firefox(background.scripts 事件页+
+  sidebar_action+gecko id,MV3 主机权限按站点由用户授予——如实
+  写进构建提示)/safari(无 side panel API,popup 兜底;载荷级
+  兼容,`xcrun safari-web-extension-converter` 转换**未在 CI 实测**
+  ——无 macOS,如实声明);`validateManifest` 双向机检(把 chromium
+  清单当 firefox 校验必须失败——反摆拍);
+- **载体零构建**(web 包嵌入式 SPA 先例):background.js 双形态自
+  适配(`browser ?? chrome`,promise 型调用),注入函数完全内联自
+  包含(executeScript func.toString 序列化,无闭包引用);
+- **死工具纪律**:`nativeRegistry` 保持同步——桥每次连接变化/心跳
+  刷状态文件(60s 过期即判死),注册条件=文件新鲜且 connected;
+  工具每次执行重新探活,失联报**可行动的错**而非挂起;
+- **extension_page_act 恒审批**:在用户真实浏览器、用户登录态下
+  动手,`needsApproval: () => true`——持久规则也不能豁免。
+
+**实测证据**:包内 21 测试 + agent 接线 1,e2e 用**与
+background.js 相同的传输代码**(fetch 流 SSE+POST 上行)打真实
+回环:配对全流程(错码 403/单次用/无令牌 401/Host 伪造 403/Origin
+伪造 403);命令往返(结果回传/错误回传/超时诚实拒绝/智能体密钥
+通道 401+502+200 三态);清单矩阵双向反例;构建产物逐文件+
+`node --check` 机检。**两级 REAL RUN**:
+1. 跨进程:真起 `hmh extension serve`(CLI 路径)→ HTTP 配对
+   (popup 路径)→ SSE 附流(background 路径)→ 状态文件发现
+   (registry 路径)→ 工具读到伪标签页;
+2. **真实浏览器**(已固化为可跳过的提交测试 real-browser.test.ts,
+   本机 BrowserOS 实跑 4.9s):`--load-extension` 加载构建产物 →
+   CDP 驱动 popup 配对按钮 → 真实 background.js 配对+附流
+   (`browser=chromium ext=0.23.22`)→ extension_tabs 列出真实
+   标签页 → extension_page_read 读回环 http 页(经
+   scripting.executeScript+collectPageData)→ extension_page_act
+   真实滚动。途中验证两处浏览器安全边界(about:blank 与扩展自有
+   chrome-extension:// 页拒绝注入)都被如实上报为可行动错误。
+   识别自家 SW 用 `chrome.runtime.getManifest().name`——BrowserOS
+   自带扩展也叫 background.js,按 URL 认 id 会认错。
+
+**教训**:
+- 真实 bug 藏在正则里:扩展 Origin 正则初版写成
+  `https://chrome-extension:`——真实扩展 Origin 是
+  `chrome-extension://<id>` **协议本身**;测试里放行断言先红后绿,
+  反 theater 断言抓的就是这种"看起来对";
+- **`CdpBrowser.close()` 从不关 WebSocket**(只把字段置空)——
+  平时无人活着调它(生命周期是先杀浏览器进程),真实浏览器测试
+  第一个用户就挂了:测试 PASS 后 runner 被开着的 WS 拖住不退出。
+  修复:close 先 `ws.close()` 再等 close 事件,1s 兜底竞态;
+- 测试与后台应答循环**不能共享一个 SSE 队列**——消费者竞争让主
+  流程 next() 永远超时;手工场景先行、自动应答后启;
+- 撞上并行会话写一半的 i18n 仓态导致一次假失败——先 `git status`
+  分辨"谁的改动"再定责;
+- `Promise<T>.catch` 返回 `T | catch 类型`,`T=unknown` 会吞掉
+  catch 的类型——用 `.then(onF, onR)` 收窄。
+
+---
+
 ## 2026-10-04(三十五) · LSP→CodeWM 传感器:审计 02"LSP 作传感器"接线(724/724)
 
 **动机**:Code WM 落了本体但传感器未接——02 文档定位 LSP 是

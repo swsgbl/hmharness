@@ -22,7 +22,22 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'browser', 'evolution', 'domain-harmony', 'domain-ops', 'lsp', 'agent', 'web', 'cli', 'codexhost-bridge'];
+const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'browser', 'extension', 'evolution', 'domain-harmony', 'domain-ops', 'lsp', 'agent', 'web', 'cli', 'codexhost-bridge'];
+// TRAP GUARD (third recurrence — now machine-enforced): both publish
+// manifests must stay in sync; a divergence means some package would skip
+// preflight checks or ordered publishing. Fail loudly BEFORE any work.
+{
+  const publishSrc = fs.readFileSync(path.join(ROOT, 'scripts', 'publish.cjs'), 'utf8');
+  const publishOrderMatch = /const ORDER = \[([^\]]+)\]/.exec(publishSrc);
+  if (!publishOrderMatch) throw new Error('publish.cjs ORDER not found — manifest sync guard cannot run');
+  const publishSet = new Set(publishOrderMatch[1].split(',').map((s) => s.trim().replace(/'/g, '')).filter(Boolean));
+  const preflightSet = new Set(ORDER);
+  const missingInPreflight = [...publishSet].filter((p) => !preflightSet.has(p));
+  const missingInPublish = [...preflightSet].filter((p) => !publishSet.has(p));
+  if (missingInPreflight.length || missingInPublish.length) {
+    throw new Error(`ORDER manifests diverge: preflight missing [${missingInPreflight.join(', ')}], publish missing [${missingInPublish.join(', ')}] — fix BOTH lists`);
+  }
+}
 const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const packages = requested.length ? requested : ORDER;
 let failures = 0;

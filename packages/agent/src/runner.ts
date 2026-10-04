@@ -35,6 +35,7 @@ import { harmonyTools } from '@hmharness/domain-harmony';
 import { opsTools } from '@hmharness/domain-ops';
 import { discoverServers, lspTools } from '@hmharness/lsp';
 import { discoverBrowsers, browserTools } from '@hmharness/browser';
+import { discoverExtensionBridgeSync, extensionTools } from '@hmharness/extension';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -55,7 +56,7 @@ export function toServerConfig(c: McpServerImport): McpServerConfig {
  */
 export const spawnBase: { current?: SpawnBase } = {};
 
-export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: boolean; workspaceRoot?: string } = {}): Registry {
+export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: boolean; extension?: boolean; workspaceRoot?: string } = {}): Registry {
   const reg = new Registry();
   reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
   // W6: LSP Tier-0 code-intelligence tools — registered ONLY when a real
@@ -82,6 +83,20 @@ export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: b
         reg.registerAll(browserTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir() }));
       }
     } catch { /* browser optional: never block tool assembly */ }
+  }
+  // extension_* family (2026-10-04, ChatGPT-style browser-extension bridge)
+  // — the user's REAL browser via the paired extension. Same dead-tools
+  // rule, but liveness is a STATE FILE the bridge keeps fresh (registry
+  // build stays sync); registration additionally requires an extension
+  // to be CONNECTED right now, and the tools themselves re-check the
+  // bridge over HTTP on every call.
+  if (opts.extension !== false) {
+    try {
+      const bridge = discoverExtensionBridgeSync(homeDir());
+      if (bridge.healthy && bridge.connected) {
+        reg.registerAll(extensionTools({ home: homeDir() }));
+      }
+    } catch { /* extension optional: never block tool assembly */ }
   }
   if (depth < MAX_SPAWN_DEPTH) {
     // blueprint M10: every spawn_agent is governed by the live topology

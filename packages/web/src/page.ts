@@ -815,6 +815,7 @@ ${uiLiteSource()}
           viewChat:'对话', viewBoard:'任务看板', viewDev:'设备', viewSk:'技能中心',
           thinkL:'思考过程', copy:'复制', regen:'重新生成', refresh:'刷新',
           noDev:'未发现设备——连接真机或启动模拟器后刷新', noHdc:'未找到 hdc 命令——请安装 DevEco Studio / 命令行工具并加入 PATH',
+          extBridge:'浏览器扩展桥', extConn:'已连接', extDisc:'未连接(扩展 popup 里连接)', extDown:'桥未运行(hmh extension serve)',
           devEmu:'模拟器', devUsb:'真机', skActive:'已启用技能', skDrafts:'技能草稿', skInsights:'近期洞察', skEvo:'进化日志',
           noSkills:'(暂无)', turnsL:'轮', toolsL:'次工具', loading:'加载中…',
           modeYolo:'🔥 YOLO(全自动)', modeAutoShort:'自动',
@@ -846,6 +847,7 @@ ${uiLiteSource()}
           thinkL:'Thinking', copy:'Copy', regen:'Regenerate', refresh:'Refresh',
           noDev:'No devices found - plug in a device or start an emulator, then refresh',
           noHdc:'hdc not found - install DevEco Studio / command-line tools and add to PATH',
+          extBridge:'browser extension bridge', extConn:'connected', extDisc:'not connected (open the extension popup)', extDown:'bridge not running (hmh extension serve)',
           devEmu:'emulator', devUsb:'device', skActive:'Active skills', skDrafts:'Draft skills', skInsights:'Recent insights', skEvo:'Evolution log',
           noSkills:'(none)', turnsL:'turns', toolsL:'tool uses', loading:'loading…',
           modeYolo:'🔥 YOLO (hands-free)', modeAutoShort:'auto',
@@ -1584,24 +1586,48 @@ ${uiLiteSource()}
       window.__AN.stagger('.card', grid);
     }).catch(function (e) { grid.innerHTML = '<div class="err">' + String(e) + '</div>'; });
   }
+  /* Extension bridge row: renders FIRST and regardless of hdc — the user's
+     real browser is a device too (green=connected, amber=bridge up but no
+     extension attached, dim=bridge down). */
+  function extBridgeRow(st) {
+    var row = document.createElement('div'); row.className = 'devrow';
+    var dot = document.createElement('span'); dot.className = 'st'; dot.textContent = '\u25CF';
+    dot.style.color = st && st.connected ? 'var(--ok)' : (st && st.available ? 'var(--warn)' : 'var(--dim)');
+    var tg = document.createElement('span'); tg.textContent = L.extBridge + ' 127.0.0.1:' + ((st && st.port) || 7789);
+    var kd = document.createElement('span'); kd.className = 'kind';
+    kd.textContent = !st || !st.available ? L.extDown : (st.connected ? L.extConn + (st.browser ? ' \u00B7 ' + st.browser : '') : L.extDisc);
+    row.appendChild(dot); row.appendChild(tg); row.appendChild(kd);
+    return row;
+  }
   function loadDevices() {
     var box = document.getElementById('dev-body');
     box.innerHTML = '<div class="hint">' + L.loading + '</div>';
-    fetch('/api/devices').then(function (r) { return r.json(); }).then(function (d) {
-      box.innerHTML = '';
-      if (!d.hdcAvailable) { box.innerHTML = '<div class="hint">' + L.noHdc + '</div>'; return; }
-      if (!d.devices.length) { box.innerHTML = '<div class="hint">' + L.noDev + '</div>'; return; }
-      d.devices.forEach(function (v) {
-        var row = document.createElement('div'); row.className = 'devrow';
-        var st = document.createElement('span'); st.className = 'st'; st.textContent = '\\u25CF';
-        var tg = document.createElement('span'); tg.textContent = v.target;
-        var kd = document.createElement('span'); kd.className = 'kind';
-        kd.textContent = v.kind === 'emulator' ? L.devEmu : L.devUsb;
-        row.appendChild(st); row.appendChild(tg); row.appendChild(kd);
-        box.appendChild(row);
+    // extension status first (fast local probe), then the hdc inventory —
+    // the ext row must survive the hdc empty/absent early-returns
+    fetch('/api/extension/status').then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (st) {
+      var ext = extBridgeRow(st);
+      fetch('/api/devices').then(function (r) { return r.json(); }).then(function (d) {
+        box.innerHTML = '';
+        box.appendChild(ext);
+        if (!d.hdcAvailable) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = L.noHdc; box.appendChild(h); return; }
+        if (!d.devices.length) { var n = document.createElement('div'); n.className = 'hint'; n.textContent = L.noDev; box.appendChild(n); return; }
+        d.devices.forEach(function (v) {
+          var row = document.createElement('div'); row.className = 'devrow';
+          var st2 = document.createElement('span'); st2.className = 'st'; st2.textContent = '\u25CF';
+          var tg = document.createElement('span'); tg.textContent = v.target;
+          var kd = document.createElement('span'); kd.className = 'kind';
+          kd.textContent = v.kind === 'emulator' ? L.devEmu : L.devUsb;
+          row.appendChild(st2); row.appendChild(tg); row.appendChild(kd);
+          box.appendChild(row);
+        });
+        window.__AN.stagger('.devrow', box);
+      }).catch(function (e) {
+        box.innerHTML = '';
+        box.appendChild(ext);
+        var er = document.createElement('div'); er.className = 'err'; er.textContent = String(e);
+        box.appendChild(er);
       });
-      window.__AN.stagger('.devrow', box);
-    }).catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+    });
   }
   function renderSsh() {
     var box = document.getElementById('ssh-panels');

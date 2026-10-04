@@ -526,6 +526,10 @@ usage:
   hmh browser [status|trust|untrust|start|stop|open <url>]
                            BrowserOS AI browser: discovery + trust +
                            the dedicated instance browser_* tools drive
+  hmh extension [serve|pair|status|unpair|build]
+                           browser-extension bridge: adapt the agent into
+                           your REAL browser (Chrome/Edge/Brave, Firefox,
+                           Safari payload) — loopback server + pairing
   hmh tools                list all registered tools (native + MCP)
   hmh mcp                  show configured MCP servers and their tools
   hmh evolve [--every=N]   self-evolution cycle (or resident loop)
@@ -1045,6 +1049,88 @@ flags:
       return;
     }
     stdout.write('用法: hmh browser status | trust <id> | untrust <id> | start [--port=N] | stop | open <url> — BrowserOS 发现/信任/生命周期\n');
+    return;
+  }
+  if (cmd === 'extension') {
+    // Browser-extension bridge (2026-10-04): the ChatGPT-extension-style
+    // loopback server + pairing flow that adapts the agent into the user's
+    // REAL browser (Chrome/Edge/Brave, Firefox, Safari payload).
+    await initHome();
+    const sub = rest[0] ?? 'status';
+    if (sub === 'serve') {
+      const portArg = rest.find((a) => a.startsWith('--port='));
+      const { ExtensionBridgeServer, issuePairingCode, isPaired } = await import('@hmharness/extension');
+      const bridge = new ExtensionBridgeServer({ home: homeDir() });
+      const { port: actual } = await bridge.start(portArg ? Number(portArg.slice(7)) : undefined);
+      bridge.onConnectionChange = (connected) => {
+        stdout.write(connected ? '\n  ✓ 浏览器扩展已连接\n' : '\n  ✗ 浏览器扩展断开\n');
+      };
+      stdout.write(`hmh 扩展桥已运行: http://127.0.0.1:${actual}（仅本机回环）\n`);
+      if (await isPaired(homeDir())) {
+        stdout.write('  已配对 — 浏览器扩展会自动重连\n');
+      } else {
+        const code = await issuePairingCode(homeDir());
+        if (code.ok) {
+          stdout.write(`  配对码: ${code.code}（5 分钟内有效,单次使用 — 在扩展 popup 中输入）\n`);
+        } else {
+          stdout.write(`  配对码生成被锁定,${Math.ceil(code.retryInMs / 1000)}s 后重试（hmh extension pair）\n`);
+        }
+      }
+      stdout.write(DIM('  Ctrl-C 停止;状态: hmh extension status;构建扩展: hmh extension build --target=all\n'));
+      process.once('SIGINT', () => { void bridge.stop().then(() => process.exit(0)); });
+      process.once('SIGTERM', () => { void bridge.stop().then(() => process.exit(0)); });
+      return; // 桥以前台进程常驻
+    }
+    if (sub === 'pair') {
+      const { issuePairingCode } = await import('@hmharness/extension');
+      const r = await issuePairingCode(homeDir());
+      if (!r.ok) { stdout.write(`配对码被锁定,${Math.ceil(r.retryInMs / 1000)}s 后重试\n`); return; }
+      stdout.write(`配对码: ${r.code}\n`);
+      stdout.write(`  ${new Date(r.expiresAt).toLocaleTimeString()} 前有效,单次使用 — 打开浏览器扩展 popup 输入\n`);
+      stdout.write(DIM('  扩展未构建? hmh extension build --target=all;桥未运行? hmh extension serve\n'));
+      return;
+    }
+    if (sub === 'unpair') {
+      const { unpair } = await import('@hmharness/extension');
+      const ok = await unpair(homeDir());
+      stdout.write(ok ? '已吊销配对令牌(扩展下次请求即被拒,需重新配对)\n' : '本就未配对\n');
+      return;
+    }
+    if (sub === 'status') {
+      const { discoverExtensionBridge, isPaired } = await import('@hmharness/extension');
+      const b = await discoverExtensionBridge();
+      const paired = await isPaired(homeDir());
+      if (!b.healthy) { stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`); return; }
+      stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 配对: ${paired ? '已配对' : '未配对(hmh extension pair)'}\n`);
+      stdout.write(b.connected
+        ? `  扩展已连接${b.browser ? ' · ' + b.browser : ''}${b.extVersion ? ' v' + b.extVersion : ''} — 智能体 extension_* 工具可用\n`
+        : '  扩展未连接 — 打开浏览器扩展 popup 配对/连接\n');
+      return;
+    }
+    if (sub === 'build') {
+      const tArg = rest.find((a) => a.startsWith('--target='));
+      const oArg = rest.find((a) => a.startsWith('--out='));
+      const pArg = rest.find((a) => a.startsWith('--port='));
+      const target = (tArg ? tArg.slice(9) : 'all') as 'chromium' | 'firefox' | 'safari' | 'all';
+      if (!['chromium', 'firefox', 'safari', 'all'].includes(target)) {
+        stdout.write('用法: hmh extension build [--target=chromium|firefox|safari|all] [--out=目录] [--port=N]\n');
+        return;
+      }
+      const { buildExtension } = await import('@hmharness/extension');
+      try {
+        const results = await buildExtension({ target, outDir: oArg ? oArg.slice(6) : undefined, port: pArg ? Number(pArg.slice(7)) : undefined });
+        for (const r of results) {
+          stdout.write(`✓ ${r.target} → ${r.dir}\n`);
+          stdout.write(`  载入: ${r.loadHint}\n`);
+          for (const n of r.notes) stdout.write(DIM(`  注: ${n}\n`));
+        }
+        stdout.write(DIM('  下一步: hmh extension serve(另开终端)→ 浏览器载入扩展 → popup 输入 hmh extension pair 的配对码\n'));
+      } catch (err) {
+        stdout.write(`构建失败: ${String(err instanceof Error ? err.message : err).slice(0, 300)}\n`);
+      }
+      return;
+    }
+    stdout.write('用法: hmh extension serve | pair | status | unpair | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入)\n');
     return;
   }
   if (cmd === 'cognitive') {

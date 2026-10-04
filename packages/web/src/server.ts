@@ -883,6 +883,23 @@ export async function startServer(opts: { port: number; host?: string; version?:
         req.on('close', () => sseClients.delete(res));
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/extension/status') {
+        // Read-only probe of the browser-extension bridge (loopback). The
+        // web server takes ZERO new dependencies for this: it speaks plain
+        // HTTP to the bridge exactly the way the extension does. Unreachable
+        // bridge = honest available:false, never a 500.
+        const extPort = Number(process.env.HMH_EXTENSION_PORT ?? 0) || 7789;
+        try {
+          const r = await fetch(`http://127.0.0.1:${extPort}/v1/status`, { signal: AbortSignal.timeout(1_500) });
+          const j = await r.json() as { ok?: boolean; paired?: boolean; connected?: boolean; browser?: string; extVersion?: string };
+          if (r.ok && j.ok) {
+            json(res, 200, { available: true, port: extPort, paired: j.paired, connected: j.connected, browser: j.browser, extVersion: j.extVersion });
+            return;
+          }
+        } catch { /* not running */ }
+        json(res, 200, { available: false, port: extPort });
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/devices') {
         // Read-only device inventory via hdc (local dev tool). Never mutates.
         const probe = await new Promise<{ ok: boolean; devices: Array<{ target: string; kind: string }> }>((resolve) => {

@@ -1,0 +1,38 @@
+/**
+ * @hmharness/extension - browser-extension bridge for mainstream browsers
+ *
+ * Public surface: protocol types, pairing/token store, the loopback
+ * bridge server, agent-side client + discovery + tools, the cross-browser
+ * manifest matrix, and the unpacked-directory builder.
+ */
+export {
+  PROTOCOL_VERSION,
+  type BridgeCommand,
+  type BridgeStatus,
+  type PageAct,
+  type PageSnapshot,
+  type RawPageData,
+  type TabInfo,
+  type UplinkMessage,
+} from './protocol.ts';
+export {
+  CODE_TTL_MS, PAIR_ATTEMPT_LIMIT, PAIR_LOCKOUT_MS,
+  issuePairingCode, isPaired, pairingPath, redeemPairingCode, touchLastSeen, unpair, verifyToken,
+  type PairingStore,
+} from './token.ts';
+export {
+  DEFAULT_BRIDGE_PORT, ExtensionBridgeServer, bridgePort, probeBridge, readBridgeState, stateFilePath,
+  type BridgeStateFile,
+} from './bridge.ts';
+export { agentCommand, bridgeFromState, bridgeStatus, type BridgeHandle } from './client.ts';
+export {
+  discoverExtensionBridge, discoverExtensionBridgeSync,
+  type DiscoveredExtensionBridge,
+} from './registry.ts';
+export { extensionTools, type ExtensionToolContext } from './tools.ts';
+export { formatPageSnapshot, summarizePage } from './page.ts';
+export {
+  EXTENSION_TARGETS, EXTENSION_VERSION, GECKO_ID, TARGET_SPECS, manifestFor, validateManifest,
+  type ExtensionTarget, type ManifestOptions, type TargetSpec,
+} from './adapters.ts';
+export { buildExtension, payloadDir, PAYLOAD_FILES, type BuildOptions, type BuildResult } from './build.ts';

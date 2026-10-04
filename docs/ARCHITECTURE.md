@@ -61,6 +61,14 @@
 │     永不碰日常浏览器;ACP 场景 attach 宿主标签页) │
 │   trust(sha256 信任钉,同 LSP 契约)             │
 ├────────────────────────────────────────────────┤
+│  浏览器扩展层 extension(2026-10 第 16 包)       │
+│   扩展桥:接入用户真实浏览器(Chromium 系/       │
+│   Firefox/Safari 载荷;ChatGPT 式回环服务+      │
+│   一次性配对码,fetch 流 SSE+POST,无 eval 面)  │
+│   extension_* 四件套(status/tabs/page_read/    │
+│   page_act——真实页面操作恒审批;状态文件判活,  │
+│   未连接即不注册——死工具纪律)                  │
+├────────────────────────────────────────────────┤
 │  执行层 agent(工具·系统提示·spawn_agent·runner) │
 ├────────────────────────────────────────────────┤
 │  域层  domain-harmony(设备/工具链/构建/安装/运行/日志)│
@@ -84,10 +92,11 @@
 └────────────────────────────────────────────────┘
 ```
 
-十五包依赖方向(自上而下,禁止反向):cli/web → cognitive + environments +
-lsp + browser + agent → evolution + domain-harmony → kernel。
+十六包依赖方向(自上而下,禁止反向):cli/web → cognitive + environments +
+lsp + browser + extension + agent → evolution + domain-harmony → kernel。
 lsp 只依赖 kernel(代码智能不依赖认知策略);browser 独立成包
-(浏览器执行是环境能力,不与认知层耦合)。
+(浏览器执行是环境能力,不与认知层耦合);extension 同理独立
+(真实浏览器接入是环境能力,仅依赖 kernel 的 Tool 类型)。
 cli 与 web 互为兄弟前端,共享 agent 层的 runner 事件协议(onDelta/onToolCall/onApproval/onFinal),
 行为完全一致——终端与浏览器只是同一事件流的两张皮。
 acp-serve 是第三个前端:宿主驱动的会话流(与用户驱动的 cli/web 对偶),

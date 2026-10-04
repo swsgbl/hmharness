@@ -117,6 +117,12 @@ export class CodeWorldModel {
   get build(): BuildFact | null {
     return this.latestBuild;
   }
+  /** Runtime observations (sensor-pushed), oldest first. Deliberately NOT
+   *  part of stateHash: runtime history is evidence, not code state —
+   *  holdout/drift hashing must not change because the agent browsed. */
+  get runtime(): RuntimeFact[] {
+    return [...this.runtimeFacts];
+  }
 
   entity(id: string): CodeEntity | undefined {
     return this.entities.get(id);

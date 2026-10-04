@@ -1,0 +1,59 @@
+/* hmharness bridge popup/sidepanel — one stylesheet, both contexts */
+:root {
+  color-scheme: dark;
+  --bg: #16181d;
+  --card: #1e222a;
+  --line: #2c313c;
+  --text: #e3e6eb;
+  --dim: #9aa3b2;
+  --ok: #34a853;
+  --warn: #fbbc04;
+  --err: #ea4335;
+  --acc: #8ab4f8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 14px;
+  width: 340px; /* popup; sidepanel stretches beyond */
+  font: 13px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+h1 .logo { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, #8ab4f8, #34a853); display: inline-block; }
+.status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); margin-bottom: 10px;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+.dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.dot.off { background: var(--err); }
+.dot.pair { background: var(--warn); }
+.status .txt { flex: 1; }
+.mono { font-family: ui-monospace, Consolas, monospace; }
+.row { display: flex; gap: 6px; margin-bottom: 8px; }
+input {
+  flex: 1; min-width: 0; padding: 7px 9px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font-size: 13px;
+}
+input:focus { outline: 1px solid var(--acc); }
+button {
+  padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); cursor: pointer; font-size: 13px;
+}
+button:hover { border-color: var(--acc); }
+button.primary { background: var(--acc); color: #10131a; border-color: var(--acc); font-weight: 600; }
+.hint { color: var(--dim); font-size: 12px; margin: 6px 0 0; }
+.hint b { color: var(--text); font-weight: 600; }
+pre#out {
+  margin: 8px 0 0; padding: 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--card);
+  white-space: pre-wrap; word-break: break-all;
+  font: 12px/1.45 ui-monospace, Consolas, monospace; color: var(--dim);
+  max-height: 220px; overflow: auto;
+}
+pre#out:empty { display: none; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }

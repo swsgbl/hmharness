@@ -215,6 +215,19 @@ export class CdpBrowser {
   }
 
   async close(): Promise<void> {
+    // dropSocket() nulls the field WITHOUT closing the socket — the WS
+    // would stay open and hold the event loop (found by the extension
+    // real-browser test: runner hung after PASS until this was fixed).
+    // Bounded by a 1s race: a socket whose peer already died may never
+    // deliver a close event.
+    const ws = this.ws;
     this.dropSocket();
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, 1_000);
+        ws.addEventListener('close', () => { clearTimeout(t); resolve(); }, { once: true });
+        try { ws.close(); } catch { clearTimeout(t); resolve(); /* already dead */ }
+      });
+    }
   }
 }

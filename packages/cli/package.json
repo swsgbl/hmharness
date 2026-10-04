@@ -53,6 +53,7 @@
     "@hmharness/environments": "0.23.22",
     "@hmharness/evaluation": "0.23.22",
     "@hmharness/evolution": "0.23.22",
+    "@hmharness/extension": "0.23.22",
     "@hmharness/kernel": "0.23.22",
     "@hmharness/observability": "0.23.22",
     "@hmharness/sandbox": "0.23.22",
