@@ -4,30 +4,62 @@
 
 ```
 ┌────────────────────────────────────────────────┐
-│  前端  cli(终端:REPL/一次性/evolve/web/cognitive)│
+│  前端  cli(终端:REPL/一次性/evolve/web/cognitive│
+│        /lsp/browser/acp-serve)                  │
 │        web(浏览器:SSE 推流+远程审批+会话回放     │
 │              +/api/cognitive 研究面板)           │
+│        acp-serve(ACP 服务器:BrowserOS 助手面板  │
+│              等外部宿主像调 Codex 一样调 hmh,    │
+│              ndjson JSON-RPC+审批卡+会话复用)    │
+├────────────────────────────────────────────────┤
+│  代码智能层 lsp(LSP 3.18 Client/Manager,2026-10)│
+│   registry(PATH+DevEco-local 官方发现/健康探测/  │
+│     来源分级,绝不自动下载)                       │
+│   client(握手/请求/诊断推送)process-manager     │
+│   (cwd 绑定+env 清洗+重启预算+killSync)          │
+│   trust(Capability OS 首片:sha256 钉住+篡改拒执)│
+│   tools(Tier-0/1 只读工具,diagnostics 恒标注    │
+│     source:lsp=反馈非证明)                       │
 ├────────────────────────────────────────────────┤
 │  认知层 cognitive(2026-09 蓝图,Cognitive OS)     │
 │   environment 协议+注册表(observe/act/snapshot/ │
-│     restore/evaluate 一致性测试)                │
-│   world-model(信念表+预测置信+误差聚类+修订)    │
+│     restore/evaluate 一致性测试+snapshotClass   │
+│     三分类:deterministic/forkable/observational)│
+│   world-model(信念表+预测置信+误差聚类+修订+    │
+│     WM2.0 结构化增量 stateDiff/predictDelta)     │
 │   goal(图谱/分解/漂移/高影响审批)               │
 │   exploration(不确定性×信息增益×相关性−风险)    │
-│   rlm(可编程认知工作台:变量/checkpoint/fork)     │
+│   slice(纵切片:Observe→Goal→Plan→Act→          │
+│     独立Evaluate→Learn,claim-blind 类型级隔离)  │
+│   crowd(群体回路:匿名摘要/指纹匹配/absorb)      │
+│   rlm(worker 沙箱:崩溃隔离+秘密不继承+硬终止)   │
 │   memory 五层(working/episodic/semantic/        │
-│     procedural/world+溯源+矛盾检测+只增巩固)    │
-│   skill-compiler(经验→可验证技能→门禁晋升)      │
+│     procedural/world+溯源+矛盾检测+只增巩固+    │
+│     分词计分检索)                                │
+│   skill-compiler(经验→可验证技能→门禁晋升+      │
+│     n-gram 工作流归纳+失败反模式警示)            │
 │   continual(学习控制平面:九类对象,harness优先)  │
 │   evolution2(候选契约/序贯门禁/金丝雀/审计/     │
 │     reward-hacking 检测)                        │
 │   multi-agent(角色契约/共享黑板/预算/心跳/取消) │
-│   benchmark(GeneralBench 统一指标+transfer lab) │
+│   benchmark(GeneralBench 统一指标+transfer lab+ │
+│     三臂阶梯 ladder3:Model-only vs +Harness vs  │
+│     +Cognitive OS)                              │
 ├────────────────────────────────────────────────┤
 │  环境层 environments(Cognitive OS 适配器)        │
 │   terminal(原生:文件/命令/评估探针)             │
-│   harmonyos(hdc 桥)/browser(CDP 观察+桥接动作) │
-│   desktop(窗口枚举+自动化桥)/arc3(骨架,拒伪装) │
+│   harmonyos(hdc 桥)/browser(CDP 观察+桥接动作+  │
+│     CdpActBridge 钉住页目标+加载等待)           │
+│   desktop(窗口枚举+自动化桥)/arc3(官方 REST     │
+│     全桥+帧渲染+视觉实玩+记分卡)                 │
+├────────────────────────────────────────────────┤
+│  浏览器执行层 browser(BrowserOS AI 浏览器,      │
+│   2026-10 第 15 包)                             │
+│   browser_* 八件套(navigate/snapshot/click/    │
+│     type/read/scroll/screenshot/tabs)           │
+│   专用实例(:9223+HMH_HOME/browser/profile,      │
+│     永不碰日常浏览器;ACP 场景 attach 宿主标签页) │
+│   trust(sha256 信任钉,同 LSP 契约)             │
 ├────────────────────────────────────────────────┤
 │  执行层 agent(工具·系统提示·spawn_agent·runner) │
 ├────────────────────────────────────────────────┤
@@ -52,10 +84,14 @@
 └────────────────────────────────────────────────┘
 ```
 
-十三包依赖方向(自上而下,禁止反向):cli/web → cognitive + environments + agent →
-evolution + domain-harmony → kernel。
+十五包依赖方向(自上而下,禁止反向):cli/web → cognitive + environments +
+lsp + browser + agent → evolution + domain-harmony → kernel。
+lsp 只依赖 kernel(代码智能不依赖认知策略);browser 独立成包
+(浏览器执行是环境能力,不与认知层耦合)。
 cli 与 web 互为兄弟前端,共享 agent 层的 runner 事件协议(onDelta/onToolCall/onApproval/onFinal),
 行为完全一致——终端与浏览器只是同一事件流的两张皮。
+acp-serve 是第三个前端:宿主驱动的会话流(与用户驱动的 cli/web 对偶),
+同一 runner 同一门禁,协议层适配 ACP ndjson。
 cognitive 只依赖 kernel:认知策略不碰审批/沙箱内部,治理组合它们而非绕过它们。
 
 ## 关键决策及依据(立项调研存档于本地)
