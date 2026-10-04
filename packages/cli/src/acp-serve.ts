@@ -86,16 +86,16 @@ async function listContentWindows(port: number): Promise<Set<number>> {
   return content;
 }
 
-/** close every window NOT in the content-baseline whose tabs are ALL blank
- *  (the host's per-connection workspace windows — whenever they appeared).
- *  A window with real content is never touched. Returns how many closed;
- *  never throws (best-effort sweep). */
-export async function recycleBlankWindows(port: number, contentBaseline: Set<number>): Promise<number> {
+/** close every window NOT in the protected snapshot whose tabs are ALL
+ *  blank (the host's per-connection workspace windows). Protected-set
+ *  windows — everything that existed when our connection initialized —
+ *  are never touched. Returns how many closed; never throws. */
+export async function recycleBlankWindows(port: number, protectedWindows: Set<number>): Promise<number> {
   try {
     const current = await listHostWindows(port);
     let closed = 0;
     for (const windowId of current) {
-      if (contentBaseline.has(windowId)) continue;
+      if (protectedWindows.has(windowId)) continue;
       try {
         if (await windowIsBlank(port, windowId)) {
           await hostBrowserCall(port, 'Browser.closeWindow', { windowId });
@@ -235,16 +235,43 @@ export function createAcpServer(opts: CreateAcpServerOptions): { handle(msg: unk
         // implement (initialize/new/load/prompt/cancel/update/permission) is
         // stable across the 0.4 interop baseline and later additions are
         // optional; a hard version mismatch would just refuse to connect.
-        // loadSession: true — the ACP session id IS the hmh rollout id, so
-        // the host can reconnect a prior conversation instead of spawning a
-        // fresh agent (and, under BrowserOS Agent Mode, a fresh window)
-        // for every message.
+        // loadSession + sessionCapabilities: the host treats agents that
+        // declare session-lifecycle capabilities (close/delete/fork/list/
+        // resume — observed on the built-in claude-agent-acp) as long-lived
+        // manageable sessions and REUSES the connection; without them it
+        // spawns a fresh agent (and a fresh workspace WINDOW) per message —
+        // the exact "a new browser window on every message" bug.
         ok({
           protocolVersion: (m.params?.protocolVersion as string) ?? '0',
-          agentCapabilities: { loadSession: true },
+          agentCapabilities: {
+            loadSession: true,
+            sessionCapabilities: {
+              additionalDirectories: {},
+              close: {},
+              delete: {},
+              fork: {},
+              list: {},
+              resume: {},
+            },
+            // the host hands every session a browser MCP over http (with an
+            // internal lease header) — declaring we speak http MCP may be
+            // what keeps it from provisioning a workspace WINDOW instead
+            mcpCapabilities: { http: true, sse: false },
+          },
           authMethods: [],
         });
         await opts.onInitialized?.().catch(() => undefined);
+        return;
+      }
+      case 'session/close':
+      case 'session/delete': {
+        const sid = m.params?.sessionId as string | undefined;
+        if (sid) sessions.delete(sid);
+        ok({});
+        return;
+      }
+      case 'session/list': {
+        ok({ sessions: [...sessions.keys()].map((id) => ({ sessionId: id, ...(sessions.get(id)!.hmhId ? { title: sessions.get(id)!.hmhId } : {}) })) });
         return;
       }
       case 'authenticate': {
@@ -259,10 +286,14 @@ export function createAcpServer(opts: CreateAcpServerOptions): { handle(msg: unk
         ok({ sessionId });
         return;
       }
-      case 'session/load': {
+      case 'session/load':
+      case 'session/resume': {
+        // `session/resume` is the acpx host's name for the same operation
+        // (observed on the wire) — both register the prior session and
+        // restore its transcript from the hmh rollout.
         const sid = typeof m.params?.sessionId === 'string' ? m.params.sessionId : '';
         if (!sid) {
-          err(m.id, -32602, 'session/load needs sessionId');
+          err(m.id, -32602, `${m.method} needs sessionId`);
           return;
         }
         if (!sessions.has(sid)) {
@@ -389,6 +420,15 @@ export function createAcpServer(opts: CreateAcpServerOptions): { handle(msg: unk
         return;
       }
       default: {
+        // unknown session/* methods: answer tolerantly with {} (the host's
+        // extended session vocabulary evolves; a hard -32601 made it fall
+        // back to fresh-session-per-message behavior). The wire log records
+        // every such call so we can implement the ones the host actually
+        // uses.
+        if (isRequest && m.method.startsWith('session/')) {
+          ok({});
+          return;
+        }
         if (isRequest) err(m.id, -32601, `method not found: ${m.method}`);
       }
     }
@@ -433,15 +473,18 @@ export async function serveAcp(): Promise<void> {
       });
     },
   };
-  // window-recycling hooks (only under a host browser). The host gives
-  // every new agent connection a blank workspace window; the baseline is
-  // the set of CONTENT windows (safe to keep forever), and each sweep
-  // closes any blank window outside it — regardless of when it appeared
-  // (the host may open ours before the handshake OR after the turn — hence
-  // the delayed second sweep). Every action lands in a log file so a
-  // recurrence is diagnosable from disk.
+  // window-recycling (host browser only), SNAPSHOT-based — the safe design
+  // after the 2026-10-04 incident. The host opens a blank workspace window
+  // for every new agent connection (per-message in practice). W0 = ALL
+  // window ids at initialize time; sweeps close ONLY windows that (a) are
+  // not in W0 AND (b) currently hold nothing but blank tabs. The user's own
+  // windows ALWAYS predate our connection → they are in W0 → they can
+  // never be closed, even mid-load (the incident's failure mode). The one
+  // residual risk: a blank window the USER opens during our connection
+  // lifetime — accepted, it is empty by definition. No initialize (host
+  // skip) → no recycling (miss, never misfire).
   const attachPort = Number(process.env.HMH_BROWSER_ATTACH ?? 0);
-  let contentBaseline: Set<number> | null = null;
+  let w0Snapshot: Set<number> | null = null;
   const recycleLog = async (msg: string): Promise<void> => {
     console.error(`[acp-window] ${msg}`);
     try {
@@ -452,35 +495,27 @@ export async function serveAcp(): Promise<void> {
     } catch { /* logging is best-effort */ }
   };
   const sweep = async (why: string): Promise<void> => {
-    if (!contentBaseline) {
-      await recycleLog(`${why}: baseline unavailable — sweep skipped`);
-      return;
-    }
-    const closed = await recycleBlankWindows(attachPort, contentBaseline);
-    contentBaseline = await listContentWindows(attachPort).catch(() => contentBaseline);
-    await recycleLog(`${why}: closed=${closed} contentWindows=${contentBaseline?.size ?? '?'}`);
+    if (!w0Snapshot) return; // no initialize → no snapshot → never sweep
+    const closed = await recycleBlankWindows(attachPort, w0Snapshot);
+    await recycleLog(`${why}: closed=${closed} (W0=${w0Snapshot.size})`);
   };
-  const hooks = Number.isInteger(attachPort) && attachPort > 0
+  const recycleEnabled = process.env.HMH_BROWSER_RECYCLE !== '0' && Number.isInteger(attachPort) && attachPort > 0;
+  const hooks = recycleEnabled
     ? {
         onInitialized: async () => {
-          contentBaseline = await listContentWindows(attachPort).catch(() => null);
-          await recycleLog(`initialize: contentWindows=${contentBaseline?.size ?? 'unavailable'}`);
-          // opening sweep: recycle whatever blank windows earlier
-          // connections left behind (the host may hard-kill us between
-          // messages — taskkill gives no stdin-close cleanup chance)
-          await sweep('opening');
+          w0Snapshot = await listHostWindows(attachPort).catch(() => null);
+          await recycleLog(`initialize: W0 snapshot = ${w0Snapshot?.size ?? 'unavailable'} windows`);
         },
         onTurnSettled: async () => {
           await sweep('turn-settled');
-          // the host sometimes opens the workspace window AFTER the stop
-          // response — sweep again shortly, fire-and-forget
-          void (async () => {
-            await new Promise((r) => setTimeout(r, 2_500));
-            await sweep('turn-settled+2.5s').catch(() => undefined);
-          })();
         },
       }
     : {};
+  let residentTimer: ReturnType<typeof setInterval> | null = null;
+  if (recycleEnabled) {
+    residentTimer = setInterval(() => { void sweep('resident').catch(() => undefined); }, 2_000);
+    (residentTimer as unknown as { unref?: () => void }).unref?.();
+  }
   const server = createAcpServer({ io, ...hooks });
 
   const rl = readline.createInterface({ input: process.stdin });
@@ -489,6 +524,20 @@ export async function serveAcp(): Promise<void> {
     if (!text) return;
     let msg: { id?: unknown };
     try { msg = JSON.parse(text); } catch { console.error('[acp] unparseable frame:', text.slice(0, 120)); return; }
+    // full wire log (host→agent frames): the single best forensic artifact
+    // for host-behavior mysteries. Truncated params keep it bounded.
+    void (async () => {
+      try {
+        const { appendFile, mkdir } = await import('node:fs/promises');
+        const logsDir = join(homeDir(), 'logs');
+        await mkdir(logsDir, { recursive: true });
+        const m = msg as { method?: string; id?: unknown; params?: unknown };
+        const brief = m.method
+          ? `${m.method} id=${String(m.id)} params=${JSON.stringify(m.params ?? {}).slice(0, 400)}`
+          : `response id=${String(m.id)} ${JSON.stringify(msg).slice(0, 200)}`;
+        await appendFile(join(logsDir, 'acp-wire.log'), `${new Date().toISOString()} ${brief}\n`, 'utf8');
+      } catch { /* best-effort */ }
+    })();
     // responses to OUR agent→client requests (permissions)
     if ((msg.id !== undefined) && !('method' in (msg as object))) {
       const entry = pending.get(Number(msg.id));
@@ -505,6 +554,7 @@ export async function serveAcp(): Promise<void> {
   return new Promise<void>((resolve) => {
     rl.on('close', async () => {
       for (const [, p] of pending) p.reject(new Error('client disconnected'));
+      if (residentTimer) clearInterval(residentTimer);
       // last-chance sweep: the host disposes us between messages, and the
       // workspace window it gave this connection would otherwise linger
       await Promise.race([sweep('disconnect'), new Promise((r) => setTimeout(r, 6_000))]);

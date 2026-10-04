@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/browser",
-  "version": "0.23.21",
+  "version": "0.23.22",
   "description": "hmharness BrowserOS driver — discovers, trust-pins and launches the BrowserOS AI browser (Chromium fork), then drives it over the Chrome DevTools Protocol. Client only, zero dependencies, dedicated profile: the user's daily browser is never touched.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.21"
+    "@hmharness/kernel": "0.23.22"
   },
   "files": [
     "dist"

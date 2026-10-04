@@ -484,7 +484,7 @@ export const desktopTypeTool: Tool = {
 export const browserOpenTool: Tool = {
   name: 'browser_open',
   description:
-    'Open a URL in the user\'s default browser (visible). Then use desktop_screenshot + see_image to see the page, desktop_click/desktop_type to interact. Full workflow: browser_open → desktop_screenshot → see_image (find elements) → desktop_click (click) → desktop_screenshot (verify).',
+    'Open a URL in the user\'s default browser (visible). Then use desktop_screenshot + see_image to see the page, desktop_click/desktop_type to interact. Full workflow: browser_open → desktop_screenshot → see_image (find elements) → desktop_click (click) → desktop_screenshot (verify). When running inside a host browser (BrowserOS ACP), this navigates the host\'s active tab instead of opening a new OS window — pair it with browser_snapshot/browser_read.',
   parameters: {
     type: 'object',
     properties: {
@@ -496,6 +496,25 @@ export const browserOpenTool: Tool = {
   async execute(args) {
     const url = String(args.url ?? '').trim();
     if (!/^https?:\/\//i.test(url)) return { output: 'only http(s) URLs', isError: true };
+    // Under a host browser (acp-serve/BrowserOS): opening the OS default
+    // browser pops a SECOND window per call — the exact bug users see as
+    // "a new browser window on every message". Navigate the host's active
+    // tab instead; the browser_* family reads/verifies from there.
+    const attachPort = Number(process.env.HMH_BROWSER_ATTACH ?? 0);
+    if (Number.isInteger(attachPort) && attachPort > 0) {
+      try {
+        const { CdpBrowser } = await import('@hmharness/browser');
+        const c = new CdpBrowser({ port: attachPort });
+        if (await c.up()) {
+          const tabs = (await c.tabs()).filter((t) => !t.url.startsWith('chrome-extension://'));
+          const page = tabs.find((t) => !t.url.startsWith('about:')) ?? tabs[0];
+          const tid = page?.targetId ?? (await c.openTab('about:blank'));
+          await c.navigate(tid, url);
+          const title = String(await c.evaluate(tid, 'document.title').catch(() => ''));
+          return { output: `navigated the host browser to ${url} (title: ${title || 'loading'}) — use browser_snapshot/browser_read to see the page` };
+        }
+      } catch { /* fall through to the default-browser path if attach fails */ }
+    }
     try {
       if (process.platform === 'win32') {
         const { execFile } = await import('node:child_process');

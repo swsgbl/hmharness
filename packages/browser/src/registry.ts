@@ -14,7 +14,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
 export const BROWSEROS_INSTALL_URL = 'https://www.browseros.com';
@@ -77,10 +77,12 @@ function which(cmd: string): string | null {
   return first ?? null;
 }
 
-/** Health = a plausible Chromium binary on disk. `--version` is displayed
- *  when the platform prints it, but Windows GUI-subsystem binaries stay
- *  silent with exit 0 — silence must not read as brokenness here (unlike
- *  language servers, whose shims DO speak --version). */
+/** Health = a plausible Chromium binary on disk. The binary is NEVER
+ *  EXECUTED for probing: on Windows, chrome-family `--version` LAUNCHES
+ *  THE BROWSER (GUI-subsystem quirk — observed popping a full BrowserOS
+ *  instance on every `hmh` startup). Version info, when wanted, is parsed
+ *  from the versioned directory that ships beside the executable
+ *  (Application/<ver>/chrome.exe layout). */
 function healthProbe(command: string): { healthy: boolean; reason?: string; version?: string } {
   try {
     const size = statSync(command).size;
@@ -90,15 +92,10 @@ function healthProbe(command: string): { healthy: boolean; reason?: string; vers
   }
   let version: string | undefined;
   try {
-    const r = spawnSync(command, ['--version'], { encoding: 'utf8', timeout: 5_000, windowsHide: true });
-    if (r.status === 0) {
-      const line = ((r.stdout || '') + (r.stderr || '')).split('\n').map((l) => l.trim()).filter(Boolean)[0];
-      // keep only ASCII version banners; a zh-CN Windows chrome.exe answers
-      // --version with a GBK "opening in existing session" notice (mojibake
-      // in utf8, and delegation noise even when decoded) — not version info
-      if (line && /^(BrowserOS|Chrome|Chromium|Edg)[\s/]/i.test(line)) version = line.slice(0, 80);
-    }
-  } catch { /* GUI subsystem silence is fine */ }
+    const dir = dirname(command);
+    const m = basename(dir).match(/^\d+\.\d+\.\d+\.\d+$/);
+    if (m) version = m[0];
+  } catch { /* version display is optional */ }
   return { healthy: true, version };
 }
 
