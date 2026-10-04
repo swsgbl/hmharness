@@ -163,14 +163,29 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
   let t = strings((cfg.locale ?? 'zh') as Locale);
   const header = () => stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`));
   stdout.write(CYAN('hmh') + DIM(` · ${cfg.provider.model} · ${home}\n`) + DIM(`${t.replHint} · /help ${String(t.cmdHelp)}\n\n`));
-  // npm is pull-based; the update reminder is a cached (1/day) registry
-  // check printed when resolved - never blocks, never nags offline
-  const { notifyUpdate } = await import('./update-check.ts');
+  // npm is pull-based; the update check is cached and never blocks. T27-v2
+  // REPL trio (parity with the TUI): briefing on the first launch of a new
+  // version, then background auto-update with visible dim start/outcome
+  // lines - unless tui.autoUpdate=false, which downgrades to the plain hint
+  const { notifyUpdate, autoUpdate, nextBriefing } = await import('./update-check.ts');
   const { createRequire } = await import('node:module');
   const CURRENT_VERSION = createRequire(import.meta.url)('../package.json').version as string;
-  void notifyUpdate(home, CURRENT_VERSION, (latest) => {
-    stdout.write(DIM(`↑ ${t.updateHint(latest)}\n\n`));
-  });
+  const briefing = await nextBriefing(home, CURRENT_VERSION);
+  if (briefing) stdout.write(DIM(`${t.tuiBriefing(CURRENT_VERSION, briefing)}\n\n`));
+  const autoOff = (cfg as { tui?: { autoUpdate?: boolean } }).tui?.autoUpdate === false;
+  if (autoOff) {
+    void notifyUpdate(home, CURRENT_VERSION, (latest) => {
+      stdout.write(DIM(`↑ ${t.updateHint(latest)}\n\n`));
+    });
+  } else {
+    void autoUpdate({
+      home,
+      current: CURRENT_VERSION,
+      say: (v) => stdout.write(DIM(`${t.tuiUpdating(v)}\n`)),
+      onDone: (code, v) => stdout.write(DIM(`${code === 0 ? t.tuiUpdated(v) : t.tuiAutoUpdateFailed('exit ' + code)}\n`)),
+      sayFail: (why) => stdout.write(DIM(`${t.tuiAutoUpdateFailed(why)}\n`)),
+    });
+  }
   const { reg, clients } = await buildRegistry();
   const rl = readline.createInterface({ input: stdin, output: stdout });
   // stdin EOF (piped input, closed terminal) must exit the loop - a bare
