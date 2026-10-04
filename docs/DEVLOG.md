@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-10-04(三十) · EVAL-IND:版本化任务集+dataset hash+seed(711/711)
+
+**动机**:审计对 benchmark 的判词"是框架不是语料"——跑过的评测
+无法钉住"跑了哪些任务/什么顺序/哪些是 holdout"(datasetHash 全仓
+零引用)。行动决议第二项。
+
+**关键决策**(evalset.ts):
+- **EvalTaskSet 版本化**:id+revision+任务(带断言 spec+holdout 标
+  记);**datasetHash=canonical form 的 sha256**(任务按 id 排序后
+  序列化——顺序无关、内容敏感,revision 是身份的一部分);
+- **seededOrder**:零依赖 PRNG(mulberry32)+确定性洗牌——同 seed
+  同顺序,seedFromString 从字符串稳定导出;
+- **holdout 门**:splitSet 按 holdout 标记切分;holdoutDisciplineOK
+  检查 train 臂零 holdout 任务;**buildRunReport 在构造时拒绝**含
+  越分任务的报告(贴错标签的报告造不出来);
+- **可比性规则**:reportsComparable=datasetHash+seed+split 三者全
+  同——跨数据集/跨 seed/跨分区的比较从制度上排除(自评经典假阳)。
+
+**实测证据**:711/711 全绿(+4:哈希顺序无关+内容/revision 敏感/
+同 seed 同序异 seed 异序+是排列/holdout 切分+污染检出+报告构造拒
+越分/四类不可比全断言)。
+
+**教训**:
+- 可比性是三元的:数据集+种子+分区缺一不可——只对 datasetHash
+  不对 seed,同一数据集两次乱序跑也会被误读为效应。
+
+---
+
 ## 2026-10-04(二十九) · COG-MEA 长任务闭环:审计行动决议第一项(707/707)
 
 **动机**:2026-10-04 审计的"下一核心"——不要横向加 agent role,把
@@ -97,6 +125,15 @@ unavailable")——修:基线懒初始化;②agent 调老工具 browser_open
 单次出现后消失,无法断定来源;**决策:不做自动杀独立实例**(裸
 命令行与用户日常主进程无法区分,误杀=灾难),留给用户复现时
 带 pid 取证再定位。
+
+**round 28 追加四(事故与回退)**:常驻清扫器造成**误杀事故**——窗口
+加载中 getTabs 短暂读成空白,用户自己的助手面板被关(日志
+02:10:18 contentWindows 1→0 → 02:10:20 closed=1,用户报告"界面
+闪退")。教训:**在别人的窗口宇宙里做自动关闭,判据再严也有竞态
+窗口**——加载态/重载态都逃不过"瞬时空白"误判。终版:**回收默认
+彻底关闭**(HMH_BROWSER_RECYCLE=1 显式开启才生效),保留
+browser_open→attach 导航这层真修复(agent 自身不再弹窗);宿主侧
+弹窗改为"用户复现时别关窗、带 pid 取证、人工定位后精准处理"。
 
 **教训**:
 1. "集成给用户"必须真人验收一轮——三连坑全部藏在协议之外
