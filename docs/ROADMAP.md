@@ -40,8 +40,8 @@
 terminal 环境过共享 conformance 契约测试,`hmh cognitive status` 真机可用,
 类型零错,全仓构建链纳入(13 包)。
 
-**下一步(§26 定论后:全计划生产收官,2026-10-04)**:12 周复审计划
-(2026-10-03 文档)W1-W12 全部落点——三 P0 清零(RLM worker 沙箱/
+**下一步(2026-10-04 晚:审计计划池全部清零+研究基建上产)**:12 周复审
+计划(2026-10-03 文档)W1-W12 全部落点——三 P0 清零(RLM worker 沙箱/
 纵切片六段闭环+类型级 claim-blind 独立评估/evaluator 分离)、快照
 三分类、LSP Client/Manager 全栈(Tier-0/1 工具+健康预检+DevEco-local
 官方发现+真 clangd 19.1.7 全链 VERIFIED+来源信任 sha256 钉住)、
@@ -50,9 +50,23 @@ WM2.0 结构化增量+deltaAccuracy、Memory2.0 计分检索、Skill2.0 n-gram
 +Cognitive OS:easy 4/4×3 地板、hard 0.5×3,阶梯差 0——通过率价值
 不在 harness,校准维 +0.4166 全阶梯独正);群体回路端到端(summary
 →merge→absorb --from);Capability OS 首片(供应链三要素)。
-npm 0.23.13→0.23.20 八连发,latest 生产可用。剩余开口全为外部:
-投稿(等作者)、bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在
-IDE JVM 内不可外部直驱)。
+
+**2026-10-04 审计(0.23.12 快照)计划池六项全清零(轮 29-35,0.23.22
+在产)**:①**COG-MEA 长任务闭环**(Manager 有界重试/重规划+新鲜执行者
+零转录污染+claim-blind 只读审计+学习者键审计裁决;三不变量测试钉死);
+②**EVAL-IND 五件套**(版本化任务集+datasetHash+seed+holdout 构造拒
+越分+配对 McNemar 精确检验——先拒不可比再数不一致对);③**沙箱
+red-team**(可执行载荷抓真逃逸:R3 动态 import/R1 process→worker 内
+剥四全局;不可堵向量=SANDBOX_BYPASS_VECTORS 机器检查);④**WM-2
+深水区**(观测 lift 因果挖掘+时序 lag+Occam 抑制+反事实重放恒标
+model-based-extrapolation;观测因果学能排序不能排除);⑤**Code World
+Model**(审计五类本体+编辑预测先行/实际后置/误差结算;LSP 传感器只
+发射 symbol 树证明的 defines);⑥**flaky 根修**(run.started→
+run.created 一行错配,摘录步兑现)。
+
+剩余开口全为外部:投稿(等作者;已收录 PR21,实际是条目更新)、
+bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在 IDE JVM 内不可外部
+直驱)。
 
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 
