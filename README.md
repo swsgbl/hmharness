@@ -159,6 +159,8 @@ hmh lsp list | trust <id> | untrust <id>         # 语言服务器发现/健康/
 
 每次任务自动落认知轨迹（工具动作+预测+结果+耗时，按工具归因到 browser/desktop/harmonyos/terminal 各环境）；世界模型从历史学习并反哺系统提示；探索引擎优先探测模型预测最差的动作（预测误差=信息增益）；校准可靠度随使用提升——**"越用越准"有学习曲线为证**（五环境全有读数：terminal/harmonyos/browser/arc3 四环境 improving，desktop 完美校准 flat 1.00）。
 
+研究基建（库层，随 `@hmharness/cognitive` 提供）：**MEA 长任务闭环**（Manager 分解/新鲜执行者零转录污染/claim-blind 只读审计/学习者键审计裁决）；**版本化评测任务集**（datasetHash+seed+holdout 门+配对 McNemar 精确检验）；**观测因果挖掘与反事实重放**（时序 lag+Occam 抑制；观测因果学能排序不能排除——诚实标签恒随行）；**Code World Model**（LSP 传感器→五类本体，编辑预测先行+实际后置误差结算）。
+
 ## 仓库结构
 
 ```

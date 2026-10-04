@@ -26,6 +26,10 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 **进化 2.0 治理**：候选契约（假设/预期/回归声明/holdout/transfer/回滚缺一不可）→ 序贯 SPRT 门禁（train 样本永不决策）→ 金丝雀 → reward-hacking 检测 → 不可变审计。
 **多智能体治理**：spawn_agent 全部走角色契约拓扑 + 共享预算 + 跨进程不可变审计。
 **校准报告**：`hmh cognitive calibration` 按动作列预测可靠度——harness 实证价值所在。
+**MEA 长任务闭环**：Manager 分解（有界重试/重规划）→新鲜执行者（零跨步转录污染）→只读审计者（claim-blind，类型级墙）→学习者（记忆键审计裁决）；三不变量各有测试钉死。
+**版本化评测**：EvalTaskSet（datasetHash=canonical sha256）+确定性 seed+holdout 门（越分报告构造时拒绝）+配对 McNemar 精确检验（先拒绝不可比，再数不一致对）。
+**观测因果/反事实**：lift 因果挖掘（时序前置结构性，lag 0/1）+Occam 抑制（lag1 遇不弱 lag0 让位）+反事实重放（model-based-extrapolation 诚实标签）；观测因果学能排序不能排除。
+**Code World Model**：LSP+API KG+build/runtime facts 统一五类本体（CodeEntity/Relation/Diagnostic/BuildFact/RuntimeFact）；编辑预测先行（关系图爆炸半径+诚实诊断下限）+实际后置结算（Jaccard/precision/recall+missed=图不全惊喜）；LSP 传感器只发射 symbol 树证明的 defines 关系。
 
 **校准研究定论（§26 全谱系，消融 11 轮）**：
 - 单任务·提示层：0（工具可靠性统计与经验层对单任务结果均无净效应）
