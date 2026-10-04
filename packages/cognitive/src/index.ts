@@ -34,3 +34,4 @@ export * from './crowd.ts';
 export * from './slice.ts';
 export * from './mea.ts';
 export * from './evalset.ts';
+export * from './code-world-model.ts';

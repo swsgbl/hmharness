@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-10-04(三十四) · Code World Model:审计计划池收官(721/721)
+
+**动机**:审计 02 主线 B"LSP+API KG+build/runtime facts 统一成
+CodeEntity/Relation/Diagnostic/BuildFact/RuntimeFact"——计划池最后一项。
+
+**关键决策**(code-world-model.ts):
+- **本体五类按审计原文**:CodeEntity(file/module/function/class/
+  method/field)+SymbolRelation(defines/calls/references/imports/
+  implements)+CodeDiagnostic(source:lsp/build/runtime)+BuildFact+
+  RuntimeFact;cognitive 零依赖 lsp 包——**传感器喂数,模型持有本体**
+  (分层不破);
+- **诊断按 uri 幂等覆盖**(传感器推新态,同消息同源去重);
+- **编辑的预测先行**:predictEditDelta 从关系图算爆炸半径(重命名/
+  删除 X=X 自身+所有点名 X 的关系+两端实体);newDiagnosticEstimate
+  =被触文件既有诊断数(**诚实下限,不猜新诊断**);
+- **WM-2 纪律全量适用**:recordEditDelta 结算开放式预测——Jaccard/
+  precision/recall+missed(图不全的惊喜,正是信号)+spurious;
+  一次编辑一预测,结算即闭;
+- **stateHash**:实体/关系/诊断 canonical 排序哈希——供 holdout 纪
+  律与漂移检测复用。
+
+**实测证据**:721/721(+4:五类合一+图查询+诊断幂等/重命名爆炸半
+径=完美实际零误差+二次结算拒绝/**图不全→missed 可测**(秘密调用
+者落入 missed,precision<1)/状态哈希顺序无关内容敏感)。
+
+**教训**:
+- Code WM 的预测下限要诚实:估计"既有诊断数"而不是编造"新诊断
+  数"——不可算的量宁可不算;
+- 惊喜(missed)不是失败而是图完整性的度量——同 WM-2 的预测误差
+  一样,它是学习信号。
+
+---
+
 ## 2026-10-04(三十三) · WM-2 深水区:因果/时序/反事实(717/717)
 
 **动机**:审计 M2"entity/relation/causal/temporal/counterfactual"——
