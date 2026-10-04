@@ -16,7 +16,8 @@
   },
   "files": [
     "dist",
-    "board"
+    "board",
+    "release-notes.json"
   ],
   "engines": {
     "node": ">=22"

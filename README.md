@@ -46,7 +46,7 @@ npm install -g @hmharness/cli     # Node >= 22
 hmh init                    # 建立 ~/.hmharness（配置 + 状态目录）
 ```
 
-> 更新是全自动的:`hmh` 启动时后台静默检查并升级(无弹窗、无提示,新版本下次启动生效;`config.json` 设 `tui.autoUpdate=false` 可退回仅提示)。
+> 更新是全自动的:`hmh` 启动时后台静默检查并升级——**无弹窗**,TUI 内有轻提示(更新开始/完成)与升级后首启的一行更新简报,新版本下次启动生效;`config.json` 设 `tui.autoUpdate=false` 可退回仅提示。
 
 **方式二:源码运行**(开发/尝鲜):
 

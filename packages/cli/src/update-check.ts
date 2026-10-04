@@ -9,6 +9,30 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
+/** Shipped one-line release notes (packages/cli/release-notes.json): the
+ *  updater briefing reads them so the FIRST launch of a new version can tell
+ *  the user what changed. publish.cjs enforces every released version has an
+ *  entry. Degrades to null when absent - the briefing is a courtesy. */
+export interface ReleaseNotes {
+  notes: Array<{ v: string; date?: string; note: string }>;
+}
+
+export async function loadReleaseNotes(distDir?: string): Promise<ReleaseNotes | null> {
+  const base = distDir ?? join(import.meta.dirname ?? '.', '');
+  try {
+    const j = JSON.parse(await readFile(join(base, '..', 'release-notes.json'), 'utf8')) as ReleaseNotes;
+    return j && Array.isArray(j.notes) ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The one-line note for one version ('' when unknown - never invented). */
+export function noteFor(notes: ReleaseNotes | null, version: string): string {
+  const hit = notes?.notes.find((n) => n && n.v === version && typeof n.note === 'string');
+  return hit ? hit.note : '';
+}
+
 const REGISTRY = 'https://registry.npmjs.org/-/package/@hmharness/cli/dist-tags';
 // 5 minutes for auto-update mode (fresh enough to catch new releases same-session);
 // the check is a single lightweight GET, not worth caching longer
@@ -187,7 +211,9 @@ export async function aiRepairUpdate(opts: {
   error: string;
   version: string;
   chatImpl?: (prompt: string) => Promise<string>;
-  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
+  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: (...a: never[]) => void) => void };
+  /** completion hook for the repaired install (T27-v2 briefing) */
+  onDone?: (code: number) => void;
   logFd: number;
 }): Promise<string | null> {
   try {
@@ -212,6 +238,7 @@ export async function aiRepairUpdate(opts: {
     const child = plat === 'win32'
       ? spawnFn('cmd.exe', ['/d', '/s', '/c', cmd], { detached: true, stdio: ['ignore', opts.logFd, opts.logFd], cwd: opts.home, windowsHide: true })
       : spawnFn(cmd.split(' ')[0], cmd.split(' ').slice(1), { detached: true, stdio: ['ignore', opts.logFd, opts.logFd], cwd: opts.home });
+    child.on('close', (code: number) => opts.onDone?.(code ?? -1));
     child.unref();
     return cmd;
   } catch {
@@ -233,10 +260,15 @@ export function spawnStarted(child: { on: (ev: string, fn: () => void) => void }
 export async function autoUpdate(opts: {
   home: string;
   current: string;
-  /** failure notice only - success is SILENT by design (T27): the new
-   *  version announces itself in the TUI header on the next launch */
+  /** one dim line when the background install STARTS (T27-v2: visible but
+   *  windowless - the user keeps a sense of control without popups) */
+  say?: (version: string) => void;
+  /** fires when the detached installer actually EXITS (code 0 = updated);
+   *  the completion line lands here, minutes after autoUpdate returned */
+  onDone?: (code: number, version: string) => void;
+  /** failure notice only - a started install never nags */
   sayFail?: (line: string) => void;
-  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: () => void) => void };
+  spawnImpl?: (cmd: string, args: string[], o: { detached: boolean; stdio: unknown; cwd: string; windowsHide?: boolean }) => { unref: () => void; on: (ev: string, fn: (...a: never[]) => void) => void };
   now?: number;
   aiChat?: (prompt: string) => Promise<string>;
   /** override the running dist dir (tests inject a board layout) */
@@ -277,11 +309,14 @@ export async function autoUpdate(opts: {
             cwd: opts.home,
             windowsHide: true, // never flash a console window (T27)
           });
+          child.on('close', (code: number) => opts.onDone?.(code ?? -1, info.latest));
           child.unref();
           await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest, via: 'board-installer' }), 'utf8');
+          opts.say?.(info.latest); // dim in-TUI start line (T27-v2), BEFORE the
+          // start-failure probe so the visual order is always start -> outcome
           const started = await spawnStarted(child);
           if (!started) throw new Error('board installer failed to start');
-          return; // silent success (T27)
+          return;
         }
         opts.sayFail?.('board install: updater script missing');
         return;
@@ -293,12 +328,13 @@ export async function autoUpdate(opts: {
         cwd: opts.home,
         windowsHide: true, // detached cmd.exe/npm MUST NOT open a visible window (T27)
       });
+      child.on('close', (code: number) => opts.onDone?.(code ?? -1, info.latest));
       child.unref();
       await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest }), 'utf8');
+      opts.say?.(info.latest); // dim in-TUI start line (T27-v2), BEFORE the
+      // start-failure probe so the visual order is always start -> outcome
       const started = await spawnStarted(child);
       if (!started) throw new Error('installer failed to start');
-      // silent success (T27): no notice - the header version changes on the
-      // next launch; every detail is in update.log if anyone needs it
     } catch (err) {
       // SMART layer: let the user's own model adapt to this machine
       const errText = String(err).slice(0, 400);
@@ -312,10 +348,12 @@ export async function autoUpdate(opts: {
         version: info.latest,
         chatImpl: opts.aiChat,
         spawnImpl: opts.spawnImpl,
+        onDone: (code) => opts.onDone?.(code, info.latest),
         logFd: log.fd,
       });
       if (ran) {
         await writeFile(lockFile, JSON.stringify({ time: now, to: info.latest, via: 'ai-repair', cmd: ran }), 'utf8');
+        opts.say?.(info.latest + ' (AI 修复安装)');
       } else {
         opts.sayFail?.(errText.slice(0, 80));
       }

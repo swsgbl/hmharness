@@ -3,8 +3,80 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkForUpdate, cmpSemver, isBoardInstall, boardHomeFromDistDir, autoUpdate } from '../update-check.ts';
+import { checkForUpdate, cmpSemver, isBoardInstall, boardHomeFromDistDir, autoUpdate, loadReleaseNotes, noteFor } from '../update-check.ts';
 import { renderStats, type PkgStat } from '../npm-stats.ts';
+
+/* ------------- T27-v2: visible-but-windowless update notices + briefing ------------- */
+
+function fakeChild() {
+  const listeners: Record<string, Array<(code?: number) => void>> = {};
+  const child = {
+    unref: () => {},
+    on: (ev: string, fn: (code?: number) => void) => { (listeners[ev] ??= []).push(fn); },
+  };
+  return { child, emit: (ev: string, code?: number) => { for (const fn of listeners[ev] ?? []) fn(code); } };
+}
+
+test('autoUpdate notices: say at start, onDone(code,version) when the installer exits (T27-v2)', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-notice-'));
+  const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
+  const fc = fakeChild();
+  const said: string[] = [];
+  const dones: Array<[number, string]> = [];
+  try {
+    await autoUpdate({
+      home, current: '0.2.0', now: Date.now(), fetchImpl,
+      say: (v) => said.push(v),
+      onDone: (code, v) => dones.push([code, v]),
+      sayFail: () => { throw new Error('sayFail must not fire for a started install'); },
+      spawnImpl: () => fc.child as never,
+    });
+    assert.deepEqual(said, ['9.9.9'], 'one dim start line the moment the install launches');
+    assert.equal(dones.length, 0, 'completion has not fired yet (installer still running)');
+    fc.emit('close', 0);
+    assert.deepEqual(dones, [[0, '9.9.9']], 'clean exit reports success with the version');
+    // a runtime failure also reports once, honestly
+    const fc2 = fakeChild();
+    const dones2: Array<[number, string]> = [];
+    await writeFile(join(home, 'updating.lck'), JSON.stringify({ time: 0 }), 'utf8'); // stale lock
+    await autoUpdate({
+      home, current: '0.2.0', now: Date.now(), fetchImpl,
+      onDone: (c, v) => dones2.push([c, v]),
+      spawnImpl: () => fc2.child as never,
+    });
+    fc2.emit('close', 1);
+    assert.deepEqual(dones2, [[1, '9.9.9']], 'nonzero exit surfaces the code');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('release notes: shipped file loads, noteFor finds and never invents', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-notes-'));
+  try {
+    await mkdir(join(dir, 'dist'), { recursive: true });
+    await writeFile(join(dir, 'release-notes.json'), JSON.stringify({ notes: [{ v: '1.2.3', note: '修复了更新提示' }, { v: '1.2.2', note: 'x' }] }), 'utf8');
+    const notes = await loadReleaseNotes(join(dir, 'dist'));
+    assert.ok(notes);
+    assert.equal(noteFor(notes, '1.2.3'), '修复了更新提示');
+    assert.equal(noteFor(notes, '0.0.0'), '', 'unknown version = empty, never fabricated');
+    const bare = await mkdtemp(join(tmpdir(), 'hmh-notes2-'));
+    await mkdir(join(bare, 'dist'), { recursive: true });
+    assert.equal(await loadReleaseNotes(join(bare, 'dist')), null, 'missing file degrades to null');
+    await rm(bare, { recursive: true, force: true });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('the real shipped release-notes.json covers the running cli version (guard mirror)', async () => {
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const cliV = req('../../package.json') as { version: string };
+  const notes = await loadReleaseNotes();
+  assert.ok(notes, 'shipped notes file must exist next to dist');
+  assert.ok(noteFor(notes, cliV.version).length > 0, 'current version ' + cliV.version + ' must have a briefing entry');
+});
 
 test('cmpSemver: numeric per-component ordering (not lexicographic)', () => {
   assert.equal(cmpSemver('0.2.0', '0.2.0'), 0);

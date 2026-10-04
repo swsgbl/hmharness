@@ -147,6 +147,10 @@ export interface Strings {
   opsHint: string;
   tuiLongOutputHint: (tool: string, lines: number) => string;
   tuiUserFolded: (hidden: number) => string;
+  /** update briefing trio (T27-v2): start line, completion line, first-launch note */
+  tuiUpdating: (v: string) => string;
+  tuiUpdated: (v: string) => string;
+  tuiBriefing: (v: string, note: string) => string;
   tuiAutoUpdateFailed: (why: string) => string;
   tuiEvolveDone: (proposals: number, insights: number, notes: number) => string;
   tuiPassRate: (pct: string) => string;
@@ -306,6 +310,9 @@ const zh: Strings = {
   opsHint: '更多操作:/ops scan 立即扫描并生成今日简报 · /ops brief 查看最近简报',
   tuiLongOutputHint: (tool, lines) => `⎿ ${tool} 输出 ${lines} 行(已折叠) · 按 z 展开最后一条 · Ctrl+T 看全文`,
   tuiUserFolded: (hidden) => `(…还有 ${hidden} 行已折叠 · Ctrl+T 看全文)`,
+  tuiUpdating: (v) => `⤴ 发现新版本 ${v}，后台更新中（不打扰当前会话，新版本下次启动生效）`,
+  tuiUpdated: (v) => `✓ 已更新到 ${v} · 重启 hmh 后生效`,
+  tuiBriefing: (v, note) => `📋 本次更新 ${v}：${note}`,
   tuiAutoUpdateFailed: (why) => `⤴ 自动更新未能开始(${why})，下次再试;或手动: npm i -g @hmharness/cli@latest`,
   tuiEvolveDone: (p, i, n) => `evolve 完成: ${p} 提案 · 洞察 ${i} · 记忆 ${n}`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,
@@ -460,6 +467,9 @@ const en: Strings = {
   opsHint: 'more: /ops scan pull upstream + write today brief · /ops brief latest brief',
   tuiLongOutputHint: (tool, lines) => `⎿ ${tool} produced ${lines} lines (folded) · z expands the last cell · Ctrl+T full transcript`,
   tuiUserFolded: (hidden) => `(…${hidden} more lines folded · Ctrl+T full transcript)`,
+  tuiUpdating: (v) => `⤴ new version ${v} - updating in the background (this session is unaffected; effective on next launch)`,
+  tuiUpdated: (v) => `✓ updated to ${v} · restart hmh to activate`,
+  tuiBriefing: (v, note) => `📋 updated ${v}: ${note}`,
   tuiAutoUpdateFailed: (why) => `⤴ auto-update could not start (${why}); or manually: npm i -g @hmharness/cli@latest`,
   tuiEvolveDone: (p, i, n) => `evolve done: ${p} proposals · ${i} insights · ${n} notes`,
   tuiPassRate: (pct) => `pass rate: ${pct}`,

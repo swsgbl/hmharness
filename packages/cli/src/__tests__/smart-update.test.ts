@@ -61,9 +61,10 @@ function mockSpawnOnce(err: boolean) {
   }
 }
 
-test('autoUpdate: installer starts -> SILENT success (T27), lock written, no DEP0137 leak', async () => {
+test('autoUpdate: installer starts -> one start line, no fail line, lock written (T27-v2)', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-smartupd-'));
   let saidFail: string[] = [];
+  let said: string[] = [];
   let spawned: Array<{ file: string; args: string[] }> = [];
   const fetchImpl = (async () => new Response(JSON.stringify({ latest: '9.9.9' }), { status: 200 })) as unknown as typeof fetch;
   try {
@@ -72,6 +73,7 @@ test('autoUpdate: installer starts -> SILENT success (T27), lock written, no DEP
       home,
       current: '0.1.0',
       now: Date.now(),
+      say: (v) => said.push(v),
       sayFail: (l) => saidFail.push(l),
       spawnImpl: (file, args) => {
         spawned.push({ file, args });
@@ -93,7 +95,8 @@ test('autoUpdate: installer starts -> SILENT success (T27), lock written, no DEP
     } else {
       assert.equal(spawned[0].file, 'npm');
     }
-    assert.equal(saidFail.length, 0, 'T27: a started install says NOTHING - the version change lands silently');
+    assert.deepEqual(said, ['9.9.9'], 'T27-v2: exactly one visible start line');
+    assert.equal(saidFail.length, 0, 'a started install never nags');
     const lock = JSON.parse(await readFile(join(home, 'updating.lck'), 'utf8'));
     assert.equal(lock.to, '9.9.9');
   } finally {

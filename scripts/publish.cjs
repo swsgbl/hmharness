@@ -43,6 +43,26 @@ const REG = 'https://registry.npmjs.org';
   }
 }
 
+// 0a-1. release-notes coverage: the cli ships release-notes.json and the TUI
+// briefs the user on the first launch of each new version - every release
+// MUST carry its one-liner or the briefing silently degrades
+{
+  try {
+    const notes = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'cli', 'release-notes.json'), 'utf8'));
+    const cliV = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'cli', 'package.json'), 'utf8')).version;
+    const has = Array.isArray(notes.notes) && notes.notes.some((n) => n && n.v === cliV && typeof n.note === 'string' && n.note.trim());
+    if (!has) {
+      console.error('release-notes preflight FAILED: packages/cli/release-notes.json has no entry for ' + cliV);
+      console.error('  add { "v": "' + cliV + '", "date": "<today>", "note": "<one line, zh>" } to notes[] (newest first) - the TUI shows it once after the update lands');
+      process.exit(1);
+    }
+    console.log('release-notes preflight ok: briefing present for ' + cliV);
+  } catch (e) {
+    console.error('release-notes preflight FAILED: packages/cli/release-notes.json unreadable (' + e.message + ')');
+    process.exit(1);
+  }
+}
+
 // 0a. dependency-coverage preflight: every @hmharness/* dependency of every
 // package in the set must itself be IN the set - a dep on an unpublished
 // package breaks installs for every user (0.23.14 lesson: agent depended on

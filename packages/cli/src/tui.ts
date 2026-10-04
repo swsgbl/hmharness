@@ -1585,6 +1585,25 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     await clearPending(home);
   }
   if (webUp) rt.addText(t.tuiWebLinked(DEFAULT_WEB_PORT), 'dim');
+  // update briefing (T27-v2): the FIRST launch of a new version shows its
+  // one-line note from the shipped release-notes.json - shown once per
+  // version (stamp in HMH_HOME), never on a fresh install
+  {
+    const { loadReleaseNotes, noteFor } = await import('./update-check.ts');
+    const notes = await loadReleaseNotes();
+    const stamp = join(home, 'last-noted-version.json');
+    if (notes) {
+      let last: string | undefined;
+      try { last = (JSON.parse(await (await import('node:fs/promises')).readFile(stamp, 'utf8')) as { v?: string }).v; } catch { /* fresh install */ }
+      if (last !== undefined && last !== HMH_VERSION) {
+        const note = noteFor(notes, HMH_VERSION);
+        rt.addText(t.tuiBriefing(HMH_VERSION, note || '—'), 'dim');
+      }
+      if (last !== HMH_VERSION) {
+        try { await (await import('node:fs/promises')).writeFile(stamp, JSON.stringify({ v: HMH_VERSION }), 'utf8'); } catch { /* best effort */ }
+      }
+    }
+  }
   // update reminder: cached (1/day) registry check, resolved async into the
   // transcript via addText (frame-safe); offline stays silent
   {
@@ -1601,8 +1620,14 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       void autoUpdate({
         home,
         current,
-        // settled design T27: success is fully silent (no popup window via
-        // windowsHide, no transcript line) - only a failed install speaks
+        // settled design T27-v2 (复案 2026-10-03): windowless stays, but the
+        // user keeps control - one dim line when the install starts, one
+        // when it lands, and a one-line briefing on the first launch after
+        say: (latest) => rt.addText(t.tuiUpdating(latest), 'dim'),
+        onDone: (code, latest) => {
+          if (code === 0) rt.addText(t.tuiUpdated(latest), 'dim');
+          else rt.addText(t.tuiAutoUpdateFailed('exit ' + code), 'dim');
+        },
         sayFail: (why) => rt.addText(t.tuiAutoUpdateFailed(why), 'dim'),
       });
     }
