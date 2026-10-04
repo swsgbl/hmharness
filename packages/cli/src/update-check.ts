@@ -33,6 +33,28 @@ export function noteFor(notes: ReleaseNotes | null, version: string): string {
   return hit ? hit.note : '';
 }
 
+/** First-launch-of-a-new-version briefing (T27-v2 part 3). Returns the
+ *  note text when the HMH_HOME stamp differs from the RUNNING version
+ *  (then re-stamps); fresh installs (no stamp) and same-version launches
+ *  return null. Shared by the TUI and the REPL so "hmh starts" means
+ *  both frontends. */
+export async function nextBriefing(home: string, current: string): Promise<string | null> {
+  const notes = await loadReleaseNotes();
+  if (!notes) return null;
+  const stamp = join(home, 'last-noted-version.json');
+  let last: string | undefined;
+  try {
+    last = (JSON.parse(await readFile(stamp, 'utf8')) as { v?: string }).v;
+  } catch { /* fresh install */ }
+  if (last === current) return null;
+  try {
+    await mkdir(home, { recursive: true });
+    await writeFile(stamp, JSON.stringify({ v: current }), 'utf8');
+  } catch { /* best-effort stamp */ }
+  if (last === undefined) return null; // fresh install: welcome covers it
+  return noteFor(notes, current) || '—';
+}
+
 const REGISTRY = 'https://registry.npmjs.org/-/package/@hmharness/cli/dist-tags';
 // 5 minutes for auto-update mode (fresh enough to catch new releases same-session);
 // the check is a single lightweight GET, not worth caching longer

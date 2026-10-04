@@ -1589,20 +1589,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
   // one-line note from the shipped release-notes.json - shown once per
   // version (stamp in HMH_HOME), never on a fresh install
   {
-    const { loadReleaseNotes, noteFor } = await import('./update-check.ts');
-    const notes = await loadReleaseNotes();
-    const stamp = join(home, 'last-noted-version.json');
-    if (notes) {
-      let last: string | undefined;
-      try { last = (JSON.parse(await (await import('node:fs/promises')).readFile(stamp, 'utf8')) as { v?: string }).v; } catch { /* fresh install */ }
-      if (last !== undefined && last !== HMH_VERSION) {
-        const note = noteFor(notes, HMH_VERSION);
-        rt.addText(t.tuiBriefing(HMH_VERSION, note || '—'), 'dim');
-      }
-      if (last !== HMH_VERSION) {
-        try { await (await import('node:fs/promises')).writeFile(stamp, JSON.stringify({ v: HMH_VERSION }), 'utf8'); } catch { /* best effort */ }
-      }
-    }
+    const { nextBriefing } = await import('./update-check.ts');
+    const briefing = await nextBriefing(home, HMH_VERSION);
+    if (briefing) rt.addText(t.tuiBriefing(HMH_VERSION, briefing), 'dim');
   }
   // update reminder: cached (1/day) registry check, resolved async into the
   // transcript via addText (frame-safe); offline stays silent

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkForUpdate, cmpSemver, isBoardInstall, boardHomeFromDistDir, autoUpdate, loadReleaseNotes, noteFor } from '../update-check.ts';
+import { checkForUpdate, cmpSemver, isBoardInstall, boardHomeFromDistDir, autoUpdate, loadReleaseNotes, noteFor, nextBriefing } from '../update-check.ts';
 import { renderStats, type PkgStat } from '../npm-stats.ts';
 
 /* ------------- T27-v2: visible-but-windowless update notices + briefing ------------- */
@@ -76,6 +76,29 @@ test('the real shipped release-notes.json covers the running cli version (guard 
   const notes = await loadReleaseNotes();
   assert.ok(notes, 'shipped notes file must exist next to dist');
   assert.ok(noteFor(notes, cliV.version).length > 0, 'current version ' + cliV.version + ' must have a briefing entry');
+});
+
+test('nextBriefing: once per version, fresh installs silent, unknown note shows dash', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-brief-'));
+  const { readFile, writeFile } = await import('node:fs/promises');
+  try {
+    // fresh install: nothing, but the stamp is laid down
+    assert.equal(await nextBriefing(home, '0.23.23'), null);
+    let stamp = JSON.parse(await readFile(join(home, 'last-noted-version.json'), 'utf8'));
+    assert.equal(stamp.v, '0.23.23');
+    // same version again: nothing
+    assert.equal(await nextBriefing(home, '0.23.23'), null);
+    // version bump (a real released one with a note): the briefing text
+    const b = await nextBriefing(home, '0.23.22');
+    assert.ok(b && b.length > 0, 'downgrade/change to a known version still briefs: ' + b);
+    stamp = JSON.parse(await readFile(join(home, 'last-noted-version.json'), 'utf8'));
+    assert.equal(stamp.v, '0.23.22');
+    // a version with no note entry: dash, never fabricated
+    await writeFile(join(home, 'last-noted-version.json'), JSON.stringify({ v: '0.0.1' }), 'utf8');
+    assert.equal(await nextBriefing(home, '9.9.9'), '—');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
 test('cmpSemver: numeric per-component ordering (not lexicographic)', () => {
