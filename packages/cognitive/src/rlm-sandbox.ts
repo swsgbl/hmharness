@@ -39,22 +39,41 @@ export interface SandboxOptions {
 /** The worker bootstrap source. Runs as CommonJS, receives {code, vars, meta}
  *  through workerData (structured-cloned at spawn), executes the code as an
  *  async function body with a frozen ctx, and posts the result back.
- *  Shadows the dangerous globals at function-constructor scope so casual
- *  access fails loudly. */
+ *  RED-TEAM HARDENING (round 32, executable-payload driven): after the
+ *  bootstrap captures parentPort, the escape-reachable globals are STRIPPED
+ *  from the worker's globalThis — globalThis.process (kills the R1/R4
+ *  reach-and-kill vectors), Worker/fetch/WebSocket (network + thread
+ *  spawn). What remains impossible to block without a per-worker
+ *  permission model is declared in SANDBOX_BYPASS_VECTORS below — pinned
+ *  by the red-team test so a silent hole can never masquerade as covered. */
 const WORKER_SOURCE = `
 const { parentPort, workerData } = require('node:worker_threads');
 (async () => {
+  // hardening pass: strip escape globals BEFORE evaluating any user code
+  try { delete globalThis.process; } catch { /* non-configurable: shadow instead below */ }
+  try { globalThis.Worker = undefined; } catch { }
+  try { globalThis.fetch = undefined; } catch { }
+  try { globalThis.WebSocket = undefined; } catch { }
   const ctx = Object.freeze({ vars: Object.freeze({ ...workerData.vars }), meta: Object.freeze({ ...workerData.meta }) });
   try {
-    const process = undefined, require = undefined;
-    const fn = new Function('ctx', 'process', 'require', '"use strict";return (async()=>{' + workerData.code + '})();');
-    const value = await fn(ctx, undefined, undefined);
+    const fn = new Function('ctx', 'process', 'require', 'fetch', 'Worker', 'WebSocket', '"use strict";return (async()=>{' + workerData.code + '})();');
+    const value = await fn(ctx, undefined, undefined, undefined, undefined, undefined);
     parentPort.postMessage({ ok: true, value });
   } catch (err) {
     parentPort.postMessage({ ok: false, error: { code: 'E_EVAL', message: err && err.message ? String(err.message).slice(0, 500) : String(err).slice(0, 500) } });
   }
 })();
 `;
+
+/**
+ * HONEST threat model: escape vectors the worker CANNOT block today (they
+ * need a per-worker permission model, which Node does not offer per
+ * worker). The red-team test asserts every still-escaping probe is on this
+ * list, and every vector NOT on it is blocked — a new silent hole fails CI.
+ */
+export const SANDBOX_BYPASS_VECTORS: readonly string[] = [
+  'dynamic-import', // import('node:*') inside eval code reaches Node modules
+] as const;
 
 /** Run RLM eval code inside a fresh worker. One worker per eval — RLM evals
  *  are coarse-grained (composing workspace variables), so per-eval spawn
