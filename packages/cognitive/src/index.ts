@@ -35,3 +35,4 @@ export * from './slice.ts';
 export * from './mea.ts';
 export * from './evalset.ts';
 export * from './code-world-model.ts';
+export * from './code-world-store.ts';

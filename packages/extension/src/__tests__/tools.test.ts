@@ -138,6 +138,44 @@ test('tools: live bridge + connected extension — status/tabs/read full round-t
   }
 });
 
+test('tools: onPageRead observation hook — fired with RAW data on success, silent on failure', async () => {
+  const home = await tmpHome();
+  const bridge = new ExtensionBridgeServer({ home });
+  try {
+    const { port } = await bridge.start(0);
+    const code = await issuePairingCode(home);
+    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.ok ? code.code : '' }) })).json() as { token: string };
+    const good: RawPageData = { url: 'https://ok.dev', title: 'OK', selection: '', headings: [], links: [], inputs: [], text: 'body' };
+    let failNext = false;
+    const detach = await connectStub(port, paired.token, (cmd) => {
+      if (cmd.kind === 'page.read') {
+        if (failNext) return Promise.reject(new Error('extension refused'));
+        return good;
+      }
+      return { pong: true };
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    const seen: RawPageData[] = [];
+    // a THROWING hook must never fail the tool (best-effort by contract)
+    const tools = extensionTools({ home, onPageRead: (raw) => { seen.push(raw); throw new Error('hook boom'); } });
+    const read = tools.find((t) => t.name === 'extension_page_read')!;
+    const ok = await read.execute({}, { cwd: home, home });
+    assert.equal(ok.isError, undefined);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]!.url, 'https://ok.dev');
+    // failed read: error surfaced, hook NOT called
+    failNext = true;
+    seen.length = 0;
+    const bad = await read.execute({}, { cwd: home, home });
+    assert.equal(bad.isError, true);
+    assert.equal(seen.length, 0);
+    detach();
+  } finally {
+    await bridge.stop();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('tools: bridge dies between registry build and tool call — execute fails honestly, not a hang', async () => {
   const home = await tmpHome();
   // forge a FRESH state file pointing at a port where nothing listens

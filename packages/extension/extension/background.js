@@ -105,6 +105,8 @@
     const ac = new AbortController();
     stream = ac;
     badge('error'); // pessimistic until the stream proves alive
+    let lastBlockAt = Date.now();
+    let watchdog = null;
     try {
       const res = await fetch(baseUrl() + '/v1/events', {
         headers: { authorization: 'Bearer ' + binding.token },
@@ -127,10 +129,23 @@
       badge('on');
       backoff = RECONNECT_MIN_MS; // a proven attach resets the backoff
 
+      // dead-stream watchdog: the bridge heartbeats every 5s — silence for
+      // 40s means this stream is a ghost (MV3 workers can be killed and
+      // respawned onto a NEW stream while the browser keeps the old socket
+      // half-open). Abandon it and reconnect instead of listening to
+      // nothing forever.
+      watchdog = setInterval(() => {
+        if (Date.now() - lastBlockAt > 40_000) {
+          clearInterval(watchdog);
+          if (stream === ac) { ac.abort(); }
+        }
+      }, 5_000);
+
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        if (stream !== ac) return; // a newer attach superseded us
+        lastBlockAt = Date.now();
+        if (stream !== ac) { clearInterval(watchdog); return; } // superseded
         buf += decoder.decode(value, { stream: true });
         let idx;
         while ((idx = buf.indexOf('\n\n')) >= 0) {
@@ -139,7 +154,9 @@
           handleSseBlock(block);
         }
       }
+      if (watchdog) clearInterval(watchdog);
     } catch (e) {
+      if (watchdog) clearInterval(watchdog);
       if (stream !== ac) return;
     }
     if (stream === ac) {
@@ -394,15 +411,20 @@
 
   api.runtime.onStartup.addListener(() => { void loadBinding().then(() => attach()); });
   api.runtime.onInstalled.addListener(() => { void loadBinding().then(() => attach()); });
-  // service-worker revival safety net: a 1-minute alarm re-attaches the
-  // stream whenever Chrome has killed and respawned the worker
+  // service-worker revival safety net: a 30s alarm (Chrome 120+ floor;
+  // engines that reject sub-minute periods fall back to 1min) re-attaches
+  // the stream whenever Chrome has killed and respawned the worker mid-idle
   try {
-    api.alarms.create('hmh-keepalive', { periodInMinutes: 1 });
+    api.alarms.create('hmh-keepalive', { periodInMinutes: 0.5 });
+  } catch (e) {
+    try { api.alarms.create('hmh-keepalive', { periodInMinutes: 1 }); } catch (e2) { /* no alarms at all */ }
+  }
+  try {
     api.alarms.onAlarm.addListener(() => {
       if (!stream) void loadBinding().then(() => attach());
       else pushTabsSoon();
     });
-  } catch (e) { /* alarms unavailable (Safari) — fetch-stream keepalive still holds */ }
+  } catch (e) { /* alarms unavailable (Safari) — fetch-stream keepalive + watchdog still hold */ }
 
   for (const ev of ['onUpdated', 'onActivated', 'onRemoved']) {
     try { api.tabs[ev].addListener(() => pushTabsSoon()); } catch (e) { /* */ }

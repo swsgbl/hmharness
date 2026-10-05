@@ -9,7 +9,7 @@ test('adapters: chromium manifest — MV3 service worker + side panel + chrome f
   assert.equal(m.side_panel.default_path, 'sidepanel.html');
   assert.equal(m.action.default_popup, 'popup.html');
   assert.equal(m.minimum_chrome_version, '116');
-  assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7789/*']);
+  assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7789/*', '<all_urls>']);
   assert.ok(m.permissions.includes('scripting'));
   assert.ok(m.permissions.includes('activeTab'));
   assert.deepEqual(validateManifest('chromium', m), []);
@@ -37,7 +37,7 @@ test('adapters: safari manifest — popup-only surface, no side panel keys', () 
 test('adapters: port injection — the manifest points at the bridge it will talk to', () => {
   for (const t of EXTENSION_TARGETS) {
     const m = manifestFor(t, { port: 7799 }) as Record<string, any>;
-    assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7799/*']);
+    assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7799/*', '<all_urls>']);
   }
 });
 

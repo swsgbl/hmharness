@@ -9,6 +9,10 @@
 (() => {
   'use strict';
   const api = globalThis.browser ?? globalThis.chrome;
+  // readiness marker: tests (and anything else driving this page) must not
+  // click before the listeners below exist — a click on a listener-less
+  // button is a silent no-op (found by the real-browser e2e forensics)
+  document.body.dataset.hmhUi = 'ready';
   const $ = (id) => document.getElementById(id);
   const out = $('out');
 

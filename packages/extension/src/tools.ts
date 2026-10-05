@@ -27,6 +27,12 @@ import { formatPageSnapshot, summarizePage } from './page.ts';
 export interface ExtensionToolContext {
   /** HMH_HOME — where the bridge state file lives */
   home: string;
+  /** Composition-layer observation hook: called with the RAW page data
+   *  after every successful page.read (the agent layer feeds its Code
+   *  World Model runtime sensor from here — extension stays cognitive-
+   *  free, layering intact). Best-effort by contract; never fails the
+   *  tool, never called on failed reads. */
+  onPageRead?: (raw: RawPageData) => void;
 }
 
 const WRAP = (err: unknown): { output: string; isError: boolean } => ({
@@ -105,6 +111,7 @@ export function extensionTools(ctx: ExtensionToolContext): Tool[] {
             ...(Number.isInteger(args.tabId) ? { tabId: Number(args.tabId) } : {}),
           });
           if (!raw || typeof raw.url !== 'string') return { output: '扩展返回的页面数据不完整(受保护页面?)', isError: true };
+          try { ctx.onPageRead?.(raw); } catch { /* observation hook is best-effort */ }
           return { output: formatPageSnapshot(summarizePage(raw)) };
         } catch (err) { return WRAP(err); }
       },

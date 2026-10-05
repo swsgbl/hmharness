@@ -55,4 +55,5 @@ hmh extension pair | unpair             # 重发配对码 / 吊销令牌
 ## 测试
 
 - 协议级 e2e(`bridge.test.ts`):用与 background.js 相同的传输代码打真实回环,无需浏览器
-- **真实浏览器 e2e**(`real-browser.test.ts`):把构建产物 `--load-extension` 进真实 Chromium 系浏览器(BrowserOS/Edge/Chrome,无则跳过),CDP 驱动 popup 配对,验证真实 background.js 附流并响应智能体命令
+- **真实浏览器 e2e**(`real-browser.test.ts`):逐台装载验证本机全部 Chromium 系浏览器(BrowserOS/Chrome/Edge,无则跳过)——BrowserOS/Edge 走 `--load-extension`;**品牌 Chrome(2025+)已忽略该 flag**(且会毒化 DevTools 通道),改经 browser 级 WebSocket 的 `Extensions.loadUnpacked` 装载。CDP 驱动 popup 配对,验证真实 background.js 附流并响应智能体命令
+- 连接诚实性:桥心跳为**要求应答的 ping 命令**(连失 2 次判死,防 MV3 worker 死后残留的幽灵流);SW 端 40s 无数据即主动弃流重连 + 30s alarms 自愈

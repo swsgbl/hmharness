@@ -36,6 +36,7 @@ import { opsTools } from '@hmharness/domain-ops';
 import { discoverServers, lspTools } from '@hmharness/lsp';
 import { discoverBrowsers, browserTools } from '@hmharness/browser';
 import { discoverExtensionBridgeSync, extensionTools } from '@hmharness/extension';
+import { pageReadSink } from './code-wm-recorder.ts';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -94,7 +95,10 @@ export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: b
     try {
       const bridge = discoverExtensionBridgeSync(homeDir());
       if (bridge.healthy && bridge.connected) {
-        reg.registerAll(extensionTools({ home: homeDir() }));
+        // onPageRead feeds the PERSISTED Code World Model (round 38):
+        // every real-browser page observation becomes durable RuntimeFact
+        // evidence — best-effort, never able to fail the tool itself.
+        reg.registerAll(extensionTools({ home: homeDir(), onPageRead: pageReadSink(homeDir()) }));
       }
     } catch { /* extension optional: never block tool assembly */ }
   }

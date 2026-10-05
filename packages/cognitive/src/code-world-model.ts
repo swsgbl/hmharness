@@ -76,16 +76,31 @@ export interface PredictionError {
 
 /* ---------------- the model ---------------- */
 
+/** Data-only export shape — the persistence layer (code-world-store.ts)
+ *  adds the kind/version envelope. fromSnapshot() is its inverse. */
+export interface CodeWorldData {
+  entities: CodeEntity[];
+  relations: SymbolRelation[];
+  diagnostics: CodeDiagnostic[];
+  build: BuildFact | null;
+  runtime: RuntimeFact[];
+}
+
 export class CodeWorldModel {
   private entities = new Map<string, CodeEntity>();
-  private relations: SymbolRelation[] = [];
+  /** keyed `${from}->${to}:${kind}` — round 38 made relation ingest
+   *  IDEMPOTENT like entities: a sensor re-observing the same edge is the
+   *  same fact, not a new one. Append-only storage would grow without
+   *  bound once persistence landed (every save→load cycle re-syncs). */
+  private relations = new Map<string, SymbolRelation>();
   /** latest diagnostics per uri (sensors push; overwrite per uri) */
   private diagnostics = new Map<string, CodeDiagnostic[]>();
   private latestBuild: BuildFact | null = null;
   private runtimeFacts: RuntimeFact[] = [];
   private openPredictions = new Map<string, { predicted: EditDelta; at: string }>();
 
-  /** Ingest sensors' output — idempotent per entity id; diagnostics replace per uri. */
+  /** Ingest sensors' output — idempotent per entity id AND per relation
+   *  edge; diagnostics replace per uri. */
   ingest(input: {
     entities?: CodeEntity[];
     relations?: SymbolRelation[];
@@ -94,7 +109,7 @@ export class CodeWorldModel {
     runtime?: RuntimeFact;
   }): void {
     for (const e of input.entities ?? []) this.entities.set(e.id, e);
-    this.relations.push(...(input.relations ?? []));
+    for (const r of input.relations ?? []) this.relations.set(`${r.from}->${r.to}:${r.kind}`, r);
     for (const d of input.diagnostics ?? []) {
       const cur = this.diagnostics.get(d.uri) ?? [];
       const next = cur.filter((x) => x.message !== d.message || x.source !== d.source);
@@ -105,11 +120,39 @@ export class CodeWorldModel {
     if (input.runtime) this.runtimeFacts.push(input.runtime);
   }
 
+  /** Full data export (entities, deduped relations, diagnostics, build,
+   *  runtime) — the store's save path; stateHash stays the cheap path. */
+  snapshot(): CodeWorldData {
+    return {
+      entities: [...this.entities.values()],
+      relations: [...this.relations.values()],
+      diagnostics: [...this.diagnostics.values()].flat(),
+      build: this.latestBuild,
+      runtime: [...this.runtimeFacts],
+    };
+  }
+
+  /** Restore from a snapshot (load path) — a fresh model, one bulk set. */
+  static fromSnapshot(data: Partial<CodeWorldData>): CodeWorldModel {
+    const m = new CodeWorldModel();
+    for (const e of data.entities ?? []) m.entities.set(e.id, e);
+    for (const r of data.relations ?? []) m.relations.set(`${r.from}->${r.to}:${r.kind}`, r);
+    for (const d of data.diagnostics ?? []) {
+      const cur = m.diagnostics.get(d.uri) ?? [];
+      const next = cur.filter((x) => x.message !== d.message || x.source !== d.source);
+      next.push(d);
+      m.diagnostics.set(d.uri, next);
+    }
+    if (data.build) m.latestBuild = data.build;
+    m.runtimeFacts.push(...(data.runtime ?? []));
+    return m;
+  }
+
   get entityCount(): number {
     return this.entities.size;
   }
   get relationCount(): number {
-    return this.relations.length;
+    return this.relations.size;
   }
   get diagnosticCount(): number {
     return [...this.diagnostics.values()].reduce((s, l) => s + l.length, 0);
@@ -129,7 +172,7 @@ export class CodeWorldModel {
   }
 
   relationsOf(entityId: string): SymbolRelation[] {
-    return this.relations.filter((r) => r.from === entityId || r.to === entityId);
+    return [...this.relations.values()].filter((r) => r.from === entityId || r.to === entityId);
   }
 
   diagnosticsFor(uri: string): CodeDiagnostic[] {
@@ -146,7 +189,7 @@ export class CodeWorldModel {
   predictEditDelta(edit: { editKind: 'rename' | 'delete' | 'modify'; target: string }): EditDelta {
     const touchedEntities = new Set<string>([edit.target]);
     const touchedRelations = new Set<string>();
-    for (const r of this.relations) {
+    for (const r of this.relations.values()) {
       if (r.from === edit.target || r.to === edit.target) {
         touchedRelations.add(`${r.from}->${r.to}:${r.kind}`);
         touchedEntities.add(r.from);
@@ -191,12 +234,20 @@ export class CodeWorldModel {
     };
   }
 
-  /** Snapshot hash — for holdout discipline and drift detection. */
+  /** Snapshot hash — for holdout discipline and drift detection.
+   *  Content-sensitive on diagnostics too (round 38): hashing only the uri
+   *  list made "a new diagnostic on a known file" invisible to drift
+   *  detection — a round-35 test assertion had been passing for the WRONG
+   *  reason (duplicate relation edges from re-syncs), exposed by relation
+   *  idempotence. Canonical: sorted, order-independent. Runtime history
+   *  stays OUT (evidence, not code state). */
   stateHash(): string {
     return stableHash({
       entities: [...this.entities.keys()].sort(),
-      relations: this.relations.map((r) => `${r.from}->${r.to}:${r.kind}`).sort(),
-      diagnosticUris: [...this.diagnostics.keys()].sort(),
+      relations: [...this.relations.keys()].sort(),
+      diagnostics: [...this.diagnostics.entries()]
+        .map(([uri, list]) => `${uri}::${list.map((d) => `${d.source ?? ''}|${d.severity}|${d.message}`).sort().join(';')}`)
+        .sort(),
       build: this.latestBuild,
     });
   }

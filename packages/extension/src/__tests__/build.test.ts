@@ -14,7 +14,7 @@ test('build: all targets produce loadable unpacked dirs with validated manifests
   for (const r of results) {
     const m = JSON.parse(await readFile(join(r.dir, 'manifest.json'), 'utf8')) as Record<string, unknown>;
     assert.equal(m.manifest_version, 3);
-    assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7790/*']);
+    assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7790/*', '<all_urls>']);
     for (const f of PAYLOAD_FILES) {
       const body = await readFile(join(r.dir, f), 'utf8');
       assert.ok(body.length > 0, `${r.target}/${f} empty`);

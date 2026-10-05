@@ -4,6 +4,136 @@
 
 ---
 
+## 2026-10-04(三十九) · 三浏览器真装验证:Chrome/Edge/BrowserOS 全绿(763/763)
+
+**动机**:用户点名"装到谷歌和 Edge 浏览器验证"。真实浏览器测试
+从"第一台可用浏览器"升级为**逐台装载验证**——每台发现的可执行
+文件一个子测试:装载→CDP 驱动 popup 配对→真实 background.js 附流
+→工具读写真页。
+
+**关键决策**(四个真问题,全部实测定位):
+- **品牌 Chrome 的 2026 装载现实**:Chrome(2025 中)已忽略
+  `--load-extension`;且**带着这对死 flag 启动还会毒化 DevTools 的
+  `Extensions.loadUnpacked`**(实测:带 flag→扩展页 chrome-error,
+  不带→装载成功)。解法:品牌 Chrome 无扩展 flag 启动,纯走
+  loadUnpacked(browser 级 WebSocket 一条命令,返回扩展 id;空闲
+  MV3 SW 不列示于 /json——信任返回 id,打开 popup 即唤醒 SW);
+- **幽灵连接(gghost link)竞态**:取证三连——桥 connected:true、
+  SW 进程活着(CDP 可 evaluate)、命令却黑洞。重构:SW 被杀→浏览器
+  不关其 fetch socket→SW 重生后建新流,桥的 live 还是旧幽灵。三重
+  修复(全是生产级连接诚实性,非测试补丁):①桥心跳从纯事件升级
+  为**要求应答的 ping 命令**,连失 2 次→判死(live 清空+状态文件
+  同步——extension_status 不再对幽灵撒谎);②SW 端 40s 无任何块
+  即主动弃流重连(看门狗)+alarms 30s 加速重生自愈;③测试在
+  connected 后先 ping 验真再驱动工具;
+- **popup 点击竞态**:HTML 先于 ui.js 就绪时按钮无监听,click()是
+  静默空操作——取证显示"已配对码未消费、out 区空白"。ui.js 就绪
+  时给 body 打 `data-hmh-ui` 标记,测试等标记再点;
+- **失败取证内建**:tabs 失败时自动转储桥状态+SW 存活性(CDP
+  evaluate);popup 失败时转储 tab location;SW 未现时转储目标清单
+  ——这轮三次根因定位全部靠它们,一轮之内自举。
+
+**实测证据**:763/763(+3=三浏览器子测试)。**两次连跑三浏览器
+全绿**(browseros/chrome/edge 各 ~4-6s:装载→配对→附流→tabs 列真
+实标签→读回环 http 页→scroll 真页)。定位期实证:Edge 单跑
+健康(ping 1ms/tabs 2ms)而 [browseros→edge] 3/3 必挂——顺序
+才触发幽灵;[chrome→edge] 过——chrome 从未 attach 无从留幽灵。
+typecheck 0、构建绿、PREFLIGHT OK。
+
+**教训**:
+- "TCP 没断"≠"对端活着":MV3 SW 之死可以不 abort 它的 fetch 流;
+  连接语义必须自带活性证明(心跳要应答),否则状态永远可能撒谎;
+- 品牌 Chrome 的扩展自动化通道已经换了(--load-extension 死,
+  Extensions.loadUnpacked 活)——而且死 flag 会污染活通道,两者
+  不可混用;
+- 时序竞态的取证要"三面取证"(两端状态+通道活性),单看桥侧
+  connected:true 把我引向了三条错路才收敛到幽灵。
+
+---
+
+## 2026-10-04(三十八) · Code WM 落地:持久化 + 扩展传感器生产接线(760/760)
+
+**动机**:round 37 落了 RuntimeFact 传感器但只是库(等模型获得
+持久化);round 38 补上最后一块:模型有了 HOME,真实浏览器的页面
+观察从此成为**落盘的运行时证据**。
+
+**关键决策**:
+- **模型持久化**(cognitive/code-world-store.ts):HMH_HOME/
+  cognitive/code-world-model.json,snapshot()/fromSnapshot() 全五类
+  往返;唯一无界种类——runtime facts(智能体会持续浏览,其余被
+  代码规模约束)在**保存时**裁到最新 500 条(进程内视图不裁);
+  损坏/缺失=新模型,与信任文件同一纪律;
+- **关系幂等化**(存量缺口,持久化会放大):relations 从追加数组
+  改为按 `${from}->${to}:${kind}` 键的 Map——传感器重复观察同一条
+  边=同一事实,不是新事实;否则每次 save→load 再同步都无限增长;
+- **观察钩子作 DI**(extension 工具上下文 onPageRead):成功读取
+  后携带原始页面数据回调,尽力而为契约(钩子抛错绝不失败工具,
+  失败读取不触发)——extension 包保持零认知依赖,agent 组合层喂
+  传感器,分层不破;
+- **agent 记录器**:按 home 懒加载单例+2s 防抖落盘;崩溃最多丢一
+  个防抖窗口的观察(证据不能杀死它所证据的工作);
+- **stateHash 内容敏感化**(修真问题):原来只哈希诊断 **uri 列表**
+  ——已知文件上新增诊断对漂移检测不可见。round 35 的一条断言
+  ("新诊断改变 stateHash")其实一直**因错误的理由**通过(重复
+  同步累积的重复边改变了哈希,不是诊断!)——关系幂等化一落地
+  立刻揭穿。修法按审计契约:诊断内容(source|severity|message 规
+  范排序)入哈希,排序无关;runtime 仍刻意不入。
+
+**实测证据**:760/760(+8:存储往返/500 条裁剪/损坏降级/关系幂等跨
+save-load;钩子成功携带原始数据+抛错不伤工具+失败不触发;记录器
+sink→防抖落盘/**全链**:注册表工具经真实回环桥读页→落盘文件出现
+chain.dev 事实/损坏文件不阻断后续观察)。预检绿。
+
+**教训**:
+- "一直绿"的测试可能因错误的理由绿——重复边这种副产品撑起了
+  一条语义不同的断言;语义修正当以"断言所言的事现在真的为真"验
+  收,不是恢复哈希差异;
+- 给只写存储补读访问器只是第一步;真正的审计问题是"哈希/漂移检
+  测看得见它该看见的东西吗"——uri 列表对诊断内容是盲的。
+
+---
+
+## 2026-10-04(三十七) · 扩展桥深度接线:Code WM 运行时传感器 + Web 状态卡(752/752)
+
+**动机**:round 36 落了扩展桥本体,两个既定后续:审计本体五类中的
+RuntimeFact 自落地起**没有传感器来源**——用户的真实浏览器正是天然
+的运行时事实源;web 前端设备视图看不见扩展桥,用户无法一眼确认
+"我的浏览器连上了吗"。
+
+**关键决策**:
+- **RuntimeFact 第一传感器**(agent 层,与 round 35 LSP 传感器同一
+  形态:组合层适配器,两个分层方向都不破):pageReadToRuntimeFacts
+  每次页面观察只产 **1-2 条事实**(ext.page.read=标题—URL,身份是
+  URL;非空选区再加一条 ext.page.selection=用户意图信号);标题/
+  链接/正文是**本轮上下文不是持久事实**——"每标题一条事实"是用
+  噪声冒充证据。库+测试先行,生产接线等模型获得持久化/单例(与
+  round 35 完全相同的诚实姿态);
+- **只写不读的 RuntimeFact 补上 runtime 访问器**(cognitive):
+  写死不读的存储无法审计;访问器**刻意不入 stateHash**——运行时
+  历史是证据不是代码状态,holdout/漂移哈希不能因为智能体浏览过
+  页面而改变(这条不变量被测试钉死);
+- **Web 状态卡零新依赖**:web 服务端不引 @hmharness/extension,
+  直接像扩展一样用普通 HTTP 探测回环 /v1/status(HMH_EXTENSION_
+  PORT,默认 7789);devices 视图第一行常驻扩展状态行(绿=已连接/
+  琥珀=桥活未连/灰=桥停),hdc 缺失的早退路径不再吞掉它;双语
+  标签 4 键 zh/en 对称(i18n-symmetry 测试守卫)。
+
+**实测证据**:752/752(+2:传感器映射=恰好 1-2 条/截断/无标题退化
+为 URL;入库读回 3 条+stateHash 前后不变)。真实冒烟:web 服务器
+(临时 home+固定临时端口)真起服 → /api/extension/status 桥活
+(available:true, connected:false)与桥死(available:false)两态
++ SPA 携带扩展行标记。预检绿(其间一次 STALE 失败=并行会话 14:39
+的新提交,src/dist mtime+git diff 定位,重建即绿)。
+
+**教训**:
+- 只写不读的存储是审计盲区;补访问器时先想清楚它**该不该进
+  stateHash**——运行时证据不进,理由写进注释并由测试钉死;
+- 预检的 STALE 检查抓的多是真陈旧(并行会话刚提交新源码)——
+  先比对 mtime 与 `git diff`(内容已=HEAD 即"dist 落后于新提交")
+  再定责,不急着重build。
+
+---
+
 ## 2026-10-04(三十六) · 浏览器扩展桥:主流浏览器接入用户的真实浏览器(746/746)
 
 **动机**:browser_* 家族只驱动 hmh 专属 BrowserOS 实例;用户的

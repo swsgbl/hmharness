@@ -83,7 +83,14 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
     version,
     description: '将 hmharness 智能体接入你的真实浏览器:读取标签页/页面内容,经逐次批准后操作页面。本机回环通信,无遥测。',
     permissions: ['activeTab', 'scripting', 'tabs', 'storage', 'alarms'],
-    host_permissions: [`http://127.0.0.1:${opts.port}/*`],
+    // 127.0.0.1:<port> = the bridge itself. <all_urls> = page read/act on
+    // the user's REAL pages — the entire point of this extension; the
+    // browser's own site-access control (toolbar icon → 站点访问权限)
+    // remains the user's kill switch. MV3 fact (2026, multi-browser e2e):
+    // scripting.executeScript is REFUSED on any host outside this list —
+    // "Cannot access contents of url" — no amount of user consent in the
+    // popup can substitute for the manifest declaration.
+    host_permissions: [`http://127.0.0.1:${opts.port}/*`, '<all_urls>'],
     action: {
       default_title: 'hmharness 桥接',
       default_popup: 'popup.html',
@@ -135,5 +142,6 @@ export function validateManifest(target: ExtensionTarget, manifest: Record<strin
   }
   const host = JSON.stringify(m.host_permissions ?? []);
   if (!host.includes('127.0.0.1')) problems.push('host_permissions must cover 127.0.0.1 (loopback bridge)');
+  if (!host.includes('<all_urls>')) problems.push('host_permissions must include <all_urls> — page read/act is REFUSED on any host the manifest does not declare (MV3 hard boundary, multi-browser verified)');
   return problems;
 }

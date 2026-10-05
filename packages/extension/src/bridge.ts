@@ -93,6 +93,7 @@ export class ExtensionBridgeServer {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
   private agentSecret = '';
+  private missedPings = 0;
   /** CLI serve loop hook: fires on extension attach/detach for live output. */
   onConnectionChange?: (connected: boolean) => void;
   /** last tabs.push payload — surfaced in status for humans, not used by tools */
@@ -117,7 +118,7 @@ export class ExtensionBridgeServer {
     if (!addr || typeof addr !== 'object') throw new Error('bridge listen failed');
     this.server = server;
     this.port = addr.port;
-    this.pingTimer = setInterval(() => this.beat(), 15_000);
+    this.pingTimer = setInterval(() => this.beat(), 5_000);
     await this.writeState(false);
     return { port: this.port };
   }
@@ -304,6 +305,7 @@ export class ExtensionBridgeServer {
     res.write(`retry: 3000\n\n`);
     res.write(this.sse('hello', { ok: true, protocol: PROTOCOL_VERSION }));
     this.live = { res, connectedAt: new Date().toISOString(), lastSeenAt: new Date().toISOString() };
+    this.missedPings = 0;
     req.on('close', () => {
       if (this.live?.res === res) {
         this.live = null;
@@ -328,15 +330,36 @@ export class ExtensionBridgeServer {
     }
   }
 
-  /** 15s in-stream ping — keeps the fetch-stream reader in the extension's
-   *  service worker fed (and its lifetime extended) even when idle. */
+  /** 5s liveness heartbeat (round 39: upgraded from a no-ack SSE event to
+   *  a REQUIRED-ANSWER ping command). Rationale: when an MV3 service
+   *  worker is killed, its fetch stream may linger un-aborted — the bridge
+   *  would keep believing it is connected to a ghost (multi-browser e2e
+   *  forensics: SW alive on a NEW stream, command written to the DEAD one,
+   *  bridge still reporting connected). Two missed pings = the SSE downlink
+   *  is declared dead: live cleared, state file + onConnectionChange tell
+   *  the truth. The ping also keeps live workers fed (MV3 lifetime). */
   private beat(): void {
     if (this.closed || !this.live) return;
-    try {
-      this.live.res.write(`event: ping\ndata: {"t":${JSON.stringify(new Date().toISOString())}}\n\n`);
-    } catch {
+    this.missedPings++;
+    if (this.missedPings > 2) {
+      // ghost link: the extension stopped answering heartbeats
+      try { this.live.res.end(); } catch { /* already gone */ }
       this.live = null;
+      this.missedPings = 0;
+      void this.writeState();
+      this.onConnectionChange?.(false);
+      return;
     }
+    const id = randomUUID();
+    const timer = setTimeout(() => {
+      this.pending.delete(id);
+    }, 4_500);
+    this.pending.set(id, {
+      resolve: () => { this.missedPings = 0; },
+      reject: () => undefined,
+      timer,
+    });
+    this.send({ id, kind: 'ping' });
   }
 
   private async handleUplink(msg: UplinkMessage): Promise<void> {
