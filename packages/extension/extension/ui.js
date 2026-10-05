@@ -1,17 +1,17 @@
 /**
  * hmharness bridge — popup/sidepanel UI (zero-build asset)
  *
- * One script for both surfaces (popup.html / sidepanel.html): all real
- * work lives in the background script; this page only sends runtime
- * messages and renders answers as textContent (never innerHTML — nothing
- * the bridge or a page could send is ever parsed as markup).
+ * Connection is AUTOMATIC (round 44): the background announces and gets a
+ * token from a running bridge — there is nothing to pair or type. This
+ * page only shows live status and offers a port override (custom bridge
+ * port), reconnect, revoke, and a read-current-page self test. All
+ * answers render as textContent (never innerHTML).
  */
 (() => {
   'use strict';
   const api = globalThis.browser ?? globalThis.chrome;
-  // readiness marker: tests (and anything else driving this page) must not
-  // click before the listeners below exist — a click on a listener-less
-  // button is a silent no-op (found by the real-browser e2e forensics)
+  // readiness marker: automation must not click before listeners exist —
+  // a click on a listener-less button is a silent no-op
   document.body.dataset.hmhUi = 'ready';
   const $ = (id) => document.getElementById(id);
   const out = $('out');
@@ -35,25 +35,24 @@
     const dot = $('dot');
     const txt = $('status-txt');
     if (!st) { dot.className = 'dot'; txt.textContent = '后台无响应'; return; }
-    if (!st.paired) { dot.className = 'dot pair'; txt.textContent = '未配对 — 输入配对码'; }
+    if (!st.paired) { dot.className = 'dot off'; txt.textContent = '桥未运行或未授权 — 启动 hmh extension serve 后自动连接(30s 内)'; }
     else if (st.attached) { dot.className = 'dot on'; txt.textContent = `已连接 hmh 桥 (127.0.0.1:${st.port}) · ${st.browser}`; }
-    else { dot.className = 'dot off'; txt.textContent = `已配对 · 连接中… (127.0.0.1:${st.port})`; }
+    else { dot.className = 'dot pair'; txt.textContent = `已授权 · 连接中… (127.0.0.1:${st.port})`; }
   }
 
   async function refresh() {
     const st = await send({ type: 'hmh-status' });
-    render(st.ok === undefined ? st : st); // status payload has no ok flag
+    render(st);
     if (st.port) $('port').value = String(st.port);
     return st;
   }
 
-  $('pair').addEventListener('click', async () => {
-    const code = $('code').value.trim();
-    if (!code) { show('请先输入 hmh extension pair 生成的配对码'); return; }
-    show('配对中…');
-    const r = await send({ type: 'hmh-pair', code, port: Number($('port').value) || 7789 });
-    show(r.ok ? '✓ 配对成功，已连接智能体桥' : `✗ ${r.error || '配对失败'}`);
-    setTimeout(refresh, 600);
+  $('setport').addEventListener('click', async () => {
+    const port = Number($('port').value) || 7789;
+    show('设置端口并重连中…');
+    const r = await send({ type: 'hmh-setport', port });
+    show(r.ok ? '已设置,自动连接中…' : `✗ ${r.error || '失败'}`);
+    setTimeout(refresh, 900);
   });
 
   $('reconnect').addEventListener('click', async () => {
@@ -64,7 +63,7 @@
 
   $('unpair').addEventListener('click', async () => {
     await send({ type: 'hmh-disconnect' });
-    show('已断开（令牌已清除）');
+    show('已断开并取消本浏览器的授权(重新连接自动恢复)');
     setTimeout(refresh, 400);
   });
 
@@ -73,7 +72,7 @@
     const r = await send({ type: 'hmh-read-current' });
     show(r.ok
       ? `✓ ${r.title}\n${r.url}\n\n${r.preview}`
-      : `✗ ${r.error}\n（受保护页面无法注入；Firefox 需在扩展设置里授予主机权限）`);
+      : `✗ ${r.error}\n（受保护页面无法注入;Firefox 需在扩展设置里授予主机权限）`);
   });
 
   // side panel opener — Chrome has sidePanel.open, Firefox sidebarAction.open
@@ -87,5 +86,5 @@
   }
 
   refresh();
-  setInterval(refresh, 2000); // popup/sidepanel lifetime is short; cheap poll
+  setInterval(refresh, 2000);
 })();

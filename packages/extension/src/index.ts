@@ -16,8 +16,7 @@ export {
   type UplinkMessage,
 } from './protocol.ts';
 export {
-  CODE_TTL_MS, PAIR_ATTEMPT_LIMIT, PAIR_LOCKOUT_MS,
-  issuePairingCode, isPaired, pairingPath, redeemPairingCode, touchLastSeen, unpair, verifyToken,
+  MAX_TOKENS, isPaired, mintAndPinToken, pairedCount, pairingPath, touchLastSeen, unpair, verifyToken,
   type PairingStore,
 } from './token.ts';
 export {

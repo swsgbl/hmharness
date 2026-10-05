@@ -90,37 +90,29 @@
     });
   }
 
-  /** Startup announce + demo-pair pickup (round 41): when UNPAIRED the
-   *  background announces its base URL (so tooling can find the popup)
-   *  and polls /v1/announce-status for a demo-page-parked token — the
-   *  user can pair by typing the code into the bridge's demo page, no
-   *  popup needed (Firefox MV3 host permissions are never auto-granted,
-   *  so content-script pairing is structurally unavailable). */
-  async function announceAndPoll() {
-    if (binding.token) return;
+  /** AUTO-PAIR (round 43/44): announce once — an unpaired bridge mints a
+   *  token right in the response (extension-origin announce is the only
+   *  onboarding path; pairing codes were removed). Bridge not running →
+   *  stay unpaired; the 30s alarm retries, so the moment the user starts
+   *  `hmh extension serve` the extension connects without a restart. */
+  async function announceAndAutoPair() {
+    if (binding.token) { void attach(); return; }
     try {
-      await fetch(baseUrl() + '/v1/announce', {
+      const j = await (await fetch(baseUrl() + '/v1/announce', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ extBaseUrl: api.runtime.getURL(''), browser: detectBrowser(), extVersion: api.runtime.getManifest().version }),
-      });
-    } catch (e) { /* bridge not running — nothing to announce to */ }
-    // poll for a demo-page-parked token while unpaired (bounded; stops
-    // once paired). NOTE: "store says paired" does NOT mean THIS extension
-    // holds the token (another browser may have paired) — so no early
-    // return on the paired flag; only our own token ends the poll.
-    for (let i = 0; i < 20 && !binding.token && !stream; i++) {
-      try {
-        const j = await (await fetch(baseUrl() + '/v1/announce-status')).json();
-        if (j.token) {
-          binding.token = j.token;
-          await saveBinding();
-          badge('on');
-          void attach();
-          return;
-        }
-      } catch (e) { /* bridge down — pause and retry */ }
-      await new Promise((r) => setTimeout(r, 3000));
+      })).json();
+      if (j.token) {
+        binding.token = j.token;
+        await saveBinding();
+        badge('on');
+        void attach();
+        return;
+      }
+      badge('unpaired'); // bridge reachable but did not grant (non-extension origin should not happen here)
+    } catch (e) {
+      badge('unpaired'); // bridge not running — alarm retries
     }
   }
 
@@ -420,25 +412,18 @@
           browser: detectBrowser(),
         };
       }
-      if (msg && msg.type === 'hmh-pair') {
-        const port = Number(msg.port) || DEFAULT_PORT;
-        binding.port = port;
-        // redeem the one-time code against the bridge
-        const r = await fetch(`http://127.0.0.1:${port}/v1/pair`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ code: String(msg.code || '').trim().toUpperCase() }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) return { ok: false, error: j.error || ('配对失败 HTTP ' + r.status) };
-        binding.token = j.token;
+      if (msg && msg.type === 'hmh-setport') {
+        // custom bridge port (default 7789); re-announce immediately —
+        // auto-pair works against any port the bridge runs on
+        binding.port = Number(msg.port) || DEFAULT_PORT;
         await saveBinding();
-        void attach();
+        void announceAndAutoPair();
         return { ok: true };
       }
       if (msg && msg.type === 'hmh-connect') {
         await loadBinding();
-        void attach();
+        if (binding.token) void attach();
+        else void announceAndAutoPair();
         return { ok: true };
       }
       if (msg && msg.type === 'hmh-disconnect') {
@@ -491,7 +476,9 @@
   }
   try {
     api.alarms.onAlarm.addListener(() => {
-      if (!stream) void loadBinding().then(() => attach());
+      // revival + retry net: re-attach a dropped stream, or re-announce
+      // when still unpaired (covers "bridge started AFTER the browser")
+      if (!stream) void loadBinding().then(() => (binding.token ? attach() : announceAndAutoPair()));
       else pushTabsSoon();
     });
   } catch (e) { /* alarms unavailable (Safari) — fetch-stream keepalive + watchdog still hold */ }
@@ -501,5 +488,5 @@
   }
 
   // first load of this context (worker start or event page load)
-  void loadBinding().then(() => { void announceAndPoll(); if (binding.token) void attach(); else badge('unpaired'); });
+  void loadBinding().then(() => { if (binding.token) void attach(); else void announceAndAutoPair(); });
 })();

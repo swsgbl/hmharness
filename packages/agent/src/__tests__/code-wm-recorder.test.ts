@@ -159,14 +159,12 @@ test('recorder: FULL CHAIN — registry tool read through a live bridge lands pe
   const prevHome = process.env.HMH_HOME;
   process.env.HMH_HOME = home;
   const { ExtensionBridgeServer } = await import('@hmharness/extension');
-  const { issuePairingCode } = await import('@hmharness/extension');
   const bridge = new ExtensionBridgeServer({ home });
   let detach: () => void = () => undefined;
   try {
     const { port } = await bridge.start(0);
     // state file first: nativeRegistry's sync discovery must see connected
-    const code = await issuePairingCode(home);
-    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.ok ? code.code : '' }) })).json() as { token: string };
+    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/announce`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'chrome-extension://cwmlivetest' }, body: JSON.stringify({ extBaseUrl: 'chrome-extension://cwmlivetest/popup.html' }) })).json() as { token: string };
     const page = { url: 'https://chain.dev', title: 'Chain', selection: '', headings: [], links: [], inputs: [], text: 'body' };
     detach = await connectStub(port, paired.token, (cmd) => (cmd.kind === 'page.read' ? page : { pong: true }));
     await new Promise((r) => setTimeout(r, 200));

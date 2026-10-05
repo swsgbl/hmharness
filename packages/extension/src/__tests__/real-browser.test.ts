@@ -9,7 +9,7 @@ import net from 'node:net';
 import { CdpBrowser, discoverBrowsers } from '@hmharness/browser';
 import { buildExtension } from '../build.ts';
 import { ExtensionBridgeServer } from '../bridge.ts';
-import { issuePairingCode, unpair } from '../token.ts';
+import { unpair } from '../token.ts';
 import { extensionTools } from '../tools.ts';
 
 /**
@@ -241,54 +241,21 @@ async function firefoxFlow(
       }
       assert.ok(installResult.ok, `Addon:Install failed: ${installResult.ok ? '' : installResult.e.message}`);
 
-      // 2. the UNPAIRED background announces its base URL -> popup URL
-      //    (round 41 announce — the moz-extension://uuid is otherwise
-      //    undiscoverable from outside the browser)
-      assert.ok(await waitFor(async () => {
-        const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
-        return typeof st.extBaseUrl === 'string' && st.extBaseUrl.startsWith('moz-extension://');
-      }, 25_000), 'background never announced its base URL (event page did not run?)');
-      const st0 = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
-      assert.ok(typeof st0.extBaseUrl === 'string' && st0.extBaseUrl.startsWith('moz-extension://'), 'announced base URL must be a moz-extension origin');
-
-      // 3. pair from the DEMO PAGE — an unprivileged http page WebDriver
-      //    CAN script (Firefox refuses script execution on privileged
-      //    moz-extension:// pages AND never auto-grants MV3 host
-      //    permissions, so content-script pairing is structurally out).
-      //    The page posts the code to the bridge's /v1/demo-pair; the
-      //    background picks the parked token up via announce-status.
-      await m.command('WebDriver:Navigate', { url: `http://127.0.0.1:${PORT}/v1/demo-page` });
-      const issued = await issuePairingCode(home);
-      assert.equal(issued.ok, true);
-      let ffProbe = '';
-      assert.ok(await waitFor(async () => {
-        try {
-          const v = await m.command('WebDriver:ExecuteScript', {
-            script: `return (() => {
-              const i = document.getElementById('hmh-code'), b = document.getElementById('hmh-pair-btn');
-              if (!i || !b) return 'no-widget';
-              if (b.dataset.hmhClicked === '1') return 'already';
-              i.value = '${issued.ok ? issued.code : ''}';
-              b.dataset.hmhClicked = '1';
-              b.click();
-              return 'clicked';
-            })();`,
-          }).then((r: any) => ({ v: r?.value }), (e: Error) => ({ err: e.message.slice(0, 160) }));
-          ffProbe = `script=${JSON.stringify(v)}`;
-          return (v as { v?: string }).v === 'clicked';
-        } catch (e) { ffProbe = 'probe-throw ' + String(e).slice(0, 120); return false; }
-      }, 20_000), `firefox demo-page pair widget never fired (${ffProbe})`);
-
-      // 4. connected + liveness (same ghost-proof gate as the chromium flow)
+      // 2. AUTO-PAIR (round 43): the unpaired background announces; the
+      //    bridge (also unpaired) mints a token in the announce response —
+      //    the extension connects with ZERO user action. The old demo-page
+      //    pairing (typing a code) remains as the manual fallback.
       assert.ok(await waitFor(async () => {
         const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
         return Boolean(st.connected);
-      }, 20_000), 'firefox extension never connected to the bridge');
+      }, 30_000), 'firefox extension never AUTO-connected (announce → token → attach)');
       assert.ok(await waitFor(() => bridge.command('ping', 3_000).then(() => true, () => false), 30_000), 'command path never came alive');
 
-      // 5. agent tools against the real Firefox
+      // 3. agent tools against the real Firefox
       const tools = extensionTools({ home });
       const byName = (n: string) => tools.find((x) => x.name === n)!;
+      const st0 = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
+      assert.ok(String(st0.extBaseUrl ?? '').startsWith('moz-extension://'), 'announce surfaced the moz-extension origin');
       await m.command('WebDriver:Navigate', { url: `http://127.0.0.1:${PORT}/v1/demo-page` });
       await sleep(1_200);
       const tabs = await byName('extension_tabs').execute({}, ctx);
@@ -346,35 +313,42 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
         continue;
       }
       await t.test(`${b.name}: ${b.command}`, async () => {
-        const profile = mkdtempSync(join(tmpdir(), 'ext-real-profile-'));
+        let activeProfile = ''; // the retry loop's LATEST profile (cleanup target)
         let proc: ChildProcess | null = null;
         let cdp: InstanceType<typeof CdpBrowser> | null = null;
         try {
-          const issued = await issuePairingCode(home);
-          assert.equal(issued.ok, true);
-
-          proc = spawn(b.command, [
-            `--user-data-dir=${profile}`,
-            '--no-first-run', '--no-default-browser-check',
-            ...(usesLoadExtensionFlag(b.name)
-              ? [`--disable-extensions-except=${built.dir}`, `--load-extension=${built.dir}`]
-              : [] // branded Chrome: dead flags would poison loadUnpacked too
-            ),
-            // port 0 = Chromium picks a free one; the ACTUAL port lands in
-            // <profile>/DevToolsActivePort — no collisions with user CDP usage
-            '--remote-debugging-port=0',
-            '--headless=new',
-            'about:blank',
-          ], { stdio: 'ignore', detached: process.platform !== 'win32' });
-
+          // Launch retry (2 attempts, fresh profile each): real-browser spawns
+          // race on busy machines — Chrome occasionally dies before writing
+          // DevToolsActivePort (5 observed transients in one day, always
+          // green on rerun with identical code). A retry turns an
+          // environmental dice-roll into a deterministic gate.
           let cdpPort = 0;
-          assert.ok(await waitFor(() => {
-            try {
-              const txt = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').trim();
-              cdpPort = Number(txt.split(/\r?\n/)[0]);
-              return cdpPort > 0;
-            } catch { return false; }
-          }, 20_000), 'DevToolsActivePort never appeared');
+          for (let attempt = 0; attempt < 2 && !(cdpPort > 0); attempt++) {
+            if (proc) { try { proc.kill(); } catch { /* already gone */ } await new Promise((r) => setTimeout(r, 500)); }
+            const profile = mkdtempSync(join(tmpdir(), 'ext-real-profile-'));
+            activeProfile = profile;
+            proc = spawn(b.command, [
+              `--user-data-dir=${profile}`,
+              '--no-first-run', '--no-default-browser-check',
+              ...(usesLoadExtensionFlag(b.name)
+                ? [`--disable-extensions-except=${built.dir}`, `--load-extension=${built.dir}`]
+                : [] // branded Chrome: dead flags would poison loadUnpacked too
+              ),
+              // port 0 = Chromium picks a free one; the ACTUAL port lands in
+              // <profile>/DevToolsActivePort — no collisions with user CDP usage
+              '--remote-debugging-port=0',
+              '--headless=new',
+              'about:blank',
+            ], { stdio: 'ignore', detached: process.platform !== 'win32' });
+            await waitFor(() => {
+              try {
+                const txt = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').trim();
+                cdpPort = Number(txt.split(/\r?\n/)[0]);
+                return cdpPort > 0;
+              } catch { return false; }
+            }, 20_000);
+          }
+          assert.ok(cdpPort > 0, 'DevToolsActivePort never appeared (2 attempts, fresh profile each)');
 
           // 1. find OUR SW among the extension targets (BrowserOS ships builtins)
           cdp = new CdpBrowser({ port: cdpPort });
@@ -396,10 +370,19 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
           assert.ok(
             await waitFor(findOurs, 8_000)
             || await (async () => {
-              const r = await loadUnpackedViaCdp(cdpPort, built.dir).then(
-                (ok) => ok as { id?: string },
-                (e: Error) => { loadUnpackedNote = `loadUnpacked FAILED: ${e.message}`; return null; },
-              );
+              // same retry discipline as the launch: a one-shot CDP fetch to
+              // loopback races with a just-started browser's readiness
+              const r = await (async () => {
+                for (let i = 0; i < 2; i++) {
+                  const r2 = await loadUnpackedViaCdp(cdpPort, built.dir).then(
+                    (ok) => ok as { id?: string },
+                    (e: Error) => { loadUnpackedNote = `loadUnpacked FAILED (attempt ${i + 1}/2): ${e.message}`; return null; },
+                  );
+                  if (r2) return r2;
+                  await new Promise((res) => setTimeout(res, 800));
+                }
+                return null;
+              })();
               if (!r) return false;
               loadUnpackedNote = `loadUnpacked ok: ${JSON.stringify(r)}`;
               // wait briefly for the SW to surface, but an idle MV3 worker
@@ -411,10 +394,17 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
             `hmharness extension never appeared on CDP (${loadUnpackedNote}; extension targets seen: ${JSON.stringify(lastTargets)})`,
           );
 
-          // 2. drive the popup's pair form over CDP (what a user does by
-          //    hand) — ONLY after ui.js marked itself ready: a click on a
-          //    listener-less button is a silent no-op (race found by
-          //    forensics: HTML parsed before the script ran)
+          // 2. AUTO-PAIR (round 43): load → announce → token → attach, zero
+          //    user action. The bridge is unpaired at each subtest start
+          //    (unpair in the finally below), so the extension-origin
+          //    announce mints the token automatically.
+          assert.ok(await waitFor(async () => {
+            const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
+            return Boolean(st.connected);
+          }, 20_000), 'extension never AUTO-connected (announce → token → attach)');
+
+          // 2b. the popup stays interactive (UI verification only — the
+          //    pairing form is GONE in round 44; check the live controls)
           const popupUrl = `chrome-extension://${extId}/popup.html`;
           const tabId = await cdp.openTab(popupUrl);
           let popupLoc = '';
@@ -422,18 +412,12 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
             popupLoc = String(await cdp!.evaluate(tabId, 'location.href').catch(() => 'EVAL-ERR'));
             const r = await cdp!.evaluate(tabId, `(() => {
               if (document.body?.dataset?.hmhUi !== 'ready') return false;
-              const p = document.getElementById('port'), c = document.getElementById('code'), btn = document.getElementById('pair');
-              if (!p || !c || !btn) return false;
-              p.value = '${PORT}'; c.value = '${issued.ok ? issued.code : ''}'; btn.click(); return true;
+              const p = document.getElementById('port'), b = document.getElementById('setport');
+              if (!p || !b) return false;
+              return true;
             })()`).catch(() => null);
             return r === true;
           }, 15_000), `popup UI never became interactive (tab location: ${popupLoc})`);
-
-          // 3. the REAL background.js attached: bridge status flips connected
-          assert.ok(await waitFor(async () => {
-            const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
-            return Boolean(st.connected);
-          }, 15_000), 'extension never connected to the bridge');
 
           // 3b. LIVENESS proof before driving the tools: the ghost-link race
           // (an MV3 worker killed + respawned onto a NEW stream while the
@@ -485,7 +469,7 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
           await cdp?.close().catch(() => undefined); // the CDP WebSocket must not hold the runner open
           await unpair(home).catch(() => undefined); // next subtest starts unpaired
           await sleep(800);
-          try { rmSync(profile, { recursive: true, force: true }); } catch { /* .browseros lock — tmp dir, OS reaps */ }
+          if (activeProfile) { try { rmSync(activeProfile, { recursive: true, force: true }); } catch { /* .browseros lock — tmp dir, OS reaps */ } }
         }
       });
     }

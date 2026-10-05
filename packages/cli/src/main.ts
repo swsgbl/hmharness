@@ -1074,41 +1074,29 @@ flags:
     const sub = rest[0] ?? 'status';
     if (sub === 'serve') {
       const portArg = rest.find((a) => a.startsWith('--port='));
-      const { ExtensionBridgeServer, issuePairingCode, isPaired } = await import('@hmharness/extension');
+      const { ExtensionBridgeServer, pairedCount } = await import('@hmharness/extension');
       const bridge = new ExtensionBridgeServer({ home: homeDir() });
       const { port: actual } = await bridge.start(portArg ? Number(portArg.slice(7)) : undefined);
       bridge.onConnectionChange = (connected) => {
         stdout.write(connected ? '\n  ✓ 浏览器扩展已连接\n' : '\n  ✗ 浏览器扩展断开\n');
       };
+      bridge.onAutoPair = (origin) => {
+        stdout.write(`\n  ✓ 扩展自动授权: ${origin}（零操作连接）\n`);
+      };
       stdout.write(`hmh 扩展桥已运行: http://127.0.0.1:${actual}（仅本机回环）\n`);
-      if (await isPaired(homeDir())) {
-        stdout.write('  已配对 — 浏览器扩展会自动重连\n');
-      } else {
-        const code = await issuePairingCode(homeDir());
-        if (code.ok) {
-          stdout.write(`  配对码: ${code.code}（5 分钟内有效,单次使用 — 在扩展 popup 中输入）\n`);
-        } else {
-          stdout.write(`  配对码生成被锁定,${Math.ceil(code.retryInMs / 1000)}s 后重试（hmh extension pair）\n`);
-        }
-      }
-      stdout.write(DIM('  Ctrl-C 停止;状态: hmh extension status;构建扩展: hmh extension build --target=all\n'));
+      const count = await pairedCount(homeDir());
+      stdout.write(count > 0
+        ? `  已授权浏览器: ${count} 台 — 装有扩展的浏览器启动后自动连接\n`
+        : '  装有扩展的浏览器启动后自动连接（零操作;浏览器先开也行,30 秒内自动连上）\n');
+      stdout.write(DIM('  Ctrl-C 停止;状态: hmh extension status;安装到全部浏览器: hmh extension install\n'));
       process.once('SIGINT', () => { void bridge.stop().then(() => process.exit(0)); });
       process.once('SIGTERM', () => { void bridge.stop().then(() => process.exit(0)); });
       return; // 桥以前台进程常驻
     }
-    if (sub === 'pair') {
-      const { issuePairingCode } = await import('@hmharness/extension');
-      const r = await issuePairingCode(homeDir());
-      if (!r.ok) { stdout.write(`配对码被锁定,${Math.ceil(r.retryInMs / 1000)}s 后重试\n`); return; }
-      stdout.write(`配对码: ${r.code}\n`);
-      stdout.write(`  ${new Date(r.expiresAt).toLocaleTimeString()} 前有效,单次使用 — 打开浏览器扩展 popup 输入\n`);
-      stdout.write(DIM('  扩展未构建? hmh extension build --target=all;桥未运行? hmh extension serve\n'));
-      return;
-    }
     if (sub === 'unpair') {
       const { unpair } = await import('@hmharness/extension');
       const ok = await unpair(homeDir());
-      stdout.write(ok ? '已吊销配对令牌(扩展下次请求即被拒,需重新配对)\n' : '本就未配对\n');
+      stdout.write(ok ? '已吊销全部授权(每台浏览器下次 announce 自动重新授权连接)\n' : '本就无授权\n');
       return;
     }
     if (sub === 'install') {
@@ -1140,7 +1128,7 @@ flags:
         stdout.write(`      打开 chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选 ${r.builds.chromium ?? '(先运行 build)'}\n`);
       }
       if (targets.some((b) => b.name === 'firefox')) {
-        stdout.write(`  · firefox   release 版未签名持久安装需 AMO 签名;当前可用: about:debugging 临时载入(或演示页配对),重启后需重载\n`);
+        stdout.write(`  · firefox   release 版未签名持久安装需 AMO 签名;当前可用: about:debugging 临时载入(重启后需重载;自动连接不变)\n`);
       }
       stdout.write(DIM('  生效时机: 浏览器重启后常驻;撤销: hmh extension uninstall\n'));
       return;
@@ -1153,15 +1141,15 @@ flags:
       return;
     }
     if (sub === 'status') {
-      const { discoverExtensionBridge, isPaired, discoverInstallTargets, installedEverywhere } = await import('@hmharness/extension');
+      const { discoverExtensionBridge, pairedCount, discoverInstallTargets, installedEverywhere } = await import('@hmharness/extension');
       const b = await discoverExtensionBridge();
-      const paired = await isPaired(homeDir());
+      const count = await pairedCount(homeDir());
       if (!b.healthy) { stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`); }
       else {
-        stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 配对: ${paired ? '已配对' : '未配对(hmh extension pair)'}\n`);
+        stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 已授权浏览器: ${count} 台\n`);
         stdout.write(b.connected
           ? `  扩展已连接${b.browser ? ' · ' + b.browser : ''}${b.extVersion ? ' v' + b.extVersion : ''} — 智能体 extension_* 工具可用\n`
-          : '  扩展未连接 — 打开浏览器扩展 popup 配对/连接\n');
+          : '  扩展未连接 — 浏览器启动/重试后自动连接(桥在跑即可)\n');
       }
       stdout.write('常驻安装状态:\n');
       for (const s of installedEverywhere(discoverInstallTargets())) {
@@ -1186,13 +1174,13 @@ flags:
           stdout.write(`  载入: ${r.loadHint}\n`);
           for (const n of r.notes) stdout.write(DIM(`  注: ${n}\n`));
         }
-        stdout.write(DIM('  下一步: hmh extension serve(另开终端)→ 浏览器载入扩展 → popup 输入 hmh extension pair 的配对码\n'));
+        stdout.write(DIM('  下一步: hmh extension serve(另开终端)→ 浏览器载入扩展 → 自动连接(零操作)\n'));
       } catch (err) {
         stdout.write(`构建失败: ${String(err instanceof Error ? err.message : err).slice(0, 300)}\n`);
       }
       return;
     }
-    stdout.write('用法: hmh extension serve | pair | status | install [--browsers=..] | uninstall | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入)\n');
+    stdout.write('用法: hmh extension serve | status | install [--browsers=..] | uninstall | unpair | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入,自动连接)\n');
     return;
   }
   if (cmd === 'cognitive') {

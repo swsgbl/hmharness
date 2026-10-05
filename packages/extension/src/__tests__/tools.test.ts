@@ -4,7 +4,6 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ExtensionBridgeServer } from '../bridge.ts';
-import { issuePairingCode } from '../token.ts';
 import { discoverExtensionBridge, discoverExtensionBridgeSync } from '../registry.ts';
 import { extensionTools } from '../tools.ts';
 import type { BridgeCommand, RawPageData, TabInfo } from '../protocol.ts';
@@ -78,8 +77,7 @@ test('tools: live bridge + connected extension — status/tabs/read full round-t
   let detach: () => void = () => undefined;
   try {
     const { port } = await bridge.start(0);
-    const code = await issuePairingCode(home);
-    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.ok ? code.code : '' }) })).json() as { token: string };
+    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/announce`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'chrome-extension://toolstest' }, body: JSON.stringify({ extBaseUrl: 'chrome-extension://toolstest/popup.html' }) })).json() as { token: string };
 
     const tabs: TabInfo[] = [
       { id: 3, index: 0, title: 'hmharness docs', url: 'https://hmharness.dev/docs', active: true, windowId: 1 },
@@ -143,8 +141,7 @@ test('tools: onPageRead observation hook — fired with RAW data on success, sil
   const bridge = new ExtensionBridgeServer({ home });
   try {
     const { port } = await bridge.start(0);
-    const code = await issuePairingCode(home);
-    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.ok ? code.code : '' }) })).json() as { token: string };
+    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/announce`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'chrome-extension://hooktest' }, body: JSON.stringify({ extBaseUrl: 'chrome-extension://hooktest/popup.html' }) })).json() as { token: string };
     const good: RawPageData = { url: 'https://ok.dev', title: 'OK', selection: '', headings: [], links: [], inputs: [], text: 'body' };
     let failNext = false;
     const detach = await connectStub(port, paired.token, (cmd) => {

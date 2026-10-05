@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
 import { ExtensionBridgeServer, readBridgeState, stateFilePath, DEFAULT_BRIDGE_PORT, bridgePort } from '../bridge.ts';
-import { issuePairingCode } from '../token.ts';
 import type { BridgeCommand, TabInfo } from '../protocol.ts';
 
 async function tmpHome(): Promise<string> {
@@ -128,27 +127,38 @@ test('bridge: e2e — pair over HTTP, attach via fetch-stream SSE, round-trip co
     delete process.env.HMH_EXTENSION_PORT;
     assert.equal(bridgePort(), 7789);
 
-    // status before pairing: liveness without secrets
+    // status before any extension: liveness without secrets
     const st0 = await (await fetch(`http://127.0.0.1:${port}/v1/status`)).json();
     assert.equal(st0.ok, true);
     assert.equal(st0.paired, false);
     assert.equal(st0.connected, false);
 
-    // wrong code refused over HTTP (403, not 500)
-    const bad = await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'WRONGWRONG' }) });
-    assert.equal(bad.status, 403);
-
-    // real pair: code from the CLI path -> HTTP redeem -> bearer token
-    const issued = await issuePairingCode(home);
-    assert.equal(issued.ok, true);
-    const paired = await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: issued.ok ? issued.code : '' }) });
-    const pj = await paired.json() as { ok: boolean; token?: string };
-    assert.equal(paired.status, 200);
-    assert.equal(pj.ok, true);
-    const token = pj.token!;
-    // single use: replaying the code is refused
-    const replay = await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: issued.ok ? issued.code : '' }) });
-    assert.equal(replay.status, 403);
+    // AUTO-PAIR (the ONLY onboarding path, round 44): an extension-origin
+    // announce gets a token in the response — no code, no typing
+    const autoGrant = async (origin: string) => {
+      const r = await fetch(`http://127.0.0.1:${port}/v1/announce`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify({ extBaseUrl: `${origin}/popup.html`, browser: 'test-chromium' }),
+      });
+      return await r.json() as { ok: boolean; token?: string };
+    };
+    const g1 = await autoGrant('chrome-extension://aaa');
+    assert.equal(g1.ok, true);
+    assert.match(g1.token ?? '', /^[0-9a-f]{64}$/, 'announce must mint');
+    const token = g1.token!;
+    // a SECOND browser announcing gets its OWN token — both stay valid
+    const g2 = await autoGrant('moz-extension://bbb');
+    assert.match(g2.token ?? '', /^[0-9a-f]{64}$/, 'multi-browser: second grant');
+    assert.notEqual(g2.token, token);
+    // a loopback (web page) origin announces fine but NEVER gets a token —
+    // the extension scheme is the one claim a page cannot forge
+    const g3 = await (await fetch(`http://127.0.0.1:${port}/v1/announce`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:9999' },
+      body: JSON.stringify({ extBaseUrl: 'chrome-extension://spoof/popup.html' }),
+    })).json() as { token?: string };
+    assert.equal(g3.token, undefined, 'loopback origin must not auto-pair');
 
     // events without a token: 401, no stream
     const unauth = await fetch(`http://127.0.0.1:${port}/v1/events`);
@@ -229,10 +239,13 @@ test('bridge: agent channel — state-file secret gates /v1/agent/command; no-ex
     const nj = await none.json() as { error?: string };
     assert.match(nj.error ?? '', /没有已连接的浏览器扩展/);
 
-    // pair + connect, then the agent channel works end-to-end
-    const issued = await issuePairingCode(home);
-    const paired = await (await fetch(`http://127.0.0.1:${port}/v1/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: issued.ok ? issued.code : '' }) })).json() as { token: string };
-    const ext = await attachFakeExtension(port, paired.token);
+    // auto-grant + connect, then the agent channel works end-to-end
+    const grant = await (await fetch(`http://127.0.0.1:${port}/v1/announce`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'chrome-extension://agenttest' },
+      body: JSON.stringify({ extBaseUrl: 'chrome-extension://agenttest/popup.html' }),
+    })).json() as { token: string };
+    const ext = await attachFakeExtension(port, grant.token);
     await ext.next('hello');
     ext.answerCommands((cmd) => (cmd.kind === 'tabs.list' ? [{ id: 1, index: 0, title: 'A', url: 'https://a.dev', active: true, windowId: 1 }] : { pong: true }));
     const ok = await fetch(`http://127.0.0.1:${port}/v1/agent/command`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` }, body: JSON.stringify({ kind: 'tabs.list' }) });
@@ -256,15 +269,14 @@ test('bridge: host-header and foreign-origin requests are refused (DNS-rebinding
     const evilHost = await rawRequest(port, '/v1/status', { host: 'evil.example.com' });
     assert.equal(evilHost.status, 403);
     assert.match(evilHost.body, /refused Host/);
-    // foreign Origin on pair: refused at the origin guard — code NOT spent
-    const evilOrigin = await rawRequest(port, '/v1/pair', { origin: 'https://evil.example.com', 'content-type': 'application/json' }, 'POST', JSON.stringify({ code: 'TESTTEST' }));
+    // foreign Origin on announce: refused at the origin guard — no token
+    const evilOrigin = await rawRequest(port, '/v1/announce', { origin: 'https://evil.example.com', 'content-type': 'application/json' }, 'POST', JSON.stringify({ extBaseUrl: 'chrome-extension://x/popup.html' }));
     assert.equal(evilOrigin.status, 403);
     assert.match(evilOrigin.body, /refused Origin/);
-    // extension origin is WELCOMED on pair: reaches the handler (wrong code
-    // -> pairing error, not an origin block)
-    const extOrigin = await rawRequest(port, '/v1/pair', { origin: 'chrome-extension://abcdef', 'content-type': 'application/json' }, 'POST', JSON.stringify({ code: 'TESTTEST' }));
-    assert.equal(extOrigin.status, 403);
-    assert.match(extOrigin.body, /配对码/);
+    // extension origin is WELCOMED on announce: auto-granted a token
+    const extOrigin = await rawRequest(port, '/v1/announce', { origin: 'chrome-extension://abcdef', 'content-type': 'application/json' }, 'POST', JSON.stringify({ extBaseUrl: 'chrome-extension://abcdef/popup.html' }));
+    assert.equal(extOrigin.status, 200);
+    assert.match(extOrigin.body, /"token":"/);
   } finally {
     await bridge.stop();
     await rm(home, { recursive: true, force: true });

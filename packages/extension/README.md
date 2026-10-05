@@ -4,16 +4,20 @@
 
 架构 = 2026 桌面 agent↔扩展的收敛方案(ChatGPT 桌面版↔扩展同款):**本机回环服务 + 一次性短配对码 + SSE 下行(fetch 流)+ POST 上行**。零运行时依赖。
 
-## 快速开始
+## 快速开始(自动连接:装好即用,无配对码)
 
 ```bash
 hmh extension install              # 常驻安装到全部已发现浏览器(见下表分轨)
-hmh extension serve                # 前台启动桥(127.0.0.1:7789,自动打印配对码)
-hmh extension pair | unpair        # 配对码 / 吊销令牌
-hmh extension status               # 桥/配对/连接 + 各浏览器常驻安装状态
-hmh extension uninstall            # 全量撤销(注册表/策略/快捷方式)
-hmh extension build --target=all   # 只构建三份可加载目录
+hmh extension serve                # 启动桥(127.0.0.1:7789)
+# 浏览器启动 → 自动识别桥并连接(零操作;桥后开也行,30 秒内自动接上)
+hmh extension status               # 连接/授权浏览器数 + 安装状态
+hmh extension unpair               # 吊销全部浏览器授权(重连自动恢复)
+hmh extension uninstall            # 全量撤销安装
 ```
+
+**没有配对码**。授权 = 扩展 announce(浏览器强制的扩展源 Origin,网页无法伪造)→ 桥直接发本浏览器专属令牌(多令牌并存,最多 8 台,互不踢)。断网/桥未跑时扩展每 30 秒自动重试。popup 仅剩:状态、端口覆盖、重连、取消本机授权、读取自检。
+
+浏览器沙箱限制:扩展不能启动本地进程,桥必须由 CLI 运行(`hmh extension serve`)。
 
 ## 常驻安装通道(2026-10 真机实证;`hmh extension install` 自动分轨)
 

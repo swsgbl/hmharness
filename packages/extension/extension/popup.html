@@ -13,24 +13,21 @@
 
   <div class="row">
     <input id="port" class="mono" inputmode="numeric" placeholder="端口 7789" spellcheck="false">
-  </div>
-  <div class="row">
-    <input id="code" class="mono" placeholder="配对码（hmh extension pair）" spellcheck="false" autocomplete="off">
-    <button id="pair" class="primary">配对并连接</button>
+    <button id="setport">设置端口并连接</button>
   </div>
   <div class="row">
     <button id="reconnect">重新连接</button>
     <button id="open-panel" hidden>在侧栏打开</button>
-    <button id="unpair" style="margin-left:auto">断开</button>
+    <button id="unpair" style="margin-left:auto">断开并取消授权</button>
   </div>
 
   <hr class="sep">
   <div class="row"><button id="read" style="flex:1">读取当前页（自检）</button></div>
   <pre id="out"></pre>
 
-  <p class="hint">配对码在终端运行 <b class="mono">hmh extension pair</b> 生成；
-  桥服务由 <b class="mono">hmh extension serve</b> 提供。智能体经
-  <b class="mono">extension_*</b> 工具读取/操作本浏览器标签页（操作类需逐次批准）。</p>
+  <p class="hint">桥服务运行时(<b class="mono">hmh extension serve</b>)<b>自动连接,无需任何输入</b>;
+  桥未运行时每 30 秒自动重试,启动 CLI 即连。
+  智能体经 <b class="mono">extension_*</b> 工具读取/操作本浏览器标签页(操作类需逐次批准)。</p>
 
   <script src="ui.js"></script>
 </body>
