@@ -50,10 +50,18 @@ export class LiveCodeWmSensor {
     return result;
   }
 
-  /** Pull the CURRENT diagnostics for a uri from the model's sensor state. */
-  pullDiagnostics(uri: string): Array<{ severity: 1 | 2 | 3 | 4; message: string; source: 'lsp' }> {
+  /** Pull the CURRENT diagnostics for a uri from the model's sensor state.
+   *  Range-restored: the Code WM keeps message-level state (no ranges);
+   *  zero ranges are the honest placeholder for sensor re-reads, never a
+   *  fabricated location. */
+  pullDiagnostics(uri: string): Diagnostic[] {
     const diags = this.cwm.diagnosticsFor(uri);
-    return diags.map((d) => ({ severity: d.severity ?? 1, message: d.message, source: 'lsp' }));
+    return diags.map((d) => ({
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      severity: (d.severity ?? 1) as Diagnostic['severity'],
+      message: d.message,
+      source: 'cwm',
+    }));
   }
 
   get stats(): { tracked: number; diagPushes: number; lastSyncAt: string | null } {
