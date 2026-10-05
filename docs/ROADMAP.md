@@ -61,8 +61,15 @@ red-team**(可执行载荷抓真逃逸:R3 动态 import/R1 process→worker 内
 深水区**(观测 lift 因果挖掘+时序 lag+Occam 抑制+反事实重放恒标
 model-based-extrapolation;观测因果学能排序不能排除);⑤**Code World
 Model**(审计五类本体+编辑预测先行/实际后置/误差结算;LSP 传感器只
-发射 symbol 树证明的 defines);⑥**flaky 根修**(run.started→
-run.created 一行错配,摘录步兑现)。
+发射 symbol 树证明的 defines;**后续深化已落**——code-world-store
+持久化 snapshot/fromSnapshot+stateHash 诊断内容敏感(LSP 客户端
+LiveCodeWmSensor 活体同步:openDoc→symbols→入模));⑥**flaky 根修**
+(run.started→run.created 一行错配,摘录步兑现)。
+
+**第 16 包 @hmharness/extension(2026-10-04,0.23.23 首版上 npm)**:
+BrowserOS 原生扩展面(bridge/protocol/tools/adapters/page/build);
+双清单陷阱第三次复发后**守卫机制化**(preflight 读 publish.cjs 的
+ORDER 比对,diverge 即拒跑)。
 
 剩余开口全为外部:投稿(等作者;已收录 PR21,实际是条目更新)、
 bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在 IDE JVM 内不可外部
