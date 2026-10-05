@@ -36,7 +36,6 @@ import { rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PROTOCOL_VERSION, type BridgeCommand, type BridgeStatus, type TabInfo, type UplinkMessage } from './protocol.ts';
 import { isPaired, redeemPairingCode, touchLastSeen, verifyToken } from './token.ts';
-
 export const DEFAULT_BRIDGE_PORT = 7789; // hmh web owns 7788; the bridge takes the neighbor
 
 /** Bridge port resolution: explicit arg > HMH_EXTENSION_PORT > default. */
@@ -71,6 +70,7 @@ interface LiveExtension {
   res: ServerResponse;
   browser?: string;
   extVersion?: string;
+  extBaseUrl?: string;
   connectedAt: string;
   lastSeenAt: string;
 }
@@ -94,6 +94,16 @@ export class ExtensionBridgeServer {
   private closed = false;
   private agentSecret = '';
   private missedPings = 0;
+  /** commands awaiting a result — replayed (read-only ones) when a fresh
+   *  stream attaches, because the stream the command was written to may
+   *  have died with the MV3 worker that owned it */
+  private inFlight = new Map<string, { cmd: BridgeCommand; replayable: boolean }>();
+  /** last unpaired startup announce (extBaseUrl for tooling) */
+  private announced: { extBaseUrl: string; browser?: string; extVersion?: string; at: string } | null = null;
+  /** token minted by a demo-page redemption, parked for the announced
+   *  extension's pickup — single serve, 60s TTL */
+  private demoPairToken: string | undefined;
+  private demoPairTokenAt = 0;
   /** CLI serve loop hook: fires on extension attach/detach for live output. */
   onConnectionChange?: (connected: boolean) => void;
   /** last tabs.push payload — surfaced in status for humans, not used by tools */
@@ -132,6 +142,7 @@ export class ExtensionBridgeServer {
       p.reject(new Error('bridge stopped'));
     }
     this.pending.clear();
+    this.inFlight.clear();
     if (this.live) {
       this.live.res.end();
       this.live = null;
@@ -154,8 +165,9 @@ export class ExtensionBridgeServer {
       port: this.port,
       paired: await isPaired(this.home),
       connected: Boolean(this.live),
-      browser: this.live?.browser,
-      extVersion: this.live?.extVersion,
+      browser: this.live?.browser ?? this.announced?.browser,
+      extVersion: this.live?.extVersion ?? this.announced?.extVersion,
+      extBaseUrl: this.live?.extBaseUrl ?? this.announced?.extBaseUrl,
       lastSeen: this.live?.lastSeenAt,
     };
   }
@@ -176,9 +188,16 @@ export class ExtensionBridgeServer {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(cmd.id);
+        this.inFlight.delete(cmd.id);
         reject(new Error(`extension command ${kind} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       this.pending.set(cmd.id, { resolve, reject, timer });
+      // at-least-once across reconnects (round 40): MV3 workers die under
+      // load and the command may have been written to a stream that died
+      // with them. Read-only commands are replayed on the next attach;
+      // page.act is NEVER replayed (double-click risk beats a timeout the
+      // agent can honestly retry).
+      this.inFlight.set(cmd.id, { cmd, replayable: kind !== 'page.act' });
       this.send(cmd);
     });
   }
@@ -191,6 +210,44 @@ export class ExtensionBridgeServer {
     if (req.method === 'GET' && url === '/v1/status') {
       return this.json(res, 200, await this.status());
     }
+    if (req.method === 'GET' && url === '/v1/demo-page') {
+      // loopback demo page: a deterministic real-HTML target for first-run
+      // trials ("打开这个页面试试扩展") and tests — no external network,
+      // no state, nothing but static markup on 127.0.0.1
+      const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>hmharness 扩展演示页</title></head>
+<body><h1>hmharness 浏览器扩展演示页</h1>
+<p>这是扩展桥自带的回环演示页面 —— 智能体可以通过 extension_page_read 读取本页,经你批准后用 extension_page_act 操作本页。</p>
+<h2>工作原理</h2><p>扩展与桥之间只走本机回环:配对码换令牌,SSE 下行命令,POST 上行结果。无遥测。</p>
+<h2>安全边界</h2><p>页面操作逐次审批;主机权限由浏览器站点访问开关控制。</p>
+<div id="hmh-pair-widget" style="margin-top:18px;padding:12px;border:1px solid #ccc;border-radius:8px">
+  <b>配对</b>(终端 <code>hmh extension pair</code> 生成配对码):<br>
+  <input id="hmh-code" placeholder="配对码" style="margin:6px 0;padding:4px 8px">
+  <button id="hmh-pair-btn">配对并连接</button>
+  <span id="hmh-pair-status"></span>
+</div>
+<script>
+(function(){
+  var btn=document.getElementById('hmh-pair-btn');
+  if(!btn) return;
+  btn.onclick=function(){
+    var code=(document.getElementById('hmh-code').value||'').trim();
+    var st=document.getElementById('hmh-pair-status');
+    if(!code){ st.textContent='请输入配对码'; return; }
+    st.textContent='配对中…';
+    fetch('/v1/demo-pair',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:code})})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        st.textContent=j.ok?'✓ 已配对 — 扩展将在数秒内自动连接':'✗ '+(j.error||'配对失败');
+      })
+      .catch(function(e){ st.textContent='✗ '+String(e); });
+  };
+})();
+</script>
+</body></html>`;
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-length': Buffer.byteLength(html) });
+      res.end(html);
+      return;
+    }
     if (req.method === 'POST' && url === '/v1/pair') {
       if (!this.guardOrigin(req, res)) return;
       const body = await this.readJson(req, res);
@@ -198,6 +255,47 @@ export class ExtensionBridgeServer {
       const r = await redeemPairingCode(this.home, String((body as { code?: unknown }).code ?? ''));
       if (!r.ok) return this.json(res, 403, { ok: false, error: r.error });
       return this.json(res, 200, { ok: true, token: r.token, protocol: PROTOCOL_VERSION });
+    }
+    if (req.method === 'POST' && url === '/v1/announce') {
+      // UNAUTHENTICATED by design (round 41): the extension announces its
+      // own base URL before pairing exists. Metadata only — a URL no
+      // secret; guardOrigin/Host still apply. Feeds status.extBaseUrl so
+      // tooling can find the popup without browser automation.
+      if (!this.guardOrigin(req, res)) return;
+      const body = await this.readJson(req, res) as import('./protocol.ts').AnnounceMessage | undefined;
+      const base = typeof body?.extBaseUrl === 'string' ? body.extBaseUrl.slice(0, 200) : '';
+      if (!base || !/^(chrome|moz|safari)-extension:\/\//i.test(base)) {
+        return this.json(res, 400, { ok: false, error: 'announce needs an extension base URL' });
+      }
+      this.announced = { extBaseUrl: base, browser: body?.browser, extVersion: body?.extVersion, at: new Date().toISOString() };
+      await this.writeState();
+      return this.json(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && url === '/v1/demo-pair') {
+      // Demo-page pairing (round 41, Firefox-discovered): the page — served
+      // by THIS bridge — posts the pairing code the user typed. The bridge
+      // redeems it (same store discipline as /v1/pair: consumes the code,
+      // pins the tokenHash) and parks the TOKEN for the ANNOUNCED extension
+      // to pick up via GET /v1/announce-status. The page itself never sees
+      // the token. Honest loopback caveat, documented: between redemption
+      // and pickup the token is served unauthenticated to any loopback
+      // caller — the same exposure class as the pairing code being visible
+      // on the terminal; single-use, TTL'd, revocable via unpair.
+      if (!this.guardOrigin(req, res)) return;
+      const body = await this.readJson(req, res) as { code?: unknown } | undefined;
+      const r = await redeemPairingCode(this.home, String(body?.code ?? ''));
+      if (!r.ok) return this.json(res, 403, { ok: false, error: r.error });
+      this.demoPairToken = r.token;
+      this.demoPairTokenAt = Date.now();
+      return this.json(res, 200, { ok: true });
+    }
+    if (req.method === 'GET' && url === '/v1/announce-status') {
+      // unauthenticated: what an UNPAIRED extension needs to join — its
+      // pending demo-pair token, if one is parked and fresh (60s)
+      const fresh = this.demoPairToken && this.demoPairTokenAt && Date.now() - this.demoPairTokenAt < 60_000;
+      const token = fresh ? this.demoPairToken : undefined;
+      if (token) { this.demoPairToken = undefined; } // single serve
+      return this.json(res, 200, { ok: true, paired: await isPaired(this.home), token });
     }
     if (req.method === 'GET' && url === '/v1/events') {
       if (!this.guardOrigin(req, res)) return;
@@ -306,6 +404,11 @@ export class ExtensionBridgeServer {
     res.write(this.sse('hello', { ok: true, protocol: PROTOCOL_VERSION }));
     this.live = { res, connectedAt: new Date().toISOString(), lastSeenAt: new Date().toISOString() };
     this.missedPings = 0;
+    // replay read-only commands the dead stream never answered (round 40):
+    // the fresh attach is the only delivery chance they have left
+    for (const [, info] of this.inFlight) {
+      if (info.replayable) this.send(info.cmd);
+    }
     req.on('close', () => {
       if (this.live?.res === res) {
         this.live = null;
@@ -372,6 +475,7 @@ export class ExtensionBridgeServer {
       if (this.live) {
         this.live.browser = msg.browser;
         this.live.extVersion = msg.extVersion;
+        this.live.extBaseUrl = typeof msg.extBaseUrl === 'string' ? msg.extBaseUrl : this.live.extBaseUrl;
         this.live.lastSeenAt = new Date().toISOString();
       }
       await touchLastSeen(this.home);
@@ -380,6 +484,7 @@ export class ExtensionBridgeServer {
     }
     if (msg.kind === 'result') {
       const p = this.pending.get(msg.id);
+      this.inFlight.delete(msg.id);
       if (!p) return; // late result for a timed-out command — nothing to do
       this.pending.delete(msg.id);
       clearTimeout(p.timer);

@@ -1,14 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, execSync, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { spawn, spawnSync, execSync, type ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import net from 'node:net';
 import { CdpBrowser, discoverBrowsers } from '@hmharness/browser';
 import { buildExtension } from '../build.ts';
 import { ExtensionBridgeServer } from '../bridge.ts';
-import { issuePairingCode } from '../token.ts';
+import { issuePairingCode, unpair } from '../token.ts';
 import { extensionTools } from '../tools.ts';
 
 /**
@@ -29,11 +30,21 @@ function findBrowserBinaries(): Array<{ name: string; command: string }> {
   const out: Array<{ name: string; command: string }> = [];
   const bo = discoverBrowsers(true).find((b) => b.healthy);
   if (bo) out.push({ name: 'browseros', command: bo.command });
+  const la = process.env.LOCALAPPDATA ?? '';
+  const pf = process.env.ProgramFiles ?? '';
   const candidates: Array<[string, string]> = [
     ['chrome', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'],
     ['chrome', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'],
     ['edge', 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'],
     ['edge', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'],
+    // chromium-family peers (round 41): Brave / Opera / Quark install roots
+    ['brave', join(la, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')],
+    ['opera', join(la, 'Programs', 'Opera', 'opera.exe')],
+    ['opera', join(pf, 'Opera', 'opera.exe')],
+    ['quark', join(pf, 'Quark', 'quark.exe')],
+    // gecko (round 41): Firefox via Marionette temporary install
+    ['firefox', join(pf, 'Mozilla Firefox', 'firefox.exe')],
+    ['firefox', 'C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'],
     ['chrome', '/usr/bin/google-chrome'],
     ['chromium', '/usr/bin/chromium-browser'],
     ['chromium', '/usr/bin/chromium'],
@@ -42,8 +53,28 @@ function findBrowserBinaries(): Array<{ name: string; command: string }> {
   ];
   const seen = new Set(out.map((b) => b.command));
   for (const [name, p] of candidates) {
-    if (!seen.has(p) && existsSync(p)) { seen.add(p); out.push({ name, command: p }); }
+    if (p && p !== join('', '') && !seen.has(p) && existsSync(p)) { seen.add(p); out.push({ name, command: p }); }
   }
+  // desktop shortcuts (how the user actually launches browsers): resolve
+  // .lnk targets and keep ones that name a known browser executable
+  try {
+    const desktop = join(process.env.USERPROFILE ?? process.env.HOME ?? '', 'Desktop');
+    for (const f of readdirSync(desktop)) {
+      if (!f.toLowerCase().endsWith('.lnk')) continue;
+      const lnk = join(desktop, f);
+      const r = spawnSync('powershell', ['-NoProfile', '-Command',
+        `(New-Object -ComObject WScript.Shell).CreateShortcut('${lnk.replace(/'/g, "''")}').TargetPath`], { encoding: 'utf8', timeout: 10_000 });
+      const target = (r.stdout ?? '').trim();
+      const base = target.split('\\').pop()?.toLowerCase() ?? '';
+      const family = base === 'firefox.exe' ? 'firefox'
+        : ['brave.exe', 'opera.exe', 'quark.exe'].includes(base) ? 'chromium-peer' : null;
+      if (!family || !existsSync(target)) continue;
+      const name = family === 'firefox' ? 'firefox' : base.replace('.exe', '');
+      if (![...out].some((b) => b.command.toLowerCase() === target.toLowerCase())) {
+        out.push({ name, command: target });
+      }
+    }
+  } catch { /* no desktop or no shortcuts — optional discovery */ }
   return out;
 }
 
@@ -102,6 +133,188 @@ async function loadUnpackedViaCdp(cdpPort: number, dir: string): Promise<unknown
   });
 }
 
+/** Minimal Marionette (Gecko's automation protocol) client — just enough
+ *  to install the extension temporarily and drive its popup. Wire: TCP,
+ *  length-prefixed JSON; server handshake {applicationType,marionetteProtocol};
+ *  commands `[0,id,name,params]`; responses `[1,id,error,result]`. Firefox
+ *  release builds require SIGNED extensions EXCEPT temporary installs,
+ *  whose sanctioned automation path is exactly this command. */
+class Marionette {
+  private sock: import('node:net').Socket | null = null;
+  private buf = '';
+  private nextId = 1;
+  private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  private readonly handshake: Promise<void>;
+
+  constructor(port: number) {
+    this.handshake = new Promise<void>((resolve, reject) => {
+      const s = net.connect(port, '127.0.0.1');
+      s.setEncoding('utf8');
+      s.on('error', (e) => reject(e));
+      s.on('data', (d: string) => {
+        this.buf += d;
+        for (;;) {
+          const m = /^(\d+):/.exec(this.buf);
+          if (!m) break;
+          const len = Number(m[1]);
+          const head = m[0].length;
+          if (this.buf.length < head + len) break;
+          const payload = this.buf.slice(head, head + len);
+          this.buf = this.buf.slice(head + len);
+          let msg: unknown;
+          try { msg = JSON.parse(payload); } catch { continue; }
+          if (Array.isArray(msg) && msg[0] === 1) {
+            const p = this.pending.get(msg[1] as number);
+            if (p) {
+              this.pending.delete(msg[1] as number);
+              if (msg[2]) p.reject(new Error(String(JSON.stringify(msg[2])).slice(0, 220)));
+              else p.resolve(msg[3]);
+            }
+          } else if (!Array.isArray(msg)) {
+            resolve(); // server handshake {applicationType, marionetteProtocol}
+          }
+        }
+      });
+      this.sock = s;
+    });
+  }
+
+  ready(): Promise<void> {
+    return this.handshake;
+  }
+
+  command(name: string, params: Record<string, unknown> = {}): Promise<any> {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      const frame = JSON.stringify([0, id, name, params]);
+      this.sock!.write(`${Buffer.byteLength(frame)}:${frame}`);
+    });
+  }
+
+  close(): void {
+    try { this.sock?.end(); } catch { /* already dead */ }
+  }
+}
+
+/** Firefox flow: temporary install via Marionette, popup pairing driven
+ *  through WebDriver, agent tools over the loopback (browser-agnostic). */
+async function firefoxFlow(
+  t: import('node:test').TestContext,
+  b: { name: string; command: string },
+  shared: { home: string; bridge: ExtensionBridgeServer; builtDir: string },
+): Promise<void> {
+  await t.test(`firefox: ${b.command}`, async () => {
+    const { home, bridge, builtDir } = shared;
+    const profile = mkdtempSync(join(tmpdir(), 'ext-real-ff-profile-'));
+    let proc: ChildProcess | null = null;
+    let mar: Marionette | null = null;
+    const ctx = { cwd: home, home };
+    try {
+      // -no-remote: NEVER attach to the user's running Firefox
+      proc = spawn(b.command, ['-no-remote', '-profile', profile, '-marionette', '--headless', 'about:blank'],
+        { stdio: 'ignore' });
+
+      assert.ok(await waitFor(async () => {
+        try { const m = new Marionette(2828); await m.ready(); m.close(); return true; } catch { return false; }
+      }, 30_000), 'Marionette port 2828 never came up');
+
+      mar = new Marionette(2828);
+      await mar.ready();
+      const m = mar;
+
+      // 1. session FIRST (current Firefox routes Addon:Install through the
+      //    WebDriver agent — it refuses without an active session), then
+      //    temporary install — try the unpacked dir, fall back to a zip
+      await m.command('WebDriver:NewSession', { capabilities: { alwaysMatch: { acceptInsecureCerts: true, browserName: 'firefox' } } });
+      let installResult = await m.command('Addon:Install', { path: builtDir, temporary: true })
+        .then((v) => ({ ok: true as const, v }), (e: Error) => ({ ok: false as const, e }));
+      if (!installResult.ok) {
+        const zip = join(profile, 'payload.zip');
+        const zipped = spawnSync('powershell', ['-NoProfile', '-Command',
+          `Compress-Archive -Path '${builtDir.replace(/'/g, "''")}*' -DestinationPath '${zip.replace(/'/g, "''")}' -Force`],
+          { encoding: 'utf8', timeout: 30_000 });
+        if (zipped.status === 0) {
+          installResult = await m.command('Addon:Install', { path: zip, temporary: true })
+            .then((v) => ({ ok: true as const, v }), (e: Error) => ({ ok: false as const, e }));
+        }
+      }
+      assert.ok(installResult.ok, `Addon:Install failed: ${installResult.ok ? '' : installResult.e.message}`);
+
+      // 2. the UNPAIRED background announces its base URL -> popup URL
+      //    (round 41 announce — the moz-extension://uuid is otherwise
+      //    undiscoverable from outside the browser)
+      assert.ok(await waitFor(async () => {
+        const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
+        return typeof st.extBaseUrl === 'string' && st.extBaseUrl.startsWith('moz-extension://');
+      }, 25_000), 'background never announced its base URL (event page did not run?)');
+      const st0 = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
+      assert.ok(typeof st0.extBaseUrl === 'string' && st0.extBaseUrl.startsWith('moz-extension://'), 'announced base URL must be a moz-extension origin');
+
+      // 3. pair from the DEMO PAGE — an unprivileged http page WebDriver
+      //    CAN script (Firefox refuses script execution on privileged
+      //    moz-extension:// pages AND never auto-grants MV3 host
+      //    permissions, so content-script pairing is structurally out).
+      //    The page posts the code to the bridge's /v1/demo-pair; the
+      //    background picks the parked token up via announce-status.
+      await m.command('WebDriver:Navigate', { url: `http://127.0.0.1:${PORT}/v1/demo-page` });
+      const issued = await issuePairingCode(home);
+      assert.equal(issued.ok, true);
+      let ffProbe = '';
+      assert.ok(await waitFor(async () => {
+        try {
+          const v = await m.command('WebDriver:ExecuteScript', {
+            script: `return (() => {
+              const i = document.getElementById('hmh-code'), b = document.getElementById('hmh-pair-btn');
+              if (!i || !b) return 'no-widget';
+              if (b.dataset.hmhClicked === '1') return 'already';
+              i.value = '${issued.ok ? issued.code : ''}';
+              b.dataset.hmhClicked = '1';
+              b.click();
+              return 'clicked';
+            })();`,
+          }).then((r: any) => ({ v: r?.value }), (e: Error) => ({ err: e.message.slice(0, 160) }));
+          ffProbe = `script=${JSON.stringify(v)}`;
+          return (v as { v?: string }).v === 'clicked';
+        } catch (e) { ffProbe = 'probe-throw ' + String(e).slice(0, 120); return false; }
+      }, 20_000), `firefox demo-page pair widget never fired (${ffProbe})`);
+
+      // 4. connected + liveness (same ghost-proof gate as the chromium flow)
+      assert.ok(await waitFor(async () => {
+        const st = await (await fetch(`http://127.0.0.1:${PORT}/v1/status`)).json();
+        return Boolean(st.connected);
+      }, 20_000), 'firefox extension never connected to the bridge');
+      assert.ok(await waitFor(() => bridge.command('ping', 3_000).then(() => true, () => false), 30_000), 'command path never came alive');
+
+      // 5. agent tools against the real Firefox
+      const tools = extensionTools({ home });
+      const byName = (n: string) => tools.find((x) => x.name === n)!;
+      await m.command('WebDriver:Navigate', { url: `http://127.0.0.1:${PORT}/v1/demo-page` });
+      await sleep(1_200);
+      const tabs = await byName('extension_tabs').execute({}, ctx);
+      assert.ok(!tabs.isError, `extension_tabs failed: ${tabs.output}`);
+      assert.ok(/demo-page/.test(tabs.output), 'real tabs include the demo page');
+      // Firefox MV3 STRUCTURAL BOUNDARY (round 41, wire-verified): host
+      // permissions are OPT-IN — never auto-granted, temporary installs
+      // included. tabs/status/pairing/command channels all work; page
+      // scripting stays refused until the user grants site access in
+      // about:addons. The tool must surface that honestly (actionable
+      // error, not a hang), exactly like a real user would see.
+      const read = await byName('extension_page_read').execute({}, ctx);
+      assert.ok(read.isError, 'un-granted Firefox MUST refuse page scripting');
+      assert.match(read.output, /Missing host permission|host permission/i);
+      const act = await byName('extension_page_act').execute({ action: 'scroll', direction: 'bottom' }, ctx);
+      assert.ok(act.isError, 'un-granted Firefox MUST refuse page acting');
+    } finally {
+      if (proc?.pid) killTree(proc.pid);
+      mar?.close();
+      await unpair(home).catch(() => undefined); // next subtest starts unpaired
+      await sleep(800);
+      try { rmSync(profile, { recursive: true, force: true }); } catch { /* profile lock — tmp dir, OS reaps */ }
+    }
+  });
+}
+
 test('real browser: extension installs, pairs via popup, serves agent tools', { timeout: 300_000 }, async (t) => {
   // HMH_TEST_BROWSERS=browseros,chrome,edge narrows the set (debugging aid)
   const filter = process.env.HMH_TEST_BROWSERS?.split(',').map((s) => s.trim());
@@ -115,12 +328,23 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
   const prevHome = process.env.HMH_HOME;
   process.env.HMH_HOME = home;
   try {
-    // self-contained: build the chromium payload FOR THIS PORT into tmp
-    const [built] = await buildExtension({ target: 'chromium', outDir, port: PORT });
+    // self-contained: build BOTH payloads for this port into tmp —
+    // chromium (BrowserOS/Chrome/Edge/Brave/Opera/Quark) + firefox (Marionette)
+    const [builtC, builtF] = await Promise.all([
+      buildExtension({ target: 'chromium', outDir, port: PORT }),
+      buildExtension({ target: 'firefox', outDir, port: PORT }),
+    ]);
+    const built = builtC[0]!;
+    const builtFf = builtF[0]!;
     assert.ok(built, 'chromium build produced a dir');
+    assert.ok(builtFf, 'firefox build produced a dir');
     await bridge.start(PORT);
 
     for (const b of browsers) {
+      if (b.name === 'firefox') {
+        await firefoxFlow(t, b, { home, bridge, builtDir: builtFf.dir });
+        continue;
+      }
       await t.test(`${b.name}: ${b.command}`, async () => {
         const profile = mkdtempSync(join(tmpdir(), 'ext-real-profile-'));
         let proc: ChildProcess | null = null;
@@ -259,6 +483,7 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
         } finally {
           if (proc?.pid) killTree(proc.pid);
           await cdp?.close().catch(() => undefined); // the CDP WebSocket must not hold the runner open
+          await unpair(home).catch(() => undefined); // next subtest starts unpaired
           await sleep(800);
           try { rmSync(profile, { recursive: true, force: true }); } catch { /* .browseros lock — tmp dir, OS reaps */ }
         }

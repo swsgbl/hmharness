@@ -32,7 +32,12 @@ export {
 export { extensionTools, type ExtensionToolContext } from './tools.ts';
 export { formatPageSnapshot, summarizePage } from './page.ts';
 export {
-  EXTENSION_TARGETS, EXTENSION_VERSION, GECKO_ID, TARGET_SPECS, manifestFor, validateManifest,
+  EXTENSION_ID, EXTENSION_KEY, EXTENSION_TARGETS, EXTENSION_VERSION, GECKO_ID, TARGET_SPECS, manifestFor, validateManifest,
   type ExtensionTarget, type ManifestOptions, type TargetSpec,
 } from './adapters.ts';
 export { buildExtension, payloadDir, PAYLOAD_FILES, type BuildOptions, type BuildResult } from './build.ts';
+export {
+  CHROMIUM_REG_HIVES, buildCarriesPinnedKey, discoverInstallTargets, findInstallableBrowsers,
+  installExtension, installShortcuts, installedEverywhere, stableInstallDir, uninstallExtension,
+  type InstallableBrowser, type InstallOutcome, type InstallResult,
+} from './install.ts';

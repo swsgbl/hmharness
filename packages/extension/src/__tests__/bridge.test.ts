@@ -82,10 +82,24 @@ async function attachFakeExtension(port: number, token: string, opts: { hello?: 
       }
     })();
   };
+  let pingDrainRunning = true;
+  // the bridge heartbeats a REQUIRED-answer ping every 5s (round 40) —
+  // drain those continuously so manual scenarios only ever see real commands
+  void (async () => {
+    while (pingDrainRunning) {
+      const i = queue.findIndex((b) => b.event === 'command' && (b.data as BridgeCommand)?.kind === 'ping');
+      if (i >= 0) {
+        const ping = queue.splice(i, 1)[0]!.data as BridgeCommand;
+        await uplink({ kind: 'result', id: ping.id, ok: true, data: { pong: true } }).catch(() => undefined);
+        continue;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  })();
   if (opts.hello !== false) {
     await uplink({ kind: 'hello', protocol: 'hmext/1', extVersion: '0.0.0-test', browser: 'test-chromium' });
   }
-  return { next, uplink, answerCommands, close: () => ac.abort() };
+  return { next, uplink, answerCommands, close: () => { pingDrainRunning = false; ac.abort(); } };
 }
 
 /** raw HTTP request with header control fetch() forbids (Host/Origin attacks) */

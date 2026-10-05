@@ -4,6 +4,103 @@
 
 ---
 
+## 2026-10-05(四十一) · 七浏览器真装验证:Brave/Opera/夸克/Firefox 接入(768/768)
+
+**动机**:用户点名适配四台桌面浏览器:Firefox.exe / Brave.lnk /
+Opera 浏览器.lnk / 夸克浏览器.lnk。探测:三个 .lnk 解析到真实
+本体;桌面 Firefox.exe 是 402KB 孤立残件(真身在 Program Files)。
+Brave/Opera/夸克是 Chromium 系(现有 chromium 载荷直接适用);
+Firefox 是 Gecko,需要全新自动化通道。
+
+**关键决策**(Firefox 三道真墙,全部实测撞上后逐一正解):
+- **墙一:装载**。Firefox release 签名强制,唯一免签通道是
+  Marionette 协议 `Addon:Install`(temporary)——自写 30 行
+  Marionette 客户端(长度前缀 JSON 帧);当前版本要求先
+  `WebDriver:NewSession` 再 Addon:Install(否则 invalid session id);
+- **墙二:发现与驱动**。moz-extension://<随机UUID> 外部不可知,
+  且 Firefox WebDriver **拒绝导航到扩展页**、**拒绝在特权页执行
+  脚本**。两层解:①未配对时后台向桥 `/v1/announce` 广播自己的
+  base URL(零秘密,状态页顺带显示 popup 地址);②**演示页直连
+  配对**——桥的 /v1/demo-page 配对组件把码直接 POST 给
+  /v1/demo-pair(同源!),桥兑换后把令牌"停泊",后台经
+  /v1/announce-status 轮询领取(单次发放、60s TTL)。配对从此
+  **完全不经过扩展 UI**——比 popup 更普适的产品形态;
+  内容脚本中转方案先做后弃:wire 取证显示 Firefox 128+ 对 MV3
+  主机权限一律不自动授予,内容脚本被结构性拒注入;
+- **墙三:页面注入**。`Missing host permission for the tab`——
+  Firefox MV3 主机权限是 **opt-in**(临时安装也不授予),须用户在
+  about:addons 手动开。不绕过:tabs/status/配对/命令通道全部正常,
+  page_read/act 在授权前**如实上报可行动错误**(测试钉死这个边界
+  的双向:拒绝发生+错误消息如实);
+- **跨子测试状态独立**:每台浏览器子测试结束 unpair——
+  `paired:true` 是桥全局的,Firefox 后台轮询曾因前序子测试的
+  配对残留提前退出("paired≠本扩展已持有令牌"是产品级修正)。
+
+**实测证据**:768/768。**七台浏览器两连跑全绿**:BrowserOS /
+Google Chrome(loadUnpacked 通道)/ Edge / **Brave / Opera / 夸克
+(chromium 载荷,--load-extension)** / **Firefox(Marionette 临时
+装载+announce+演示页配对;page 注入边界如实断言)**。桌面 .lnk
+解析纳入发现(用户怎么启动,测试就怎么发现)。typecheck 0
+(本轮文件);build/preflight 被并行会话写一半的 code-wm-live.ts
+挡住(非本轮改动,待其静止后重建即绿——round 38 同款)。
+
+**教训**:
+- 浏览器自动化协议的"官方通道"每家都在换:Chrome 的
+  --load-extension 死了换 Extensions.loadUnpacked,Firefox 活着的是
+  Marionette Addon:Install+temporary——每道墙都值得读 wire 级
+  报错而不是猜;
+- 配对把"扩展 UI"当必经之路是设计缺陷:桥自己的页面(同源)是
+  更普适的配对面——Gecko 的特权页禁令反而逼出了更好的产品形态;
+- "store 说 paired"≠"这个扩展持有令牌":全局状态与实例状态的
+  混淆在多浏览器共存的现实里必然咬人。
+
+---
+
+## 2026-10-05(四十) · 有头真装验证 Chrome+Edge + MV3 主机权限边界 + 命令重放(763/763)
+
+**动机**:用户点名"装到谷歌和 edge 浏览器验证"。round 39 是
+headless 自动化;本轮升格为**有头(可见窗口)真实用户流验证**,
+并把验证中暴露的两个产品级缺口补掉。
+
+**关键决策**:
+- **MV3 主机权限是注入的硬边界**(两台浏览器一致实证):载荷原只
+  声明回环主机,`extension_page_read/act` 对任何其它站点被浏览器
+  拒绝(`Cannot access contents of url`)——popup 里的用户同意不能
+  替代清单声明。产品要接入真实浏览器就必须声明 `<all_urls>`(浏览器
+  自带的站点访问开关仍是用户最终控制权);`validateManifest` 同步
+  把 `<all_urls>` 纳入机检;
+- **命令重放(at-least-once,只读)**:全仓重载下 Edge SW 被杀,
+  命令在创建瞬间写进随 SW 死去的流 → 烧掉超时,新流附上已晚。桥
+  维护 inFlight 命令信封,新流 attach 时**重放只读命令**
+  (tabs.list/page.read/ping——幂等;`page.act` 永不重放,双击风险
+  重于可诚实重试的超时);扩展按 id 去重:同 worker 重放**回放缓存
+  结果**,跨 worker 重放重新执行(新鲜 worker 缓存为空);
+- **回环演示页** `GET /v1/demo-page`:有头验证最初以 example.com 为
+  目标,中途本机外网断开(实测 fetch failed)——外网站点使演示
+  受网络摆布。桥自带静态演示页(仅回环),验证/首跑 UX 双用,
+  确定性回归。
+
+**实测证据**:763/763。**有头验证 Chrome+Edge 全绿**(可见窗口:
+装载→popup 配对→ping 验真→status→tabs 见演示页→read 出
+"演示页"标题→act scroll bottom);提交版三浏览器测试在重载全仓
+环境中同绿(此前该环境 3/3 必挂 Edge)。定位链:两台浏览器一致
+权限报错→定性为 MV3 硬边界而非 bug;Edge 单跑健康而 [browseros→
+edge] 必挂→顺序依赖→复现脚本两通道皆通→committed 差异收敛到
+"命令写给将死的流"→重放修复。typecheck 0、构建绿、PREFLIGHT OK。
+
+**教训**:
+- "popup 里用户点了同意"≠"清单授权了"——MV3 的注入边界在
+  manifest,不在 UI 共识;权限报错第一次出现就该读全文而不是当
+  环境噪声;
+- 幽灵连接的完整解是**投递语义**而不只是活性检测:活性检测让桥
+  不再对死链撒谎,重放才让命令穿越 worker 死亡;`page.act` 的
+  排除是诚实的能力边界(宁超时勿双击);
+- 演示/验证目标一旦依赖外网就不再是测试——网络抖动会把"产品
+  问题"与"运营商问题"搅在一起;回环自举(桥自带演示页)是
+  唯一确定性出路。
+
+---
+
 ## 2026-10-04(三十九) · 三浏览器真装验证:Chrome/Edge/BrowserOS 全绿(763/763)
 
 **动机**:用户点名"装到谷歌和 Edge 浏览器验证"。真实浏览器测试

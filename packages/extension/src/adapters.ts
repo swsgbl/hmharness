@@ -31,6 +31,20 @@ export const EXTENSION_TARGETS: ExtensionTarget[] = ['chromium', 'firefox', 'saf
 export const EXTENSION_VERSION = '0.23.22'; // bump with package releases
 export const GECKO_ID = 'bridge@hmharness.dev';
 
+/**
+ * Fixed public key (round 42) — pins the extension ID across browsers,
+ * install paths and install channels: lceccbmgohpgfgckenddombndnklbafm.
+ * Without it, an unpacked extension's ID is derived from its folder path,
+ * which makes REGISTRY-based persistent installs impossible (the registry
+ * key must name the ID) and breaks deep-links/settings references the
+ * moment the folder moves. The private half is never needed (we ship
+ * unpacked); this is the standard Chrome-webstore-style id pinning.
+ */
+export const EXTENSION_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4q3ILDDKZOiEgNrQDc7ljtWiTzt3tSsbgnpgvTgZNh7L4BjU+4Evad1arNin/IN6LKyS7pyJoFL6vaEApk+KZdRJQ8a6Um4IanqAIz+OLDm5NjpHqlvlPBREHb5bDASfz5awT6CiE/cZxT42AgeMFOzYszSGNUQlpp+2mFmE2EJ9iSHUUu1ipVYj1IDko0SIP8PNqbiPy+b2AGLV6FWfCLsHzaIlEJAB02uusMdXOUaNUkG4/FrRT++iYKREmhwONZgDA788fiHIQZ35hYQ3GBPiFubZuOsDxAzIROajwbTkw0sk5/Iq0NH/C7swho18sWmYw6lbBzXVwxDURvMQ5wIDAQAB';
+
+/** The ID pinned by EXTENSION_KEY (sha256(pubkey-der) → a-p mapping). */
+export const EXTENSION_ID = 'lceccbmgohpgfgckenddombndnklbafm';
+
 export interface TargetSpec {
   id: ExtensionTarget;
   /** browsers this target loads in unchanged */
@@ -81,6 +95,8 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
     manifest_version: 3,
     name: 'hmharness 浏览器桥接',
     version,
+    // fixed ID pinning (registry installs + stable references)
+    key: EXTENSION_KEY,
     description: '将 hmharness 智能体接入你的真实浏览器:读取标签页/页面内容,经逐次批准后操作页面。本机回环通信,无遥测。',
     permissions: ['activeTab', 'scripting', 'tabs', 'storage', 'alarms'],
     // 127.0.0.1:<port> = the bridge itself. <all_urls> = page read/act on

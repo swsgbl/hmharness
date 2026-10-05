@@ -51,11 +51,24 @@ export type BridgeCommand =
 
 /** Extension -> bridge uplink messages (POST /v1/uplink bodies). */
 export type UplinkMessage =
-  | { kind: 'hello'; protocol: string; extVersion: string; browser: string; userAgent?: string }
+  | { kind: 'hello'; protocol: string; extVersion: string; browser: string; extBaseUrl?: string; userAgent?: string }
   | { kind: 'result'; id: string; ok: true; data: unknown }
   | { kind: 'result'; id: string; ok: false; error: string }
   | { kind: 'tabs.push'; tabs: TabInfo[] }
   | { kind: 'bye' };
+
+/** Unauthenticated startup announce (POST /v1/announce): the extension's
+ *  own base URL (chrome-extension://host/ or moz-extension://uuid/), so
+ *  tooling can find the popup WITHOUT browser automation. Leaks nothing —
+ *  a URL is only useful to a process that could talk to the extension
+ *  anyway. Closes the Firefox discovery chicken-egg: the background can
+ *  announce before pairing (no token yet), giving automation the popup
+ *  URL it needs to drive the pair form. */
+export interface AnnounceMessage {
+  extBaseUrl: string;
+  browser?: string;
+  extVersion?: string;
+}
 
 /** Raw page data collected by the injected collector (see extension/
  *  background.js `collectPageData`). Node-side `summarizePage` (page.ts)
@@ -93,5 +106,8 @@ export interface BridgeStatus {
   connected: boolean;
   browser?: string;
   extVersion?: string;
+  /** the extension's own base URL — from the paired hello, or (unpaired)
+   *  from the last startup announce */
+  extBaseUrl?: string;
   lastSeen?: string;
 }

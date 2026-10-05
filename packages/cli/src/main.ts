@@ -1111,15 +1111,62 @@ flags:
       stdout.write(ok ? '已吊销配对令牌(扩展下次请求即被拒,需重新配对)\n' : '本就未配对\n');
       return;
     }
+    if (sub === 'install') {
+      // PERSISTENT install into every discovered browser's extension list
+      // (Chromium: HKCU registry external-extension channel; Firefox:
+      // enterprise policy force_installed). Takes effect at next start.
+      const pArg = rest.find((a) => a.startsWith('--port='));
+      const bArg = rest.find((a) => a.startsWith('--browsers='));
+      const { installExtension, discoverInstallTargets, findInstallableBrowsers, buildCarriesPinnedKey, EXTENSION_ID } = await import('@hmharness/extension');
+      let targets = discoverInstallTargets();
+      if (bArg) {
+        const want = bArg.slice('--browsers='.length).split(',').map((s) => s.trim()).filter(Boolean);
+        targets = targets.filter((b) => want.includes(b.name));
+      }
+      const usable = findInstallableBrowsers(targets);
+      if (usable.length === 0) { stdout.write('未发现可安装的浏览器(chrome/edge/brave/opera/quark/firefox)\n'); return; }
+      stdout.write(`发现 ${usable.length} 台浏览器: ${usable.map((b) => b.name).join(', ')} · 固定扩展 ID ${EXTENSION_ID}\n`);
+      const r = await installExtension({ home: homeDir(), browsers: targets, port: pArg ? Number(pArg.slice(7)) : undefined });
+      if (r.builds.chromium) {
+        if (!buildCarriesPinnedKey(r.builds.chromium)) { stdout.write('✗ 载荷缺少固定 key — 安装中止(重试或检查构建)\n'); return; }
+        stdout.write(`✓ chromium 载荷: ${r.builds.chromium}(稳定目录,勿移动)\n`);
+      }
+      if (r.builds.firefox) stdout.write(`✓ firefox 载荷: ${r.builds.firefox} + XPI\n`);
+      for (const o of r.outcomes) stdout.write(`  ${o.ok ? '✓' : '✗'} ${o.browser.padEnd(9)} ${o.detail}\n`);
+      // honest split for the two browsers with NO automated persistent
+      // channel in 2026 (both empirically pinned down on this machine):
+      if (targets.some((b) => b.name === 'chrome')) {
+        stdout.write(`  · chrome    自动持久通道已关闸(实测:注册表/开发者模式/手写 Preferences 均被忽略) — 手动一次即持久:\n`);
+        stdout.write(`      打开 chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选 ${r.builds.chromium ?? '(先运行 build)'}\n`);
+      }
+      if (targets.some((b) => b.name === 'firefox')) {
+        stdout.write(`  · firefox   release 版未签名持久安装需 AMO 签名;当前可用: about:debugging 临时载入(或演示页配对),重启后需重载\n`);
+      }
+      stdout.write(DIM('  生效时机: 浏览器重启后常驻;撤销: hmh extension uninstall\n'));
+      return;
+    }
+    if (sub === 'uninstall') {
+      const { uninstallExtension, discoverInstallTargets } = await import('@hmharness/extension');
+      const outcomes = await uninstallExtension({ home: homeDir(), browsers: discoverInstallTargets() });
+      if (outcomes.length === 0) { stdout.write('未发现已知浏览器\n'); return; }
+      for (const o of outcomes) stdout.write(`  ${o.ok ? '✓' : '✗'} ${o.browser.padEnd(9)} ${o.detail}\n`);
+      return;
+    }
     if (sub === 'status') {
-      const { discoverExtensionBridge, isPaired } = await import('@hmharness/extension');
+      const { discoverExtensionBridge, isPaired, discoverInstallTargets, installedEverywhere } = await import('@hmharness/extension');
       const b = await discoverExtensionBridge();
       const paired = await isPaired(homeDir());
-      if (!b.healthy) { stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`); return; }
-      stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 配对: ${paired ? '已配对' : '未配对(hmh extension pair)'}\n`);
-      stdout.write(b.connected
-        ? `  扩展已连接${b.browser ? ' · ' + b.browser : ''}${b.extVersion ? ' v' + b.extVersion : ''} — 智能体 extension_* 工具可用\n`
-        : '  扩展未连接 — 打开浏览器扩展 popup 配对/连接\n');
+      if (!b.healthy) { stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`); }
+      else {
+        stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 配对: ${paired ? '已配对' : '未配对(hmh extension pair)'}\n`);
+        stdout.write(b.connected
+          ? `  扩展已连接${b.browser ? ' · ' + b.browser : ''}${b.extVersion ? ' v' + b.extVersion : ''} — 智能体 extension_* 工具可用\n`
+          : '  扩展未连接 — 打开浏览器扩展 popup 配对/连接\n');
+      }
+      stdout.write('常驻安装状态:\n');
+      for (const s of installedEverywhere(discoverInstallTargets())) {
+        stdout.write(`  ${s.installed ? '✓' : '·'} ${s.browser.padEnd(9)} ${s.detail}\n`);
+      }
       return;
     }
     if (sub === 'build') {
@@ -1145,7 +1192,7 @@ flags:
       }
       return;
     }
-    stdout.write('用法: hmh extension serve | pair | status | unpair | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入)\n');
+    stdout.write('用法: hmh extension serve | pair | status | install [--browsers=..] | uninstall | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入)\n');
     return;
   }
   if (cmd === 'cognitive') {

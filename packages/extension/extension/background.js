@@ -85,8 +85,43 @@
       protocol: 'hmext/1',
       extVersion: api.runtime.getManifest().version,
       browser: detectBrowser(),
+      extBaseUrl: api.runtime.getURL(''),
       userAgent: navigator.userAgent,
     });
+  }
+
+  /** Startup announce + demo-pair pickup (round 41): when UNPAIRED the
+   *  background announces its base URL (so tooling can find the popup)
+   *  and polls /v1/announce-status for a demo-page-parked token — the
+   *  user can pair by typing the code into the bridge's demo page, no
+   *  popup needed (Firefox MV3 host permissions are never auto-granted,
+   *  so content-script pairing is structurally unavailable). */
+  async function announceAndPoll() {
+    if (binding.token) return;
+    try {
+      await fetch(baseUrl() + '/v1/announce', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ extBaseUrl: api.runtime.getURL(''), browser: detectBrowser(), extVersion: api.runtime.getManifest().version }),
+      });
+    } catch (e) { /* bridge not running — nothing to announce to */ }
+    // poll for a demo-page-parked token while unpaired (bounded; stops
+    // once paired). NOTE: "store says paired" does NOT mean THIS extension
+    // holds the token (another browser may have paired) — so no early
+    // return on the paired flag; only our own token ends the poll.
+    for (let i = 0; i < 20 && !binding.token && !stream; i++) {
+      try {
+        const j = await (await fetch(baseUrl() + '/v1/announce-status')).json();
+        if (j.token) {
+          binding.token = j.token;
+          await saveBinding();
+          badge('on');
+          void attach();
+          return;
+        }
+      } catch (e) { /* bridge down — pause and retry */ }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   }
 
   function detectBrowser() {
@@ -178,16 +213,39 @@
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
     if (event === 'command' && msg && msg.kind) {
-      void runCommand(msg).then(
-        (out) => reply(msg.id, true, out),
-        (err) => reply(msg.id, false, String(err && err.message ? err.message : err)),
-      );
+      dispatchCommand(msg);
     } else if (event === 'fatal') {
       badge('error');
       // protocol mismatch etc. — stop hammering the server
       if (stream) { stream.abort(); stream = null; }
     }
     // 'hello' ack and 'ping' heartbeats need no action
+  }
+
+  // At-least-once command delivery (round 40): the bridge replays
+  // read-only commands when a fresh stream attaches, because the stream
+  // a command was written to can die with its MV3 worker. Dedupe by id:
+  // a duplicate replays the CACHED result (same worker — the answer was
+  // lost with the dead stream) or re-executes (fresh worker — read-only
+  // commands are idempotent; page.act is never replayed by the bridge).
+  const handled = new Map(); // id -> uplink payload (bounded below)
+  function dispatchCommand(cmd) {
+    if (handled.has(cmd.id)) {
+      const cached = handled.get(cmd.id);
+      if (cached) void reply(cmd.id, cached.ok, cached.ok ? cached.data : cached.error);
+      return;
+    }
+    void runCommand(cmd).then(
+      (out) => { remember(cmd.id, { ok: true, data: out }); reply(cmd.id, true, out); },
+      (err) => { const e = String(err && err.message ? err.message : err); remember(cmd.id, { ok: false, error: e }); reply(cmd.id, false, e); },
+    );
+  }
+  function remember(id, payload) {
+    handled.set(id, payload);
+    if (handled.size > 100) {
+      const first = handled.keys().next().value;
+      handled.delete(first);
+    }
   }
 
   async function reply(id, ok, payload) {
@@ -410,7 +468,19 @@
   // ------------------------------------------------------------- lifecycle
 
   api.runtime.onStartup.addListener(() => { void loadBinding().then(() => attach()); });
-  api.runtime.onInstalled.addListener(() => { void loadBinding().then(() => attach()); });
+  api.runtime.onInstalled.addListener((details) => {
+    void loadBinding().then(() => {
+      // pairing onboarding (round 41): a FRESH install that isn't paired
+      // yet opens its own pairing page — the user sees exactly what to do
+      // next, and automation gets a reachable tab (Firefox refuses
+      // WebDriver navigation to moz-extension:// URLs, so the extension
+      // opening the page itself is the only cross-browser path)
+      if (details && details.reason === 'install' && !binding.token) {
+        try { void api.tabs.create({ url: api.runtime.getURL('popup.html') }); } catch (e) { /* no tabs API (Safari?) */ }
+      }
+      void attach();
+    });
+  });
   // service-worker revival safety net: a 30s alarm (Chrome 120+ floor;
   // engines that reject sub-minute periods fall back to 1min) re-attaches
   // the stream whenever Chrome has killed and respawned the worker mid-idle
@@ -431,5 +501,5 @@
   }
 
   // first load of this context (worker start or event page load)
-  void loadBinding().then(() => { if (binding.token) void attach(); else badge('unpaired'); });
+  void loadBinding().then(() => { void announceAndPoll(); if (binding.token) void attach(); else badge('unpaired'); });
 })();

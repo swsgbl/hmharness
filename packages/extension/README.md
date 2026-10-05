@@ -25,23 +25,31 @@ hmh extension pair | unpair             # 重发配对码 / 吊销令牌
 | `extension_page_read` | 读标签页内容:标题/URL/用户选区/大纲/表单/链接/正文(只读) |
 | `extension_page_act` | 在真实标签页里 click/type/scroll/select —— **每次调用都需用户批准** |
 
-## 跨浏览器矩阵(2026-10 调研)
+## 跨浏览器矩阵(2026-10 实测,七台真机两连跑全绿)
 
-| | Chromium (Chrome/Edge/Brave) | Firefox | Safari |
-|---|---|---|---|
-| 后台 | MV3 service worker | MV3 事件页 `background.scripts`(有意不支持 SW) | SW(经 converter) |
-| 侧栏 | `side_panel` | `sidebar_action` | 无 —— popup 兜底 |
-| 备注 | `minimum_chrome_version` 116 | gecko id + MV3 主机权限按站点由用户授予 | 载荷级兼容;`xcrun safari-web-extension-converter` 转换未在 CI 实测(无 macOS) |
+| | Chromium 系:Chrome/Edge/Brave/Opera/夸克/BrowserOS | Firefox |
+|---|---|---|
+| 装载(手动) | chrome://extensions 等开发者模式加载已解压 | about:debugging 临时载入 firefox 目录 |
+| 装载(自动化) | `--load-extension`(品牌 Chrome 已失效,走 CDP `Extensions.loadUnpacked`) | Marionette `Addon:Install`(temporary,免签) |
+| 配对 | 扩展 popup,或**演示页**(`http://127.0.0.1:7789/v1/demo-page` 输码即连) | **演示页**(Firefox 特权页禁 WebDriver 脚本,popup 外更普适) |
+| 发现 | 固定 chrome-extension://id | 后台向桥 `/v1/announce` 广播 moz-extension://uuid |
+| 后台 | MV3 service worker | MV3 事件页(不支持 SW) |
+| 侧栏 | `side_panel`(夸克/Opera 视版本) | `sidebar_action` |
+| 页面读/写 | 清单声明即生效 | **主机权限 opt-in**:需在 about:addons 手动授予"访问您在该网站的数据";授予前工具如实报 `Missing host permission` |
+| Safari | 载荷级兼容(`xcrun safari-web-extension-converter`),未在 CI 实测(无 macOS) | — |
 
-同一份零构建载体(`extension/` 目录:background.js 双形态自适配 + popup/sidepanel 共用 UI),`manifestFor` 按目标生成清单,`validateManifest` 双向机检(把 chromium 清单当 firefox 校验必须失败)。
+同一份零构建载体,`manifestFor` 按目标生成清单,`validateManifest` 双向机检。
 
 ## 安全姿态
 
 - 仅绑 `127.0.0.1`;Host 头白名单(拒 DNS rebinding);Origin 必须是 `chrome-extension://` / `moz-extension://` / `safari-web-extension://` 或回环
 - 配对码:一次性、5 分钟 TTL、5 次错码锁 60s;Bearer 令牌**只落 sha256**
 - 线协议(hmext/1)只有结构化命令 —— 无任何代码求值面
+- 主机权限 = 回环桥 + `<all_urls>`:page_read/page_act 只在浏览器授权的站点内工作(MV3 硬边界),浏览器的**站点访问开关**是用户的最终控制
 - 扩展令牌与智能体通道密钥(桥状态文件内、随进程生死)互不可替代
 - `extension_page_act` 恒审批:在用户登录态的真实页面上动手,持久规则不能豁免
+- 命令投递:桥心跳为要求应答的 ping(连失 2 次判死幽灵流);**只读命令跨重连重放**(at-least-once),`page.act` 永不重放(宁超时勿双击)
+- 内置回环演示页:`http://127.0.0.1:7789/v1/demo-page` —— 装好扩展后即可在真实 HTML 上试 read/act
 
 ## 环境变量
 
