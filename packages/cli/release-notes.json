@@ -1,6 +1,11 @@
 {
   "notes": [
     {
+      "v": "0.23.25",
+      "date": "2026-10-05",
+      "note": "Code World Model 三传感器族全部生产接线：LSP 符号/诊断（lsp 工具观察钩子）+ 浏览器页面观察 + 鸿蒙构建判定（harmony_build 结果成为最新 BuildFact）——一个模型，三类证据持续落盘"
+    },
+    {
       "v": "0.23.24",
       "date": "2026-10-05",
       "note": "七浏览器真装验证：Chrome/Edge/Brave/Opera/夸克/Firefox/BrowserOS 两连跑全绿；Firefox 走 Marionette 临时装载 + 演示页同源配对；MV3 主机权限边界如实上报，只读命令可重放"
