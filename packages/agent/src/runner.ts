@@ -36,7 +36,7 @@ import { opsTools } from '@hmharness/domain-ops';
 import { discoverServers, lspTools } from '@hmharness/lsp';
 import { discoverBrowsers, browserTools } from '@hmharness/browser';
 import { discoverExtensionBridgeSync, extensionTools } from '@hmharness/extension';
-import { pageReadSink } from './code-wm-recorder.ts';
+import { pageReadSink, lspObserveSink } from './code-wm-recorder.ts';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -69,7 +69,11 @@ export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: b
       // healthy-only: a PATH shim whose toolchain lacks the component would
       // register a tool that always errors — skip it, keep the registry honest
       if (discoverServers().some((s) => s.healthy)) {
-        reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir() }));
+        // onObserve feeds the PERSISTED Code World Model (round 43): every
+        // lsp_symbols/lsp_diagnostics pull becomes durable entity/relation/
+        // diagnostic evidence — best-effort, same store as the extension
+        // recorder, never able to fail the tool that observed.
+        reg.registerAll(lspTools({ workspaceRoot: opts.workspaceRoot ?? process.cwd(), home: homeDir(), onObserve: lspObserveSink(homeDir()) }));
       }
     } catch { /* lsp optional: never block tool assembly */ }
   }

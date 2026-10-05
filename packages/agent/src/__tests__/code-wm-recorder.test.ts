@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resetCodeWorldRecorder, pageReadSink } from '../code-wm-recorder.ts';
+import { resetCodeWorldRecorder, pageReadSink, lspObserveSink } from '../code-wm-recorder.ts';
 import { codeWorldModelPath } from '@hmharness/cognitive';
 
 /** Chain contract (round 38): nativeRegistry's extension_page_read carries
@@ -78,6 +78,40 @@ test('recorder: sink → sensor → debounced persistence (unit-level)', async (
     assert.equal(file.kind, 'hmharness-code-world');
     const kinds = file.runtime.map((f: { kind: string }) => f.kind);
     assert.deepEqual(kinds, ['ext.page.read', 'ext.page.selection', 'ext.page.read']);
+  } finally {
+    resetCodeWorldRecorder();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('recorder: LSP observations → ontology → same persisted store (round 43)', async () => {
+  resetCodeWorldRecorder();
+  const home = await tmpHome();
+  try {
+    const sink = lspObserveSink(home);
+    // a symbol tree the sensor can PROVE (class Foo defines method bar),
+    // plus one live diagnostic — exactly what lsp_symbols/lsp_diagnostics
+    // emit through onObserve in production
+    const zeroRange = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+    sink({
+      uri: 'file:///w/x.ts',
+      symbols: [{ name: 'Foo', kind: 5, range: zeroRange, children: [{ name: 'bar', kind: 6, range: zeroRange }] }],
+      diagnostics: [{ range: zeroRange, severity: 1, message: 'boom', source: 'lsp' }],
+    });
+    // an observation with no payload must be a no-op (no data, no write)
+    sink({ uri: 'file:///w/empty.ts' });
+    const landed = await waitFor(async () => {
+      try { return (await readFile(codeWorldModelPath(home), 'utf8')).includes('x.ts#Foo'); } catch { return false; }
+    });
+    assert.ok(landed, 'debounced flush must land the LSP entities');
+    const file = JSON.parse(await readFile(codeWorldModelPath(home), 'utf8'));
+    assert.equal(file.kind, 'hmharness-code-world');
+    assert.ok(file.entities.some((e: { id: string; kind: string }) => e.id === 'file:///w/x.ts#Foo' && e.kind === 'class'), 'class entity ingested keyed uri#name');
+    assert.ok(file.entities.some((e: { id: string; kind: string }) => e.id === 'file:///w/x.ts#bar' && e.kind === 'method'), 'method entity ingested (flat uri#name keying)');
+    assert.ok(file.relations.some((r: { kind: string; from: string; to: string }) => r.kind === 'defines' && r.from === 'file:///w/x.ts#Foo' && r.to === 'file:///w/x.ts#bar'), 'defines edge proven by the symbol tree');
+    assert.ok(file.diagnostics.some((d: { uri: string; message: string; source: string }) => d.uri === 'file:///w/x.ts' && d.message === 'boom' && d.source === 'lsp'), 'diagnostic ingested with the feedback-not-proof label');
+    // the empty observation must not have created a phantom entity
+    assert.ok(!file.entities.some((e: { id: string }) => e.id.startsWith('file:///w/empty.ts')), 'empty observation stays a no-op');
   } finally {
     resetCodeWorldRecorder();
     await rm(home, { recursive: true, force: true });

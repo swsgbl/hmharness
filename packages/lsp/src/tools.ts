@@ -10,13 +10,31 @@ import type { Tool } from '@hmharness/kernel';
 import { ProcessManager } from './process-manager.ts';
 import { LspClient } from './client.ts';
 import { discoverServers, serverForFile, fileToUri, type DiscoveredServer } from './registry.ts';
-import type { Diagnostic } from './protocol.ts';
+import type { Diagnostic, DocumentSymbol } from './protocol.ts';
+
+/** What a read-only tool observed — fed to the caller's Code World Model
+ *  sink. Same posture as the extension onPageRead hook: observation only,
+ *  best-effort, never able to fail the tool that observed. */
+export interface LspObservation {
+  uri: string;
+  symbols?: DocumentSymbol[];
+  diagnostics?: Diagnostic[];
+}
 
 export interface LspToolContext {
   workspaceRoot: string;
   /** HMH_HOME — required by the source-trust guard (Capability OS slice);
    *  when absent PATH servers are refused honestly */
   home?: string;
+  /** Observation sink: symbols/diagnostics pulled by the tools ride into
+   *  the persisted Code World Model. Optional; sink errors are swallowed. */
+  onObserve?: (obs: LspObservation) => void;
+}
+
+function emitObservation(ctx: LspToolContext, obs: LspObservation): void {
+  try {
+    ctx.onObserve?.(obs);
+  } catch { /* an observation sink must never fail the tool that observed */ }
 }
 
 interface ManagedClient {
@@ -112,6 +130,7 @@ export function lspTools(ctx: LspToolContext): Tool[] {
         const abs = resolveFile(ctx, String(args.file ?? ''));
         const r = await withClient(String(args.file ?? ''), async (mc, uri) => {
           const diags = mc.diagnostics.get(uri) ?? [];
+          emitObservation(ctx, { uri, diagnostics: diags });
           return `[${mc.server.id}${mc.server.official ? '' : ' (community/unofficial)'}] ${uri}\n` + fmtDiags(diags);
         });
         return r;
@@ -149,6 +168,7 @@ export function lspTools(ctx: LspToolContext): Tool[] {
       async execute(args) {
         return withClient(String(args.file ?? ''), async (mc, uri) => {
           const syms = await mc.client.documentSymbols({ uri });
+          emitObservation(ctx, { uri, symbols: syms });
           const flat: string[] = [];
           const walk = (ss: typeof syms, depth: number) => {
             for (const s of ss.slice(0, 30)) {
