@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resetCodeWorldRecorder, pageReadSink, lspObserveSink } from '../code-wm-recorder.ts';
+import { resetCodeWorldRecorder, pageReadSink, lspObserveSink, observeBuildTools } from '../code-wm-recorder.ts';
+import type { Tool } from '@hmharness/kernel';
 import { codeWorldModelPath } from '@hmharness/cognitive';
 
 /** Chain contract (round 38): nativeRegistry's extension_page_read carries
@@ -112,6 +113,40 @@ test('recorder: LSP observations → ontology → same persisted store (round 43
     assert.ok(file.diagnostics.some((d: { uri: string; message: string; source: string }) => d.uri === 'file:///w/x.ts' && d.message === 'boom' && d.source === 'lsp'), 'diagnostic ingested with the feedback-not-proof label');
     // the empty observation must not have created a phantom entity
     assert.ok(!file.entities.some((e: { id: string }) => e.id.startsWith('file:///w/empty.ts')), 'empty observation stays a no-op');
+  } finally {
+    resetCodeWorldRecorder();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('recorder: build tools observe → LATEST BuildFact replaces (round 44)', async () => {
+  resetCodeWorldRecorder();
+  const home = await tmpHome();
+  try {
+    const mk = (name: string, out: (cwd: string) => Promise<{ output: string; isError?: boolean }>): Tool =>
+      ({ name, description: 'fake', parameters: { type: 'object' }, execute: (_args, ctx) => out(ctx.cwd) });
+    const okBuild = mk('harmony_build', async () => ({ output: 'BUILD SUCCESSFUL in 3s' }));
+    const failBuild = mk('harmony_cjpm_build', async () => ({ output: 'error: no cjpm toolchain', isError: true }));
+    const untouched = mk('harmony_lint', async () => ({ output: 'lint ok' }));
+    const wrapped = observeBuildTools([okBuild, failBuild, untouched], home);
+    assert.equal(wrapped.length, 3, 'wrap preserves the tool list');
+    // result passthrough is byte-identical — the wrap observes, never alters
+    assert.equal((await wrapped[0].execute({}, { cwd: home, home })).output, 'BUILD SUCCESSFUL in 3s');
+    await wrapped[1].execute({}, { cwd: home, home });
+    await wrapped[2].execute({}, { cwd: home, home });
+    const landed = await waitFor(async () => {
+      try {
+        const j = JSON.parse(await readFile(codeWorldModelPath(home), 'utf8'));
+        return j.build && j.build.ok === false;
+      } catch { return false; }
+    });
+    assert.ok(landed, 'the failing build verdict must land — LATEST replaces the earlier success');
+    const file = JSON.parse(await readFile(codeWorldModelPath(home), 'utf8'));
+    assert.equal(file.build.ok, false, 'cjpm failure is the latest build fact');
+    assert.ok(typeof file.build.outputDigest === 'string' && file.build.outputDigest.length === 16, 'digest = 16-char sha256 prefix of the output');
+    assert.ok(file.build.at, 'timestamp recorded');
+    // the non-build tool ran after but must not have overwritten the slot
+    assert.equal(file.build.ok, false, 'harmony_lint does not touch the build slot');
   } finally {
     resetCodeWorldRecorder();
     await rm(home, { recursive: true, force: true });

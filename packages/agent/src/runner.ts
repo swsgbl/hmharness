@@ -36,7 +36,7 @@ import { opsTools } from '@hmharness/domain-ops';
 import { discoverServers, lspTools } from '@hmharness/lsp';
 import { discoverBrowsers, browserTools } from '@hmharness/browser';
 import { discoverExtensionBridgeSync, extensionTools } from '@hmharness/extension';
-import { pageReadSink, lspObserveSink } from './code-wm-recorder.ts';
+import { pageReadSink, lspObserveSink, observeBuildTools } from './code-wm-recorder.ts';
 import * as readline from 'node:readline/promises';
 import { stdin } from 'node:process';
 import { baseTools } from './tools.ts';
@@ -59,7 +59,7 @@ export const spawnBase: { current?: SpawnBase } = {};
 
 export function nativeRegistry(depth: number, opts: { lsp?: boolean; browser?: boolean; extension?: boolean; workspaceRoot?: string } = {}): Registry {
   const reg = new Registry();
-  reg.registerAll(baseTools).registerAll(harmonyTools).registerAll(opsTools);
+  reg.registerAll(baseTools).registerAll(observeBuildTools(harmonyTools, homeDir())).registerAll(opsTools);
   // W6: LSP Tier-0 code-intelligence tools — registered ONLY when a real
   // server is discoverable on PATH; a machine with no language servers
   // must not carry dead tools. Discovery is synchronous (memoized PATH
