@@ -8,6 +8,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
@@ -205,11 +206,6 @@ const DAEMON_VERSION = (() => {
  *  declare (theme). Cast locally instead of widening the kernel contract. */
 type WebCfg = HmhConfig & { theme?: 'dark' | 'light' | 'system' };
 
-/** Runtime-steering buffer: /api/inject pushes user text here while a task
- *  runs; the runner's inject poll drains it between tool batches; cleared
- *  when the busy task finishes. */
-const injectionQueue: string[] = [];
-
 /** /help text for the web subset - one command per line, zh/en short. */
 const COMMAND_HELP = [
   '/help — 命令清单 / command list',
@@ -261,20 +257,38 @@ export async function startServer(opts: { port: number; host?: string; version?:
   await loadMobileSessions();
   const { reg, clients } = await buildRegistry();
 
-  let busy = false;
-  // Task queue: submissions while busy are queued and auto-started when the
-  // current task finishes (replaces the old 409 rejection). Codex-style: the
-  // send button doubles as the stop button, so the queue itself needs no
-  // commands - it is visible in the UI and interruptible per item.
-  const taskQueue: Array<{ text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }> = [];
-  /** circuit-breaker latch: the last finished task died on a PERMANENT
-   *  provider auth/balance error (401/402/403). The pump stops draining -
-   *  every queued task would fail identically. A later successful (or
-   *  differently-failing) task resets the latch inside runOne. */
-  let lastAuthError = false;
-  let currentAbort: AbortController | null = null;
-  let pendingApproval: PendingApproval | null = null;
+  // ---- W15: per-session independent execution (dsh parity) ----
+  // Every session runs its tasks in a CHILD PROCESS (task-runner.ts): real
+  // cwd isolation (no global chdir), crash containment, daemon death does
+  // not kill the run. busy/queue/approval/inject/breaker are ALL per
+  // session now; the old global single slot is gone.
+  interface QueuedItem { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }
+  interface SessionExec {
+    busy: boolean;
+    queue: QueuedItem[];
+    proc: import('node:child_process').ChildProcess | null;
+    stdin: import('node:stream').Writable | null;
+    pending: (PendingApproval & { id: number }) | null;
+    authError: boolean;
+  }
+  const executors = new Map<string, SessionExec>();
+  const execFor = (sid: string): SessionExec => {
+    let e = executors.get(sid);
+    if (!e) {
+      e = { busy: false, queue: [], proc: null, stdin: null, pending: null, authError: false };
+      executors.set(sid, e);
+    }
+    return e;
+  };
+  const anyBusy = () => [...executors.values()].some((e) => e.busy);
+  const allQueued = () => [...executors.values()].flatMap((e) => e.queue.map((q) => ({ ...q, owner: e })));
+  let activeSessionId = '';
   const sseClients = new Set<ServerResponse>();
+  // queue persistence (survives daemon death): per-session pending items
+  const queueFile = join(home, 'web-queues.json');
+  const saveQueues = () =>
+    writeFile(queueFile, JSON.stringify([...executors.entries()].map(([sid, e]) => ({ sid, queue: e.queue }))), 'utf8')
+      .catch(() => { /* best effort */ });
   // 2026-09-28 deepseek-harness semantics transplant: every session is an
   // INDEPENDENT thread. The old single global `conversation` meant viewing a
   // history session and following up corrupted the live thread, and outputs
@@ -282,7 +296,6 @@ export async function startServer(opts: { port: number; host?: string; version?:
   // session id; a history session resumes its own rollout transcript.
   interface SessionThread { conversation: ChatMessage[]; cwd: string; rolloutId?: string }
   const sessionThreads = new Map<string, SessionThread>();
-  let activeSessionId = '';
   const threadFor = (id: string): SessionThread => {
     let t = sessionThreads.get(id);
     if (!t) {
@@ -358,19 +371,23 @@ export async function startServer(opts: { port: number; host?: string; version?:
   const broadcast = (event: string, data: unknown) => {
     for (const r of sseClients) sseSend(r, event, data);
   };
-  const broadcastQueue = () => broadcast('queue', { items: taskQueue.map((t) => t.text) });
+  const broadcastQueue = () => {
+    // per-session queue event (the multi-session views key on it) + the
+    // legacy flat view (concatenated) for the single-bar fallback
+    for (const [sid, e] of executors) broadcast('queue', { sessionId: sid, items: e.queue.map((t) => t.text) });
+    broadcast('queue', { items: allQueued().map((t) => t.text) });
+  };
 
-  // Single execution path for queued and direct tasks alike. The old shape
-  // duplicated the whole runner inside the finally-block to drain the queue -
-  // a degraded copy (missing onLine/onApproval, mismatched event names) that
-  // drifted every time the direct path changed. One runOne + one pump.
-  const runOne = async (item: { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }, fromQueue = false): Promise<void> => {
-    busy = true;
-    lastAuthError = false; // fresh latch per task attempt
-    currentAbort = new AbortController();
-    // this task runs INSIDE its session's thread (deepseek-harness semantics:
-    // the session owns the state; the runner never sees a global thread)
+  /** Spawn the per-session child executor (W15). The child relays runner
+   *  events as ndjson on stdout; steering (inject/abort/approvals) flows
+   *  back over its stdin. The daemon never runs agent code in-process
+   *  anymore - a runaway task cannot take the UI down, and a daemon crash
+   *  leaves the child free to finish (the rollout is durable either way). */
+  const runOne = async (item: QueuedItem, fromQueue = false): Promise<void> => {
     const sid = item.sessionId || `web-${Date.now().toString(36)}`;
+    const exec = execFor(sid);
+    exec.busy = true;
+    exec.authError = false; // fresh latch per task attempt
     activeSessionId = sid;
     const thread = threadFor(sid);
     // history-session follow-up: adopt that rollout's transcript + cwd as the
@@ -386,103 +403,164 @@ export async function startServer(opts: { port: number; host?: string; version?:
             if (tr.cwd) thread.cwd = tr.cwd;
           }
         }
-      } catch { /* not a known rollout - fresh thread */}
+      } catch { /* not a known rollout - fresh thread */ }
     }
     const resume = item.fresh ? [] : thread.conversation;
     broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue, sessionId: sid, cwd: thread.cwd });
-    const unattended = item.yes || cfg.approval === 'auto';
-    // run inside the SESSION's directory: each thread remembers its own
-    // project cwd (deepseek-harness semantics); single-slot execution means
-    // the chdir is safe, and the previous cwd is restored afterwards
-    const prevCwd = process.cwd();
-    if (isAbsolute(thread.cwd)) {
-      try { process.chdir(thread.cwd); } catch { /* vanished dir - keep server cwd */ }
+
+    const { spawn } = await import('node:child_process');
+    const { createInterface: rlCreate } = await import('node:readline');
+    const { writeFile: wf, rm: rmf } = await import('node:fs/promises');
+    // dist build: <web>/dist/task-runner.js sits next to server.js; source
+    // runs (tsx): fall back to task-runner.ts through the tsx loader,
+    // resolved to an ABSOLUTE file URL - the child's cwd is the session's
+    // project dir, where a bare 'tsx' specifier would not resolve
+    const here = import.meta.dirname ?? '.';
+    const runnerJs = join(here, 'task-runner.js');
+    const runnerTs = join(here, 'task-runner.ts');
+    const useTs = !existsSync(runnerJs);
+    let runnerArgs: string[];
+    if (useTs) {
+      const req = createRequire(import.meta.url);
+      const { pathToFileURL } = await import('node:url');
+      runnerArgs = ['--import', pathToFileURL(req.resolve('tsx')).href, runnerTs];
+    } else {
+      runnerArgs = [runnerJs];
     }
+    const payloadFile = join((await import('node:os')).tmpdir(), `hmh-task-${process.pid}-${Date.now().toString(36)}.json`);
     try {
-      const result = await runAgentTask({
+      await wf(payloadFile, JSON.stringify({
         task: item.text,
-        registry: reg,
-        cfg,
+        mode: item.mode,
         yes: item.yes,
+        fresh: item.fresh,
+        sessionId: item.fresh ? sid : thread.rolloutId ?? sid,
+        cwd: thread.cwd,
+        home,
         resumeMessages: resume,
-        sessionId: item.fresh ? undefined : thread.rolloutId,
-        signal: currentAbort.signal,
-        // runtime steering: the runner polls this between tool batches and
-        // lands injected text as user messages in the live transcript
-        inject: { poll: () => injectionQueue.splice(0).map((text) => ({ text })) },
-        // per-session persistent goal; fresh threads deliberately start without one
         goal: item.fresh ? undefined : await getGoal(home, thread.rolloutId ?? sid),
-        // auto/yolo tasks must not wire the remote approval prompt at all -
-        // the remote gate used to override the yes flag unconditionally,
-        // which is why "auto" still popped approvals (the audited bug)
-        approvalAsk: unattended ? undefined : (name, args) =>
-          new Promise<boolean>((resolve) => {
-            const timer = setTimeout(() => {
-              if (pendingApproval?.resolve === resolve) pendingApproval = null;
-              broadcast('approvalDone', { name, granted: false, timeout: true });
-              resolve(false);
-            }, APPROVAL_TIMEOUT_MS);
-            pendingApproval = { name, args, resolve, timer };
-            broadcast('approvalReq', { name, args });
-          }),
-        events: {
-          onLine: (l) => broadcast('line', { text: l, sessionId: sid }),
-          onDelta: (kind, chunk) => broadcast('delta', { kind, chunk, sessionId: sid }),
-          onToolCall: (name, args) => broadcast('tool', { name, args, sessionId: sid }),
-          onToolResult: (name, output, isError) =>
-            broadcast('toolResult', { name, isError, preview: output.slice(0, 300), full: output.slice(0, 8000), sessionId: sid }),
-          onApproval: (name, args, granted) => broadcast('approvalDone', { name, args, granted, sessionId: sid }),
-          onInjected: (text) => broadcast('injected', { text, sessionId: sid }),
-          onFinal: (r) => {
-            // extend THIS session's thread only. r.messages carries the whole
-            // run; keep user/assistant turns with tool_calls stripped (the
-            // next run prepends its own system prompt and must not inherit
-            // dangling tool-call pairs).
-            const full = (r as { messages?: ChatMessage[] }).messages;
-            thread.conversation = full
-              ? full.filter((m) => m.role === 'user' || m.role === 'assistant')
-                  .map((m) => (m.role === 'assistant' && m.tool_calls ? { role: 'assistant', content: m.content } : m))
-              : [...resume, { role: 'user', content: item.text }];
-            thread.rolloutId = r.sessionId;
-            broadcast('final', { ...r, sessionId: sid, turnsInThread: Math.floor(thread.conversation.length / 2) });
-          },
-        },
-      });
-      // the result itself already fanned out via onFinal; nothing to return
-      void result;
+      }), 'utf8');
     } catch (err) {
-      // circuit breaker (see lastAuthError): latch permanent auth/balance
-      // failures so the pump holds the remaining queue instead of draining
-      // every task into the same 402
-      lastAuthError = isProviderAuthError(String(err));
-      broadcast('error', { message: String(err).slice(0, 400), sessionId: sid });
-    } finally {
-      try { if (process.cwd() !== prevCwd) process.chdir(prevCwd); } catch { /* best effort */ }
-      currentAbort = null;
-      pendingApproval = null;
-      busy = false;
-      injectionQueue.length = 0; // stale steering text must not leak into the next task
+      broadcast('error', { message: 'payload write failed: ' + String(err).slice(0, 200), sessionId: sid });
+      exec.busy = false;
+      broadcast('busy', { busy: false, sessionId: sid });
+      return;
+    }
+
+    const child = spawn(process.execPath, [...runnerArgs, payloadFile], {
+      cwd: thread.cwd,
+      env: { ...process.env, HMH_HOME: home },
+      windowsHide: true,
+      detached: true, // survives a daemon crash; the rollout keeps the record
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.unref();
+    exec.proc = child;
+    exec.stdin = child.stdin;
+
+    const relay = (ev: Record<string, unknown>) => {
+      const kind = String(ev.kind ?? '');
+      if (kind === 'line') broadcast('line', { text: ev.text, sessionId: sid });
+      else if (kind === 'delta') broadcast('delta', { kind: ev.k, chunk: ev.chunk, sessionId: sid });
+      else if (kind === 'tool') broadcast('tool', { name: ev.name, args: ev.args, sessionId: sid });
+      else if (kind === 'toolResult') broadcast('toolResult', { name: ev.name, isError: ev.isError === true, preview: String(ev.output ?? '').slice(0, 300), full: String(ev.output ?? '').slice(0, 8000), sessionId: sid });
+      else if (kind === 'injected') broadcast('injected', { text: ev.text, sessionId: sid });
+      else if (kind === 'approvalDone') broadcast('approvalDone', { name: ev.name, args: ev.args, granted: ev.granted === true, sessionId: sid });
+      else if (kind === 'approvalReq') {
+        const id = Number(ev.id ?? 0);
+        const send = (granted: boolean) => {
+          try { exec.stdin?.write(JSON.stringify({ type: 'approval', id, granted }) + '\n'); } catch { /* gone */ }
+        };
+        const timer = setTimeout(() => {
+          if (exec.pending?.id === id) exec.pending = null;
+          broadcast('approvalDone', { name: ev.name, granted: false, timeout: true, sessionId: sid });
+          send(false);
+        }, APPROVAL_TIMEOUT_MS);
+        exec.pending = { name: String(ev.name ?? ''), args: ev.args as Record<string, unknown>, resolve: send, timer, id };
+        broadcast('approvalReq', { name: ev.name, args: ev.args, sessionId: sid });
+      } else if (kind === 'final') {
+        const msgs = (ev.messages ?? []) as ChatMessage[];
+        thread.conversation = msgs.length
+          ? msgs
+          : [...resume, { role: 'user', content: item.text }];
+        thread.rolloutId = String(ev.sessionId ?? sid);
+        broadcast('final', {
+          text: ev.text, sessionId: sid, turns: ev.turns, toolUses: ev.toolUses, usage: ev.usage,
+          turnsInThread: Math.floor(thread.conversation.length / 2),
+        });
+      } else if (kind === 'error') {
+        exec.authError = isProviderAuthError(String(ev.error ?? ''));
+        broadcast('error', { message: String(ev.error ?? '').slice(0, 400), sessionId: sid });
+      }
+    };
+
+    const out = rlCreate({ input: child.stdout! });
+    out.on('line', (line) => {
+      if (!line.trim()) return;
+      try { relay(JSON.parse(line) as Record<string, unknown>); } catch { /* malformed line: skip */ }
+    });
+    let stderrTail = '';
+    child.stderr?.on('data', (d: Buffer) => { stderrTail = (stderrTail + d.toString()).slice(-600); });
+
+    const finish = async (code: number) => {
+      if (exec.pending) { clearTimeout(exec.pending.timer); exec.pending = null; }
+      exec.busy = false;
+      exec.proc = null;
+      exec.stdin = null;
+      if (code !== 0 && stderrTail.trim()) {
+        broadcast('error', { message: 'task child exit ' + code + ': ' + stderrTail.trim().slice(0, 300), sessionId: sid });
+      }
       broadcast('busy', { busy: false, sessionId: sid });
       broadcast('state', await stateObject());
-    }
+      pumpSession(sid);
+    };
+    child.on('exit', (code) => { void finish(code ?? -1); });
+    child.on('error', (err) => {
+      broadcast('error', { message: 'spawn failed: ' + String(err).slice(0, 300), sessionId: sid });
+      void rmf(payloadFile, { force: true }).catch(() => {});
+      void finish(-1);
+    });
   };
-  const pump = async (): Promise<void> => {
-    while (!busy && taskQueue.length > 0) {
-      // circuit breaker (settled design T24, TUI parity): the previous task
-      // died on a permanent provider auth/balance error - hold the queue
-      // (items stay visible/deletable) until a subsequent task succeeds or
-      // the user switches route
-      if (lastAuthError) {
-        broadcast('line', { text: `⛔ provider auth/balance error - queue held (${taskQueue.length} task(s)); fix the key/balance or switch provider, then resubmit`, sessionId: activeSessionId ?? '' });
-        broadcastQueue();
-        return;
-      }
-      const next = taskQueue.shift();
-      if (!next) break;
+
+  /** Per-session pump: after a task lands (or dies), the NEXT queued item of
+   *  THAT session starts. Other sessions never waited on this one - that is
+   *  the whole point of W15. Circuit breaker (T24) is per session. */
+  const pumpSession = (sid: string): void => {
+    const exec = execFor(sid);
+    if (exec.busy || exec.queue.length === 0) { saveQueues(); return; }
+    if (exec.authError) {
+      broadcast('line', { text: `⛔ provider auth/balance error - session queue held (${exec.queue.length} task(s)); fix the key/balance or switch provider, then resubmit`, sessionId: sid });
       broadcastQueue();
-      await runOne(next, true);
+      saveQueues();
+      return;
     }
+    const next = exec.queue.shift();
+    if (!next) { saveQueues(); return; }
+    broadcastQueue();
+    saveQueues();
+    void runOne(next, true);
   };
+
+  // restore queues persisted before a daemon death (W15 self-healing): a
+  // queued item never started, so resuming it cannot double-run anything
+  try {
+    const restored = JSON.parse(await readFile(queueFile, 'utf8')) as Array<{ sid?: unknown; queue?: unknown }>;
+    let n = 0;
+    for (const r of restored) {
+      if (typeof r.sid !== 'string' || !Array.isArray(r.queue)) continue;
+      const exec = execFor(r.sid);
+      for (const q of r.queue) {
+        if (q && typeof (q as QueuedItem).text === 'string') { exec.queue.push(q as QueuedItem); n++; }
+      }
+    }
+    if (n > 0) {
+      broadcast('line', { text: `⟲ ${n} 个排队任务已从上次守护退出中恢复，即将继续`, sessionId: '' });
+      broadcastQueue();
+      for (const sid of executors.keys()) pumpSession(sid);
+    }
+    await rm(join(home, 'web-queues.json'), { force: true }).catch(() => {});
+  } catch { /* no persisted queues */ }
+
 
   const stateObject = async () => {
     const [active, drafts, insights] = await Promise.all([listSkills(home), listDrafts(home), readInsights(home, 8)]);
@@ -498,9 +576,10 @@ export async function startServer(opts: { port: number; host?: string; version?:
       model: resolveProvider(cfg, 'chat').model,
       home,
       locale: cfg.locale ?? 'zh',
-      busy,
-      approvalPending: pendingApproval !== null,
-      queue: taskQueue.map((t) => t.text),
+      busy: anyBusy(),
+      busySessions: [...executors.entries()].filter(([, e]) => e.busy).map(([sid]) => sid),
+      approvalPending: [...executors.values()].some((e) => e.pending !== null),
+      queue: allQueued().map((t) => t.text),
       // the session whose task is currently running (or last ran) - the web
       // topbar follows THIS, not the global workspace, when showing status
       activeSessionId,
@@ -963,7 +1042,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
           json(res, 404, { error: 'workspace not found' });
           return;
         }
-        if (busy) {
+        if (anyBusy()) {
           json(res, 409, { error: 'a task is already running' });
           return;
         }
@@ -1310,57 +1389,85 @@ export async function startServer(opts: { port: number; host?: string; version?:
         // browser view is just a projection of it.
         const sidIn = typeof (body as { sessionId?: unknown }).sessionId === 'string' ? String((body as { sessionId?: unknown }).sessionId).slice(0, 80) : undefined;
         const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn };
-        // Queue instead of reject: tasks submitted while busy are accepted
-        // and auto-started when the current one finishes (user request:
-        // "input always available, new tasks queue during execution")
-        if (busy) {
-          taskQueue.push(item);
-          broadcast('queued', { position: taskQueue.length, task: composed, sessionId: sidIn ?? '' });
+        // W15: queueing is PER SESSION. A busy session queues the follow-up;
+        // every OTHER session still starts immediately - sessions never wait
+        // on each other (dsh parity). A session without an id gets a fresh
+        // one and always runs now.
+        const sidFor = sidIn ?? `web-${Date.now().toString(36)}`;
+        item.sessionId = sidFor;
+        const exec = execFor(sidFor);
+        if (exec.busy) {
+          exec.queue.push(item);
+          saveQueues();
+          broadcast('queued', { position: exec.queue.length, task: composed, sessionId: sidFor });
           broadcastQueue();
-          json(res, 200, { ok: true, queued: true, position: taskQueue.length });
+          json(res, 200, { ok: true, queued: true, position: exec.queue.length });
           return;
         }
         json(res, 200, { ok: true });
         // Runs detached; every event fans out to all SSE clients.
-        void (async () => {
-          await runOne(item);
-          await pump();
-        })();
+        void runOne(item);
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/interrupt') {
-        // Codex-style stop: the send button doubles as a stop button while a
-        // task runs. Interrupts the CURRENT task only; queued items still run
-        // (clear them via DELETE /api/queue or per-item removal first).
-        if (!busy || !currentAbort) {
-          json(res, 200, { ok: false, busy });
+        // Codex-style stop per SESSION: aborts that session's running child
+        // (in-flight tools finish first, kernel semantics); other sessions
+        // are untouched. No sessionId given + exactly one running session ->
+        // that one (legacy single-task clients).
+        const ibody = JSON.parse((await readBody(req)) || '{}') as { sessionId?: unknown };
+        const sidIn = typeof ibody.sessionId === 'string' ? ibody.sessionId.slice(0, 80) : '';
+        const running = [...executors.entries()].filter(([, e]) => e.busy);
+        const target = sidIn && executors.get(sidIn)?.busy ? executors.get(sidIn)! : running.length === 1 ? running[0][1] : null;
+        if (!target?.stdin) {
+          json(res, 200, { ok: false, busy: anyBusy(), running: running.length });
           return;
         }
-        currentAbort.abort();
+        try { target.stdin.write(JSON.stringify({ type: 'abort' }) + '\n'); } catch { /* child gone */ }
         json(res, 200, { ok: true });
         return;
       }
       if (url.pathname === '/api/queue') {
         if (req.method === 'GET') {
-          json(res, 200, { items: taskQueue.map((t) => t.text), busy });
+          const sidQ = url.searchParams.get('sessionId') ?? '';
+          if (sidQ) {
+            const e = executors.get(sidQ);
+            json(res, 200, { sessionId: sidQ, items: e ? e.queue.map((t) => t.text) : [], busy: e?.busy === true });
+            return;
+          }
+          json(res, 200, { items: allQueued().map((t) => t.text), busy: anyBusy() });
           return;
         }
         if (req.method === 'DELETE') {
-          // no index: clear all; ?i=N: remove one queued item (UI's per-row ✕)
+          // no index: clear all (or ?sessionId=X clears that session's);
+          // ?i=N: remove one queued item of the FLAT list (UI's per-row ✕)
+          const sidQ = url.searchParams.get('sessionId') ?? '';
           const idxRaw = url.searchParams.get('i');
           if (idxRaw === null) {
-            const n = taskQueue.length;
-            taskQueue.length = 0;
+            if (sidQ) {
+              const e = executors.get(sidQ);
+              const n = e ? e.queue.length : 0;
+              if (e) e.queue.length = 0;
+              saveQueues();
+              broadcastQueue();
+              json(res, 200, { ok: true, cleared: n });
+              return;
+            }
+            let n = 0;
+            for (const e of executors.values()) { n += e.queue.length; e.queue.length = 0; }
+            saveQueues();
             broadcastQueue();
             json(res, 200, { ok: true, cleared: n });
             return;
           }
+          const flat = allQueued();
           const i = Number(idxRaw);
-          if (!Number.isInteger(i) || i < 0 || i >= taskQueue.length) {
+          if (!Number.isInteger(i) || i < 0 || i >= flat.length) {
             json(res, 404, { error: 'no such queued item' });
             return;
           }
-          taskQueue.splice(i, 1);
+          const victim = flat[i];
+          victim.owner.queue.splice(victim.owner.queue.indexOf(victim), 1);
+          saveQueues();
           broadcastQueue();
           json(res, 200, { ok: true });
           return;
@@ -1445,13 +1552,19 @@ export async function startServer(opts: { port: number; host?: string; version?:
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/approve') {
-        const body = JSON.parse((await readBody(req)) || '{}') as { granted?: boolean };
-        if (!pendingApproval) {
-          json(res, 404, { error: 'no approval pending' });
+        // W15: approvals are per session (several sessions can ask at once).
+        // sessionId given -> that session's card; omitted + exactly one
+        // pending anywhere -> it (legacy single-card clients).
+        const body = JSON.parse((await readBody(req)) || '{}') as { granted?: boolean; sessionId?: unknown };
+        const sidIn = typeof body.sessionId === 'string' ? body.sessionId.slice(0, 80) : '';
+        const pendings = [...executors.entries()].filter(([, e]) => e.pending);
+        const hit = sidIn ? executors.get(sidIn) : pendings.length === 1 ? executors.get(pendings[0][0]) : undefined;
+        const p = hit?.pending ?? null;
+        if (!p) {
+          json(res, 404, { error: 'no approval pending', concurrent: pendings.length });
           return;
         }
-        const p = pendingApproval;
-        pendingApproval = null;
+        hit!.pending = null;
         clearTimeout(p.timer);
         p.resolve(body.granted === true);
         json(res, 200, { ok: true, granted: body.granted === true });
@@ -1668,18 +1781,23 @@ export async function startServer(opts: { port: number; host?: string; version?:
       }
       // ---- runtime steering: inject text into the running task ----
       if (req.method === 'POST' && url.pathname === '/api/inject') {
-        const body = JSON.parse((await readBody(req)) || '{}') as { text?: unknown };
+        const body = JSON.parse((await readBody(req)) || '{}') as { text?: unknown; sessionId?: unknown };
         const text = typeof body.text === 'string' ? body.text.trim() : '';
         if (!text) {
           json(res, 400, { error: 'text required' });
           return;
         }
-        if (!busy) {
-          json(res, 409, { error: 'no task running' });
+        // W15: injection routes to ONE session's child (given id, or the
+        // single running one for legacy clients); other sessions untouched
+        const sidIn = typeof body.sessionId === 'string' ? body.sessionId.slice(0, 80) : '';
+        const running = [...executors.entries()].filter(([, e]) => e.busy);
+        const exec = sidIn ? executors.get(sidIn) : running.length === 1 ? running[0][1] : undefined;
+        if (!exec?.stdin) {
+          json(res, 409, { error: 'no task running', running: running.length });
           return;
         }
-        injectionQueue.push(text);
-        broadcast('injected', { text, sessionId: activeSessionId });
+        try { exec.stdin.write(JSON.stringify({ type: 'inject', text }) + '\n'); } catch { /* child gone */ }
+        broadcast('injected', { text, sessionId: sidIn || activeSessionId });
         json(res, 200, { ok: true });
         return;
       }
@@ -1807,7 +1925,7 @@ export async function startServer(opts: { port: number; host?: string; version?:
           return;
         }
         if (line === '/status') {
-          okText(`model ${resolveProvider(cfg, 'chat').model} · locale ${cfg.locale ?? 'zh'} · ${busy ? 'busy' : 'idle'} · queue ${taskQueue.length}`);
+          okText(`model ${resolveProvider(cfg, 'chat').model} · locale ${cfg.locale ?? 'zh'} · ${anyBusy() ? 'busy' : 'idle'} · queue ${allQueued().length} · sessions running ${[...executors.values()].filter((e) => e.busy).length}`);
           return;
         }
         if (line === '/resume' || line.startsWith('/resume ')) {

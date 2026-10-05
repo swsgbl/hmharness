@@ -56,6 +56,7 @@
 | W12 | **交付物 chips(A9)**:edit_file/write_file 的路径在任务结束时渲染为可点击 chips(去重保序,纯函数 extractDeliverables),点击在右栏预览(A5) | 对标 dsh ui-deliverables | c7953a4 | ✅ 生效 |
 | W13 | **消息反馈(A10)+主题(A11)**:每条 AI 回答带 👍/👎,写入 `insights/explicit-feedback.jsonl`(自描述存储,不污染进化 feed 的严格 Insight 联合类型;`POST /api/feedback`);CSS 变量 token 化(dark/light/system 三态,`body[data-theme]`,`POST /api/config` 持久化+SSE 状态回传) | 对标 dsh ui-message-feedback/ui-theme;反馈字段 outcome 语义以独立文件实现 | c7953a4 | ✅ 生效 |
 | W14 | **M5 Web 项**(A13/A14/A15):会话视图=轨迹时间线(工具调用按序计数圆点条)+全文搜索(输入即过滤渲染行);`POST /api/open` 在系统文件管理器打开工作区路径(仅工作区内,insideWs 守卫;win32 explorer /select) | 对标 dsh ui-trajectory/ui-open-in-app + 会话搜索;A12 定时提醒未做(可裁量) | 本轮 | ✅ 生效 |
+| W15 | **会话独立执行(每会话子进程)**:废除全局单槽——每会话独立 busy/队列/断路器/审批/注入/中断;任务在**子进程**里跑(task-runner.ts:payload 文件+ndjson 事件流+stdin 审批/注入/中止),cwd 由子进程原生隔离(全局 chdir 舞步删除),跑飞任务压不垮守护;**detached 子进程在守护崩溃后继续跑完**(rollout 是持久记录);每会话队列持久化 web-queues.json,守护重启自动恢复排队项(未启动过→重跑无双跑风险)。页面:输入区/停止键跟随**当前查看的会话**(其他会话运行不打扰本会话输入),审批卡带会话归属可并发堆叠,/api/task·interrupt·approve·inject·queue 全部 sessionId 路由(无 id+恰一运行=兼容旧客户端) | 对标 dsh 3080 会话独立运行;单槽串行=旧 0.6.1 队列设计,被本定案取代(复案登记) | 本轮 | ✅ 生效 |
 
 ## CLI/REPL
 
@@ -75,6 +76,7 @@
 | 2026-09-19 | T16 中 /copy 的剪贴板链=win32 clip/darwin pbcopy/linux 硬编码 xclip | **/copy 改走 clipboardCandidates 候选链**:Wayland 会话优先 wl-copy,X11 依次 xclip→xsel,逐个尝试直到 spawn 成功 | 硬编码 xclip 在纯 Wayland 会话(Omarchy)必然失败;产品要求全系统核查复制/粘贴功能 | 本轮 |
 | 2026-09-19 | T21:SGR 鼠标上报自启动常开(滚轮全终端直通) | **T23:捕获默认关+?1007 备用屏滚动**:常开 ?1000h/?1006h 把点击/拖拽也捕获=所有终端失去原生划选复制(宿主机原有能力也回归丢失,实测反馈修正);默认改为 ?1007(终端自行把滚轮译为方向键,零点击捕获,方向键路径本就滚动转录);捕获仅在面板打开时临时开启(旧行为恢复)或用户 /mouse 显式强制(持久化 tui.mouse,面向既不翻译滚轮也不认 ?1007 的终端如老 conhost) | 选中/复制是不可牺牲的原生能力;滚轮必须靠不碰点击的机制实现 | 本轮 |
 | 2026-10-04 | T27:更新成功**零提示**(完全静默) | **T27-v2:三段式轻提示**——启动一行 dim、完成一行(版本+重启生效/onDone 挂安装器退出码)、升级后首启一行简报(release-notes.json 随包,版本戳只显一次) | 用户:完全静默失去掌控感,想看到"正在更新"+进度+版本简报;弹的是**窗口**不是文字——窗口零容忍不变,界面内文字还回掌控感 | 本轮 |
+| 2026-10-05 | Web 全局单槽串行(0.6.1 队列设计:busy 时新任务全局排队,同一时刻仅一任务) | **W15:会话独立执行**——每会话独立子进程/队列/断路器/审批/注入;跨会话并行,会话内仍串行(保 rollout 完整性);T24 断路器语义不变但降为会话级 | 对标 dsh 3080:多会话并行是会话独立的核心承诺;全局单槽让一个会话的长任务饿死其他所有会话;会话内串行保留(并发写同一 rollout 会撕裂历史) | 本轮 |
 
 ## 维护规则
 

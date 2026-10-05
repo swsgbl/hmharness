@@ -745,6 +745,7 @@ ${uiLiteSource()}
   var curSid = null;              // the session currently displayed
   var activeSink = null;          // write target while routing an SSE event (per-session root)
   var busySid = '';               // session whose task is running (server echo)
+  var runningSids = {};           // W15: EVERY running session (parallel execution)
   function newViewRecord(sid) {
     var root = document.createElement('div');
     root.className = 'sessview';
@@ -786,6 +787,10 @@ ${uiLiteSource()}
       else pv.style.display = 'none';
     }
     updateTopbarCwd();
+    // W15 parallel sessions: the composer follows the VIEWED session - stop
+    // button when THIS session runs, plain send when it does not (another
+    // session running elsewhere never blocks the input here)
+    setBusy(!!runningSids[sid], null);
     var shown = views.get(sid);
     if (shown) shown.root.scrollTop = 0;
     log.scrollTop = log.scrollHeight;
@@ -1113,7 +1118,11 @@ ${uiLiteSource()}
     renderQueue(s.queue || []);
     // mid-run page reload: no 'busy' SSE event will fire until the task ends,
     // so the composer state (stop button, runstatus) must come from state too
-    if (typeof s.busy === 'boolean' && s.busy !== !!window.__agentBusy) setBusy(s.busy);
+    // W15: with parallel sessions the composer follows the VIEWED session
+    // (busySessions); legacy single-busy state falls back to the global flag
+    var mineBusy = Array.isArray(s.busySessions) ? (curSid ? s.busySessions.indexOf(curSid) >= 0 : s.busySessions.length > 0) : s.busy;
+    if (typeof mineBusy === 'boolean' && mineBusy !== !!window.__agentBusy) setBusy(mineBusy);
+    if (Array.isArray(s.busySessions)) s.busySessions.forEach(function (bs) { runningSids[bs] = runningSids[bs] || true; });
     document.getElementById('model').textContent = s.model;
     document.getElementById('model2').textContent = s.model;
     renderModelPick(s);
@@ -2529,7 +2538,12 @@ ${uiLiteSource()}
   es.addEventListener('busy', function (e) {
     var d = JSON.parse(e.data);
     var v = route(d.sessionId);
-    setBusy(d.busy, d.mode);
+    // W15: track EVERY session's run state; the composer follows the VIEWED
+    // session only (mountView re-evaluates on switches)
+    if (d.busy) runningSids[d.sessionId] = d.task || true;
+    else delete runningSids[d.sessionId];
+    var mine = d.sessionId === curSid || (!curSid && d.busy);
+    setBusy(!!mine && d.busy, d.mode);
     if (d.busy) {
       busySid = d.sessionId || '';
       if (v) {
@@ -2560,7 +2574,15 @@ ${uiLiteSource()}
     el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \u2014 ' + d.task, true);
   });
   es.addEventListener('queue', function (e) {
-    renderQueue(JSON.parse(e.data).items || []);
+    var d = JSON.parse(e.data);
+    // W15: per-session queue events only book-keep; the FLAT event (no
+    // sessionId, all sessions concatenated) is what the bar renders
+    if (d.sessionId) {
+      var qv = views.get(d.sessionId);
+      if (qv) qv.queue = d.items || [];
+      return;
+    }
+    renderQueue(d.items || []);
   });
   es.addEventListener('delta', function (e) {
     var d = JSON.parse(e.data);
@@ -2712,21 +2734,36 @@ ${uiLiteSource()}
     if (d.name === 'web_search') renderSearchCards(d);
     foldToolResult(d);
   });
+  var apQueue = [];               // W15: concurrent approvals, stacked
   es.addEventListener('approvalReq', function (e) {
     var d = JSON.parse(e.data);
+    apQueue.push(d);
+    if (document.getElementById('approval').style.display === 'block') return; // card busy: stacked, shown next
+    showApprovalCard(d);
+  });
+  function showApprovalCard(d) {
     document.getElementById('ap-name').textContent = d.name;
     document.getElementById('ap-args').textContent = JSON.stringify(d.args).slice(0, 200);
     var box = document.getElementById('approval');
     box.style.display = 'block';
     box.classList.add('pulse');
+    box.dataset.sid = d.sessionId || '';
+    box.dataset.pending = String(apQueue.length - 1); // others still queued
     window.__AN.popIn(box);
     taskPhaseEvent('waitingApproval');
     renderApprovalMeta(d);
-  });
+  }
   es.addEventListener('approvalDone', function (e) {
-    document.getElementById('approval').style.display = 'none';
-    document.getElementById('approval').classList.remove('pulse');
     var d = JSON.parse(e.data);
+    // only the card's OWN resolution hides it (other sessions' approvals
+    // resolve independently now)
+    var box = document.getElementById('approval');
+    if (box.style.display === 'block' && (!box.dataset.sid || box.dataset.sid === String(d.sessionId))) {
+      box.style.display = 'none';
+      box.classList.remove('pulse');
+      apQueue.shift();
+      if (apQueue.length) showApprovalCard(apQueue[0]);
+    }
     route(d.sessionId);
     flushStream();
     el('div', 'toolres', '[approval ' + d.name + ': ' + (d.granted ? 'granted' : 'DENIED') + ']');
@@ -2814,13 +2851,14 @@ ${uiLiteSource()}
   }
 
   function decide(granted) {
+    var box = document.getElementById('approval');
     api('/api/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ granted: granted })
+      body: JSON.stringify({ granted: granted, sessionId: box.dataset.sid || undefined })
     });
-    document.getElementById('approval').style.display = 'none';
-    document.getElementById('approval').classList.remove('pulse');
+    box.style.display = 'none';
+    box.classList.remove('pulse');
   }
   document.getElementById('ap-yes').onclick = function () { decide(true); };
   document.getElementById('ap-no').onclick = function () { decide(false); };
@@ -3006,7 +3044,7 @@ ${uiLiteSource()}
     return fetch(url, opts);
   }
   function interrupt() {
-    fetch('/api/interrupt', { method: 'POST' })
+    fetch('/api/interrupt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: curSid || undefined }) })
       .then(function (r) { return r.json(); })
       .then(function (d) { if (d && d.error) el('div', 'err', d.error); })
       .catch(function (err) { el('div', 'err', String(err)); });
@@ -3197,7 +3235,7 @@ ${uiLiteSource()}
     renderAtts();
   }
   function injectNow(text) {
-    fetch('/api/inject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) })
+    fetch('/api/inject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text, sessionId: curSid || undefined }) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         if (!res.ok && res.d && res.d.error) { el('div', 'err', res.d.error); return; }
