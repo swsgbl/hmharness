@@ -71,6 +71,15 @@ BrowserOS 原生扩展面(bridge/protocol/tools/adapters/page/build);
 双清单陷阱第三次复发后**守卫机制化**(preflight 读 publish.cjs 的
 ORDER 比对,diverge 即拒跑)。
 
+**0.23.24(2026-10-05):七浏览器真装轮**(rounds 40-41,770/770):
+Chrome/Edge 有头真装暴露 MV3 硬边界(注入权限在 manifest 不在 UI
+共识,`<all_urls>` 入清单+机检);幽灵连接投递语义(桥重放只读命
+令,page.act 永不重放——宁超时勿双击);回环演示页让验证不再受外
+网摆布。Brave/Opera/夸克 chromium 载荷;Firefox 三道真墙逐一正解
+(Marionette 临时装载/announce 广播+演示页同源配对/主机权限 opt-in
+如实上报)。LiveCodeWmSensor(Code WM 活体传感器)与 CI 根修随版
+上车。
+
 剩余开口全为外部:投稿(等作者;已收录 PR21,实际是条目更新)、
 bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在 IDE JVM 内不可外部
 直驱)。
