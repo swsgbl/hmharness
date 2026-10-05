@@ -12,7 +12,8 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 
 - npm 包：@hmharness/cli，当前 0.23.24；单仓 16 包（含 cognitive + environments）；内核 0 运行时依赖；770 个单元测试 CI 全绿才允许发版
 - 平台：Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证）；macOS/Linux 社区支持
-- 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放、认知面板十区+学习曲线），zh/en 双语
+- 界面：CLI / REPL / 全屏 TUI / Web 前端（浏览器审批、会话回放、认知面板十区+学习曲线），zh/en 双语；另有浏览器扩展桥（`hmh extension`，七浏览器真装）与 ACP 服务器（`hmh acp-serve`，BrowserOS 面板直连）
+- 顶层命令族：任务/REPL（裸 `hmh`）· tui · web · resume · tools/mcp · check/devices · ops · evolve · bench/skills · cognitive（19 子命令）· lsp（list/trust/untrust）· browser · extension（serve/pair/status/unpair/build/install/uninstall）· mcp-serve · acp-serve · project · experiment · dataset · route · readiness · pipeline · knowledge · label
 - 独立声明：与华为、开放原子开源基金会无隶属/合作/背书关系；净室重写，不继承任何上游运行时能力
 
 ## 认知层（Cognitive OS）
@@ -43,7 +44,7 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 
 **跨环境迁移**：显式抽象动作层（writeFile→@write / hdc-install→@install / run_command→@run）；双臂对照实验（源环境信念播种 vs 空白，同预算只差知识）；迁移矩阵面板。
 
-**认知命令集**（18 条 + 独立 hmh lsp 命令族）：`hmh cognitive status | world-model | calibration [--trend --env=] | diagnose | bench | drift | skills | explore | transfer | team | learn | replay | export | purge | play | ablate [--ladder3] | summary | absorb [--from=<url>] | slice`，另有 `hmh lsp list|trust|untrust`（语言服务器发现/健康/来源信任+sha256 钉住）。
+**认知命令集**（19 条 + 独立 hmh lsp 命令族）：`hmh cognitive status | world-model | calibration [--trend --env=] | diagnose | bench | drift | skills | explore | transfer | team | learn | replay | export | purge | play | ablate [--ladder3] | summary | absorb [--from=<url>] | slice`，另有 `hmh lsp list|trust|untrust`（语言服务器发现/健康/来源信任+sha256 钉住）。
 
 ## 零 IDE 的鸿蒙全流程怎么做
 

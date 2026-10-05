@@ -19,6 +19,7 @@
 | **鸿蒙原生域** | 工程脚手架（参数化多页面/多模块，一句话建任意结构）、hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 cjpm 构建、codelinter、**模拟器全生命周期管理（零 IDE）** |
 | **自进化** | 进化循环（洞察挖掘 → 提案 → 训练/保留双门禁 → 晋升自动快照 → 回滚）、技能三态生命周期、检索式长期记忆（带蒸馏）、定时进化、进化审计日志；**跨环境迁移**（显式抽象动作层+双臂对照实验，校准迁移证据 +0.4166） |
 | **生态借力** | MCP 客户端（stdio + HTTP，5800+ 社区服务器即插即用）、`hmh ops` 运维看家（生态雷达；AI 只起议，人批准才发布） |
+| **🔗 浏览器扩展桥** | `hmh extension serve\|pair\|install\|status\|uninstall`——把智能体接入你**真实的浏览器**（Chrome/Edge/Brave/Opera/夸克/Firefox/BrowserOS 七浏览器真机验证；一次性配对码换令牌；page_act 恒审批；只读命令跨重连重放） |
 | **多智能体** | spawn_agent 子代理（全新上下文、深度上限、共享审批、审计前缀）+ 角色契约拓扑治理 |
 | **视觉** | see_image（任意视觉模型，多厂商降级链）+ ARC-AGI-3 帧渲染视觉实玩（模型推理随 reasoning 入档） |
 | **多前端** | CLI / REPL（斜杠命令）/ **全屏 TUI（斜杠面板、滚轮翻页）** / Web（浏览器流式、远程审批、会话回放、**工作区、🧠 认知面板十区+学习曲线**） |
@@ -101,6 +102,9 @@ hmh check | devices         # 工具链体检 / 设备列表
 hmh evolve [--every=30]     # 自进化循环（单次或常驻）
 hmh bench | skills          # 基准 / 技能库
 hmh ops scan|brief|status   # 生态雷达
+hmh extension serve|pair|install|status|uninstall  # 浏览器扩展桥（七浏览器真装，配对码+审批门禁）
+hmh acp-serve               # ACP 服务器（BrowserOS 助手面板直连 hmh）
+hmh project|experiment|dataset|route|readiness|pipeline|knowledge|label   # 实验与知识管理族
 hmh --help                  # 完整用法
 ```
 

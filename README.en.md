@@ -21,6 +21,7 @@
 | **HarmonyOS native domain** | Parameterized project scaffolding (multi-page, multi-module, one sentence → any structure), hvigor build, hdc install/launch/logs/uninstall, Cangjie cjpm build, codelinter. **Full emulator lifecycle management without an IDE** |
 | **Self-evolution** | Evolution loop (insight mining → proposals → training/holdout double gate → promotion with snapshots → rollback), three-state skill lifecycle, retrieval-based long-term memory, scheduled evolution, evolution audit log; **cross-environment transfer** (explicit abstract-action layer + two-arm controlled experiments, calibration transfer evidence +0.4166) |
 | **Ecosystem borrow** | MCP client (stdio + HTTP, 5800+ community servers plug-and-play), `hmh ops` keeper (ecosystem radar; AI only proposes, humans approve before publishing) |
+| **🔗 Browser extension bridge** | `hmh extension serve\|pair\|install\|status\|uninstall` - wire the agent into your **real browsers** (Chrome/Edge/Brave/Opera/Quark/Firefox/BrowserOS verified on real machines; one-time pairing code for a token; page_act always needs approval; read-only commands replay across reconnects) |
 | **Multi-agent** | spawn_agent sub-agents (fresh context, depth limit, shared approvals, audited prefix) + role-contract topology governance |
 | **Vision** | see_image (any vision model, multi-provider fallback) + ARC-AGI-3 frame-rendered vision play (model reasoning archived with each action) |
 | **Frontends** | CLI / REPL / fullscreen TUI (slash-command palette) / Web (browser streaming, remote approvals, session replay, workspaces, **🧠 cognitive panel with learning curves**) |
@@ -100,6 +101,9 @@ hmh check | devices          # toolchain health check / device list
 hmh evolve [--every=30]      # self-evolution cycle (one-shot or resident)
 hmh bench | skills           # bench / skill library
 hmh ops scan|brief|status    # ecosystem radar
+hmh extension serve|pair|install|status|uninstall  # browser extension bridge (real-install across 7 browsers, pairing code + approval gate)
+hmh acp-serve                 # ACP server (BrowserOS assistant panel drives hmh directly)
+hmh project|experiment|dataset|route|readiness|pipeline|knowledge|label    # experiment & knowledge families
 ```
 
 Any command accepts `--locale=zh|en`. Dangerous operations go through the approval gate by default (y/N on a TTY, denied headless; `--yes` or `"approval":"auto"` to allow; destructive command patterns are hard-denied).

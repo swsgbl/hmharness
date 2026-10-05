@@ -10,7 +10,8 @@
 - 环境适配器：terminal（原生）/ harmonyos（hdc 桥）/ browser（CDP）/ desktop / ARC-AGI-3（官方 REST 全桥+帧渲染+视觉模型实玩+记分卡）
 - 手机远程控制：WiFi 扫码直连（免密）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化
 - API 知识图谱：索引 SDK 927 个 d.ts 的 20,241 个符号，查不到即诚实拒绝，防模型幻觉
-- MCP 双向：客户端接入 5800+ 社区服务器；`hmh mcp-serve` 把鸿蒙工具链供给 Claude Code/Codex
+- MCP 双向：客户端接入 5800+ 社区服务器；`hmh mcp-serve` 把鸿蒙工具链供给 Claude Code/Codex；`hmh acp-serve` 让 BrowserOS 助手面板直连 hmh
+- 浏览器扩展桥：`hmh extension serve|pair|install|status|uninstall`——智能体接入真实浏览器（七浏览器真机验证：Chrome/Edge/Brave/Opera/夸克/Firefox/BrowserOS；配对码换令牌、page_act 恒审批、只读命令跨重连重放）
 - 3 个月连续公开自进化数据集：月 1 自暴露并修复 7 个生产缺陷、月 2 修复 8 个、月 3 零缺陷 + 首次 REJECT 判定 + 首个跨尺度稳定正效应
 - 独立社区项目：与华为/开放原子无隶属关系，净室重写
 
@@ -19,7 +20,7 @@
 - [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、认知层命令集、自进化诚实注脚
 - [README English](https://github.com/swsgbl/hmharness/blob/main/README.en.md): same content in English
 - [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3 考什么、手机远程控制等 13 问的独立答案块
-- [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 13 包结构（含 cognitive 认知层 + environments 环境适配层）与内核循环
+- [架构设计](https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md): 16 包结构（含 cognitive 认知层 + environments 环境适配层 + lsp 代码智能层 + browser/extension 浏览器面）与内核循环
 - [开发日志 DEVLOG](https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md): 破案式开发记录（认知 OS 十九轮、ARC-AGI-3 实弹、校准研究、仪器完整性修复等）
 - [自进化协议 SELFFEED](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED.md) 与 [30 天复盘](https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-30d-review.md): 自进化实验协议与逐月复盘
 - [路线图](https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md): §26 研究终局表 + M1-M12 里程碑（全部 ✅）· [贡献指南](https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md)
