@@ -456,8 +456,22 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
           const readTab = plain?.targetId ?? (await cdp.openTab('about:blank'));
           await cdp.navigate(readTab, `http://127.0.0.1:${PORT}/v1/status`);
           await cdp.activateTab(readTab).catch(() => undefined);
-          await sleep(1_000);
-          const read = await byName('extension_page_read').execute({}, ctx);
+          // page_read targets the ACTIVE tab — wait for the navigation to
+          // COMMIT first: a half-navigated tab still reports its chrome://
+          // URL and the tool honestly refuses it (observed as a flake,
+          // right refusal, wrong timing)
+          assert.ok(await waitFor(async () => {
+            const cur = (await cdp!.tabs()).find((x) => x.targetId === readTab);
+            return typeof cur?.url === 'string' && cur.url.startsWith(`http://127.0.0.1:${PORT}`);
+          }, 10_000), 'status page never committed on the read tab');
+          await sleep(500);
+          let read = await byName('extension_page_read').execute({}, ctx);
+          if (read.isError && read.output.includes('Cannot access')) {
+            // activate raced the commit once — settle and retry the
+            // idempotent read-only tool once before declaring failure
+            await sleep(1_000);
+            read = await byName('extension_page_read').execute({}, ctx);
+          }
           assert.ok(!read.isError, `extension_page_read failed: ${read.output}`);
           assert.ok(read.output.includes('hmext/1'), 'page read carried the status payload');
 
