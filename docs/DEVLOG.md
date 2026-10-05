@@ -4,6 +4,54 @@
 
 ---
 
+## 2026-10-05(四十二) · 常驻安装:`hmh extension install` 与 2026 各浏览器安装通道实况(768/768)
+
+**动机**:用户要求"安装到各个浏览器的扩展里"——之前所有装载都是
+临时/测试态;本轮把扩展**真实装进**七台浏览器的扩展列表。
+
+**关键决策**(先固定 ID,再逐通道实证,最后按实况分轨):
+- **manifest 固定公钥**(EXTENSION_KEY → 固定 ID
+  lceccbmgohpgfgckenddombndnklbafm):未打包扩展的 ID 默认由**目录
+  路径**派生——目录一挪 ID 就变,注册表/策略/深链全部失效;钉
+  key 后跨浏览器/跨路径/跨安装通道稳定;
+- **2026 安装通道实况(全部真机实证)**:
+  - 注册表外部扩展(HKCU\<Vendor>\Extensions\<id> + path/版本):
+    **死**——写了不加载;预置开发者模式 Preferences 也死;
+  - 手写 profile Preferences 的扩展记录(location=4+path+state):
+    **死**——Chromium 启动时清理,不认手写记录;
+  - **快捷方式 `--load-extension`:活**(Edge/Brave/Opera/夸克/
+    BrowserOS)——唯一自动可写且每次启动都生效的通道。改写既有
+    .lnk(按**完整 target 路径**匹配,防品牌 Chrome 的 chrome.exe
+    误伤);无可改快捷方式的浏览器(Edge 只存在于任务栏钉)在
+    桌面**创建装载版启动器**;
+  - 品牌 Chrome:三条自动通道全死 → **手动一次即持久**(加载已解压
+    的扩展程序;装完 Chromium 自己持久化记录)——如实给指引;
+  - Firefox release:未签名持久安装需 AMO 签名;企业策略
+    force_installed + file:// XPI 实测**本机不加载**(签名检查仅
+    ESR/开发者版旁路)→ 演示页配对 + about:debugging 临时载入;
+- **载荷落稳定目录** HMH_HOME/extension-install/(注册表/快捷方式
+  引用该路径,挪动即砖);uninstall 全量可撤销(注册表/策略(保留
+  他人条目)/快捷方式参数备份还原)。
+
+**实测证据**:768/768(回归全绿)。真机安装执行:7 台发现;
+Brave/Opera/夸克/BrowserOS 快捷方式已改、Edge 桌面启动器已建、
+chrome/firefox 给出诚实指引。**端到端验证**:读回 .lnk 参数 + 按
+快捷方式等价启动(Brave/Edge)→ CDP 确认扩展装载且自动打开配对
+页(page target)——两轮假阴性均为验证脚本自身的引号传递 bug
+(spawn argv 保留字面引号;真实 Shell 启动会剥离),第三轮修正
+后 YES。
+
+**教训**:
+- "装进扩展列表"在 2026 已经没有统一通道:Chromium 自动化只剩
+  快捷方式 flag,品牌 Chrome 只剩手动,Firefox 只剩签名——产品
+  按实况分轨并如实告知,好过假装全绿;
+- 验证"快捷方式"时必须等价于 Shell 的命令行解析(argv 传参保留
+  字面引号,两轮假阴性都源于此);
+- 固定扩展 ID(钉 key)是所有安装通道的前置件——路径派生 ID
+  意味着"移动目录=更换扩展"。
+
+---
+
 ## 2026-10-05(四十一) · 七浏览器真装验证:Brave/Opera/夸克/Firefox 接入(768/768)
 
 **动机**:用户点名适配四台桌面浏览器:Firefox.exe / Brave.lnk /

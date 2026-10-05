@@ -7,14 +7,23 @@
 ## 快速开始
 
 ```bash
-hmh extension build --target=all        # 产出三个可加载的未打包目录
-hmh extension serve                     # 前台启动桥(127.0.0.1:7789,自动打印配对码)
-# 浏览器: chrome://extensions → 开发者模式 → 加载已解压 → 选 dist/extension-build/chromium
-#         (Edge/Brave 同理;Firefox: about:debugging 临时载入 firefox 目录的 manifest.json)
-# 扩展 popup → 输入配对码 → 配对并连接
-hmh extension status                    # 查看桥/配对/连接状态
-hmh extension pair | unpair             # 重发配对码 / 吊销令牌
+hmh extension install              # 常驻安装到全部已发现浏览器(见下表分轨)
+hmh extension serve                # 前台启动桥(127.0.0.1:7789,自动打印配对码)
+hmh extension pair | unpair        # 配对码 / 吊销令牌
+hmh extension status               # 桥/配对/连接 + 各浏览器常驻安装状态
+hmh extension uninstall            # 全量撤销(注册表/策略/快捷方式)
+hmh extension build --target=all   # 只构建三份可加载目录
 ```
+
+## 常驻安装通道(2026-10 真机实证;`hmh extension install` 自动分轨)
+
+| 浏览器 | 通道 | 说明 |
+|---|---|---|
+| Edge / Brave / Opera / 夸克 / BrowserOS | **快捷方式 `--load-extension`** | 自动改写桌面/开始菜单 .lnk(按完整路径匹配);Edge 无传统快捷方式 → 桌面创建 `hmharness · edge.lnk` 启动器。双击图标启动即装载,重启常驻 |
+| Google Chrome | **手动一次即持久** | 三条自动通道(注册表外部扩展/开发者模式预置/手写 Preferences)2026 均被忽略(实证);chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选 `~/.hmharness/extension-install/chromium/chromium` |
+| Firefox (release) | **临时载入** | 未签名持久安装需 AMO 签名(企业策略 force_installed 实测本机不旁路签名);about:debugging 临时载入 + 演示页配对,重启后重载 |
+
+扩展 ID 已用 manifest 公钥**固定**(`lceccbmgohpgfgckenddombndnklbafm`)——目录移动不换 ID,注册表/策略/深链引用稳定。载荷位于稳定目录 `HMH_HOME/extension-install/`(**勿移动/删除**)。
 
 连接后,智能体自动获得四个工具(桥在跑且扩展已连接才注册——死工具纪律):
 
