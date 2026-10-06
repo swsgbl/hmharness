@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
-<meta name="description" content="hmharness 十三问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
+<meta name="description" content="hmharness 十五问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -16,7 +16,7 @@
   "name": "hmharness",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
-  "softwareVersion": "0.23.27",
+  "softwareVersion": "0.23.28",
   "description": "开源鸿蒙开发智能体框架：零 IDE 终端跑通建工程、构建、签名、装机、日志全流程，带双门禁可审计自进化、认知层（世界模型/五层记忆/校准维，四环境学习曲线 improving）与 MCP 双向生态。",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://opensource.org/licenses/MIT",
@@ -104,6 +104,16 @@
       "@type": "Question",
       "name": "手机怎么远程控制 hmharness？",
       "acceptedAnswer": { "@type": "Answer", "text": "两种模式：WiFi 扫码直连（免密，同网段信任，扫一次即记住配对的局域网 IP）与 cloudflared 免费隧道互联网模式（6 位配对密码，配对会话持久化——服务器重启不重扫，断线自动重连、隧道死亡自动重启）。hmh web start --exposure=lan --token-gen 启动后点网页 📱 图标打开配对窗口。手机端是完整 Web 前端，支持任意 OpenAI 兼容模型（含 GLM-5.3-flash 视觉模型看 ARC 游戏帧选动作）。" }
+    },
+    {
+      "@type": "Question",
+      "name": "AI 候选会靠啰嗦通过基准测试吗？怎么防？",
+      "acceptedAnswer": { "@type": "Answer", "text": "会，hmharness 用双保险防：四种断言模式（exact/regex/none/any）钉死输出形状 + 成本门 cand > max(基线×1.3, 基线+8)。token 按 CJK≈1、ASCII≈1/4 估算，换中文灌水也绕不过；+8 绝对余量地板修复过微型考题连续误杀 10 个候选的事故。成本只否决不判分，通过率门仍是主判据。" }
+    },
+    {
+      "@type": "Question",
+      "name": "Agent 怎么记住踩过的坑？",
+      "acceptedAnswer": { "@type": "Answer", "text": "hmharness 的 memory.retrieve 是计分检索：置信度×0.4 + 新鲜度×0.2 + 词法相关×0.4，查询先分词再部分计分，替代会漏检的 AND 子串匹配。五层记忆只增不删、每条带溯源，工作区标签隔离（本区×2.5/他区×0.3）。" }
     }
   ]
 }
@@ -145,7 +155,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十三问</h1>
+  <h1>hmharness 十五问</h1>
   <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
 </div></header>
 
@@ -154,7 +164,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 <section class="qa" id="what-is-hmharness">
   <h2><a class="qn" href="#what-is-hmharness">Q1</a>hmharness 是什么？</h2>
   <div class="tldr">hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
-  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 16 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、809 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
+  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 16 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、816 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="./">官网首页</a></p>
 </section>
 
@@ -242,6 +252,21 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <div class="tldr">WiFi 扫码直连（免密，同网段信任）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化 + 断线自动重连。<code>hmh web start --exposure=lan --token-gen</code> 后网页 📱 图标打开配对窗口。</div>
   <p>WiFi 模式手机扫二维码即连（服务器记住配对过的局域网 IP）；互联网模式自动下载 cloudflared 并启动免费 Quick Tunnel（死亡自动重启、意图持久化到 config）。配对会话持久化——服务器重启不重扫。支持任意 OpenAI 兼容模型（包括 GLM-5.3-flash 视觉模型看 ARC 游戏帧选动作）。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 手机远程控制</a></p>
+</section>
+
+
+<section class="qa" id="cost-gate">
+  <h2><a class="qn" href="#cost-gate">Q14</a>AI 候选会靠「啰嗦」通过基准测试吗？怎么防？</h2>
+  <div class="tldr">会，且真实发生过。hmharness 的防法是双保险：判卷用四种断言模式钉死输出形状（一字不差 / 正则 / 禁词表 / 多候选），再加成本门——候选输出 token 成本超过基线 1.3 倍且超出超过 8 个 token 即判「成本回归」，靠啰嗦刷分直接出局。</div>
+  <p>成本公式：<code>cand &gt; max(base × 1.3, base + 8)</code>。token 估算按「中日韩字符≈1、ASCII≈1/4」——切回中文灌水同样绕不过帽。乘法帽曾把期望输出只有 4 个 token 的微型考题变成 Hair Trigger（余量仅 1 token，连续 10 个候选被误杀），<code>+8</code> 绝对余量地板修复了它——真啰嗦是 2-10 倍量级，针尖级扰动不该死。成本只否决不判分：通过率门仍是主判据，双指标各管一半。全部判定有 10 个单元测试守护（bench.ts / evolve.ts）。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/evolve.ts">packages/evolution/src/evolve.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/__tests__/gate.test.ts">gate.test.ts</a></p>
+</section>
+
+<section class="qa" id="memory-retrieval">
+  <h2><a class="qn" href="#memory-retrieval">Q15</a>Agent 怎么记住踩过的坑？记错了怎么办？</h2>
+  <div class="tldr">hmharness 的记忆检索是计分制不是全文匹配：置信度 ×0.4 + 新鲜度 ×0.2 + 词法相关 ×0.4，查询先分词再部分计分——检索「hvigor build windows」这类带无关词的查询也能命中该命中的经验，硬过滤条件不变。</div>
+  <p>旧方案 AND 子串匹配会在查询里混入无关词时全部漏检（旧 AND 检索 miss 的根因）；计分检索允许部分词法得分，排序公式在 <code>memory.retrieve</code> 中可审计。五层记忆（working/episodic/semantic/procedural/world）只增不删、每条带溯源——记错可查证，标记可追踪。工作区隔离用标签制：本区记忆 ×2.5 加权，他区降权 ×0.3 但不消失。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/CHANGELOG.md">CHANGELOG 0.23.26（memory.retrieve）</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE 认知层</a></p>
 </section>
 
 </main>
