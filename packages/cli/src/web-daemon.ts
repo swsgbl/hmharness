@@ -76,6 +76,34 @@ function portOwnerPid(port: number): number {
   return 0;
 }
 
+/** Is the pid a WEB daemon of ours (`main.js web --port=`)? Port eviction may
+ *  ONLY target self-family processes: other hmh surfaces (extension serve,
+ *  mcp-serve, dev-tree servers) legitimately occupy adjacent ports, and the
+ *  old blind taskkill kept murdering them on every version-aware restart
+ *  (the "并行活动又抢了端口" port war). */
+function isSelfWebDaemon(pid: number): boolean {
+  if (!pid || process.platform !== 'win32') return process.platform !== 'win32';
+  try {
+    const out = execSync(
+      `powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine"`,
+      { encoding: 'utf8', timeout: 8000 },
+    );
+    const cmd = out.trim();
+    return cmd.includes(' web ') || /main\.js(\.ts)?\s+web\b/.test(cmd) || /\bweb\b\s*--port=/.test(cmd);
+  } catch { return false; }
+}
+
+/** Describe a foreign occupier for the warning line (best effort). */
+function foreignOwnerDesc(pid: number): string {
+  try {
+    const out = execSync(
+      `powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine"`,
+      { encoding: 'utf8', timeout: 8000 },
+    );
+    return out.trim().slice(0, 120);
+  } catch { return 'pid ' + pid; }
+}
+
 /** Wait (bounded) until nothing answers on the port — used after evicting a
  *  stale listener so the respawn does not die on EADDRINUSE. */
 export async function waitPortFree(port: number, maxMs = 4000): Promise<boolean> {
@@ -98,13 +126,19 @@ export function stopWebDaemon(port = DEFAULT_WEB_PORT): boolean {
     killed = true;
   }
   try { unlinkSync(join(homeDir(), 'web.pid')); } catch { /* absent */ }
-  // stale pid file but the port is still held (orphaned/old daemon): evict
+  // stale pid file but the port is still held: evict ONLY if the holder is
+  // one of OUR web daemons - a foreign hmh surface (extension serve,
+  // dev-tree server) owns its port legitimately and must not be murdered
   const owner = portOwnerPid(port);
   if (owner && owner !== pid) {
-    try {
-      spawn('taskkill', ['/PID', String(owner), '/T', '/F'], { windowsHide: true });
-      killed = true;
-    } catch { /* best effort */ }
+    if (isSelfWebDaemon(owner)) {
+      try {
+        spawn('taskkill', ['/PID', String(owner), '/T', '/F'], { windowsHide: true });
+        killed = true;
+      } catch { /* best effort */ }
+    } else {
+      console.error(`[web] port ${port} is held by a NON-web process - not evicting: ${foreignOwnerDesc(owner)}`);
+    }
   }
   return killed;
 }
@@ -173,6 +207,14 @@ export async function ensureWebDaemon(port = DEFAULT_WEB_PORT, entry = process.a
     // for the port to free so the respawn cannot die on EADDRINUSE
     stopWebDaemon(port);
     await waitPortFree(port);
+    // a foreign surface still holding the port (stop refused to murder it):
+    // do NOT crash-loop a doomed respawn - say so and stay down
+    const holder = portOwnerPid(port);
+    if (holder && !isSelfWebDaemon(holder)) {
+      console.error(`[web] port ${port} is held by another process - not evicting: ${foreignOwnerDesc(holder)}`);
+      console.error(`[web] stop it, or start the web UI elsewhere: hmh web --port=<port>`);
+      return false;
+    }
   }
 
   spawnWebDaemon(port, entry);

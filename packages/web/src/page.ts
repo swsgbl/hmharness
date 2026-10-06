@@ -1971,6 +1971,17 @@ ${uiLiteSource()}
       .catch(function (e) { msg.className = 'err'; msg.textContent = L.setFailed + ': ' + String(e); });
   };
 
+  /** W15: reflect runningSids onto every session row badge (called on busy
+   *  events and after re-render). */
+  function refreshRunBadge(row, sid) {
+    var el = row.querySelector('.srun');
+    if (el) el.style.display = runningSids[sid] ? '' : 'none';
+  }
+  function refreshAllRunBadges() {
+    document.querySelectorAll('.sess').forEach(function (r) {
+      if (r.dataset && r.dataset.sid) refreshRunBadge(r, r.dataset.sid);
+    });
+  }
   function sessRow(s) {
     var b = document.createElement('button');
     b.className = 'sess';
@@ -1982,9 +1993,17 @@ ${uiLiteSource()}
     t1.appendChild(dot); t1.appendChild(time);
     var label = s.title || s.task || s.id;
     if (label) { var tk = document.createElement('span'); tk.style.flex = '1'; tk.style.overflow = 'hidden'; tk.style.textOverflow = 'ellipsis'; tk.textContent = label.slice(0, 40); t1.appendChild(tk); }
+    // W15: per-session RUNNING badge (dsh parity) - a live task in THIS
+    // session pulses the row regardless of which view is open
+    var run = document.createElement('span'); run.className = 'srun'; run.textContent = '\\u25CF';
+    run.title = 'running';
+    run.style.cssText = 'color:var(--ok);font-size:8px;flex:none;display:none';
+    t1.appendChild(run);
     b.appendChild(t1);
     var t2 = null;
     if (label) { t2 = document.createElement('div'); t2.className = 'task'; t2.textContent = label; b.appendChild(t2); }
+    b.dataset.sid = s.id;
+    refreshRunBadge(b, s.id);
     b.onclick = function (ev) {
       if (ev.target.closest && ev.target.closest('.sacts')) return;
       if (ev.target.classList && ev.target.classList.contains('ren')) return;
@@ -2542,6 +2561,7 @@ ${uiLiteSource()}
     // session only (mountView re-evaluates on switches)
     if (d.busy) runningSids[d.sessionId] = d.task || true;
     else delete runningSids[d.sessionId];
+    refreshAllRunBadges();
     var mine = d.sessionId === curSid || (!curSid && d.busy);
     setBusy(!!mine && d.busy, d.mode);
     if (d.busy) {
