@@ -79,11 +79,13 @@ schema**(三预测族——outcome/state-delta/edit——一个记录形+聚合
 failed 按 parentSeq 链;适配器 fromOutcome/fromDelta/fromEdit);④
 **Credit Assignment v0**(读账本,观察 lift=P(confirmed|在窗)−P
 (confirmed|不在窗),复用 wm-causal 语义,低支持=证据不足不报数,
-恒标 observational)。**P1 待做**:Learning Target Registry(每目标
-trainer/evaluator/holdout/canary/rollback/lineage)、Capability
-Broker+风险分级隔离(Worker→Process→Container→microVM)、Transfer
+恒标 observational)。**P1 待做**:~~Learning Target Registry~~(✓b563a8d 六要素机器强
+制+runCycle 编排+model 栏 0.95 严格高于 memory 0.6)、~~统一评测
+12 指标~~(✓9483d8c 未测=undefined 列入 unmeasured 绝不补零)、
+~~Capability Broker~~(✓cadb947 五资源类八字段令牌拒认默认+RLM
+零继承规则机械化+风险梯队组合 recommendedIsolation)、Transfer
 OS(12 动词抽象动作空间+5×5 迁移矩阵)、Evidence Ledger v2 统一
-lineage、统一评测 12 指标(恢复率/人工干预率/安全违规率);P2=外
+lineage;P2=外
 部 Benchmark 四层(Internal/Public/RealUser/Hidden;自进化绝不写
 Hidden)。
 
