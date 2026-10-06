@@ -26,6 +26,8 @@
 import type { Candidate, EvalResult, LearningDataset, LearningPlan, LearningTarget } from './continual.ts';
 import { evidenceThreshold } from './continual.ts';
 import type { CognitiveLedger, LedgerEventKind } from './ledger.ts';
+import type { CognitiveTrajectory } from './protocol.ts';
+import { mineWorkflows, type WorkflowCandidate } from './skill-compiler.ts';
 
 export type TargetTrainer = (plan: LearningPlan, dataset: LearningDataset) => Promise<Candidate>;
 export type TargetEvaluator = (candidate: Candidate, holdout: LearningDataset) => Promise<EvalResult>;
@@ -148,4 +150,74 @@ export class LearningTargetRegistry {
       this.ledger.append(kind, subject, { detail });
     } catch { /* the ledger must never break the cycle it observes */ }
   }
+}
+
+/* -------- the first REAL target: skill (upgrade pack stage C acceptance) --------
+ *
+ * The registry existed with fake-capable contracts; this factory registers
+ * the 'skill' target with the REAL trainer the codebase already owns:
+ * skill-compiler's mineWorkflows (maximal supported action n-grams over
+ * successful trajectories). The evaluator replays the top mined workflow
+ * against a CALLER-PROVIDED holdout (disjointness is the caller's
+ * discipline, same as EVAL-IND's split): evidence = the share of holdout
+ * successes whose step sequence contains the workflow contiguously.
+ * Small-N honesty: fewer than 2 holdout successes fails the evaluation -
+ * a holdout too thin to check is a rejection, not a pass.
+ */
+export interface SkillCandidate extends Candidate {
+  workflows: WorkflowCandidate[];
+}
+
+function containsGram(seq: string[], gram: string[]): boolean {
+  outer: for (let i = 0; i + gram.length <= seq.length; i++) {
+    for (let j = 0; j < gram.length; j++) if (seq[i + j] !== gram[j]) continue outer;
+    return true;
+  }
+  return false;
+}
+
+function successSequence(t: CognitiveTrajectory): string[] {
+  return t.steps.filter((s) => s.outcome === 'success').map((s) => s.action.type);
+}
+
+export function registerSkillTarget(
+  registry: LearningTargetRegistry,
+  opts: {
+    /** disjoint-from-train holdout source - the caller owns the split */
+    holdout: () => Promise<LearningDataset>;
+    mining?: { minSupport?: number; nMin?: number; nMax?: number };
+    policy?: Partial<PromotionPolicy>;
+    lineageSource?: string;
+  },
+): void {
+  registry.register({
+    target: 'skill',
+    trainer: async (plan, dataset): Promise<SkillCandidate> => ({
+      id: `skill-${plan.opportunityId}-${Math.random().toString(36).slice(2, 8)}`,
+      plan,
+      createdAt: new Date().toISOString(),
+      status: 'draft',
+      workflows: mineWorkflows(dataset.trajectories, opts.mining ?? {}),
+    }),
+    evaluator: async (candidate, holdout): Promise<EvalResult> => {
+      const top = (candidate as SkillCandidate).workflows[0];
+      const holdoutSuccesses = holdout.trajectories.filter((t) => t.metrics.success);
+      if (!top) {
+        return { candidateId: candidate.id, pass: false, metrics: { evidence: 0, holdoutSuccesses: holdoutSuccesses.length }, holdoutSize: holdout.trajectories.length };
+      }
+      const containing = holdoutSuccesses.filter((t) => containsGram(successSequence(t), top.steps)).length;
+      const evidence = holdoutSuccesses.length > 0 ? Number((containing / holdoutSuccesses.length).toFixed(3)) : 0;
+      const pass = holdoutSuccesses.length >= 2 && evidence >= 0.5;
+      return {
+        candidateId: candidate.id,
+        pass,
+        metrics: { evidence, holdoutSuccesses: holdoutSuccesses.length, workflowSupport: top.support },
+        holdoutSize: holdout.trajectories.length,
+      };
+    },
+    holdout: opts.holdout,
+    promotionPolicy: { minEvidence: 0.5, requireHoldout: true, canaryShare: 0.2, ...opts.policy },
+    rollback: async () => undefined, // skill rollback is host-side promotion bookkeeping; v0 records intent via the ledger chain
+    lineage: { registeredAt: new Date().toISOString(), version: 1, source: opts.lineageSource ?? 'skill-compiler.mineWorkflows' },
+  });
 }
