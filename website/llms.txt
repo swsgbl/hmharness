@@ -3,7 +3,7 @@
 > hmharness 是一个开源（MIT）的自进化智能体框架，已升级为跨环境 Cognitive Runtime：零依赖内核 + 自进化双门禁 + MCP 生态 + 认知层（世界模型/五层记忆/校准/探索/迁移）。零 IDE 纯终端跑通鸿蒙「建工程 → 构建 → 签名 → 装机 → 日志」全流程；认知层从任务经验中学习——校准可靠度随使用提升，五环境曲线全有读数、四环境 improving（terminal/harmonyos/browser/arc3），迁移实验证明 harness 净贡献 +0.4166（LLM 未参与）。npm 包 @hmharness/cli，Node >= 22，任意 OpenAI 兼容模型，Windows 优先。
 
 关键事实（数字均可溯源）：
-- npm 包 @hmharness/cli 0.23.28 · 单仓 16 包 · 内核 0 运行时依赖 · 816 个单元测试 CI 全绿门禁
+- npm 包 @hmharness/cli 0.23.29 · 单仓 16 包 · 内核 0 运行时依赖 · 818 个单元测试 CI 全绿门禁
 - 自进化门禁：训练门 A/B 双样本 → 金丝雀 20% 会话 → impact 判定（≥8 会话且 ≥10% 差）→ 回归即回滚
 - 认知层（Cognitive OS）：世界模型（信念表+预测置信+误差聚类+可解释修订）· 五层记忆（working/episodic/semantic/procedural/world，只增不删+溯源）· 目标系统（图谱/分解/漂移检测）· 探索引擎（不确定性×信息增益×校准导向）· 技能编译（经验→可验证技能→门禁晋升）· 进化 2.0 治理（候选契约/序贯门禁/金丝雀/reward-hacking 检测/不可变审计） · MEA 长任务闭环（Manager→新鲜执行者→claim-blind 审计→学习者键审计裁决）· 版本化评测任务集（datasetHash+seed+holdout 门+配对 McNemar 精确检验）· 观测因果挖掘（时序 lag+Occam 抑制+反事实重放）· Code World Model（LSP 传感器→五类本体→编辑预测先行）
 - 校准研究定论（§26 全谱系 + P2 三臂阶梯）：单任务提示层 0 / 跨任务复利层 0 / 校准维 +0.4166（唯一持续为正） / 三臂阶梯（Model-only vs Model+Harness vs Model+Cognitive OS）：easy 带 4/4×3 地板、hard 带（裸臂失败 50%）0.5×3，两阶梯差均 0——通过率价值不在 harness，全阶梯确认价值驻留校准维 / 学习曲线五环境全有读数：terminal、harmonyos、browser（无头 CDP 探索）、arc3 均 improving，desktop 1.00 flat（确定性工具完美校准）——harness 的实证价值在让模型更准地预期世界，而非替模型答题

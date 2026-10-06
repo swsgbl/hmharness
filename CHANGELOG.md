@@ -1,3 +1,7 @@
+## [0.23.29] - 2026-10-07
+
+学习 OS 真实数据里程碑（升级包阶段 C 验收）：registerWorldModelTarget（replayIntoWorldModel 训练臂 + 只预测记分器双臂评估，训练集按契约随行）；首个真实学习周期（scripts/real-learning-cycle.mts，555 条真实轨迹种子分割 179/77）——world_model 晋升（Brier 0.118 vs 空白 0.862，2280 未见 holdout 步 86.3% 相对校准改进），skill 诚实拒绝（0.39<0.6，挖掘不泛化）；多种子仪器（real-cycle-multiseed.mts）5/5 种子全晋升（均值 0.871/最小 0.858，符号检验 p=0.031）——分割鲁棒非运气；账本开始积累真实事件
+
 ## [0.23.28] - 2026-10-06
 
 评测四层分层（internal/public 只读摄取/real-user/hidden evaluator 独写——「自进化绝不写 Hidden」从文档愿望变成机器门，训练料污染逐项点名）；首个真实学习目标：registerSkillTarget 把技能挖掘器接进学习目标注册表六要素（holdout 连续包含重放，小样本=拒绝）；轨迹记录器 finish() 排空契约（CI 两连挂根因：固定睡眠对慢盘不成立，改为可等待的确定性落盘保证）
