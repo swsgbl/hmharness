@@ -28,9 +28,13 @@ import { evidenceThreshold } from './continual.ts';
 import type { CognitiveLedger, LedgerEventKind } from './ledger.ts';
 import type { CognitiveTrajectory } from './protocol.ts';
 import { mineWorkflows, type WorkflowCandidate } from './skill-compiler.ts';
+import { WorldModel } from './world-model.ts';
+import { replayIntoWorldModel } from './analysis.ts';
 
 export type TargetTrainer = (plan: LearningPlan, dataset: LearningDataset) => Promise<Candidate>;
-export type TargetEvaluator = (candidate: Candidate, holdout: LearningDataset) => Promise<EvalResult>;
+/** train rides along: deterministic-rebuild evaluators (world_model) need
+ *  the exact training set; evaluators that don't care ignore the 3rd arg. */
+export type TargetEvaluator = (candidate: Candidate, holdout: LearningDataset, train: LearningDataset) => Promise<EvalResult>;
 export type TargetRollback = (candidate: Candidate) => Promise<void>;
 
 export interface PromotionPolicy {
@@ -126,7 +130,7 @@ export class LearningTargetRegistry {
     let evalResult: EvalResult | undefined;
     if (reg.promotionPolicy.requireHoldout) {
       const hold = await reg.holdout();
-      evalResult = await reg.evaluator(candidate, hold);
+      evalResult = await reg.evaluator(candidate, hold, train);
       candidate = { ...candidate, status: 'evaluated', evalResult };
     }
     const evidence = evalResult?.metrics.evidence ?? 0;
@@ -219,5 +223,87 @@ export function registerSkillTarget(
     promotionPolicy: { minEvidence: 0.5, requireHoldout: true, canaryShare: 0.2, ...opts.policy },
     rollback: async () => undefined, // skill rollback is host-side promotion bookkeeping; v0 records intent via the ledger chain
     lineage: { registeredAt: new Date().toISOString(), version: 1, source: opts.lineageSource ?? 'skill-compiler.mineWorkflows' },
+  });
+}
+
+/* -------- the second REAL target: world_model (upgrade pack stage C) --------
+ *
+ * Trainer: replayIntoWorldModel over the TRAIN trajectories (the existing
+ * analysis path - predictions made BEFORE each update, the WM-009 no-leak
+ * discipline). Evaluator: the transfer-lab dual-arm logic on the holdout -
+ * a PREDICT-ONLY scorer (no belief updates) measures Brier for the trained
+ * model vs a FRESH model on the same holdout steps; evidence = the
+ * RELATIVE Brier improvement (baseline - trained) / baseline. Real carried
+ * knowledge shows up exactly when the trained arm predicts unseen steps
+ * better; the registry's world_model bar (0.6) then demands a 60% relative
+ * improvement - deliberately steep, rejections are honest outcomes.
+ * Small-N honesty: fewer than 10 scored holdout steps fails.
+ */
+export interface WorldModelCandidate extends Candidate {
+  environmentId: string;
+  beliefs: number;
+  corrections: number;
+}
+
+function brierScoreOnly(wm: WorldModel, holdout: CognitiveTrajectory[], environmentId: string): { checked: number; brier: number } {
+  let checked = 0;
+  let sum = 0;
+  for (const traj of holdout) {
+    if (traj.environment.id !== environmentId) continue;
+    for (const step of traj.steps) {
+      const p = wm.predict({ action: step.action });
+      const binary = step.outcome === 'success' ? 1 : 0;
+      sum += (p.confidence - binary) ** 2;
+      checked++;
+    }
+  }
+  return { checked, brier: checked > 0 ? Number((sum / checked).toFixed(4)) : 0 };
+}
+
+export function registerWorldModelTarget(
+  registry: LearningTargetRegistry,
+  opts: {
+    environmentId: string;
+    holdout: () => Promise<LearningDataset>;
+    policy?: Partial<PromotionPolicy>;
+    lineageSource?: string;
+  },
+): void {
+  registry.register({
+    target: 'world_model',
+    trainer: async (plan, dataset): Promise<WorldModelCandidate> => {
+      const wm = replayIntoWorldModel(dataset.trajectories, opts.environmentId);
+      const st = wm.worldState;
+      const corrections = st.beliefs.reduce((s, b) => s + (b.corrections?.length ?? 0), 0);
+      return {
+        id: `wm-${plan.opportunityId}-${Math.random().toString(36).slice(2, 8)}`,
+        plan,
+        createdAt: new Date().toISOString(),
+        status: 'draft',
+        environmentId: opts.environmentId,
+        beliefs: st.beliefs.filter((b) => b.id.startsWith('act:')).length,
+        corrections,
+      };
+    },
+    evaluator: async (candidate, holdout, train): Promise<EvalResult> => {
+      // deterministic rebuild from the SAME train set the trainer used - the
+      // evaluator receives the train dataset by contract, so no smuggling
+      const trained = replayIntoWorldModel(train.trajectories, opts.environmentId);
+      const fresh = new WorldModel(opts.environmentId);
+      const t = brierScoreOnly(trained, holdout.trajectories, opts.environmentId);
+      const f = brierScoreOnly(fresh, holdout.trajectories, opts.environmentId);
+      const evidence = f.brier > 0 ? Number(((f.brier - t.brier) / f.brier).toFixed(3)) : 0;
+      const pass = t.checked >= 10 && t.brier < f.brier && evidence >= 0.5;
+      return {
+        candidateId: candidate.id,
+        pass,
+        metrics: { evidence, brierTrained: t.brier, brierFresh: f.brier, checked: t.checked },
+        holdoutSize: holdout.trajectories.length,
+      };
+    },
+    holdout: opts.holdout,
+    promotionPolicy: { minEvidence: 0.5, requireHoldout: true, canaryShare: 0.2, ...opts.policy },
+    rollback: async () => undefined, // world-model rollback = dropping the candidate model; the base model is never mutated in-place
+    lineage: { registeredAt: new Date().toISOString(), version: 1, source: opts.lineageSource ?? 'analysis.replayIntoWorldModel' },
   });
 }
