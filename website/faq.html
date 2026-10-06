@@ -259,7 +259,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <h2><a class="qn" href="#cost-gate">Q14</a>AI 候选会靠「啰嗦」通过基准测试吗？怎么防？</h2>
   <div class="tldr">会，且真实发生过。hmharness 的防法是双保险：判卷用四种断言模式钉死输出形状（一字不差 / 正则 / 禁词表 / 多候选），再加成本门——候选输出 token 成本超过基线 1.3 倍且超出超过 8 个 token 即判「成本回归」，靠啰嗦刷分直接出局。</div>
   <p>成本公式：<code>cand &gt; max(base × 1.3, base + 8)</code>。token 估算按「中日韩字符≈1、ASCII≈1/4」——切回中文灌水同样绕不过帽。乘法帽曾把期望输出只有 4 个 token 的微型考题变成 Hair Trigger（余量仅 1 token，连续 10 个候选被误杀），<code>+8</code> 绝对余量地板修复了它——真啰嗦是 2-10 倍量级，针尖级扰动不该死。成本只否决不判分：通过率门仍是主判据，双指标各管一半。全部判定有 10 个单元测试守护（bench.ts / evolve.ts）。</p>
-  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/evolve.ts">packages/evolution/src/evolve.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/__tests__/gate.test.ts">gate.test.ts</a></p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/evolve.ts">packages/evolution/src/evolve.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/__tests__/gate.test.ts">gate.test.ts</a> · <b>速查表下载：</b><a href="downloads/ai-bench-anticheat.pdf">ai-bench-anticheat.pdf</a>（A4 一页，可自由分发）</p>
 </section>
 
 <section class="qa" id="memory-retrieval">
