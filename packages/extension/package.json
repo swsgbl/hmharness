@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/extension",
-  "version": "0.23.27",
+  "version": "0.23.28",
   "description": "hmharness browser-extension bridge — a loopback server + pairing flow (the ChatGPT desktop-app ↔ extension pattern) that lets the agent see and, with approval, act in the user's REAL browser tabs across Chrome/Edge/Brave (MV3 service worker + side panel), Firefox (MV3 event page + sidebar), and Safari (popup payload via safari-web-extension-converter). Zero runtime dependencies.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,10 +15,10 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.27"
+    "@hmharness/kernel": "0.23.28"
   },
   "devDependencies": {
-    "@hmharness/browser": "0.23.27"
+    "@hmharness/browser": "0.23.28"
   },
   "files": [
     "dist",

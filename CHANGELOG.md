@@ -1,3 +1,7 @@
+## [0.23.28] - 2026-10-06
+
+评测四层分层（internal/public 只读摄取/real-user/hidden evaluator 独写——「自进化绝不写 Hidden」从文档愿望变成机器门，训练料污染逐项点名）；首个真实学习目标：registerSkillTarget 把技能挖掘器接进学习目标注册表六要素（holdout 连续包含重放，小样本=拒绝）；轨迹记录器 finish() 排空契约（CI 两连挂根因：固定睡眠对慢盘不成立，改为可等待的确定性落盘保证）
+
 ## [0.23.27] - 2026-10-06
 
 Cognitive OS 升级包（2026-10-05 pack）P0+P1 九件上线：认知账本（15 类认知事件只增记录+谱系链）、Prediction OS 三预测族统一（outcome/state-delta/edit 一记录形+广义 Brier+学习信号排行）、认知归因（观察 lift，低支持不报数）、学习目标注册表（六要素契约机器强制+model 栏 0.95 严格高于 memory 0.6）、统一评测 12 指标（未测=undefined 绝不补零）、Capability Broker（五资源类八字段令牌+拒认默认+RLM 零继承规则机械化）、Transfer 5×5 矩阵（12 动词抽象空间+重叠≠证据）、Evidence Ledger 统一谱系（canonical lineageId+轴显式可比性）、版本一致性机检（CHANGELOG/门面/简报/16 包全对齐才许发布）

@@ -1,6 +1,11 @@
 {
   "notes": [
     {
+      "v": "0.23.28",
+      "date": "2026-10-06",
+      "note": "评测四层分层守卫（Hidden 只有 evaluator 可写，自进化训练料永不进 Hidden）+ 首个真实学习目标（技能挖掘→holdout 重放→门禁晋升全链）+ 轨迹记录器排空契约（finish 可等待=完成即落盘）"
+    },
+    {
       "v": "0.23.27",
       "date": "2026-10-06",
       "note": "Cognitive OS 升级包 P0+P1 九件上线：认知账本（认知事件只增记录+谱系链）、Prediction OS 三预测族统一、认知归因（观察 lift）、学习目标注册表（六要素契约）、统一评测 12 指标、Capability Broker（拒认默认+RLM 零继承）、Transfer 5×5 矩阵（重叠≠证据）、Evidence Ledger 统一谱系、版本一致性机检接入发布门禁"
