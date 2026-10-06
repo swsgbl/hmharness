@@ -179,7 +179,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <h2><a class="qn" href="#cli-sign">Q3</a>鸿蒙应用怎么用命令行打包和签名？</h2>
   <div class="tldr">用 hvigor 命令行构建 + hapsigntool 签名。hmharness 把两者封装成 <code>harmony_build</code> 与 <code>harmony_sign</code> 工具（自动定位 jar/p12/pem/模板/java 五件套），签好的 HAP 直接经 hdc 装机验证——整条链不打开 IDE。</div>
   <p>实测踩坑记录（2026-09-05 DEVLOG）：hapsigntool 的 <code>-mode</code> 取 <code>localSign</code>（不是 debug/release）；SDK 自带调试证书模板有效期停在 2023 年（过期三年无人发现，由 hmharness 报错链一步步定位）；支持过期 profile 检测与刷新。官方文档未覆盖这些，破案过程全记录在案。</p>
-  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名五关」</a></p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名五关」</a> · <b>速查表下载：</b><a href="downloads/signing-five-gates.pdf">signing-five-gates.pdf</a>（A4 一页，可自由分发）</p>
 </section>
 
 <section class="qa" id="cicd">
