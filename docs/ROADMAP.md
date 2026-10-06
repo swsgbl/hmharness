@@ -83,9 +83,13 @@ failed 按 parentSeq 链;适配器 fromOutcome/fromDelta/fromEdit);④
 制+runCycle 编排+model 栏 0.95 严格高于 memory 0.6)、~~统一评测
 12 指标~~(✓9483d8c 未测=undefined 列入 unmeasured 绝不补零)、
 ~~Capability Broker~~(✓cadb947 五资源类八字段令牌拒认默认+RLM
-零继承规则机械化+风险梯队组合 recommendedIsolation)、Transfer
-OS(12 动词抽象动作空间+5×5 迁移矩阵)、Evidence Ledger v2 统一
-lineage;P2=外
+零继承规则机械化+风险梯队组合 recommendedIsolation)、~~Transfer
+OS~~(✓58060f9 12 动词补齐 create/verify/recover+LITERAL_ENVIRONMENT
+可审计归属表+派生动词集+5×5 矩阵:对角=same-env/无重叠=no-overlap
+/有重叠无对照=overlap-no-evidence 绝不冒充迁移/反向方向同样不豁免)、
+~~Evidence Ledger v2~~(✓2e59527 统一 lineage:canonical sha256 顺
+序无关内容敏感,缺席字段可见不平均掉;轴显式可比性=reportsComparable
+推广;信封=谱系+载荷=可回放);P2=外
 部 Benchmark 四层(Internal/Public/RealUser/Hidden;自进化绝不写
 Hidden)。
 
