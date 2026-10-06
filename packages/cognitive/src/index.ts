@@ -38,4 +38,5 @@ export * from './code-world-model.ts';
 export * from './ledger.ts';
 export * from './prediction-os.ts';
 export * from './credit-assignment.ts';
+export * from './learning-targets.ts';
 export * from './code-world-store.ts';
