@@ -81,6 +81,16 @@ interface PendingCommand {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** One conversational turn as the browser-side chat panel sees it. */
+export interface ChatTurn { role: 'user' | 'assistant'; content: string }
+
+/** What the CLI brain receives per /v1/chat request. */
+export interface ChatTurnInput {
+  message: string;
+  page?: { url?: string; title?: string };
+  history: ChatTurn[];
+}
+
 const EXTENSION_ORIGIN = /^(chrome|moz|safari)-extension:\/\/[^/?#]+/i;
 const LOOPBACK_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
 
@@ -106,6 +116,13 @@ export class ExtensionBridgeServer {
    *  (round 43) — the terminal prints WHO connected, so zero-touch
    *  onboarding still leaves a visible trail. */
   onAutoPair?: (origin: string) => void;
+  /** CLI brain hook (round 45): answers a /v1/chat turn from the browser
+   *  chat panel. Absent → the route answers 503 honestly instead of
+   *  pretending. Throws → 500 with the message. */
+  onChat?: (input: ChatTurnInput) => Promise<string>;
+  /** per-origin chat history — in-memory only, dies with the bridge (the
+   *  transcript is the user's conversation, not a fact we persist) */
+  private readonly chatLog = new Map<string, ChatTurn[]>();
   /** last tabs.push payload — surfaced in status for humans, not used by tools */
   lastTabs: TabInfo[] = [];
 
@@ -266,6 +283,36 @@ export class ExtensionBridgeServer {
       if (!msg) return;
       await this.handleUplink(msg);
       return this.json(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && url === '/v1/chat') {
+      // BROWSER chat panel (round 45): the ChatGPT-extension-style loop —
+      // the user types IN the browser, the CLI-side brain answers. Same
+      // token auth as uplink; the agent secret must NOT work here.
+      if (!this.guardOrigin(req, res)) return;
+      if (!(await this.authorized(req, res))) return;
+      const body = await this.readJson(req, res) as { message?: unknown; reset?: unknown; page?: { url?: unknown; title?: unknown } } | undefined;
+      if (body?.reset === true) {
+        this.chatLog.clear();
+        return this.json(res, 200, { ok: true, reply: '已清空对话。' });
+      }
+      const message = typeof body?.message === 'string' ? body.message.slice(0, 4000).trim() : '';
+      if (!message) return this.fail(res, 400, 'chat needs a message');
+      if (!this.onChat) return this.fail(res, 503, '此桥未接入智能体 — 终端运行 hmh extension start(或 serve)即有大脑');
+      const key = req.headers.origin ?? 'anon';
+      const history = this.chatLog.get(key) ?? [];
+      const page = body?.page && typeof body.page === 'object' ? {
+        url: typeof body.page.url === 'string' ? body.page.url.slice(0, 500) : undefined,
+        title: typeof body.page.title === 'string' ? body.page.title.slice(0, 300) : undefined,
+      } : undefined;
+      try {
+        const reply = (await this.onChat({ message, page, history })).slice(0, 8000);
+        history.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
+        while (history.length > 16) history.shift();
+        this.chatLog.set(key, history);
+        return this.json(res, 200, { ok: true, reply });
+      } catch (err) {
+        return this.json(res, 500, { ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 300) });
+      }
     }
     if (req.method === 'POST' && url === '/v1/agent/command') {
       // AGENT side (tools.ts / client.ts): same loopback, different secret —

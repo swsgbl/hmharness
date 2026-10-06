@@ -21,7 +21,7 @@ export {
 } from './token.ts';
 export {
   DEFAULT_BRIDGE_PORT, ExtensionBridgeServer, bridgePort, probeBridge, readBridgeState, stateFilePath,
-  type BridgeStateFile,
+  type BridgeStateFile, type ChatTurn, type ChatTurnInput,
 } from './bridge.ts';
 export { agentCommand, bridgeFromState, bridgeStatus, type BridgeHandle } from './client.ts';
 export {

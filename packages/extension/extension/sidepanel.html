@@ -6,28 +6,27 @@
   <title>hmharness 桥接 · 侧栏</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <h1><span class="logo"></span>hmharness 浏览器桥接</h1>
+<body class="chat-layout">
+  <h1><span class="logo"></span>hmharness 浏览器助手</h1>
 
   <div class="status"><span class="dot" id="dot"></span><span class="txt" id="status-txt">读取状态…</span></div>
 
-  <div class="row">
-    <input id="port" class="mono" inputmode="numeric" placeholder="端口 7789" spellcheck="false">
-    <button id="setport">设置端口并连接</button>
-  </div>
-  <div class="row">
-    <button id="reconnect">重新连接</button>
-    <button id="open-panel" hidden>在侧栏打开</button>
-    <button id="unpair" style="margin-left:auto">断开并取消授权</button>
-  </div>
+  <div id="chat" aria-live="polite"></div>
 
-  <hr class="sep">
-  <div class="row"><button id="read" style="flex:1">读取当前页（自检）</button></div>
+  <div class="row composer">
+    <input id="chat-input" placeholder="问点什么,例如:总结这个页面" enterkeyhint="send" autocomplete="off">
+    <button id="chat-send" class="primary">发送</button>
+  </div>
+  <div class="row tools-row">
+    <button id="chat-reset">清空对话</button>
+    <button id="read">自检</button>
+    <button id="reconnect">重连</button>
+    <button id="unpair" style="margin-left:auto">断开</button>
+  </div>
   <pre id="out"></pre>
 
-  <p class="hint">桥服务运行时(<b class="mono">hmh extension serve</b>)<b>自动连接,无需任何输入</b>;
-  桥未运行时每 30 秒自动重试,启动 CLI 即连。
-  智能体经 <b class="mono">extension_*</b> 工具读取/操作本浏览器标签页(操作类需逐次批准)。</p>
+  <p class="hint">与 <b>hmh CLI 智能体</b>对话;它可经 <b class="mono">page_read / page_act</b> 读取并操作你当前的标签页(操作当着你的面执行)。
+  桥未运行时每 30 秒自动重试,终端执行 <b class="mono">hmh extension start</b> 即连。</p>
 
   <script src="ui.js"></script>
 </body>

@@ -298,3 +298,76 @@ test('bridge: a stale state file reads as NOT running (bridge killed without cle
   assert.equal(readBridgeState(home), null);
   await rm(home, { recursive: true, force: true });
 });
+
+test('bridge: /v1/chat — token-gated chat panel loop with per-origin history', async () => {
+  const home = await tmpHome();
+  const bridge = new ExtensionBridgeServer({ home });
+  try {
+    const { port } = await bridge.start(0);
+
+    // before ANY wiring: no brain → honest 503, never a fake answer
+    const anon = await fetch(`http://127.0.0.1:${port}/v1/announce`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'chrome-extension://chat1' },
+      body: JSON.stringify({ extBaseUrl: 'chrome-extension://chat1/popup.html', browser: 't' }),
+    }).then((r) => r.json()) as { token?: string };
+    const token = anon.token!;
+    assert.match(token, /^[0-9a-f]{64}$/);
+
+    const chatUrl = `http://127.0.0.1:${port}/v1/chat`;
+    const post = (body: unknown, headers: Record<string, string> = {}) =>
+      fetch(chatUrl, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+
+    const unauthed = await post({ message: 'hi' });
+    assert.equal(unauthed.status, 401, 'chat is token-gated like uplink');
+    const noBrain = await post({ message: 'hi' }, { authorization: `Bearer ${token}` });
+    assert.equal(noBrain.status, 503);
+    assert.match((await noBrain.json()).error, /hmh extension start/);
+    const empty = await post({}, { authorization: `Bearer ${token}` });
+    assert.equal(empty.status, 400);
+
+    // wire a brain that records what it received
+    const seen: Array<{ message: string; history: unknown[]; page?: { url?: string; title?: string } }> = [];
+    bridge.onChat = async (input) => {
+      seen.push({ message: input.message, history: [...input.history], page: input.page });
+      return `答:${input.message}`;
+    };
+
+    const r1 = await post({ message: '你好', page: { url: 'https://example.com/x', title: 'X' } }, { authorization: `Bearer ${token}`, origin: 'chrome-extension://chat1' });
+    const j1 = await r1.json();
+    assert.equal(j1.ok, true);
+    assert.equal(j1.reply, '答:你好');
+    assert.equal(seen[0]!.history.length, 0, 'first turn has no history');
+    assert.equal(seen[0]!.page!.url, 'https://example.com/x');
+
+    // second turn: the first Q/A pair rides along as history
+    await post({ message: '再说一次' }, { authorization: `Bearer ${token}`, origin: 'chrome-extension://chat1' });
+    assert.equal(seen[1]!.history.length, 2);
+    assert.deepEqual(seen[1]!.history[0], { role: 'user', content: '你好' });
+
+    // a DIFFERENT origin's chat does not see this history (per-origin logs)
+    const other = await fetch(`http://127.0.0.1:${port}/v1/announce`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'moz-extension://chat2' },
+      body: JSON.stringify({ extBaseUrl: 'moz-extension://chat2/popup.html', browser: 't' }),
+    }).then((r) => r.json()) as { token: string };
+    await post({ message: '独立会话' }, { authorization: `Bearer ${other.token}`, origin: 'moz-extension://chat2' });
+    assert.equal(seen[2]!.history.length, 0, 'history is per-origin');
+
+    // brain throwing surfaces as 500 with the message — no stack, no fake ok
+    bridge.onChat = async () => { throw new Error('provider 未配置'); };
+    const boom = await post({ message: 'x' }, { authorization: `Bearer ${token}`, origin: 'chrome-extension://chat1' });
+    assert.equal(boom.status, 500);
+    assert.equal((await boom.json()).error, 'provider 未配置');
+
+    // reset clears history for everyone — the reply itself proves the brain saw none
+    bridge.onChat = async (input) => `答(历史${input.history.length}):${input.message}`;
+    await post({ reset: true }, { authorization: `Bearer ${token}` });
+    const r2 = await post({ message: '重置后' }, { authorization: `Bearer ${token}`, origin: 'chrome-extension://chat1' });
+    const j2 = await r2.json();
+    assert.equal(j2.reply, '答(历史0):重置后', 'reset wiped the transcript');
+  } finally {
+    await bridge.stop();
+    await rm(home, { recursive: true, force: true });
+  }
+});

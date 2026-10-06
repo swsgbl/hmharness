@@ -57,3 +57,20 @@ pre#out {
 }
 pre#out:empty { display: none; }
 .sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+
+/* — chat layout (sidepanel): full-height column, transcript grows — */
+body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction: column; }
+#chat {
+  flex: 1; min-height: 120px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 4px 2px; margin: 2px 0 8px;
+}
+.msg { max-width: 92%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+.msg b { display: block; font-size: 11px; color: var(--dim); font-weight: 600; margin-bottom: 2px; }
+.msg span { white-space: pre-wrap; word-break: break-word; }
+.msg.user { align-self: flex-end; border-color: #3c4a63; background: #243043; }
+.msg.bot { align-self: flex-start; }
+.msg.thinking { color: var(--dim); font-style: italic; }
+.composer { margin-bottom: 6px; }
+.tools-row button { padding: 5px 9px; font-size: 12px; }
+body.chat-layout pre#out { max-height: 120px; }

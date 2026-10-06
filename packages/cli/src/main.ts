@@ -541,7 +541,7 @@ usage:
   hmh browser [status|trust|untrust|start|stop|open <url>]
                            BrowserOS AI browser: discovery + trust +
                            the dedicated instance browser_* tools drive
-  hmh extension [serve|pair|status|unpair|build]
+  hmh extension [start|stop|serve|status|install|uninstall|unpair|build]
                            browser-extension bridge: adapt the agent into
                            your REAL browser (Chrome/Edge/Brave, Firefox,
                            Safari payload) — loopback server + pairing
@@ -1075,23 +1075,52 @@ flags:
     if (sub === 'serve') {
       const portArg = rest.find((a) => a.startsWith('--port='));
       const { ExtensionBridgeServer, pairedCount } = await import('@hmharness/extension');
+      const { answerChatTurn } = await import('./extension-chat.ts');
       const bridge = new ExtensionBridgeServer({ home: homeDir() });
       const { port: actual } = await bridge.start(portArg ? Number(portArg.slice(7)) : undefined);
       bridge.onConnectionChange = (connected) => {
         stdout.write(connected ? '\n  ✓ 浏览器扩展已连接\n' : '\n  ✗ 浏览器扩展断开\n');
       };
+      // 侧栏对话面板的大脑:工具环走本桥,provider 走用户配置(routing chat)
+      bridge.onChat = (input) => answerChatTurn(input, {
+        readPage: () => bridge.command('page.read', undefined, 20_000),
+        act: (a) => bridge.command('page.act', { act: a }, 20_000),
+        log: (l) => stdout.write(`  ${DIM(l)}\n`),
+      });
       bridge.onAutoPair = (origin) => {
         stdout.write(`\n  ✓ 扩展自动授权: ${origin}（零操作连接）\n`);
       };
       stdout.write(`hmh 扩展桥已运行: http://127.0.0.1:${actual}（仅本机回环）\n`);
+      stdout.write('  侧栏对话面板已就绪 — 浏览器里点扩展图标 → 在侧栏对话\n');
       const count = await pairedCount(homeDir());
       stdout.write(count > 0
         ? `  已授权浏览器: ${count} 台 — 装有扩展的浏览器启动后自动连接\n`
         : '  装有扩展的浏览器启动后自动连接（零操作;浏览器先开也行,30 秒内自动连上）\n');
-      stdout.write(DIM('  Ctrl-C 停止;状态: hmh extension status;安装到全部浏览器: hmh extension install\n'));
+      stdout.write(DIM('  Ctrl-C 停止;后台常驻: hmh extension start;状态: hmh extension status;安装到全部浏览器: hmh extension install\n'));
       process.once('SIGINT', () => { void bridge.stop().then(() => process.exit(0)); });
       process.once('SIGTERM', () => { void bridge.stop().then(() => process.exit(0)); });
       return; // 桥以前台进程常驻
+    }
+    if (sub === 'start' || sub === 'stop') {
+      // 后台守护(与 hmh web start 同款):装完扩展后终端侧零操作常驻
+      const pArg = rest.find((a) => a.startsWith('--port='));
+      const port = pArg ? Number(pArg.slice(7)) : undefined;
+      const ed = await import('./extension-daemon.ts');
+      if (sub === 'stop') {
+        const killed = ed.stopExtensionDaemon(port);
+        stdout.write(killed ? '已停止扩展桥守护\n' : '守护本就未运行\n');
+        return;
+      }
+      const { probeExtensionDaemon, ensureExtensionDaemon, DEFAULT_EXTENSION_PORT } = ed;
+      const p = port ?? DEFAULT_EXTENSION_PORT;
+      const already = await probeExtensionDaemon(p);
+      if (already.up) { stdout.write(`✓ 扩展桥已在运行: 127.0.0.1:${p} — 无需重复启动\n`); return; }
+      const r = await ensureExtensionDaemon(p);
+      if (!r.up) { stdout.write(`✗ 守护启动失败(详见 ${homeDir()}/extension.log)\n`); return; }
+      stdout.write(`✓ 扩展桥守护已启动(后台,PID 文件 ${homeDir()}/extension.pid)\n`);
+      stdout.write(r.connected ? '  浏览器扩展已连接 — 智能体 extension_* 工具可用\n' : '  装有扩展的浏览器 30 秒内自动连接(浏览器先开也行)\n');
+      stdout.write(DIM('  停止: hmh extension stop;前台调试: hmh extension serve;状态: hmh extension status\n'));
+      return;
     }
     if (sub === 'unpair') {
       const { unpair } = await import('@hmharness/extension');
@@ -1131,6 +1160,14 @@ flags:
         stdout.write(`  · firefox   release 版未签名持久安装需 AMO 签名;当前可用: about:debugging 临时载入(重启后需重载;自动连接不变)\n`);
       }
       stdout.write(DIM('  生效时机: 浏览器重启后常驻;撤销: hmh extension uninstall\n'));
+      // 装完即用:终端侧零操作 —— 直接把桥守护拉起(幂等,已在跑则跳过)
+      try {
+        const { ensureExtensionDaemon } = await import('./extension-daemon.ts');
+        const p = await ensureExtensionDaemon(pArg ? Number(pArg.slice(7)) : undefined);
+        stdout.write(p.up
+          ? `✓ 扩展桥守护已启动(后台) — 浏览器打开后 30 秒内自动连接\n`
+          : DIM('  · 桥守护未能启动 — 手动: hmh extension start\n'));
+      } catch { /* 守护是锦上添花,不阻塞安装报告 */ }
       return;
     }
     if (sub === 'uninstall') {
@@ -1142,11 +1179,16 @@ flags:
     }
     if (sub === 'status') {
       const { discoverExtensionBridge, pairedCount, discoverInstallTargets, installedEverywhere } = await import('@hmharness/extension');
+      const { readExtensionPid } = await import('./extension-daemon.ts');
       const b = await discoverExtensionBridge();
       const count = await pairedCount(homeDir());
-      if (!b.healthy) { stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`); }
+      const pid = readExtensionPid();
+      if (!b.healthy) {
+        stdout.write(`✗ 扩展桥未运行（${b.unhealthyReason}）\n`);
+        stdout.write(DIM('  启动: hmh extension start(后台常驻)\n'));
+      }
       else {
-        stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 已授权浏览器: ${count} 台\n`);
+        stdout.write(`✓ 桥运行中: 127.0.0.1:${b.port} · 已授权浏览器: ${count} 台${pid ? ` · 守护 PID ${pid}` : ' · 前台模式'}\n`);
         stdout.write(b.connected
           ? `  扩展已连接${b.browser ? ' · ' + b.browser : ''}${b.extVersion ? ' v' + b.extVersion : ''} — 智能体 extension_* 工具可用\n`
           : '  扩展未连接 — 浏览器启动/重试后自动连接(桥在跑即可)\n');
@@ -1174,13 +1216,13 @@ flags:
           stdout.write(`  载入: ${r.loadHint}\n`);
           for (const n of r.notes) stdout.write(DIM(`  注: ${n}\n`));
         }
-        stdout.write(DIM('  下一步: hmh extension serve(另开终端)→ 浏览器载入扩展 → 自动连接(零操作)\n'));
+        stdout.write(DIM('  下一步: hmh extension start(后台常驻)→ 浏览器载入扩展 → 自动连接(零操作)\n'));
       } catch (err) {
         stdout.write(`构建失败: ${String(err instanceof Error ? err.message : err).slice(0, 300)}\n`);
       }
       return;
     }
-    stdout.write('用法: hmh extension serve | status | install [--browsers=..] | uninstall | unpair | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入,自动连接)\n');
+    stdout.write('用法: hmh extension start | stop | serve | status | install [--browsers=..] | uninstall | unpair | build [--target=all] [--out=dir] [--port=N] — 浏览器扩展桥(真实浏览器接入,自动连接)\n');
     return;
   }
   if (cmd === 'cognitive') {
