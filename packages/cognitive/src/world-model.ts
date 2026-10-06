@@ -177,6 +177,11 @@ export class WorldModel {
   private deltaHits = 0;
   /** open structured predictions: predictionId -> expected shape (resolved on update) */
   private openDeltaPredictions = new Map<string, string>();
+  /** Cognitive Ledger hook (v0, 2026-10-05 pack): when set, significant
+   *  cognitive changes (belief revisions) are mirrored as ledger events.
+   *  Optional and side-effect-free by contract — a ledger failure must
+   *  never break the model it observes. */
+  ledger?: (kind: 'belief.revised', subject: string, detail: string, confidence?: number) => void;
 
   constructor(environmentId: string) {
     this.state = {
@@ -366,6 +371,9 @@ export class WorldModel {
       const belief = this.state.beliefs.find((b) => b.id === `act:${actionType}`);
       if (belief) {
         belief.corrections = [...(belief.corrections ?? []), { pattern, rule, fromCluster: ev.cluster }];
+        try {
+          this.ledger?.('belief.revised', belief.id, rule, belief.confidence);
+        } catch { /* the ledger must never break the model it observes */ }
       }
       rulesAdded.push({ pattern, rule });
     }
