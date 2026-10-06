@@ -38,6 +38,18 @@ const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 
     throw new Error(`ORDER manifests diverge: preflight missing [${missingInPreflight.join(', ')}], publish missing [${missingInPublish.join(', ')}] — fix BOTH lists`);
   }
 }
+// VERSION CONSISTENCY (2026-10-05 upgrade pack P0-Hygiene): the whole
+// version surface must agree before anything ships — packages, CHANGELOG
+// head, briefing note, website facade. Tag presence is warn-only until
+// tag discipline covers every release.
+{
+  try {
+    execSync('node scripts/version-consistency.cjs', { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', timeout: 60_000 });
+  } catch {
+    console.error('  FAIL version consistency - refusing to publish a version-confused set');
+    process.exit(1);
+  }
+}
 const requested = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
 const packages = requested.length ? requested : ORDER;
 let failures = 0;
