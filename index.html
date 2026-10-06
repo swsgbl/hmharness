@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>hmharness — 自进化的鸿蒙开发智能体框架</title>
-<meta name="description" content="零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。">
+<title>hmharness — 自进化的鸿蒙开发智能体框架，跨环境 Cognitive Runtime</title>
+<meta name="description" content="零依赖内核 + 自进化一等公民 + MCP 生态 + 认知层（世界模型/校准/探索/迁移）。一句话创建鸿蒙工程、构建、装机运行；认知层从经验中学习，有学习曲线为证。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebSite","name":"hmharness","url":"https://swsgbl.github.io/hmharness/","description":"自进化的鸿蒙开发智能体框架(开源 MIT)","inLanguage":"zh-CN"}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"hmharness","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","softwareVersion":"0.18.12","description":"开源鸿蒙开发智能体框架:零 IDE 终端跑通建工程、构建、签名、装机、日志全流程,带双门禁可审计自进化与 MCP 双向生态。","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","programmingLanguage":"TypeScript, Node.js","installUrl":"https://www.npmjs.com/package/@hmharness/cli","author":{"@type":"Organization","name":"hmharness contributors","url":"https://github.com/swsgbl/hmharness"},"sameAs":["https://github.com/swsgbl/hmharness","https://www.npmjs.com/package/@hmharness/cli","https://ndtool.cn/hmharness/"]}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"hmharness","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","softwareVersion":"0.23.27","description":"开源鸿蒙开发智能体框架,跨环境 Cognitive Runtime:零 IDE 终端跑通建工程、构建、签名、装机、日志全流程,带双门禁可审计自进化与 MCP 双向生态;认知层(世界模型/校准/探索/迁移)从经验中学习,有学习曲线为证。","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","programmingLanguage":"TypeScript, Node.js","installUrl":"https://www.npmjs.com/package/@hmharness/cli","author":{"@type":"Organization","name":"hmharness contributors","url":"https://github.com/swsgbl/hmharness"},"sameAs":["https://github.com/swsgbl/hmharness","https://www.npmjs.com/package/@hmharness/cli","https://ndtool.cn/hmharness/"]}
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
 <style>
@@ -92,6 +92,7 @@ footer li{list-style:none;margin:6px 0}
   <div class="logo"><span class="star">✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px;margin-left:6px">hmharness</span></div>
   <div class="navlinks">
     <a href="#features" data-i18n="nav_features">特性</a>
+    <a href="#cognitive" data-i18n="nav_cognitive">认知层</a>
     <a href="#install" data-i18n="nav_install">快速开始</a>
     <a href="#evo" data-i18n="nav_evo">自进化</a>
     <a href="#models" data-i18n="nav_models">模型路由</a>
@@ -139,12 +140,25 @@ footer li{list-style:none;margin:6px 0}
   </div>
 </div></section>
 
+<section id="cognitive" style="padding-top:20px"><div class="wrap">
+  <h2 class="sec" data-i18n="cog_title">认知层 — harness 从经验中学习，有学习曲线为证</h2>
+  <p class="secdesc" data-i18n="cog_lead">世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>五环境曲线全有读数,四环境 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。</p>
+  <div class="cards">
+    <div class="card"><div class="ic">🌐</div><h3 data-i18n="cg1_h">世界模型与校准</h3><p data-i18n="cg1_p">信念表(每动作成功率)+ 预测置信 + 误差聚类 + 可解释修订;每个任务步自动带预测,校准报告按动作列可靠度 — 迁移双臂实验证明 harness 净贡献 <b>+0.4166</b>(LLM 未参与)。</p></div>
+    <div class="card"><div class="ic">🎮</div><h3 data-i18n="cg2_h">ARC-AGI-3 官方桥</h3><p data-i18n="cg2_p">官方 REST API 全桥(cookie 亲和/scorecard/ACTION1-7);帧渲染为图像,视觉模型看帧推理选动作,模型原话随 reasoning 入档;记分卡+行动效率/探索效率指标。</p></div>
+    <div class="card"><div class="ic">🔀</div><h3 data-i18n="cg3_h">跨环境迁移</h3><p data-i18n="cg3_p">显式抽象动作层(writeFile→@write / hdc-install→@install);双臂对照实验(源环境信念播种 vs 空白,同预算只差知识);迁移矩阵面板。</p></div>
+    <div class="card"><div class="ic">🧾</div><h3 data-i18n="cg4_h">五层记忆 + 数据治理</h3><p data-i18n="cg4_p">working/episodic/semantic/procedural/world 五层,只增不删+完整溯源(来源/会话/环境/时间);矛盾检测打标待审;<code>cognitive export</code> 单文件全量导出、<code>purge</code> 显式确认删除。</p></div>
+    <div class="card"><div class="ic">🤖</div><h3 data-i18n="cg5_h">多智能体治理</h3><p data-i18n="cg5_p">spawn_agent 全部走角色契约拓扑 + 共享预算 + 跨进程不可变审计(<code>multi-agent.jsonl</code>);supervisor 可看心跳/超时/取消级联。</p></div>
+    <div class="card"><div class="ic">📱</div><h3 data-i18n="cg6_h">手机远程控制</h3><p data-i18n="cg6_p">WiFi 扫码直连(免密)+ cloudflared 免费隧道互联网模式(6 位配对密码);配对会话持久化,服务器重启不重扫;断线自动重连。</p></div>
+  </div>
+</div></section>
+
 <section style="padding-top:20px"><div class="wrap">
   <div class="stats">
-    <div class="stat"><b>11</b><span data-i18n="s1">单仓 11 包</span></div>
+    <div class="stat"><b>13</b><span data-i18n="s1">单仓 13 包</span></div>
     <div class="stat"><b>0</b><span data-i18n="s2">运行时依赖(内核)</span></div>
-    <div class="stat"><b>524</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
-    <div class="stat"><b>2</b><span data-i18n="s4">门禁(训练+保留)</span></div>
+    <div class="stat"><b>809</b><span data-i18n="s3">单元测试(CI 全绿)</span></div>
+    <div class="stat"><b>5</b><span data-i18n="s4">环境适配器</span></div>
   </div>
 </div></section>
 
@@ -282,9 +296,9 @@ hero.from('.term-body span', { autoAlpha: 0, duration: 0.18, stagger: 0.05, clea
 /* ---- i18n ---- */
 const I18N = {
   zh: {
-    _title: 'hmharness — 自进化的鸿蒙开发智能体框架',
-    _desc: '零依赖内核 + 自进化一等公民 + MCP 生态。一句话创建鸿蒙工程、构建、装机运行、模拟器全生命周期管理;带双门禁自进化循环。',
-    nav_features: '特性', nav_install: '快速开始', nav_evo: '自进化', nav_models: '模型路由', nav_evidence: '证据', nav_faq: 'FAQ',
+    _title: 'hmharness — 自进化的鸿蒙开发智能体框架，跨环境 Cognitive Runtime',
+    _desc: '零依赖内核 + 自进化一等公民 + MCP 生态 + 认知层（世界模型/校准/探索/迁移）。一句话创建鸿蒙工程、构建、装机运行；认知层从经验中学习，有学习曲线为证。',
+    nav_features: '特性', nav_cognitive: '认知层', nav_install: '快速开始', nav_evo: '自进化', nav_models: '模型路由', nav_evidence: '证据', nav_faq: 'FAQ',
     hero_tag: '自 进 化 · 零 依 赖',
     hero_sub: '为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架 —— 零依赖内核 + 自进化一等公民 + MCP 生态借力。一句话创建工程、构建、装机、跑模拟器;每一步进化都有基准门禁与回滚。',
     cta_github: '⭐ GitHub 开源', cta_start: '四步上手',
@@ -302,7 +316,15 @@ const I18N = {
     c8_h: '安全内建', c8_p: 'deny-first 审批门禁做进循环内核;破坏性命令模式硬拒绝;进化提案过防投毒筛选;会话全量追加式审计;<code>hmh state backup</code> 进化状态一键快照与恢复。',
     c9_h: '国际化 & 多厂商', c9_p: 'zh / en 双语界面与系统提示(<code>--locale=en</code>);任意 OpenAI 兼容厂商按用途路由(chat / vision / evolve / bench)。',
     c10_h: '模型感知上下文工程', c10_p: '上下文窗口登记表,压缩预算随模型窗口自适应(128K=旧默认,未知模型零变化);超长会话滚动摘要(被逐内容先蒸馏再丢弃);工作区记忆隔离;可选 embedding 混合检索。',
-    s1: '单仓 11 包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '门禁(训练+保留)',
+    cog_title: '认知层 — harness 从经验中学习，有学习曲线为证',
+    cog_lead: '世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>五环境曲线全有读数,四环境 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。',
+    cg1_h: '世界模型与校准', cg1_p: '信念表(每动作成功率)+ 预测置信 + 误差聚类 + 可解释修订;每个任务步自动带预测,校准报告按动作列可靠度 — 迁移双臂实验证明 harness 净贡献 <b>+0.4166</b>(LLM 未参与)。',
+    cg2_h: 'ARC-AGI-3 官方桥', cg2_p: '官方 REST API 全桥(cookie 亲和/scorecard/ACTION1-7);帧渲染为图像,视觉模型看帧推理选动作,模型原话随 reasoning 入档;记分卡+行动效率/探索效率指标。',
+    cg3_h: '跨环境迁移', cg3_p: '显式抽象动作层(writeFile→@write / hdc-install→@install);双臂对照实验(源环境信念播种 vs 空白,同预算只差知识);迁移矩阵面板。',
+    cg4_h: '五层记忆 + 数据治理', cg4_p: 'working/episodic/semantic/procedural/world 五层,只增不删+完整溯源(来源/会话/环境/时间);矛盾检测打标待审;<code>cognitive export</code> 单文件全量导出、<code>purge</code> 显式确认删除。',
+    cg5_h: '多智能体治理', cg5_p: 'spawn_agent 全部走角色契约拓扑 + 共享预算 + 跨进程不可变审计(<code>multi-agent.jsonl</code>);supervisor 可看心跳/超时/取消级联。',
+    cg6_h: '手机远程控制', cg6_p: 'WiFi 扫码直连(免密)+ cloudflared 免费隧道互联网模式(6 位配对密码);配对会话持久化,服务器重启不重扫;断线自动重连。',
+    s1: '单仓 13 包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '环境适配器',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
     ins1: 'npm 安装(已发布,零构建)',
@@ -321,9 +343,9 @@ const I18N = {
     _langBtn: 'EN'
   },
   en: {
-    _title: 'hmharness — self-evolving agent framework for HarmonyOS development',
-    _desc: 'Zero-dependency kernel + first-class self-evolution + MCP ecosystem. Scaffold, build, install and run HarmonyOS apps in one sentence; every evolution step is gated and reversible.',
-    nav_features: 'Features', nav_install: 'Quick Start', nav_evo: 'Self-Evolving', nav_models: 'Model Routing', nav_evidence: 'Evidence', nav_faq: 'FAQ',
+    _title: 'hmharness — self-evolving agent framework for HarmonyOS, cross-environment Cognitive Runtime',
+    _desc: 'Zero-dependency kernel + first-class self-evolution + MCP ecosystem + a cognitive layer (world model / calibration / exploration / transfer). Scaffold, build and run HarmonyOS apps in one sentence; the cognitive layer learns from experience — learning curves included.',
+    nav_features: 'Features', nav_cognitive: 'Cognitive', nav_install: 'Quick Start', nav_evo: 'Self-Evolving', nav_models: 'Model Routing', nav_evidence: 'Evidence', nav_faq: 'FAQ',
     hero_tag: 'S E L F - E V O L V I N G · Z E R O - D E P',
     hero_sub: 'A self-evolving agent framework for the full HarmonyOS development lifecycle — a zero-dependency kernel, evolution as a first-class citizen, and the MCP ecosystem on tap. Scaffold, build, install and run in one sentence; every evolution step is benchmark-gated and reversible.',
     cta_github: '⭐ Star on GitHub', cta_start: 'Quick Start',
@@ -341,7 +363,15 @@ const I18N = {
     c8_h: 'Safety Baked In', c8_p: 'A deny-first approval gate lives in the loop kernel itself; destructive command patterns are hard-denied; evolution proposals pass a poisoning screen; sessions are append-only audited; <code>hmh state backup</code> snapshots and restores the evolution state.',
     c9_h: 'i18n & Multi-Provider', c9_p: 'Bilingual zh/en UI and system prompts (<code>--locale=en</code>); any OpenAI-compatible provider, routed per purpose (chat / vision / evolve / bench).',
     c10_h: 'Model-Aware Context Engineering', c10_p: 'A context-window registry scales the compaction budget to each model (128K = the legacy default; unknown models unchanged). Long sessions get a rolling digest (evicted content is distilled, not dropped); workspace-scoped memory; optional embedding hybrid retrieval.',
-    s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'gates (training + holdout)',
+    cog_title: 'Cognitive Layer — the harness learns from experience, learning curves included',
+    cog_lead: 'The world model learns from every task\u2019s tool trajectories and feeds the system prompt back; the exploration engine probes the actions the model predicts worst (prediction error = information gain); calibration reliability improves with use — <b>all five environments have curve readings, four of them improving</b>. Not a claim: it\u2019s the output of <code>hmh cognitive calibration --trend</code>.',
+    cg1_h: 'World Model & Calibration', cg1_p: 'Belief table (per-action success rate) + prediction confidence + error clustering + explainable revision; every task step carries a prediction automatically, and the calibration report lists per-action reliability — the two-arm transfer experiment proved a harness net contribution of <b>+0.4166</b> (no LLM involved).',
+    cg2_h: 'ARC-AGI-3 Official Bridge', cg2_p: 'Full bridge to the official REST API (cookie affinity / scorecards / ACTION1-7); frames rendered to images so a vision model sees, reasons and picks actions — the model\u2019s own words archived with each action as reasoning; scorecards plus action/exploration-efficiency metrics.',
+    cg3_h: 'Cross-Environment Transfer', cg3_p: 'An explicit abstract-action layer (writeFile→@write / hdc-install→@install); two-arm controlled experiments (source-environment belief seeding vs blank, same budget, only knowledge differs); a transfer-matrix panel.',
+    cg4_h: 'Five-Layer Memory + Data Governance', cg4_p: 'working/episodic/semantic/procedural/world — append-only with full provenance (source/session/environment/time); contradiction detection flags for review; <code>cognitive export</code> dumps everything to one file, <code>purge</code> deletes with explicit confirmation.',
+    cg5_h: 'Multi-Agent Governance', cg5_p: 'Every spawn_agent runs under a role-contract topology + shared budgets + cross-process immutable audit (<code>multi-agent.jsonl</code>); the supervisor sees heartbeats/timeouts/cancel cascades.',
+    cg6_h: 'Phone Remote Control', cg6_p: 'WiFi scan-to-connect (passwordless) + cloudflared free-tunnel internet mode (6-digit pairing PIN); pairing sessions persist across server restarts; automatic reconnection.',
+    s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'environment adapters',
     ins_title: 'Quick Start in Four Steps',
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
     ins1: 'Install via npm (published, zero build)',
