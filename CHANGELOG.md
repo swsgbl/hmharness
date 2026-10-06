@@ -1,3 +1,7 @@
+## [0.23.27] - 2026-10-06
+
+Cognitive OS 升级包（2026-10-05 pack）P0+P1 九件上线：认知账本（15 类认知事件只增记录+谱系链）、Prediction OS 三预测族统一（outcome/state-delta/edit 一记录形+广义 Brier+学习信号排行）、认知归因（观察 lift，低支持不报数）、学习目标注册表（六要素契约机器强制+model 栏 0.95 严格高于 memory 0.6）、统一评测 12 指标（未测=undefined 绝不补零）、Capability Broker（五资源类八字段令牌+拒认默认+RLM 零继承规则机械化）、Transfer 5×5 矩阵（12 动词抽象空间+重叠≠证据）、Evidence Ledger 统一谱系（canonical lineageId+轴显式可比性）、版本一致性机检（CHANGELOG/门面/简报/16 包全对齐才许发布）
+
 ## [0.23.26] - 2026-10-06
 
 会话独立运行（对标 dsh 3080）：多会话真并行——每会话独立子进程/队列/审批/中断，输入区跟随当前会话；端口收复只驱逐自家族守护（extension serve 等不再被误杀）；侧栏各会话显示运行状态点
