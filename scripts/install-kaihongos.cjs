@@ -51,9 +51,9 @@ const PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
 
 // Known-good pin set (offline fallback when the registry is unreachable).
 const FALLBACK_PINS = {
-  cli: '0.23.27', web: '0.23.27', agent: '0.23.27', kernel: '0.23.27',
-  sandbox: '0.23.27', evolution: '0.23.27', 'domain-ops': '0.23.27',
-  evaluation: '0.23.27', observability: '0.23.27', 'domain-harmony': '0.23.27',
+  cli: '0.23.28', web: '0.23.28', agent: '0.23.28', kernel: '0.23.28',
+  sandbox: '0.23.28', evolution: '0.23.28', 'domain-ops': '0.23.28',
+  evaluation: '0.23.28', observability: '0.23.28', 'domain-harmony': '0.23.28',
 };
 
 // ---------- helpers ---------------------------------------------------------
