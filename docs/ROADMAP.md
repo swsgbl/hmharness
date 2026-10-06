@@ -66,6 +66,27 @@ Model**(审计五类本体+编辑预测先行/实际后置/误差结算;LSP 传�
 LiveCodeWmSensor 活体同步:openDoc→symbols→入模));⑥**flaky 根修**
 (run.started→run.created 一行错配,摘录步兑现)。
 
+**2026-10-05 升级包计划池(0.24-0.30 Evolution Program,纲领=从
+Build 切换到 Prove and Evolve)**:P0 四件已全落——①**P0-Hygiene**
+(CHANGELOG 补账 0.23.14→0.23.26+括号段声明 DEVLOG/ROADMAP 为权威;
+version-consistency.cjs 机检 16 包/CHANGELOG 头/简报条目/门面四文件,
+接入 preflight 拒发版本混乱集;发布 tag 补建 v0.23.24-26);②
+**Cognitive Ledger v0**(十五类认知事件只增账本,parentSeq 谱系链,
+HMH_HOME/cognitive/ledger.jsonl 腐行跳过计数;WorldModel.revise 钩
+子镜像 belief.revised,账本抛错不断模型);③**Prediction OS 统一
+schema**(三预测族——outcome/state-delta/edit——一个记录形+聚合
+报告:广义 Brier/worstErrors 学习信号喂探索/账本镜像 made→confirmed/
+failed 按 parentSeq 链;适配器 fromOutcome/fromDelta/fromEdit);④
+**Credit Assignment v0**(读账本,观察 lift=P(confirmed|在窗)−P
+(confirmed|不在窗),复用 wm-causal 语义,低支持=证据不足不报数,
+恒标 observational)。**P1 待做**:Learning Target Registry(每目标
+trainer/evaluator/holdout/canary/rollback/lineage)、Capability
+Broker+风险分级隔离(Worker→Process→Container→microVM)、Transfer
+OS(12 动词抽象动作空间+5×5 迁移矩阵)、Evidence Ledger v2 统一
+lineage、统一评测 12 指标(恢复率/人工干预率/安全违规率);P2=外
+部 Benchmark 四层(Internal/Public/RealUser/Hidden;自进化绝不写
+Hidden)。
+
 **第 16 包 @hmharness/extension(2026-10-04,0.23.23 首版上 npm)**:
 BrowserOS 原生扩展面(bridge/protocol/tools/adapters/page/build);
 双清单陷阱第三次复发后**守卫机制化**(preflight 读 publish.cjs 的
