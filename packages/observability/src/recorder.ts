@@ -13,7 +13,12 @@ import { brief, type EventActor, type RunEvent, type RunEventType, type RunMetri
 export interface TrajectoryRecorder {
   readonly runId: string;
   emit(type: RunEventType | string, actor: EventActor, payload: unknown, parentEventId?: string): void;
-  finish(outcome: RunOutcome, metrics?: RunMetrics): void;
+  /** resolves once every queued append AND the summary write are durable.
+   *  Fire-and-forget callers may ignore the promise (ADR-0001 unchanged);
+   *  awaiting it is the DETERMINISTIC contract that a finished run is fully
+   *  persisted - a fixed sleep can never guarantee that on a slow disk
+   *  (the CI-only flake this replaces). */
+  finish(outcome: RunOutcome, metrics?: RunMetrics): Promise<void>;
 }
 
 export function newRunId(now = new Date()): string {
@@ -41,7 +46,7 @@ export function createTrajectoryRecorder(home: string, meta: { task: string; mod
     runId,
     emit,
     finish(outcome, metrics) {
-      if (finished) return;
+      if (finished) return Promise.resolve();
       finished = true;
       emit(outcome.success ? 'run.completed' : 'run.failed', 'system', { ...outcome, ...metrics });
       push(async () => {
@@ -50,6 +55,7 @@ export function createTrajectoryRecorder(home: string, meta: { task: string; mod
           startedAt, finishedAt: new Date().toISOString(), outcome, metrics,
         } as Parameters<TrajectoryStore['saveSummary']>[1], seq);
       });
+      return chain; // the tail includes the summary write - awaiting = durable
     },
   };
 }

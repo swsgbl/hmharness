@@ -13,9 +13,7 @@ test('store: append -> getRun -> export round trip', async () => {
     r.emit('context.assembled', 'system', { systemChars: 1234 });
     r.emit('tool.requested', 'tool', { name: 'harmony_build', args: 'module=entry' });
     r.emit('tool.denied', 'system', { name: 'harmony_build' });
-    r.finish({ success: true, reason: 'final' }, { turns: 3, toolUses: 1, durationMs: 1200 });
-    // recorder appends are queued; wait for the chain to drain (finish is last)
-    await new Promise((res) => setTimeout(res, 150));
+    await r.finish({ success: true, reason: 'final' }, { turns: 3, toolUses: 1, durationMs: 1200 }); // the deterministic drain contract - no fixed sleep can guarantee persistence on a slow disk
 
     const t = await store.getRun(r.runId);
     assert.equal(t.task, 'build the app');
