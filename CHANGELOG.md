@@ -1,3 +1,7 @@
+## [0.23.30] - 2026-10-07
+
+0.24 研究里程碑：Prediction-to-Action 三臂仪器跨环境证据（训练臂全环境胜空白臂；判别力随动作词表丰富度上升，harmonyos 0.705-0.966）；认知账本 2.0（五新事件类+beliefVersion+descendants=可回放认知 DAG）；Skill 2.0 schema（扩展型六要素，诚实适配器）；泛化实验室首析（0.39 拒绝=触发/前置条件轴主导，修复方向=前置条件挖掘+技能族，非降门槛）；Web 7788 事实地图+运行八态机（规划/验证/恢复/完成/失败可见化）
+
 ## [0.23.29] - 2026-10-07
 
 学习 OS 真实数据里程碑（升级包阶段 C 验收）：registerWorldModelTarget（replayIntoWorldModel 训练臂 + 只预测记分器双臂评估，训练集按契约随行）；首个真实学习周期（scripts/real-learning-cycle.mts，555 条真实轨迹种子分割 179/77）——world_model 晋升（Brier 0.118 vs 空白 0.862，2280 未见 holdout 步 86.3% 相对校准改进），skill 诚实拒绝（0.39<0.6，挖掘不泛化）；多种子仪器（real-cycle-multiseed.mts）5/5 种子全晋升（均值 0.871/最小 0.858，符号检验 p=0.031）——分割鲁棒非运气；账本开始积累真实事件
