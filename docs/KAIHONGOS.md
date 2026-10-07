@@ -22,14 +22,18 @@ node scripts/install-kaihongos.cjs            # 装最新版（从 npm registry 
 node scripts/install-kaihongos.cjs --bin-only # 只修复启动器（不下载）
 ```
 
-安装器做五件事，每件都对应下面一条"坑"：
+安装器做六件事，每件都对应下面一条"坑"：
 
 1. 找到可用的 Node ≥ 22（当前进程 / `dsh-pack/node` / `.ohos/node` / PATH）；
 2. 从 registry.npmjs.org 解析 `@hmharness/*` 版本集（断网时退回内置已知良好版本）；
-3. 下载 10 个官方 tarball，解包到 `/data/local/home/.local/hmharness/node_modules`
+   包清单**动态发现**（内置下限 ∪ 最新 cli 声明的全部第一方依赖），上游新增包自动跟进；
+3. 下载全部官方 tarball，解包到 `/data/local/home/.local/hmharness/node_modules`
    （暂存 → 校验 → 原子切换，旧版本保留为 `node_modules.bak`）；
 4. 生成加固启动器并装到**三个位置**（见坑 3/4）；
-5. 首次运行自动执行 `hmh init` 建立状态目录和空白配置（绝不覆盖已有配置）。
+5. 安装**自愈层**（见坑 10）：`heal-tree.cjs` 落到 `~/.hmharness/`，启动钩子并入
+   `~/.config/apikeys.env`（幂等，不影响你已有的密钥）——每次 `hmh` 启动前校验/修复
+   vendor 树，自动升级造成的缺包下次启动即自动补齐；
+6. 首次运行自动执行 `hmh init` 建立状态目录和空白配置（绝不覆盖已有配置）。
 
 装完只有一步人工操作——填密钥：
 
@@ -147,6 +151,32 @@ vi /data/local/home/.hmharness/config.json
 （inode 从 `/proc/net/tcp` 端口十六进制行取）找到后 kill。
 日常一律用 `hmh web start / stop / status`，不要手动 nohup。
 
+### 坑 10：安装器硬编码包清单滞后 → 每次自动升级后缺包崩溃（已修复）
+
+**症状**：`hmh tui` 报
+`Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@hmharness/cognitive'`
+（或 `environments` / `lsp` / `browser` / `extension`，随版本变化）。
+
+**根因**：历史上的板级安装器把包清单**硬编码为 10 个名字**，而上游几乎每个
+版本都在新增第一方包（实测时间线：cognitive → environments → lsp → browser
+→ extension）。板上自动升级（`via: "board-installer"`）每次都用**新 tarball 里
+内嵌的安装器**重装 vendor 树——清单永远滞后，于是每次升级都装出缺包的树；
+手动补的包、往树里打的补丁，随旧树一起被下一次升级冲掉，死循环。
+
+**对策（两层，均已内置）**：
+
+1. **动态包集**：安装器的清单改为"内置下限 ∪ 最新 cli 在 registry 上声明的
+   全部 `@hmharness/*` 依赖"——上游再加新包也不用改安装器。
+2. **自愈层**：`heal-tree.cjs`（装在 `~/.hmharness/`，升级流程永不触碰）+
+   启动钩子（并入 `~/.config/apikeys.env`，官方启动器模板每次 exec CLI 前必然
+   source 它）。自愈脚本**不靠清单**：对树做依赖图 BFS + 产物代码 import 扫描，
+   得出真实所需包集，缺哪个从 registry 下载哪个；断网时从 `node_modules.bak`
+   同版本离线恢复；顺带把完整包集写回树内嵌安装器，让下一次自动升级本身就
+   完整。树完整时空转开销约 0.1 秒；失败绝不阻塞启动。
+
+日志：`~/.hmharness/heal.log`（自动限幅 256KB）。手动触发：
+`node ~/.hmharness/heal-tree.cjs`。旧版装出的板子重跑一次安装命令即获得自愈层。
+
 ## 卸载 / 更新
 
 ```bash
@@ -155,4 +185,4 @@ rm -rf /data/local/home/.local/hmharness      # 卸载本体
 mount -o remount,rw / && rm -f /system/bin/hmh /usr/local/bin/hmh && mount -o remount,ro /
 ```
 
-**自动更新（≥0.23.16）**：板上的 `hmh` 启动时检测到新版会自动调用随包发布的板级安装器在后台静默升级（不弹提示、不需要 npm）——手动重跑上面的安装命令只在离线兜底或想立即强制刷新时才需要。升级来源与结果记录在 `~/.hmharness/updating.lck`（`via: "board-installer"`）与 `update.log`。
+**自动更新（≥0.23.16）**：板上的 `hmh` 启动时检测到新版会自动调用随包发布的板级安装器在后台静默升级（不弹提示、不需要 npm）——手动重跑上面的安装命令只在离线兜底或想立即强制刷新时才需要。升级来源与结果记录在 `~/.hmharness/updating.lck`（`via: "board-installer"`）与 `update.log`。安装器带自愈层（见坑 10）后，升级即便装出缺包的树，下一次 `hmh` 启动前也会自动补齐，不再出现 `ERR_MODULE_NOT_FOUND`。

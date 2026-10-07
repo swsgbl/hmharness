@@ -10,7 +10,7 @@
 //   1. locates a usable Node >= 22 (the running one, or known board paths)
 //   2. resolves the @hmharness/* version set from registry.npmjs.org
 //      (offline fallback: known-good pins below)
-//   3. downloads the 10 first-party tarballs and unpacks them under
+//   3. downloads the first-party tarballs and unpacks them under
 //      <BOARD_HOME>/.local/hmharness/node_modules  (staged, verified, swapped)
 //   4. writes a hardened launcher and installs it into THREE locations:
 //        <BOARD_HOME>/.local/bin/hmh   (user path, always writable)
@@ -19,11 +19,14 @@
 //                                        ALSO visible inside isolated
 //                                        tmpfs mount-namespace terminals
 //                                        where /bin -> /system/bin)
-//   5. first run: `hmh init` if config.json is missing
+//   5. installs the SELF-HEAL layer (heal-tree.cjs + a launcher-sourced hook):
+//      the package set below is a FLOOR, extendHeal covers the rest — see
+//      "why the heal layer exists" above installHealLayer()
+//   6. first run: `hmh init` if config.json is missing
 //
 // Usage:
 //   node install-kaihongos.cjs                 # install/upgrade to latest
-//   node install-kaihongos.cjs --bin-only      # only (re)write launchers
+//   node install-kaihongos.cjs --bin-only      # only (re)write launchers+heal
 //   node install-kaihongos.cjs --home=/x       # non-default board home
 //
 // Only Node core modules are used; tar extraction uses busybox tar.
@@ -46,14 +49,25 @@ const ROOT = path.join(BOARD_HOME, '.local', 'hmharness');
 const NM = path.join(ROOT, 'node_modules');
 const HMH_HOME = path.join(BOARD_HOME, '.hmharness');
 const REG = 'https://registry.npmjs.org';
-const PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
-  'domain-ops', 'evaluation', 'observability', 'domain-harmony'];
+// FLOOR list only. resolveVersions() unions this with whatever the latest cli
+// DECLARES as first-party deps, so new first-party packages are picked up
+// without editing this file — the historical failure mode was exactly that
+// lag: the list said 10 while cli had grown to 15 (cognitive, environments,
+// lsp, browser, extension ...), every auto-update shipped an incomplete tree
+// and the next launch died with ERR_MODULE_NOT_FOUND.
+let PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
+  'domain-ops', 'evaluation', 'observability', 'domain-harmony',
+  'cognitive', 'environments', 'lsp', 'browser', 'extension'];
 
 // Known-good pin set (offline fallback when the registry is unreachable).
+// The release bot keeps versions synced; the NAMES must cover the full
+// first-party set so the offline path cannot produce an incomplete tree.
 const FALLBACK_PINS = {
   cli: '0.23.29', web: '0.23.29', agent: '0.23.29', kernel: '0.23.29',
   sandbox: '0.23.29', evolution: '0.23.29', 'domain-ops': '0.23.29',
   evaluation: '0.23.29', observability: '0.23.29', 'domain-harmony': '0.23.29',
+  cognitive: '0.23.29', environments: '0.23.29', lsp: '0.23.29',
+  browser: '0.23.29', extension: '0.23.29',
 };
 
 // ---------- helpers ---------------------------------------------------------
@@ -118,12 +132,23 @@ async function resolveVersions() {
   const meta = await httpsJSON(REG + '/@hmharness/cli');
   const cliLatest = meta['dist-tags'].latest;
   const deps = (meta.versions[cliLatest].dependencies) || {};
+  // dynamic package set: floor ∪ first-party deps the latest cli declares —
+  // new upstream packages ride along without this file being touched
+  const names = new Set(PACKAGES);
+  for (const d of Object.keys(deps)) {
+    if (d.startsWith('@hmharness/')) names.add(d.slice('@hmharness/'.length));
+  }
+  names.delete('cli');
+  PACKAGES = ['cli', ...[...names].sort()];
+  log('  package set (' + PACKAGES.length + '): ' + PACKAGES.join(', '));
   const pins = { cli: cliLatest };
   for (const n of PACKAGES.slice(1)) {
     const want = deps['@hmharness/' + n];
     if (want && want !== '*') { pins[n] = want.replace(/[^0-9.]/g, ''); continue; }
-    const m = await httpsJSON(REG + '/@hmharness/' + n);
-    pins[n] = m['dist-tags'].latest;
+    // not declared by the latest cli: pin to the cli version itself —
+    // first-party packages release in lockstep, and a per-package dist-tag
+    // lookup can drift or 404 for brand-new names
+    pins[n] = cliLatest;
   }
   return pins;
 }
@@ -199,6 +224,70 @@ function writeLauncher(nodeBin) {
   }
 }
 
+// ---------- self-heal layer --------------------------------------------------
+// Why: the board auto-update channel re-runs THIS installer from inside the
+// freshly downloaded npm package. Even with the dynamic package set above,
+// belt-and-braces says the installed tree should be able to repair itself:
+// a package renamed, split, or added between releases cannot brick the
+// board install. The heal script discovers required @hmharness/* packages
+// from the tree ITSELF (deps graph BFS + a static import scan of built
+// code), so it never goes stale the way any hardcoded list does.
+//
+// Two pieces are installed, both OUTSIDE node_modules (which every update
+// swaps wholesale):
+//   1. <HMH_HOME>/heal-tree.cjs        — the repair script (this file's
+//      sibling twin: scripts/heal-tree.cjs / packages/cli/board/heal-tree.cjs)
+//   2. a marked hook block in <BOARD_HOME>/.config/apikeys.env — the stock
+//      launcher template always sources that file before exec'ing the CLI,
+//      and the updater never touches user config, so it is the one durable
+//      pre-start hook point. A no-op heal run costs ~0.1s; failures never
+//      block startup.
+const HEAL_HOOK_BEGIN = '# >>> hmh board self-heal hook (installed by install-kaihongos.cjs; keep) <<<';
+const HEAL_HOOK_END = '# <<< end hmh board self-heal hook >>>';
+
+function healHookSource() {
+  return [
+    HEAL_HOOK_BEGIN,
+    '# Runs heal-tree.cjs BEFORE the CLI starts: verifies the vendor tree is',
+    '# complete and repairs it (registry, or node_modules.bak offline) when an',
+    '# auto-update left packages missing. No-op cost ~0.1s; never blocks start.',
+    'if [ -d ' + NM + '/@hmharness ]; then',
+    '  _HMH_HEAL_NODE="${HNODE:-' + path.join(BOARD_HOME, 'dsh-pack/node/bin/node.bin') + '}"',
+    '  if [ -x "$_HMH_HEAL_NODE" ]; then',
+    '    HMH_BOARD_HOME="' + BOARD_HOME + '" \\',
+    '      "$_HMH_HEAL_NODE" ' + path.join(HMH_HOME, 'heal-tree.cjs') + ' >>' + path.join(HMH_HOME, 'heal.log') + ' 2>&1 \\',
+    '      || echo "hmh: self-heal could not complete (see ' + path.join(HMH_HOME, 'heal.log') + ') — starting anyway" >&2',
+    '  fi',
+    'fi',
+    'unset _HMH_HEAL_NODE',
+    HEAL_HOOK_END,
+    '',
+  ].join('\n');
+}
+
+function installHealLayer() {
+  const sibling = path.join(__dirname, 'heal-tree.cjs');
+  if (!fs.existsSync(sibling)) { log('warn: heal-tree.cjs not found beside installer — self-heal layer NOT installed'); return; }
+  const healDst = path.join(HMH_HOME, 'heal-tree.cjs');
+  fs.mkdirSync(HMH_HOME, { recursive: true });
+  fs.writeFileSync(healDst, fs.readFileSync(sibling, 'utf8'));
+  fs.chmodSync(healDst, 0o600);
+  log('heal: ' + healDst);
+
+  // merge the hook into apikeys.env, preserving whatever the user keeps there
+  const envFile = path.join(BOARD_HOME, '.config', 'apikeys.env');
+  fs.mkdirSync(path.dirname(envFile), { recursive: true });
+  let prev = '';
+  try { prev = fs.readFileSync(envFile, 'utf8'); } catch (_) { /* new */ }
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripped = prev
+    .replace(new RegExp(esc(HEAL_HOOK_BEGIN) + '[\\s\\S]*?' + esc(HEAL_HOOK_END) + '\\n?', 'g'), '')
+    .replace(/\n{3,}/g, '\n\n');
+  const next = (stripped.endsWith('\n') || stripped === '' ? stripped : stripped + '\n') + healHookSource();
+  fs.writeFileSync(envFile, next);
+  log('heal hook: ' + envFile + (prev.trim() ? ' (existing content preserved)' : ''));
+}
+
 // ---------- main ------------------------------------------------------------
 (async () => {
   log('board home: ' + BOARD_HOME);
@@ -245,6 +334,7 @@ function writeLauncher(nodeBin) {
   }
 
   writeLauncher(nodeBin);
+  installHealLayer();
 
   // first run: create the state skeleton + blank config (never overwrite)
   if (!fs.existsSync(path.join(HMH_HOME, 'config.json'))) {
