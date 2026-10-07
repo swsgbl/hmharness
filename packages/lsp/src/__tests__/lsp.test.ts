@@ -107,12 +107,24 @@ test('client: unknown method surfaces the server error honestly', async () => {
 test('process-manager: restart budget refuses flapping servers', async () => {
   const ws = await mkdtemp(join(tmpdir(), 'lsp-ws-'));
   const manager = new ProcessManager({ id: 'crasher', command: process.execPath, args: ['-e', 'process.exit(3)'], source: 'explicit' }, ws, { maxRestarts: 2 });
+  // restarts consume ONLY on explicit start() while the child is dead; a
+  // fixed 300ms sleep can race a slow spawn (start() sees it alive and
+  // returns WITHOUT counting) - so WAIT for death before each restart
+  // (await-the-boundary; this exact test flaked twice on CI)
+  const waitDead = async (): Promise<boolean> => {
+    const deadline = Date.now() + 10_000;
+    while (manager.running) {
+      if (Date.now() > deadline) return false;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return true;
+  };
   manager.start();
-  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(await waitDead(), 'first crash should exit');
   manager.start(); // restart 1
-  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(await waitDead(), 'restart 1 should crash');
   manager.start(); // restart 2
-  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(await waitDead(), 'restart 2 should crash');
   assert.throws(() => manager.start(), /restart budget/);
   await manager.stop();
   await rm(ws, { recursive: true, force: true });
