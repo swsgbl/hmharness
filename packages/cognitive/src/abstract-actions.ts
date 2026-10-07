@@ -139,3 +139,93 @@ export function transferMatrix(
     }),
   );
 }
+
+/* ---------------- Transfer OS 2.0: environment IR + readiness (0.27) ----------------
+ *
+ * The pack: "从 action overlap 升级为 knowledge transfer。建立
+ * environment-independent skill IR；五环境映射 State/Action/Observation/
+ * Verification." The IR exists (toSkillIR in skill-compiler); this table
+ * maps the OTHER three aspects per environment and transferReadiness()
+ * turns them into a concrete verdict: can a skill whose procedure speaks
+ * in abstract verbs EXECUTE and VERIFY in a target environment? Blockers
+ * are named per missing verb - readiness is computed, never assumed.
+ */
+export interface EnvironmentIR {
+  environment: TransferEnvironmentId;
+  /** state variables the environment's observations expose */
+  stateKeys: string[];
+  /** what an observation carries in this environment */
+  observationKinds: string[];
+  /** what VERIFICATION means here (empty = verification not yet modeled) */
+  verificationOps: string[];
+}
+
+export const ENVIRONMENT_IR: Record<TransferEnvironmentId, EnvironmentIR> = {
+  terminal: {
+    environment: 'terminal',
+    stateKeys: ['cwd', 'files', 'exitCode', 'stdoutTail'],
+    observationKinds: ['command-output', 'fs-listing'],
+    verificationOps: ['exit-code-zero', 'output-contains', 'file-exists'],
+  },
+  harmonyos: {
+    environment: 'harmonyos',
+    stateKeys: ['device', 'installedHaps', 'buildStatus', 'signingProfile'],
+    observationKinds: ['hdc-output', 'hilog', 'build-log'],
+    verificationOps: ['build-successful', 'device-test-pass', 'hap-installed'],
+  },
+  browser: {
+    environment: 'browser',
+    stateKeys: ['tabs', 'activeUrl', 'pageText', 'selection'],
+    observationKinds: ['page-read', 'tabs-list'],
+    verificationOps: ['url-matches', 'text-present', 'element-visible'],
+  },
+  desktop: {
+    environment: 'desktop',
+    stateKeys: ['windows', 'focusedWindow', 'screen'],
+    observationKinds: ['screenshot', 'window-list'],
+    verificationOps: ['pixel-region-match', 'window-titled'],
+  },
+  arc3: {
+    environment: 'arc3',
+    stateKeys: ['grid', 'score', 'movesLeft'],
+    observationKinds: ['rendered-frame', 'scorecard'],
+    verificationOps: ['score-improved'],
+  },
+};
+
+export interface TransferReadiness {
+  target: TransferEnvironmentId;
+  ready: boolean;
+  /** abstract verbs the procedure needs that the target env cannot express */
+  missingVerbs: string[];
+  /** verify-steps the target env cannot check (verificationOps empty or verb unmapped) */
+  verificationBlockers: string[];
+  /** target-env literals that DO cover the procedure's verbs (the binding surface) */
+  bindings: Record<string, string[]>;
+}
+
+/** Can a skill's abstract-verb procedure execute AND verify in the target?
+ *  Bindings come from the explicit literal tables - nothing inferred. */
+export function transferReadiness(
+  abstractProcedure: string[],
+  target: TransferEnvironmentId,
+): TransferReadiness {
+  const targetVerbs = new Set<string>(environmentAbstractActions(target));
+  const ir = ENVIRONMENT_IR[target];
+  const literalsFor = (verb: string): string[] =>
+    Object.entries(ABSTRACT_ACTION_MAP)
+      .filter(([lit, v]) => v === verb && LITERAL_ENVIRONMENT[lit] === target)
+      .map(([lit]) => lit);
+  const missingVerbs: string[] = [];
+  const bindings: Record<string, string[]> = {};
+  for (const verb of abstractProcedure) {
+    const lits = literalsFor(verb);
+    bindings[verb] = lits;
+    if (lits.length === 0 && !targetVerbs.has(verb)) missingVerbs.push(verb);
+  }
+  const verificationBlockers: string[] = [];
+  if (abstractProcedure.includes('verify') && ir.verificationOps.length === 0) {
+    verificationBlockers.push('target has no modeled verification ops');
+  }
+  return { target, ready: missingVerbs.length === 0 && verificationBlockers.length === 0, missingVerbs, verificationBlockers, bindings };
+}
