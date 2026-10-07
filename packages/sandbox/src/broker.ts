@@ -39,7 +39,7 @@ export interface CapabilityToken {
   readonly scope: string;
   readonly resource: string;
   readonly operation: CapabilityOperation;
-  readonly constraints?: Record<string, string | number | boolean>;
+  readonly constraints?: Record<string, string | number | boolean | string[]>;
   /** epoch ms - every token expires, always */
   readonly expiry: number;
   /** who granted and why - the audit answer to 'qui bono' */
@@ -66,7 +66,8 @@ export interface GrantInput {
   scope: string;
   resource: string;
   operation: CapabilityOperation;
-  constraints?: Record<string, string | number | boolean>;
+  /** Sandbox 2.0: constraints may carry an egress allowlist (string[]) */
+  constraints?: Record<string, string | number | boolean | string[]>;
   /** how long the token lives, ms (default 1h; cap 24h) */
   ttlMs?: number;
   provenance: string;
@@ -84,6 +85,8 @@ const MAX_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 /** classes the worker tier can never hold - the RLM rule, mechanical */
 const WORKER_FORBIDDEN: readonly CapabilityClass[] = ['network', 'secret', 'process', 'device'];
+/** a scope that names an actual path (drive letter, UNC or posix-root) */
+const PATH_SCOPE = /^([A-Za-z]:[\\/]|\\\\|\/)/;
 
 export class CapabilityBroker {
   private readonly tokens = new Map<string, CapabilityToken>();
@@ -133,6 +136,37 @@ export class CapabilityBroker {
     if (!match) {
       return this.decide(req, false, `no live ${req.class}/${op} grant for subject '${req.subject}' (deny-by-default)`, tier);
     }
+    // Sandbox 2.0 constraint enforcement (per-class, on the LIVE token):
+    //  - network connect: constraints.allowedHosts (when present) is the
+    //    egress allowlist - a host outside it denies with the host named
+    //  - filesystem: the token's scope roots the allowed subtree; a resource
+    //    outside the root denies (mount policy - 'host' scope is explicit
+    //    and auditable, never a silent fallback)
+    if (req.class === 'network' && op === 'connect') {
+      const allowed = match.constraints?.['allowedHosts'];
+      if (Array.isArray(allowed)) {
+        const host = String(req.resource ?? '');
+        // '*.example.org' admits any subdomain; a bare host admits only itself
+        const ok = allowed.some((a) => {
+          const entry = String(a);
+          if (entry.startsWith('*.')) return host.endsWith(entry.slice(1));
+          return host === entry;
+        });
+        if (!ok) {
+          return this.decide(req, false, `egress denied: '${host || '(no host)'}' not in grant ${match.id}'s allowlist [${allowed.join(', ')}]`, tier);
+        }
+      }
+    }
+    if (req.class === 'filesystem' && req.resource && PATH_SCOPE.test(match.scope)) {
+      // mount policy applies to PATH-shaped scopes (a label scope like
+      // 'workspace-root' is a semantic tag, not a root - it cannot confine)
+      const root = match.scope.replace(/\/+$/, '');
+      const res = String(req.resource).replace(/\\/g, '/').replace(/\/+$/, '');
+      const rooted = res === root || res.startsWith(root + '/');
+      if (!rooted) {
+        return this.decide(req, false, `mount policy: '${req.resource}' is outside grant ${match.id}'s scope root '${match.scope}'`, tier);
+      }
+    }
     return this.decide(req, true, `grant ${match.id} (scope ${match.scope}, provenance: ${match.provenance})`, tier, match);
   }
 
@@ -174,5 +208,52 @@ export class CapabilityBroker {
       try { this.onDeny?.(req.subject, req.class, reason); } catch { /* a deny hook must never break the denial itself */ }
     }
     return { allowed, reason, tier, ...(token !== undefined ? { token } : {}) };
+  }
+}
+
+/* ---------------- SecretBroker (Sandbox 2.0: secrets never ride payloads) ----------------
+ *
+ * The audit rule: secret 不传给 LSP/RLM/subagent. The broker holds the
+ * values; callers (and logs, and the LLM context) only ever see opaque
+ * REFERENCES. resolve() checks the CapabilityBroker for a live 'secret'
+ * grant on the subject FIRST - no grant, no value, deny-by-default like
+ * everything else; redact() turns any string's secret values into
+ * ${ref} tokens so audit trails and transcripts stay clean even when a
+ * value leaks into an output by accident.
+ */
+export class SecretBroker {
+  private readonly secrets = new Map<string, string>();
+  constructor(private readonly broker: CapabilityBroker) {}
+
+  /** store a secret; returns the opaque reference to use everywhere else */
+  set(name: string, value: string): string {
+    const ref = `secret:${name}`;
+    this.secrets.set(name, value);
+    return ref;
+  }
+
+  /** resolve a reference to its value - only under a live secret grant */
+  resolve(subject: string, ref: string): { ok: true; value: string } | { ok: false; reason: string } {
+    const m = /^secret:(.+)$/.exec(ref);
+    if (!m) return { ok: false, reason: `not a secret reference: '${ref.slice(0, 24)}'` };
+    const name = m[1];
+    const decision = this.broker.check({ subject, class: 'secret', resource: name, operation: 'read' }, { riskLevel: 'high' });
+    if (!decision.allowed) return { ok: false, reason: decision.reason };
+    const value = this.secrets.get(name);
+    if (value === undefined) return { ok: false, reason: `no such secret '${name}'` };
+    return { ok: true, value };
+  }
+
+  /** replace known secret values in any text with their references */
+  redact(text: string): string {
+    let out = text;
+    for (const [name, value] of this.secrets) {
+      if (value.length > 0) out = out.split(value).join(`secret:${name}`);
+    }
+    return out;
+  }
+
+  list(): string[] {
+    return [...this.secrets.keys()];
   }
 }
