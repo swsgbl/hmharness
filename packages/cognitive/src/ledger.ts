@@ -26,6 +26,14 @@ import { join } from 'node:path';
 export type LedgerEventKind =
   | 'belief.created'
   | 'belief.revised'
+  /** Ledger 2.0 (weekly pack 0.24 P0): the DAG vocabulary grows so the
+   *  replayable cognitive graph can express supersession, contradiction,
+   *  causal hypotheses, strategy changes and attribution results. */
+  | 'belief.superseded'
+  | 'belief.contradicted'
+  | 'causal.hypothesis'
+  | 'strategy.changed'
+  | 'credit.attribution'
   | 'prediction.made'
   | 'prediction.confirmed'
   | 'prediction.failed'
@@ -55,6 +63,8 @@ export interface LedgerEvent {
   readonly confidence?: number;
   /** the event this one answers or revises */
   readonly parentSeq?: number;
+  /** Ledger 2.0: the version of the belief after this event (belief.* only) */
+  readonly beliefVersion?: number;
 }
 
 export interface LedgerSummary {
@@ -71,6 +81,8 @@ export interface LedgerAppendInput {
   taskId?: string;
   confidence?: number;
   parentSeq?: number;
+  /** Ledger 2.0: belief version after this event (belief.* kinds) */
+  beliefVersion?: number;
 }
 
 /** Pure in-memory append-only ledger. Rebuild from persistence with loadLedger. */
@@ -90,6 +102,7 @@ export class CognitiveLedger {
       ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
       ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
       ...(input.parentSeq !== undefined ? { parentSeq: input.parentSeq } : {}),
+      ...(input.beliefVersion !== undefined ? { beliefVersion: input.beliefVersion } : {}),
     });
     this.eventsBySeq.push(evt);
     return evt;
@@ -126,6 +139,28 @@ export class CognitiveLedger {
       out.unshift(cursor);
       const parent: number | undefined = cursor.parentSeq;
       cursor = parent === undefined ? undefined : this.eventsBySeq.find((e) => e.seq === parent);
+    }
+    return out;
+  }
+
+  /** Ledger 2.0: everything downstream of an event (the replay-from-cause
+   *  query - what did this belief revision LEAD to?). Branches included. */
+  descendants(seq: number): LedgerEvent[] {
+    const childrenOf = new Map<number, LedgerEvent[]>();
+    for (const e of this.eventsBySeq) {
+      if (e.parentSeq === undefined) continue;
+      const list = childrenOf.get(e.parentSeq) ?? [];
+      list.push(e);
+      childrenOf.set(e.parentSeq, list);
+    }
+    const out: LedgerEvent[] = [];
+    const queue = [seq];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        out.push(child);
+        queue.push(child.seq);
+      }
     }
     return out;
   }

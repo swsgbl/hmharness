@@ -24,6 +24,10 @@ import type { CognitiveLedger, LedgerEvent, LedgerEventKind } from './ledger.ts'
 export const CONTRIBUTOR_KINDS: readonly LedgerEventKind[] = [
   'belief.created',
   'belief.revised',
+  'belief.superseded',
+  'belief.contradicted',
+  'causal.hypothesis',
+  'strategy.changed',
   'exploration.chosen',
   'skill.candidate',
   'skill.promoted',
