@@ -64,6 +64,66 @@ export interface VerificationResult {
   checks: Array<{ id: string; metric: string; actual: number; expected: string; pass: boolean }>;
 }
 
+/* ---------------- Skill 2.0 (weekly pack 0.25 Learning OS 2.0) ----------------
+ *
+ * The upgrade pack extends the skill schema to
+ * precondition -> variables -> procedure -> expected state delta ->
+ * verification -> counterexample. V1 already carries preconditions/
+ * procedure/verification; V2 adds the rest as OPTIONAL fields so every
+ * existing skill and test stays valid (compatibility layer first - the
+ * pack's own rule). The Skill Generalization Lab (0.26) populates
+ * counterexamples from real rejection analysis; honest miners leave
+ * fields EMPTY rather than inventing content (absent is not null).
+ */
+export interface SkillVariable {
+  name: string;
+  description?: string;
+  example?: string;
+}
+
+export interface SkillSpecV2 extends SkillSpec {
+  /** named variables the procedure binds (mined from args when available) */
+  variables?: SkillVariable[];
+  /** what the world should look like after a successful run */
+  expectedStateDelta?: Array<{ key: string; change: string }>;
+  /** known counterexamples: situations where this skill MUST NOT fire */
+  counterexamples?: Array<{ description: string; source: string }>;
+  /** where this skill came from - trajectory ids / miner + version */
+  provenance?: string;
+  /** miner-estimated confidence in [0,1] */
+  confidence?: number;
+  /** environments this skill is known to apply in */
+  environmentScope?: string[];
+}
+
+/** Honest adapter: a mined workflow becomes a V2 skill with EXACTLY the
+ *  fields the data supports. Action-type n-grams cannot recover variable
+ *  bindings or state deltas - those stay EMPTY (the Lab fills them when
+ *  its analysis can), and empty is stated, never faked. */
+export function toSkillSpecV2(
+  candidate: WorkflowCandidate,
+  opts: { provenance?: string; environmentScope?: string[] } = {},
+): SkillSpecV2 {
+  return {
+    id: `skill-${candidate.environmentId}-${candidate.steps.join('-').slice(0, 40)}`,
+    name: candidate.steps.slice(0, 3).join(' → '),
+    trigger: { environmentId: candidate.environmentId, actionTypes: candidate.steps },
+    preconditions: [],
+    procedure: candidate.steps.map((ref) => ({ kind: 'act' as const, ref })),
+    verification: [],
+    evidence: candidate.trajectoryIds.map((id) => ({ trajectoryId: id, steps: 0, outcome: 'success' as const })),
+    version: '2.0.0',
+    status: 'candidate',
+    createdAt: new Date().toISOString(),
+    variables: [],
+    expectedStateDelta: [],
+    counterexamples: [],
+    provenance: opts.provenance ?? `mineWorkflows (support ${candidate.support})`,
+    confidence: Math.min(1, Number((candidate.support / 10).toFixed(2))),
+    environmentScope: opts.environmentScope ?? [candidate.environmentId],
+  };
+}
+
 /** The benchmark surface the compiler verifies against — implemented by
  *  the environments/bench packages; kept as an interface for independence
  *  (evaluator independence rule: the compiler never grades its own work). */
