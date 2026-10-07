@@ -124,6 +124,94 @@ export function toSkillSpecV2(
   };
 }
 
+/* -------- counterexample derivation (0.26 Lab loop closure) --------
+ *
+ * The Lab's attribution found the 0.39 rejection is a TRIGGER/PRECONDITION
+ * failure: holdout successes contain the workflow's steps in shapes the
+ * strict n-gram cannot match. Those observed shapes ARE the
+ * counterexamples: each recorded as "steps present, sequence X" with the
+ * divergent prefix - so a future trigger can learn NOT to fire on a
+ * strict-contiguity match alone, and precondition mining has its raw
+ * material. Capped, deduped by shape; the source stays the holdout
+ * trajectory ids (never train - counterexamples must generalize, and
+ * train shapes are what the skill WAS mined from).
+ */
+export interface DerivedCounterexample {
+  description: string;
+  source: string;
+}
+
+export function deriveCounterexamples(
+  candidate: WorkflowCandidate,
+  holdout: CognitiveTrajectory[],
+  opts: { cap?: number } = {},
+): DerivedCounterexample[] {
+  const cap = opts.cap ?? 10;
+  const gram = candidate.steps;
+  const seen = new Set<string>();
+  const out: DerivedCounterexample[] = [];
+  for (const traj of holdout) {
+    if (!traj.metrics.success) continue;
+    const seq = traj.steps.filter((s) => s.outcome === 'success').map((s) => s.action.type);
+    const setSeq = new Set(seq);
+    const gramPresent = gram.every((g) => setSeq.has(g));
+    if (!gramPresent) continue; // coverage-axis miss: different work, no signal for the trigger
+    // steps all present but NOT contiguous: the trigger's contiguity assumption fails here
+    let contiguous = false;
+    outer: for (let i = 0; i + gram.length <= seq.length; i++) {
+      for (let j = 0; j < gram.length; j++) if (seq[i + j] !== gram[j]) continue outer;
+      contiguous = true; break;
+    }
+    if (contiguous) continue;
+    const shape = seq.join('|');
+    if (seen.has(shape)) continue;
+    seen.add(shape);
+    out.push({
+      description: `steps present but sequence diverges: [${seq.slice(0, 8).join(' → ')}${seq.length > 8 ? ' …' : ''}] - strict contiguity must not be the only trigger`,
+      source: `holdout ${traj.id}`,
+    });
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+/* -------- environment-independent skill IR (0.27 Transfer OS 2.0 start) --------
+ *
+ * A skill's IR is its procedure expressed in ABSTRACT verbs (the
+ * twelve-verb space) - the environment-independent form knowledge
+ * transfer routes through. Action types the map doesn't know stay as
+ * literal tokens in an `unmapped` list: stated, never guessed.
+ */
+export interface SkillIR {
+  skillId: string;
+  /** procedure steps as abstract verbs; unmapped positions keep the literal */
+  abstractProcedure: string[];
+  /** indexes into abstractProcedure the map could not translate */
+  unmapped: number[];
+  environmentScope: string[];
+  provenance: string;
+}
+
+export function toSkillIR(
+  skill: SkillSpecV2,
+  map: Record<string, string>,
+): SkillIR {
+  const abstractProcedure: string[] = [];
+  const unmapped: number[] = [];
+  skill.procedure.forEach((step, i) => {
+    const a = map[step.ref];
+    if (a) abstractProcedure.push(a);
+    else { abstractProcedure.push(step.ref); unmapped.push(i); }
+  });
+  return {
+    skillId: skill.id,
+    abstractProcedure,
+    unmapped,
+    environmentScope: skill.environmentScope ?? [],
+    provenance: skill.provenance ?? '',
+  };
+}
+
 /** The benchmark surface the compiler verifies against — implemented by
  *  the environments/bench packages; kept as an interface for independence
  *  (evaluator independence rule: the compiler never grades its own work). */
