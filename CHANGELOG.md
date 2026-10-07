@@ -1,3 +1,7 @@
+## [0.23.31] - 2026-10-07
+
+0.26-0.28 三线齐进：反例生成（holdout 中"全步在场但乱序"的形状=真实反例，去重封顶回填 SkillSpecV2.counterexamples）；Transfer OS 2.0（toSkillIR 抽象动词 IR+ENVIRONMENT_IR 五环境三面映射+transferReadiness 迁移就绪判定，缺动词逐个具名）；Sandbox 2.0（egress 允许表+mount 策略+SecretBroker：引用全场、值仅活授予下可解、redact 洗转录）
+
 ## [0.23.30] - 2026-10-07
 
 0.24 研究里程碑：Prediction-to-Action 三臂仪器跨环境证据（训练臂全环境胜空白臂；判别力随动作词表丰富度上升，harmonyos 0.705-0.966）；认知账本 2.0（五新事件类+beliefVersion+descendants=可回放认知 DAG）；Skill 2.0 schema（扩展型六要素，诚实适配器）；泛化实验室首析（0.39 拒绝=触发/前置条件轴主导，修复方向=前置条件挖掘+技能族，非降门槛）；Web 7788 事实地图+运行八态机（规划/验证/恢复/完成/失败可见化）
