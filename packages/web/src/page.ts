@@ -627,6 +627,8 @@ export const PAGE = `<!doctype html>
         <button type="button" class="rtab on" data-tab="detail" id="rtab-detail">详情</button>
         <button type="button" class="rtab" data-tab="files" id="rtab-files">文件</button>
         <button type="button" class="rtab" data-tab="preview" id="rtab-preview">预览</button>
+        <button type="button" class="rtab" data-tab="evidence" id="rtab-evidence">证据</button>
+        <button type="button" class="rtab" data-tab="logs" id="rtab-logs">日志</button>
       </div>
       <button id="rcollapse" class="ghost sm" title="折叠右栏" style="margin-left:auto">»</button>
       <button id="rclose" class="ghost sm" title="关闭右栏">✕</button>
@@ -641,6 +643,12 @@ export const PAGE = `<!doctype html>
       </div>
       <div id="rtab-preview-pane" class="rtabpane">
         <div id="pview"><div class="hint" style="padding:10px">在文件树或对话中点击文件路径在此预览</div></div>
+      </div>
+      <div id="rtab-evidence-pane" class="rtabpane">
+        <div id="eview" style="padding:10px;font-size:12px;color:var(--dim)">当前会话的认知谱系：模型、世界模型版本、技能快照、证据链</div>
+      </div>
+      <div id="rtab-logs-pane" class="rtabpane">
+        <div id="lview" style="padding:10px;font-size:11.5px;font-family:var(--mono);color:var(--dim);overflow:auto">暂无日志</div>
       </div>
     </div>
   </div>
@@ -2255,6 +2263,63 @@ ${uiLiteSource()}
         loadTree((state && state.workspace && state.workspace.path) || '', ft);
       }
     }
+    // Context Dock (UX pack 03): Evidence loads the current session's
+    // cognitive lineage on demand; Logs streams the tail of the session log
+    if (tab === 'evidence') loadEvidencePane();
+    if (tab === 'logs') loadLogsPane();
+  }
+  /** Evidence pane: the structured cognitive facts of the viewed session -
+   *  model, world-model version, skill snapshot, evidence chain. Sourced
+   *  from /api/cognitive (structured facts only, never raw thinking). */
+  function loadEvidencePane() {
+    var ev = document.getElementById('eview');
+    if (!ev) return;
+    ev.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+    fetch('/api/cognitive').then(function (r) { return r.json(); }).then(function (c) {
+      var rows = [];
+      if (c && c.model) rows.push(['模型', c.model]);
+      if (c && c.worldModel && c.worldModel.version !== undefined) rows.push(['世界模型', 'v' + c.worldModel.version + ' · ' + (c.worldModel.beliefs || 0) + ' beliefs']);
+      if (c && c.skills) rows.push(['技能', Object.keys(c.skills).length + ' active']);
+      if (c && c.calibration) rows.push(['校准', 'Brier ' + (c.calibration.brier !== undefined ? c.calibration.brier.toFixed(3) : '—')]);
+      if (c && c.memory) rows.push(['记忆', (c.memory.episodic || 0) + 'ep · ' + (c.memory.semantic || 0) + 'sem']);
+      if (c && c.evidenceChain) rows.push(['证据链', c.evidenceChain.length + ' links']);
+      ev.innerHTML = '';
+      if (rows.length === 0) { ev.innerHTML = '<div class="hint">暂无认知谱系数据</div>'; return; }
+      rows.forEach(function (r) {
+        var d = document.createElement('div');
+        d.style.cssText = 'display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)';
+        var k = document.createElement('span'); k.style.cssText = 'color:var(--dim);min-width:64px'; k.textContent = r[0];
+        var v = document.createElement('span'); v.textContent = String(r[1]);
+        d.appendChild(k); d.appendChild(v); ev.appendChild(d);
+      });
+    }).catch(function () { ev.innerHTML = '<div class="hint">加载失败</div>'; });
+  }
+  /** Logs pane: the tail of the session's tool log - what actually ran,
+   *  most recent first, capped. Structured rows, not raw stream dumps. */
+  function loadLogsPane() {
+    var lv = document.getElementById('lview');
+    if (!lv) return;
+    var v = views.get(curSid);
+    lv.innerHTML = '';
+    var entries = [];
+    if (v && v.toolRegistry) {
+      Object.keys(v.toolRegistry).forEach(function (seq) {
+        var t = v.toolRegistry[seq];
+        entries.push({ seq: Number(seq), name: t.name, args: t.args });
+      });
+      entries.sort(function (a, b) { return b.seq - a.seq; });
+      entries = entries.slice(0, 50);
+    }
+    if (entries.length === 0) { lv.textContent = '暂无日志'; return; }
+    entries.forEach(function (e) {
+      var d = document.createElement('div');
+      d.style.cssText = 'padding:3px 0;border-bottom:1px solid var(--line)';
+      var head = document.createElement('span'); head.style.color = 'var(--text)';
+      head.textContent = '#' + e.seq + ' ' + e.name;
+      var ar = document.createElement('span'); ar.style.color = 'var(--dim)';
+      ar.textContent = ' ' + JSON.stringify(e.args || {}).slice(0, 100);
+      d.appendChild(head); d.appendChild(ar); lv.appendChild(d);
+    });
   }
   Array.prototype.forEach.call(document.querySelectorAll('.rtab'), function (b) {
     b.onclick = function () { openRight(b.getAttribute('data-tab')); };
