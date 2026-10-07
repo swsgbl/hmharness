@@ -27,7 +27,7 @@ import type { Candidate, EvalResult, LearningDataset, LearningPlan, LearningTarg
 import { evidenceThreshold } from './continual.ts';
 import type { CognitiveLedger, LedgerEventKind } from './ledger.ts';
 import type { CognitiveTrajectory } from './protocol.ts';
-import { mineWorkflows, type WorkflowCandidate } from './skill-compiler.ts';
+import { mineWorkflows, type WorkflowCandidate, mineAntiPatterns, type AntiPattern } from './skill-compiler.ts';
 import { WorldModel } from './world-model.ts';
 import { replayIntoWorldModel } from './analysis.ts';
 
@@ -223,6 +223,64 @@ export function registerSkillTarget(
     promotionPolicy: { minEvidence: 0.5, requireHoldout: true, canaryShare: 0.2, ...opts.policy },
     rollback: async () => undefined, // skill rollback is host-side promotion bookkeeping; v0 records intent via the ledger chain
     lineage: { registeredAt: new Date().toISOString(), version: 1, source: opts.lineageSource ?? 'skill-compiler.mineWorkflows' },
+  });
+}
+
+/* -------- the third REAL target: tool = anti-pattern learning (learning what NOT to do) --------
+ *
+ * mineAntiPatterns finds failure-ENDING action runs (>= minFailures
+ * support). The evaluator asks whether the top pattern GENERALIZES as a
+ * failure signal on unseen holdout data: detection = share of holdout
+ * FAILURES containing the run; control = share of holdout SUCCESSES
+ * containing it; evidence = detection - control. A pattern that fires on
+ * successes too is not a failure signal (control keeps it honest); a
+ * pattern that vanishes on unseen failures was overfit to the train set.
+ */
+export interface AntiPatternCandidate extends Candidate {
+  patterns: AntiPattern[];
+}
+
+export function registerAntiPatternTarget(
+  registry: LearningTargetRegistry,
+  opts: {
+    holdout: () => Promise<LearningDataset>;
+    mining?: { minFailures?: number; nMax?: number };
+    policy?: Partial<PromotionPolicy>;
+    lineageSource?: string;
+  },
+): void {
+  registry.register({
+    target: 'tool',
+    trainer: async (plan, dataset): Promise<AntiPatternCandidate> => ({
+      id: `anti-${plan.opportunityId}-${Math.random().toString(36).slice(2, 8)}`,
+      plan,
+      createdAt: new Date().toISOString(),
+      status: 'draft',
+      patterns: mineAntiPatterns(dataset.trajectories, opts.mining ?? {}),
+    }),
+    evaluator: async (candidate, holdout): Promise<EvalResult> => {
+      const top = (candidate as AntiPatternCandidate).patterns[0];
+      const failures = holdout.trajectories.filter((t) => !t.metrics.success);
+      const successes = holdout.trajectories.filter((t) => t.metrics.success);
+      if (!top) {
+        return { candidateId: candidate.id, pass: false, metrics: { evidence: 0, holdoutFailures: failures.length }, holdoutSize: holdout.trajectories.length };
+      }
+      const runIn = (t: CognitiveTrajectory): boolean => containsGram(t.steps.map((s) => s.action.type), top.pattern);
+      const detection = failures.length > 0 ? Number((failures.filter(runIn).length / failures.length).toFixed(3)) : 0;
+      const control = successes.length > 0 ? Number((successes.filter(runIn).length / successes.length).toFixed(3)) : 0;
+      const evidence = Number((detection - control).toFixed(3));
+      const pass = failures.length >= 2 && detection >= 0.5 && evidence > 0;
+      return {
+        candidateId: candidate.id,
+        pass,
+        metrics: { evidence, detection, control, holdoutFailures: failures.length, patternFailures: top.failures },
+        holdoutSize: holdout.trajectories.length,
+      };
+    },
+    holdout: opts.holdout,
+    promotionPolicy: { minEvidence: 0.5, requireHoldout: true, canaryShare: 0.2, ...opts.policy },
+    rollback: async () => undefined, // anti-pattern rollback = stop warning on it; the pattern history stays auditable
+    lineage: { registeredAt: new Date().toISOString(), version: 1, source: opts.lineageSource ?? 'skill-compiler.mineAntiPatterns' },
   });
 }
 
