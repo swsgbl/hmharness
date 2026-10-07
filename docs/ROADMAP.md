@@ -107,9 +107,21 @@ Chrome/Edge 有头真装暴露 MV3 硬边界(注入权限在 manifest 不在 UI
 如实上报)。LiveCodeWmSensor(Code WM 活体传感器)与 CI 根修随版
 上车。
 
-剩余开口全为外部:投稿(等作者;已收录 PR21,实际是条目更新)、
+剩余开口全为外部:投稿(已提交条目更新 PR #31 待合并)、
 bench 语料(靠使用增长)、ArkTS 专属 LSP(jar 在 IDE JVM 内不可外部
 直驱)。
+
+**0.23.25-0.23.32(2026-10-05/08):学习 OS+UX 专项全谱落地**:
+0.23.25=零配对装载即连+Code WM 三传感器族(LSP 符号/浏览器观察/
+构建判定);0.23.26=web 会话独立执行(W15 并行);0.23.27=升级包
+P0 四件(Cognitive Ledger+Prediction OS+Credit Assignment+版本
+一致性机检);0.23.28=四层评测隔离+Skill Target;0.23.29=**学习
+OS 真实数据里程碑**(world_model 86.3% 相对校准改进 5/5 种子
+p=0.031+skill 诚实拒绝);0.23.30=0.24 研究里程碑(Ledger 2.0 DAG
++Prediction-to-Action 三臂跨环境证据+泛化归因);0.23.31=0.26-0.28
+三线(反例生成+Transfer OS 2.0 就绪判定+Sandbox 2.0 出口/挂载/秘
+密);0.23.32=Web UX 三主件(Turn 卡+Context Dock+Cognitive
+HUD)+内核弱模型轮。
 
 ## 评审采纳:30/60/90 天节奏(2026-09-06 定,外部评审驱动)
 
