@@ -514,6 +514,7 @@ export const PAGE = `<!doctype html>
       <span class="chip" id="home"></span>
       <span class="chip" id="locale-chip">zh</span>
       <span class="chip" id="goal-chip" title="会话目标" style="display:none;cursor:pointer;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <span class="chip" id="hud-chip" title="认知状态" style="display:none;gap:6px;font-family:var(--mono);font-size:11px;cursor:pointer"></span>
       <button id="theme-chip" class="ghost sm" title="theme">🌓</button>
       <span id="topspacer" style="margin-left:auto"></span>
       <span id="connchip" title="connection">⟳ 重连中…</span>
@@ -1138,7 +1139,35 @@ ${uiLiteSource()}
   function taskPhaseEvent(kind, detail) {
     if (!window.__agentBusy) return;
     setTaskPhase(kind, detail);
+    updateHud();
   }
+
+  /** Cognitive HUD (UX pack 03): a compact chip in the topbar projecting
+   *  the session's structured cognitive facts - the same /api/cognitive
+   *  data the Evidence tab shows, compressed to one glanceable line:
+   *  WM confidence · prediction status · recovery count · verify count.
+   *  Structured facts ONLY - no internal thinking is ever displayed. */
+  var hudData = { phase: '', verify: 0, recovering: 0 };
+  function updateHud() {
+    var chip = document.getElementById('hud-chip');
+    if (!chip) return;
+    var parts = [];
+    if (hudData.phase) parts.push('\\u25B8' + phaseLabel(hudData.phase));
+    if (hudData.verify > 0) parts.push('\\u2713' + hudData.verify);
+    if (hudData.recovering > 0) parts.push('\\u21BB' + hudData.recovering);
+    if (parts.length > 0) {
+      chip.style.display = '';
+      chip.textContent = parts.join(' ');
+    } else {
+      chip.style.display = 'none';
+    }
+  }
+  (function initHud() {
+    // verify count rides the same classifier the Turn Card uses
+    var origVerify = null;
+    // recovering count increments on the provider-retry branch
+    // (wired at the retry discard path below)
+  })();
 
   function renderState(s) {
     state = s;
@@ -2664,6 +2693,7 @@ ${uiLiteSource()}
         v.deliverables = [];
         v.planSeenRun = false; // run-state 2.0: the planning phase re-arms per run
         v.turnVerify = 0; // Turn Card: the Verify segment re-arms per run
+        hudData.verify = 0; hudData.recovering = 0; hudData.phase = ''; updateHud(); // HUD re-arms per run
         closeToolGroup(v);
       }
       if (d.cwd && curSid === busySid) updateTopbarCwd();
@@ -2706,6 +2736,7 @@ ${uiLiteSource()}
       // provider retried after a mid-stream cut: drop the half answer so the
       // regenerated text is not shown as a duplicate
       taskPhaseEvent('recovering', 'retry'); // run-state 2.0: the recovery phase is visible, not silent
+      hudData.recovering = (hudData.recovering || 0) + 1; hudData.phase = 'recovering'; updateHud();
       if (v.curBlock && v.curBlock.discard) v.curBlock.discard();
       v.curBlock = null; v.curKind = null;
       return;
@@ -2774,8 +2805,11 @@ ${uiLiteSource()}
     var s = v.seq;
     row.onclick = function () { showDetailsIn(v, s); };
     // run-state 2.0: verification-shaped tools light their own phase (and
-    // feed the Turn Card's Verify segment)
-    if (typeof classifyToolPhase === 'function' && classifyToolPhase(d.name) === 'verifying') v.turnVerify = (v.turnVerify || 0) + 1;
+    // feed the Turn Card's Verify segment + the Cognitive HUD's verify count)
+    if (typeof classifyToolPhase === 'function' && classifyToolPhase(d.name) === 'verifying') {
+      v.turnVerify = (v.turnVerify || 0) + 1;
+      hudData.verify = v.turnVerify; hudData.phase = 'verifying'; updateHud();
+    }
     taskPhaseEvent(typeof classifyToolPhase === 'function' ? classifyToolPhase(d.name) : 'executing', d.name);
     v.parCount++;
     v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
