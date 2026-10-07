@@ -307,6 +307,20 @@ export function zhTask(t: string): string {
  *  helper meant renderMarkdown threw "renderInlineBlocks is not defined" in
  *  the page and EVERY live reply fell back to raw text (found live 2026-09-27;
  *  covered by the inline-completeness test in uilite.test.ts). */
+/** Run-state 2.0 (UX pack 03): classify a tool call into the operational
+ *  phase - verification-shaped tools get their own phase so the cockpit
+ *  answers "is it DOING or CHECKING". Pure name heuristic, zh/en labels
+ *  stay in the page's PHASE_KEYS. */
+export function classifyToolPhase(name: string): 'verifying' | 'executing' {
+  return /^(harmony_)?(build|device_test|test|verify|check|lint|validate|bench|tsc|typecheck)/i.test(String(name)) ? 'verifying' : 'executing';
+}
+
+/** True when accumulated visible text lays out a numbered plan (>=2 steps)
+ *  - the planning phase derives from VISIBLE output, never chain-of-thought. */
+export function hasPlanText(text: string): boolean {
+  return extractPlan(String(text)).length >= 2;
+}
+
 export function uiLiteSource(): string {
   // __name polyfill: tsx/esbuild (keep-names) rewrites inner function decls as
   // `var f = __name(function f(){...})` INSIDE the serialized bodies - the
@@ -315,6 +329,7 @@ export function uiLiteSource(): string {
     + 'var TOK_KW = ' + JSON.stringify(TOK_KW) + ';';
   return [prelude,
     tokLine, renderInlineBlocks, inlineMd,
-    fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask]
+    fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask,
+    classifyToolPhase, hasPlanText]
     .map(function (f) { return typeof f === 'string' ? f : f.toString(); }).join('\n');
 }

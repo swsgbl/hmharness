@@ -1059,6 +1059,16 @@ ${uiLiteSource()}
       setTaskPhase('start');
     } else {
       rs.classList.remove('yolo');
+      // run-state 2.0: brief terminal flash (completed/failed) before idle -
+      // the outcome flag is set by the final/error SSE handlers
+      var termEl = document.getElementById('rs-phase');
+      if (termEl && window.__lastTaskOk !== undefined && taskStartAt) {
+        var ok = window.__lastTaskOk;
+        var dur = elapsedStr();
+        termEl.textContent = (ok ? '\\u2713 ' + phaseLabel('completed') : '\\u2717 ' + phaseLabel('failed')) + ' \\u00B7 ' + dur;
+        setTimeout(function () { if (!window.__agentBusy && termEl) termEl.textContent = ''; }, 3000);
+      }
+      window.__lastTaskOk = undefined;
       setTaskPhase('idle');
       taskStartAt = 0;
     }
@@ -1083,9 +1093,14 @@ ${uiLiteSource()}
   var PHASE_KEYS = {
     start: { zh: '启动', en: 'starting' },
     thinking: { zh: '思考', en: 'thinking' },
+    planning: { zh: '规划', en: 'planning' },
     responding: { zh: '回复', en: 'responding' },
     executing: { zh: '执行', en: 'executing' },
+    verifying: { zh: '验证', en: 'verifying' },
     waitingApproval: { zh: '等待审批', en: 'waiting approval' },
+    recovering: { zh: '恢复', en: 'recovering' },
+    completed: { zh: '完成', en: 'completed' },
+    failed: { zh: '失败', en: 'failed' },
   };
   function phaseLabel(k) {
     var p = PHASE_KEYS[k];
@@ -2383,6 +2398,13 @@ ${uiLiteSource()}
     var v = activeSinkSidVal ? views.get(activeSinkSidVal) : null;
     if (!v) return;
     if (v.curBlock) v.curBlock.finalize();
+    // run-state 2.0: a laid-out numbered plan (>=2 steps in the VISIBLE
+    // text) flips the phase to planning - once per run, derived from output
+    // only, never from chain-of-thought
+    if (!v.planSeenRun && v.lastAssistantText && typeof hasPlanText === 'function' && hasPlanText(v.lastAssistantText)) {
+      v.planSeenRun = true;
+      taskPhaseEvent('planning');
+    }
     // a new model turn resets the parallel group context
     v.parCount = 0; v.parBox = null;
     v.curBlock = null;
@@ -2570,6 +2592,7 @@ ${uiLiteSource()}
         if (d.cwd) v.cwd = d.cwd;
         // per-task state reset: deliverables must not leak into the next task
         v.deliverables = [];
+        v.planSeenRun = false; // run-state 2.0: the planning phase re-arms per run
         closeToolGroup(v);
       }
       if (d.cwd && curSid === busySid) updateTopbarCwd();
@@ -2611,6 +2634,7 @@ ${uiLiteSource()}
     if (d.kind === 'reset') {
       // provider retried after a mid-stream cut: drop the half answer so the
       // regenerated text is not shown as a duplicate
+      taskPhaseEvent('recovering', 'retry'); // run-state 2.0: the recovery phase is visible, not silent
       if (v.curBlock && v.curBlock.discard) v.curBlock.discard();
       v.curBlock = null; v.curKind = null;
       return;
@@ -2678,7 +2702,8 @@ ${uiLiteSource()}
     }
     var s = v.seq;
     row.onclick = function () { showDetailsIn(v, s); };
-    taskPhaseEvent('executing', d.name);
+    // run-state 2.0: verification-shaped tools light their own phase
+    taskPhaseEvent(typeof classifyToolPhase === 'function' ? classifyToolPhase(d.name) : 'executing', d.name);
     v.parCount++;
     v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
     if (v.parCount === 2 && !v.parBox) {
@@ -2793,6 +2818,7 @@ ${uiLiteSource()}
     var v = route(d.sessionId);
     if (!v) return;
     flushStream();
+    window.__lastTaskOk = true; // run-state 2.0 terminal flash source
     closeToolGroup(v); // settle any trailing tool run into its folded group
     // A6 plan card + A9 deliverables + A10 feedback ride the final event
     if (v.lastAssistantText) renderPlanCard(v, v.lastAssistantText);
@@ -2832,7 +2858,12 @@ ${uiLiteSource()}
     el('div', 'msg-inject', '\\u21AA ' + (L ? L.injected : 'injected') + ': ' + JSON.parse(e.data).text);
   });
   es.addEventListener('error', function (e) {
-    if (e.data) { flushStream(); el('div', 'err', 'error: ' + JSON.parse(e.data).message); }
+    if (e.data) {
+      flushStream();
+      window.__lastTaskOk = false; // run-state 2.0 terminal flash source
+      taskPhaseEvent('failed', String(JSON.parse(e.data).message || '').slice(0, 60)); // run-state 2.0 terminal state
+      el('div', 'err', 'error: ' + JSON.parse(e.data).message);
+    }
   });
 
   /** Approval risk badge (docx P1 #3): what it does + impact + risk level in

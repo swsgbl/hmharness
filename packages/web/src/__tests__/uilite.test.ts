@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables, zhTask } from '../uilite.ts';
+import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables, zhTask, classifyToolPhase, hasPlanText } from '../uilite.ts';
+
+test('run-state 2.0: classifyToolPhase separates verification-shaped tools', () => {
+  assert.equal(classifyToolPhase('harmony_build'), 'verifying');
+  assert.equal(classifyToolPhase('harmony_device_test'), 'verifying');
+  assert.equal(classifyToolPhase('tsc'), 'verifying');
+  assert.equal(classifyToolPhase('check_schema'), 'verifying');
+  assert.equal(classifyToolPhase('run_command'), 'executing');
+  assert.equal(classifyToolPhase('write_file'), 'executing');
+  assert.equal(classifyToolPhase('read_file'), 'executing');
+});
+
+test('run-state 2.0: hasPlanText detects a numbered plan in visible output', () => {
+  assert.equal(hasPlanText('1. build the app\n2. test it'), true);
+  assert.equal(hasPlanText('1) first\n2) second'), true);
+  assert.equal(hasPlanText('just prose, no steps'), false);
+  assert.equal(hasPlanText('1. only one step'), false);
+});
 
 test('fuzzyMatchScore: subsequence rank, prefix/boundary bonuses, -1 on miss', () => {
   assert.ok(fuzzyMatchScore('st', 'settings.ts') >= 0, 's-t is a subsequence');
