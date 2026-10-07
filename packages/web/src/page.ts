@@ -249,6 +249,11 @@ export const PAGE = `<!doctype html>
   .say b { color:#fff; }
   .msg-user { color:var(--text); background:var(--panel2); border-radius:12px; padding:8px 14px; margin:10px 0 6px auto; width:fit-content; max-width:74%; white-space:pre-wrap; }
   .queued { color:var(--warn); font-size:12.5px; margin:4px 0 4px auto; width:fit-content; max-width:74%; opacity:.85; }
+  .turncard { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:baseline; padding:8px 12px; margin:10px 0 4px; border:1px solid var(--line); border-radius:10px; background:var(--panel2); font-size:12px; }
+  .turncard .tseg { display:inline-flex; gap:5px; align-items:baseline; }
+  .turncard .tlab { color:var(--dim); }
+  .turncard .tnum { color:var(--text); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .turncard .tseg.strong .tnum { font-weight:600; }
   .projgrp { width:100%; display:flex; align-items:center; gap:6px; background:none; border:0; color:var(--dim); font-size:12px; font-weight:600; padding:6px 8px; margin-top:8px; cursor:pointer; border-radius:6px; text-align:left; }
   .projgrp:hover { color:var(--text); background:var(--panel2); }
   .projgrp.cur { color:var(--cyan); }
@@ -2593,6 +2598,7 @@ ${uiLiteSource()}
         // per-task state reset: deliverables must not leak into the next task
         v.deliverables = [];
         v.planSeenRun = false; // run-state 2.0: the planning phase re-arms per run
+        v.turnVerify = 0; // Turn Card: the Verify segment re-arms per run
         closeToolGroup(v);
       }
       if (d.cwd && curSid === busySid) updateTopbarCwd();
@@ -2702,7 +2708,9 @@ ${uiLiteSource()}
     }
     var s = v.seq;
     row.onclick = function () { showDetailsIn(v, s); };
-    // run-state 2.0: verification-shaped tools light their own phase
+    // run-state 2.0: verification-shaped tools light their own phase (and
+    // feed the Turn Card's Verify segment)
+    if (typeof classifyToolPhase === 'function' && classifyToolPhase(d.name) === 'verifying') v.turnVerify = (v.turnVerify || 0) + 1;
     taskPhaseEvent(typeof classifyToolPhase === 'function' ? classifyToolPhase(d.name) : 'executing', d.name);
     v.parCount++;
     v.groupNames[d.name] = (v.groupNames[d.name] || 0) + 1;
@@ -2820,6 +2828,29 @@ ${uiLiteSource()}
     flushStream();
     window.__lastTaskOk = true; // run-state 2.0 terminal flash source
     closeToolGroup(v); // settle any trailing tool run into its folded group
+    // Turn Card (UX pack 03: Request -> Plan -> Actions -> Verification ->
+    // Answer): a compact five-segment summary of the COMPLETED turn, so the
+    // first glance answers "what did I ask, what happened, was it checked".
+    // Data comes from what this view already tracked; nothing new is parsed.
+    try {
+      var planN = (v.planText && typeof extractPlan === 'function') ? extractPlan(v.planText).length : 0;
+      var turn = document.createElement('div'); turn.className = 'turncard';
+      var seg = function (k, val, strong) {
+        var s = document.createElement('span'); s.className = 'tseg' + (strong ? ' strong' : '');
+        var lab = document.createElement('span'); lab.className = 'tlab'; lab.textContent = k;
+        var num = document.createElement('span'); num.className = 'tnum'; num.textContent = val;
+        s.appendChild(lab); s.appendChild(num); return s;
+      };
+      var en = L && L.localeKey === 'en';
+      var reqTxt = (v.lastTask || '').slice(0, 60) || '-';
+      var req = seg(en ? 'Request' : '请求', reqTxt, false); req.title = v.lastTask || '';
+      turn.appendChild(req);
+      turn.appendChild(seg(en ? 'Plan' : '计划', String(planN || '-'), planN > 0));
+      turn.appendChild(seg(en ? 'Actions' : '动作', String(d.toolUses || 0), false));
+      turn.appendChild(seg(en ? 'Verify' : '验证', String(v.turnVerify || 0), (v.turnVerify || 0) > 0));
+      turn.appendChild(seg(en ? 'Answer' : '回答', (d.turns || 0) + (en ? 't' : '轮'), true));
+      v.root.appendChild(turn);
+    } catch (err) { /* the turn card is decoration - never break the final */ }
     // A6 plan card + A9 deliverables + A10 feedback ride the final event
     if (v.lastAssistantText) renderPlanCard(v, v.lastAssistantText);
     renderDeliverables(v);
