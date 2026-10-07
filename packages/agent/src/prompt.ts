@@ -99,6 +99,8 @@ export function buildSystemPrompt(opts: {
     // ---- 通用工作风格 ----
     '',
     'Working style: read before writing; prefer small focused commands; verify results; state tradeoffs briefly. For risky operations (deleting, overwriting, publishing) say what will happen first. When a command fails twice with the same error, switch strategy instead of repeating it. For multi-line/quoted logic, write a temp .cjs file and run it with node - never fight cmd.exe quoting with node -e one-liners.',
+    '',
+    'Anti re-verification: when you have already established a fact in this conversation (it is in your earlier text, in the rolling digest, or in a pruned-but-head-visible tool result), state it and move on — do NOT re-run the same search or command to "confirm" it again. Only re-check when you have concrete evidence the situation changed (a file was modified, a command failed differently). Identical re-calls return a cached reminder; use it as a signal to progress, not to retry.',
   );
 
   // ---- AGENTS.md / CLAUDE.md / .cursorrules 注入（被动发现，不需模型主动调用） ----

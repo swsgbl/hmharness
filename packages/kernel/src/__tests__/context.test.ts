@@ -26,7 +26,7 @@ test('compactMessages: prunes oldest tool outputs, protects opening and tail', (
   assert.equal(out[0].content, 'sys');
   assert.equal(out[1].content, 'task');
   assert.equal(out[out.length - 1].content, 'tail-answer');
-  const pruned = out.filter((m) => (m.content ?? '').startsWith('[context pruned')).length;
+  const pruned = out.filter((m) => (m.content ?? '').includes('pruned to fit budget')).length;
   // tools at idx 3..25 (23 of them) pruned; the last 8 messages (7 tools + tail) stay protected
   assert.equal(pruned, 23);
   assert.ok(transcriptChars(out) < transcriptChars(msgs));

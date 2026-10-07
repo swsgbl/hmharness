@@ -105,6 +105,18 @@ export async function runLoop(opts: {
   let idleTurns = 0; // consecutive turns with no successful tool calls
   let reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' | 'interrupted' = 'final';
 
+  // Re-verification loop breaker (2026-10-07 export: 108 tool calls in 5
+  // user turns, 20+ turns re-deriving the SAME fact because the earlier tool
+  // result got tombstoned by compaction and the model doesn't trust its own
+  // text conclusions). Ring of recent (tool+args) → result head; an EXACT
+  // repeat returns the cached result with a note, saving a network call and
+  // telling the model it already knows this.
+  const recentCalls = new Map<string, { head: string; isError: boolean; turn: number }>();
+  const callKey = (name: string, args: Record<string, unknown>) => {
+    try { return name + ':' + JSON.stringify(args); } catch { return name + ':unserializable'; }
+  };
+  const RESULT_HEAD_CHARS = 500;
+
   // The loop runs until the model gives a final answer (no tool calls), goes
   // idle (stuck), or hits a safety valve. Soft checkpoints at the adaptive
   // turn limit nudge the model but don't stop it — days-long tasks run
@@ -232,10 +244,30 @@ export async function runLoop(opts: {
     }
     await Promise.all(planned.map(async (p) => {
       if (p.skip) return;
+      // Re-verification breaker: an EXACT repeat (same tool, same args) of a
+      // recent successful call returns the cached head instead of re-running.
+      // The note tells the model WHY, so it stops trying to re-verify.
+      const key = callKey(p.name, p.args);
+      const prev = recentCalls.get(key);
+      if (prev && !prev.isError && turn - prev.turn <= 20) {
+        p.output = `[you already ran ${p.name} with these exact arguments at turn ${prev.turn}; re-running identical calls wastes time — here is what it returned]\n${prev.head}`;
+        p.isError = false;
+        return;
+      }
       try {
         const r = await registry.get(p.name)!.execute(p.args, ctx);
         p.output = r.output;
         p.isError = r.isError === true;
+        // remember successful results for the dedup ring (errors go through
+        // the failed-command short-circuit instead)
+        if (!p.isError) {
+          recentCalls.set(key, { head: p.output.slice(0, RESULT_HEAD_CHARS), isError: false, turn });
+          if (recentCalls.size > 50) {
+            // drop the oldest entries when the ring fills
+            const firstKey = recentCalls.keys().next().value;
+            if (firstKey !== undefined) recentCalls.delete(firstKey);
+          }
+        }
       } catch (err) {
         p.output = String(err);
         p.isError = true;

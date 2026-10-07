@@ -35,6 +35,20 @@ function protectedRange(messages: ChatMessage[]): Set<number> {
   return keep;
 }
 
+/** A pruned tool result keeps its HEAD - the first line(s) of a command
+ *  output usually contain the finding ("Inno @ 722596", "z-ai provider
+ *  found"). A zero-information "[context pruned]" tombstone forces the model
+ *  to re-derive facts it already had, which is the #1 driver of the
+ *  re-verification loop observed in long sessions (2026-10-07 export:
+ *  108 tool calls, 20+ re-verification turns on facts the model already
+ *  knew). The headstone carries enough signal to say "I already know this"
+ *  without carrying the full dump. */
+export const HEADSTONE_CHARS = 200;
+function headstone(original: string): string {
+  const head = original.slice(0, HEADSTONE_CHARS).replace(/\s+$/, '');
+  return `[earlier tool output, pruned to fit budget — head preserved]\n${head}${original.length > HEADSTONE_CHARS ? '\n…' : ''}`;
+}
+
 export const DIGEST_MARK = '[rolling digest of earlier context]';
 
 function findDigest(messages: ChatMessage[]): number {
@@ -47,7 +61,7 @@ export function compactMessages(messages: ChatMessage[], budget = DEFAULT_CONTEX
   const out = messages.map((m) => ({ ...m }));
   for (let i = 0; i < out.length && transcriptChars(out) > budget; i++) {
     if (keep.has(i) || out[i].role !== 'tool') continue;
-    out[i] = { ...out[i], content: '[context pruned: earlier tool output removed to fit budget]' };
+    out[i] = { ...out[i], content: headstone(String(out[i].content ?? '')) };
   }
   return out;
 }
@@ -68,7 +82,7 @@ export function compactWithEvictions(messages: ChatMessage[], budget = DEFAULT_C
   for (let i = 0; i < out.length && transcriptChars(out) > budget; i++) {
     if (keep.has(i) || out[i].role !== 'tool') continue;
     evicted += out[i].content?.length ?? 0;
-    out[i] = { ...out[i], content: '[context pruned: earlier tool output removed to fit budget]' };
+    out[i] = { ...out[i], content: headstone(String(out[i].content ?? '')) };
   }
   return { messages: out, evictedChars: evicted };
 }
@@ -92,7 +106,8 @@ export async function compactWithDigest(
   const evicted = [] as string[];
   // what was evicted = tombstoned positions vs the input (compare by index)
   for (let i = 0; i < pruned.length; i++) {
-    if (pruned[i].role === 'tool' && pruned[i].content === '[context pruned: earlier tool output removed to fit budget]'
+    if (pruned[i].role === 'tool'
+      && String(pruned[i].content ?? '').includes('pruned to fit budget')
       && messages[i]?.role === 'tool' && messages[i].content !== pruned[i].content) {
       evicted.push(String(messages[i].content).slice(0, 4000));
     }
