@@ -1,3 +1,7 @@
+## [0.23.32] - 2026-10-08
+
+Web 工作台 UX 三主件（升级包 03 专项）：Turn 卡（final 事件五段汇总卡：请求/计划步数/动作数/验证工具数/回答轮数，全部来自视图已跟踪量零新解析）；Context Dock（右栏五 tab：详情/文件/预览+证据（/api/cognitive 认知谱系结构化事实行）/日志（会话工具日志尾 50 条））；Cognitive HUD（顶栏 #hud-chip：操作相位+验证计数+恢复计数，per-run 重臂，空闲隐藏，绝不显示思考全文）；内核弱模型增强（并行会话轮：headstone 墓碑+repeat-call 去重）随版
+
 ## [0.23.31] - 2026-10-07
 
 0.26-0.28 三线齐进：反例生成（holdout 中"全步在场但乱序"的形状=真实反例，去重封顶回填 SkillSpecV2.counterexamples）；Transfer OS 2.0（toSkillIR 抽象动词 IR+ENVIRONMENT_IR 五环境三面映射+transferReadiness 迁移就绪判定，缺动词逐个具名）；Sandbox 2.0（egress 允许表+mount 策略+SecretBroker：引用全场、值仅活授予下可解、redact 洗转录）
