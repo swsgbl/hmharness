@@ -26,6 +26,9 @@ import { join } from 'node:path';
 
 const HOME = process.env.HMH_HOME ?? join(homedir(), '.hmharness');
 const SEEDS = process.argv[2] ? Number(process.argv[2]) : 3;
+/** optional environment override (default: the richest one) - the terminal
+ *  honest-negative follow-up: richer-vocabulary environments are the next lens */
+const ENV_OVERRIDE = process.argv[3];
 /** the first run's honest negative: a single 0.5 gate is a COARSE lens on
  *  data whose belief EMA converges early - sweep operating points instead */
 const GATES = [0.3, 0.5, 0.7];
@@ -55,7 +58,7 @@ const all = await loadTrajectories(HOME, 1000);
 const usable = all.filter((t) => t.steps.length > 0);
 const byEnv = new Map<string, number>();
 for (const t of usable) byEnv.set(t.environment.id, (byEnv.get(t.environment.id) ?? 0) + 1);
-const env = [...byEnv.entries()].sort((a, b) => b[1] - a[1])[0][0];
+const env = ENV_OVERRIDE ?? [...byEnv.entries()].sort((a, b) => b[1] - a[1])[0][0];
 const pool = usable.filter((t) => t.environment.id === env);
 console.log(`prediction-to-action x${SEEDS} on '${env}' (${pool.length} trajectories), gates=[${GATES.join(', ')}]`);
 
