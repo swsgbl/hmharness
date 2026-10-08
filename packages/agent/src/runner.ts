@@ -564,7 +564,12 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     },
   }).catch((err: unknown) => {
     traj.finish({ success: false, reason: 'error', error: brief(String(err), 200) }, { toolUses: toolsUsed.length });
-    throw err;
+    // The rollout EXISTS on disk (session/create + the user event were written
+    // before the loop started), but the throw used to hide its id from every
+    // caller — the TUI never bound currentSessionId on the error path, so
+    // /export said "nothing to export" and the next task silently forked a
+    // fresh session. Attach the id; error paths keep the thread bound.
+    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { sessionId: session.id });
   });
   // the task ended (or died): late pushes must queue for the NEXT task instead
   // of silently vanishing into a channel nothing drains

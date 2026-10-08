@@ -1955,6 +1955,11 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     } catch (err) {
       rt.setBusy(false);
       currentInject = null;
+      // Bind the session even on failure (the runner attaches sessionId to
+      // thrown errors): /export works right after an error and the next task
+      // APPENDS to the same rollout instead of silently forking a fresh one.
+      const errSid = (err as { sessionId?: string }).sessionId;
+      if (typeof errSid === 'string') currentSessionId = errSid;
       authErrorHit = isProviderAuthError(String(err));
       rt.addText(String(err), 'err');
       // Recovery First (docx TUI 专项): every task failure names the next step

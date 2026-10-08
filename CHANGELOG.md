@@ -1,3 +1,7 @@
+## [0.23.33] - 2026-10-08
+
+毒物控制+报错会话不散绑（用户两次实锤复现 2026-10-08）：坏参工具调用零死刑（空串/截断 JSON arguments 不执行+明确重发指引，进 transcript 前消毒为 {}，回放同消毒——一次模型格式失误不再被 provider 400 杀死整个会话）；runAgentTask 抛错携带 sessionId、TUI 报错后绑回会话（/export 立即可用、下一任务续写同一 rollout 而非静默分叉），latestSession 空前缀=真·mtime 最新
+
 ## [0.23.32] - 2026-10-08
 
 Web 工作台 UX 三主件（升级包 03 专项）：Turn 卡（final 事件五段汇总卡：请求/计划步数/动作数/验证工具数/回答轮数，全部来自视图已跟踪量零新解析）；Context Dock（右栏五 tab：详情/文件/预览+证据（/api/cognitive 认知谱系结构化事实行）/日志（会话工具日志尾 50 条））；Cognitive HUD（顶栏 #hud-chip：操作相位+验证计数+恢复计数，per-run 重臂，空闲隐藏，绝不显示思考全文）；内核弱模型增强（并行会话轮：headstone 墓碑+repeat-call 去重）随版

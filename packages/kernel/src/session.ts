@@ -14,6 +14,7 @@ import { appendFile, mkdir, open as fopen, readdir, readFile, stat } from 'node:
 import { readFileSync, statSync } from 'node:fs';
 import { join, basename as pathBasename } from 'node:path';
 import type { ChatMessage } from './types.ts';
+import { sanitizeToolCalls } from './loop.ts';
 
 export type SessionEvent =
   | { t: 'session/start'; id: string; time: string; cwd: string; model: string; git?: { branch?: string; commit?: string }; forkedFrom?: string }
@@ -404,9 +405,16 @@ export async function findSessionFile(home: string, prefix: string): Promise<str
   return null;
 }
 
-/** Find the newest session file under home/sessions matching an id prefix. */
+/** Find the newest session file under home/sessions matching an id prefix.
+ *  Empty prefix = THE newest session overall. It used to delegate to
+ *  findSessionFile, whose first line returns null on an empty prefix — so
+ *  "export the latest session" could NEVER find anything (TUI /export after
+ *  a crashed first task said "还没有可导出的会话内容" while the rollout sat
+ *  complete on disk, 2026-10-08 session 5y1nrs). */
 export async function latestSession(home: string, prefix = ''): Promise<string | null> {
-  return findSessionFile(home, prefix);
+  if (prefix) return findSessionFile(home, prefix);
+  const { list } = await collectCandidates(home, 'updated');
+  return list.length > 0 ? list[0].file : null;
 }
 
 /**
@@ -442,7 +450,10 @@ export async function loadTranscript(file: string): Promise<SessionTranscript | 
       out.messages.push({
         role: 'assistant',
         content: ev.text,
-        ...(calls.length > 0 ? { tool_calls: calls } : {}),
+        // replay protection: a rollout may contain calls with invalid-JSON
+        // arguments (recorded raw for audit); replaying them into a live
+        // conversation would 400 the first provider call of the resumed run
+        ...(calls.length > 0 ? { tool_calls: sanitizeToolCalls(calls) } : {}),
       });
       pendingCallIds = calls.map((c) => c.id);
     } else if (ev.t === 'tool') {

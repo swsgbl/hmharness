@@ -39,6 +39,63 @@ test('loadTranscript rebuilds messages with tool_call_id pairing', async () => {
   }
 });
 
+test('latestSession with an EMPTY prefix returns the mtime-newest rollout (TUI /export fallback)', async () => {
+  // regression (2026-10-08): after a task died on its first turn, the TUI
+  // never bound currentSessionId, /export fell back to latestSession(home,'')
+  // — which delegated to findSessionFile, whose empty-prefix guard returns
+  // null unconditionally. "还没有可导出的会话内容" while the rollout sat
+  // complete on disk.
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-sess-latest-'));
+  try {
+    await mkdir(join(dir, 'sessions', '2026', '10', '08'), { recursive: true });
+    const mk = async (id: string) => {
+      const f = join(dir, 'sessions', '2026', '10', '08', id + '.jsonl');
+      await writeFile(f, JSON.stringify({ t: 'session/start', id, time: 't', cwd: 'c', model: 'm' }) + '\n', 'utf8');
+      return f;
+    };
+    const a = await mk('2026-10-08T02-38-33-aaaaaa');
+    const b = await mk('2026-10-08T02-47-05-bbbbbb');
+    const t0 = new Date('2026-10-08T02:38:34Z');
+    const t1 = new Date('2026-10-08T02:47:10Z');
+    await utimes(a, t0, t0);
+    await utimes(b, t1, t1);
+    assert.equal(await latestSession(dir, ''), b, 'newest by mtime wins');
+    assert.equal(await latestSession(dir, '2026-10-08T02-38-33-aaaaaa'), a, 'prefix form still resolves');
+    assert.equal(await latestSession(join(dir, 'nowhere'), ''), null, 'no sessions at all -> null');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadTranscript sanitizes invalid-JSON tool arguments (a replayed rollout never 400s)', async () => {
+  // a rollout records calls raw (audit truth); replaying them into a live
+  // conversation must not poison the first provider call of the resumed run
+  const dir = await mkdtemp(join(tmpdir(), 'hmh-sess-san-'));
+  try {
+    await mkdir(join(dir, 'sessions'), { recursive: true });
+    const lines = [
+      JSON.stringify({ t: 'session/start', id: 's9', time: 't', cwd: 'c', model: 'm' }),
+      JSON.stringify({ t: 'user', time: 't', text: 'install tty7' }),
+      JSON.stringify({ t: 'assistant', time: 't', text: null, tool_calls: [
+        { id: 'call_empty', type: 'function', function: { name: 'web_search', arguments: '' } },
+        { id: 'call_trunc', type: 'function', function: { name: 'web_search', arguments: '{"query' } },
+        { id: 'call_ok', type: 'function', function: { name: 'web_search', arguments: '{"query":"tty7"}' } },
+      ] }),
+      JSON.stringify({ t: 'tool', time: 't', name: 'web_search', output: 'empty args error', isError: true }),
+      JSON.stringify({ t: 'tool', time: 't', name: 'web_search', output: 'unparseable error', isError: true }),
+      JSON.stringify({ t: 'tool', time: 't', name: 'web_search', output: 'results', isError: false }),
+    ].join('\n');
+    const file = join(dir, 'sessions', 's9.jsonl');
+    await writeFile(file, lines, 'utf8');
+    const tr = await loadTranscript(file);
+    const asst = tr!.messages.find((m) => m.role === 'assistant' && m.tool_calls)!;
+    const args = (asst.tool_calls as Array<{ function: { arguments: string } }>).map((c) => c.function.arguments);
+    assert.deepEqual(args, ['{}', '{}', '{"query":"tty7"}']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('Session appends events to its jsonl file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'hmh-sess2-'));
   try {

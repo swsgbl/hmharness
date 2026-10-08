@@ -125,6 +125,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  emit({ kind: 'error', error: String(err).slice(0, 400) });
+  // sessionId rides along when the runner attached it (task-level failures):
+  // the daemon can keep the session bound for export/next-task instead of
+  // orphaning the rollout on disk
+  emit({ kind: 'error', error: String(err).slice(0, 400), sessionId: (err as { sessionId?: string }).sessionId });
   process.exit(1);
 });

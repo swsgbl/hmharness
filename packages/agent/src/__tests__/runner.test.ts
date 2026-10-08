@@ -90,6 +90,50 @@ test('trajectory wiring: runAgentTask leaves a typed, replayable trajectory even
   }
 });
 
+test('a thrown task error carries sessionId: the rollout stays bound for /export and resume (2026-10-08)', async () => {
+  // regression: a provider HTTP 400 killed the task AFTER the session file
+  // was created and the user event written — but the throw hid the id, the
+  // TUI never bound currentSessionId on the error path, and /export said
+  // "还没有可导出的会话内容" while the rollout sat complete on disk.
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const home = await mkdtemp(join(tmpdir(), 'hmh-siderr-'));
+  const prevHome = process.env.HMH_HOME;
+  process.env.HMH_HOME = home;
+  try {
+    const { runAgentTask } = await import('../runner.ts');
+    const { Registry } = await import('@hmharness/kernel');
+    const { baseTools } = await import('../tools.ts');
+    const err = await runAgentTask({
+      task: 'probe task',
+      registry: ((): unknown => { const r = new Registry(); for (const t of baseTools) r.register(t); return r; })() as never,
+      cfg: { ...defaultConfig(), provider: { baseUrl: 'http://127.0.0.1:1/v1', apiKey: 'k', model: 'm', timeoutMs: 300 } } as never,
+      yes: true,
+      events: {},
+    } as never).then(() => null, (e: unknown) => e);
+    assert.ok(err instanceof Error, 'the dead provider surfaces as an error');
+    const sid = (err as Error & { sessionId?: string }).sessionId;
+    assert.ok(typeof sid === 'string' && sid.length > 0, 'the error carries the sessionId the runner created');
+    // the rollout lands in a date-nested dir (sessions/YYYY/MM/DD/<id>.jsonl)
+    // - find it without hard-coding today's date
+    const { readdir } = await import('node:fs/promises');
+    const findRollout = async (d: string): Promise<string | null> => {
+      for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
+        const f = join(d, e.name);
+        if (e.isDirectory()) { const hit = await findRollout(f); if (hit) return hit; }
+        else if (e.name === sid + '.jsonl') return f;
+      }
+      return null;
+    };
+    const file = await findRollout(join(home, 'sessions'));
+    assert.ok(file, 'that exact rollout file exists on disk (sid=' + sid + ')');
+  } finally {
+    process.env.HMH_HOME = prevHome;
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('approved-rules: structured matching blocks path traversal (review security fix)', async () => {
   const mod = await import('../runner.ts');
   const matchesRule = (mod as unknown as { matchesRule: (r: Array<{tool:string;argPrefix:string;time:string}>, t: string, a: Record<string, unknown>) => boolean }).matchesRule;

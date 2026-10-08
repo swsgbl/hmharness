@@ -44,6 +44,25 @@ export interface LoopResult {
   reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' | 'interrupted';
 }
 
+/** A model occasionally emits tool-call arguments that are not valid JSON —
+ *  an empty string, or a long argument list truncated mid-string (weak/flash
+ *  models do both under long outputs; agnes-3.0-flash hit each once on
+ *  2026-10-08). Every OpenAI-compatible provider REJECTS any request whose
+ *  assistant history carries such a call (HTTP 400 "Assistant tool call
+ *  arguments must be valid JSON"), so one malformed call used to kill the
+ *  whole task on the NEXT turn. Sanitizing rewrites only the stored
+ *  arguments to '{}' — the paired error tool result already tells the model
+ *  what happened, and valid calls pass through byte-for-byte. Shared by the
+ *  live loop (before the assistant message enters the transcript) and
+ *  loadTranscript (before a replayed rollout re-enters one). */
+export function sanitizeToolCalls<T extends { function: { arguments: string } }>(calls: T[]): T[] {
+  return calls.map((c) => {
+    if (!c.function?.arguments) return { ...c, function: { ...c.function, arguments: '{}' } };
+    try { JSON.parse(c.function.arguments); return c; }
+    catch { return { ...c, function: { ...c.function, arguments: '{}' } }; }
+  });
+}
+
 export async function runLoop(opts: {
   provider: ProviderConfig;
   registry: RegistryLike;
@@ -195,7 +214,11 @@ export async function runLoop(opts: {
       return { text, turns: turn, toolUses, messages: working, usage, reason: 'final' };
     }
 
-    working.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
+    // Poison control: invalid-JSON arguments must never enter the transcript
+    // raw — the provider 400s the whole next request otherwise (see
+    // sanitizeToolCalls). The rollout recorder keeps the raw call via
+    // onAssistant; this is only the wire-boundary copy.
+    working.push({ role: 'assistant', content: message.content ?? null, tool_calls: sanitizeToolCalls(calls) });
 
     // Two-phase execution: approvals are asked ONE AT A TIME (the gate is a
     // single dialog - ordering matters), then all approved tools run
@@ -212,11 +235,17 @@ export async function runLoop(opts: {
     const planned: Planned[] = [];
     for (const call of calls) {
       const name = call.function.name;
+      const rawArgs = call.function.arguments;
       let args: Record<string, unknown> = {};
       let badArgs = false;
-      try {
-        args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
-      } catch {
+      if (rawArgs) {
+        try { args = JSON.parse(rawArgs) as Record<string, unknown>; }
+        catch { badArgs = true; }
+      } else {
+        // Empty-string arguments are invalid JSON to every provider too (they
+        // 400 on replay). Executing with {} used to produce a confusing shell
+        // error ("The argument 'file' cannot be empty") — skip with a clear
+        // message so the model repeats the call properly.
         badArgs = true;
       }
       events?.onToolCall?.(name, args);
@@ -227,7 +256,9 @@ export async function runLoop(opts: {
         p.isError = true;
         p.skip = true;
       } else if (badArgs) {
-        p.output = `unparseable tool arguments for ${name}: ${call.function.arguments.slice(0, 200)}`;
+        p.output = rawArgs
+          ? `unparseable tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON): ${rawArgs.slice(0, 200)}`
+          : `empty tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON)`;
         p.isError = true;
         p.skip = true;
       } else if (tool.needsApproval?.(args, ctx)) {
