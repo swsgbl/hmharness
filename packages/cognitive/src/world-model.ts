@@ -412,4 +412,60 @@ export class WorldModel {
   get transitionsStore(): TransitionStore {
     return this.transitions;
   }
+
+  /* -------- Long-running sessions (weekly pack 0.30 P2 infrastructure) -------- */
+
+  /** WM checkpoint: a serializable snapshot that fromCheckpoint() can restore
+   *  exactly — the state, the rolling accuracy counters, and the transitions
+   *  (the replay/revision evidence, capped to the most recent N). */
+  checkpoint(maxTransitions = 1000): string {
+    return JSON.stringify({
+      kind: 'hmharness-world-model-checkpoint',
+      version: 1,
+      state: this.state,
+      deltaChecked: this.deltaChecked,
+      deltaHits: this.deltaHits,
+      seq: this.seq,
+      predictions: [...this.predictions.values()].slice(-200),
+      transitions: this.transitions.all().slice(-maxTransitions),
+    });
+  }
+
+  static fromCheckpoint(json: string): WorldModel {
+    const j = JSON.parse(json) as {
+      kind: string; version: number; state: WorldState;
+      deltaChecked: number; deltaHits: number; seq: number;
+      predictions: Prediction[]; transitions: Transition[];
+    };
+    if (j.kind !== 'hmharness-world-model-checkpoint') throw new Error('not a world-model checkpoint');
+    const wm = new WorldModel(j.state.environmentId);
+    wm.state = j.state;
+    wm.deltaChecked = j.deltaChecked;
+    wm.deltaHits = j.deltaHits;
+    wm.seq = j.seq;
+    for (const p of j.predictions ?? []) wm.predictions.set(p.id, p);
+    for (const t of j.transitions ?? []) wm.transitions.append(t);
+    return wm;
+  }
+
+  /** Stale-belief detection (0.30): beliefs whose last confirming evidence is
+   *  older than the threshold are flagged — a long-running session should
+   *  distrust them for planning until fresh evidence reconfirms. A belief
+   *  never confirmed (no lastConfirmedAt) is flagged only when the model has
+   *  been running (version > 1), so fresh models don't false-alarm. */
+  staleBeliefs(maxAgeMs: number, now: Date = new Date()): Array<{ id: string; claim: string; lastConfirmedAt?: string; ageMs: number }> {
+    if (this.state.version <= 1) return [];
+    const nowMs = now.getTime();
+    return this.state.beliefs
+      .filter((b) => {
+        if (!b.lastConfirmedAt) return true; // never confirmed = stale by definition (after warm-up)
+        return nowMs - new Date(b.lastConfirmedAt).getTime() >= maxAgeMs;
+      })
+      .map((b) => ({
+        id: b.id,
+        claim: b.claim,
+        ...(b.lastConfirmedAt ? { lastConfirmedAt: b.lastConfirmedAt } : {}),
+        ageMs: b.lastConfirmedAt ? nowMs - new Date(b.lastConfirmedAt).getTime() : Infinity,
+      }));
+  }
 }
