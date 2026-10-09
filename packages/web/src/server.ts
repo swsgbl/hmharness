@@ -245,8 +245,25 @@ async function readBody(req: IncomingMessage, limit = 100_000): Promise<string> 
   return data;
 }
 
-export async function startServer(opts: { port: number; host?: string; version?: string }): Promise<void> {
+/** 组合式生命周期句柄:HMH Desktop 的 host supervisor 消费(2026-10-09)。
+ *  port 是实际绑定端口(port 0 时为 OS 分配值);close() 幂等。 */
+export interface WebServerHandle {
+  port: number;
+  host: string;
+  close(): Promise<void>;
+}
+
+export async function startServer(opts: {
+  port: number;
+  host?: string;
+  version?: string;
+  /** 桌面桥模式(HMH Desktop ADR-003 同款合同):强制 loopback 信任 +
+   *  全 API 校验高熵 token + stdout 引导行 + /api/desktop/shutdown。
+   *  token 只经环境变量传递,绝不进 URL/日志。 */
+  desktop?: { token: string };
+}): Promise<WebServerHandle> {
   const host = opts.host ?? '127.0.0.1';
+  const desktop = opts.desktop;
   // the version the CLI spawns us with (the daemon's code snapshot); used by
   // the version-aware staleness check. Absent (foreground debug) -> the web
   // package's own version, which is never equal to the CLI's, so foreground
@@ -630,13 +647,20 @@ export async function startServer(opts: { port: number; host?: string; version?:
     };
   };
 
-  const exposure = (cfg as WebCfg).web?.exposure ?? 'loopback';
+  // desktop mode is ALWAYS loopback: no LAN/WAN/tunnel surface, period.
+  const exposure = desktop !== undefined ? 'loopback' : ((cfg as WebCfg).web?.exposure ?? 'loopback');
   const remoteToken = (cfg as WebCfg).web?.token ?? '';
+  // starts as the requested port; becomes the actually-bound port after
+  // listen() (port 0 → OS-assigned). The Host allowlist reads it per-request.
+  let actualPort = opts.port;
   const server = createServer(async (req, res) => {
     // ---- mobile pairing routes run BEFORE the exposure gate: the phone's
     // ONLY proof is the QR-borne one-time token (or the tunnel PIN). These
     // two routes never expose task data by themselves. ----
-    const port = String(opts.port);
+    // actualPort is assigned after listen(); the request handler only runs
+    // post-listen, so the Host allowlist already sees the real (possibly
+    // OS-assigned) port instead of the requested literal (port 0).
+    const port = String(actualPort);
     const host = (req.headers.host ?? '').toLowerCase();
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     try {
@@ -689,6 +713,14 @@ export async function startServer(opts: { port: number; host?: string; version?:
       }
     } catch (err) {
       json(res, 500, { error: String(err).slice(0, 200) });
+      return;
+    }
+    // ---- desktop bridge gate (2026-10-09, HMH Desktop) ----
+    // Desktop host mode: a fresh high-entropy token (env-borne only) guards
+    // EVERY route on top of the loopback Host/Origin checks below. The 401
+    // body is the DesktopError shape so the desktop client can map codes.
+    if (desktop && req.headers['x-hmh-key'] !== desktop.token) {
+      json(res, 401, { code: 'AUTH_FAILED', message: 'missing or invalid x-hmh-key', retryable: false });
       return;
     }
     // ---- exposure gate (2026-09-28 remote control) ----
@@ -934,6 +966,13 @@ export async function startServer(opts: { port: number; host?: string; version?:
         } catch (err) {
           json(res, 500, { error: String(err).slice(0, 200) });
         }
+        return;
+      }
+      if (desktop && req.method === 'POST' && url.pathname === '/api/desktop/shutdown') {
+        // desktop bridge graceful stop: the desktop supervisor calls this
+        // (token-gated above) BEFORE falling back to killing its own child.
+        json(res, 200, { ok: true });
+        shutdown();
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/state') {
@@ -2121,18 +2160,33 @@ export async function startServer(opts: { port: number; host?: string; version?:
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    // lan/wan must bind the wildcard; loopback stays on 127.0.0.1
+    // lan/wan must bind the wildcard; loopback (and desktop mode) stays on 127.0.0.1
     const bind = exposure === 'loopback' ? host : '0.0.0.0';
     server.listen(opts.port, bind, resolve);
   }).catch((err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`port ${opts.port} is already in use - hmh web may already be running.`);
-      console.error(`open http://127.0.0.1:${opts.port} in a browser, or start with --port=<another>.`);
-      process.exit(1);
+      // 2026-10-09 (HMH Desktop): the library no longer process.exit()s the
+      // HOST process - the caller decides how to report and exit. The CLI's
+      // foreground path prints the same two friendly lines it always did
+      // (main.ts catches EADDRINUSE explicitly).
+      const e = new Error(`port ${opts.port} is already in use`) as NodeJS.ErrnoException;
+      e.code = 'EADDRINUSE';
+      throw e;
     }
     throw err;
   });
-  console.log(`hmh web · http://${host}:${opts.port} · model ${cfg.provider.model} · home ${home}`);
+  // port 0 (desktop mode / callers wanting an OS-assigned port): report the
+  // actually-bound port back. Non-zero ports: identical to opts.port.
+  const bound = server.address();
+  actualPort = typeof bound === 'object' && bound !== null ? bound.port : opts.port;
+  if (desktop) {
+    // Desktop bootstrap line (contract: hmh-desktop packages/host-adapter):
+    // ONE json line on stdout; every other log goes to stderr so the
+    // supervisor's stdout parsing stays pure.
+    process.stdout.write(`${JSON.stringify({ hmhDesktopHostReady: true, port: actualPort, version: daemonVersion })}\n`);
+    console.error(`[hmh desktop-host] ready on 127.0.0.1:${actualPort} (runtime ${daemonVersion})`);
+  } else {
+  console.log(`hmh web · http://${host}:${actualPort} · model ${cfg.provider.model} · home ${home}`);
     if (exposure !== 'loopback') {
     const lanIp = preferredLanAddress();
     console.log(`exposure: ${exposure.toUpperCase()} - 手机与电脑同一 WiFi 时扫网页里的 📱 二维码即可连接`);
@@ -2154,8 +2208,14 @@ export async function startServer(opts: { port: number; host?: string; version?:
   } else {
     console.log('(local only; Ctrl-C to stop)');
   }
+  } // end !desktop banner branch
 
-  const shutdown = () => {
+  // graceful shutdown, idempotent: SIGINT/SIGTERM (foreground) and the
+  // desktop /api/desktop/shutdown route all funnel through this one path.
+  let shutdownDone = false;
+  const shutdown = (): void => {
+    if (shutdownDone) return;
+    shutdownDone = true;
     clearInterval(heartbeat);
     for (const c of clients) c.close();
     for (const r of sseClients) r.end();
@@ -2165,4 +2225,15 @@ export async function startServer(opts: { port: number; host?: string; version?:
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  return {
+    port: actualPort,
+    host,
+    // library close(): triggers the same graceful path; resolves once the
+    // process is on its way out (or after the same 1.5s backstop).
+    close: () =>
+      new Promise<void>((resolve) => {
+        shutdown();
+        setTimeout(resolve, 1_600);
+      }),
+  };
 }

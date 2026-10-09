@@ -1779,11 +1779,22 @@ flags:
     const { startServer } = await import('@hmharness/web');
     const { createRequire: cr } = await import('node:module');
     const ver = (cr(import.meta.url)('../package.json').version as string) ?? '';
-    await startServer({
-      port: Number.isFinite(port) ? port : 7788,
-      host: exposure === 'loopback' ? '127.0.0.1' : '0.0.0.0',
-      version: ver,
-    });
+    try {
+      await startServer({
+        port: Number.isFinite(port) ? port : 7788,
+        host: exposure === 'loopback' ? '127.0.0.1' : '0.0.0.0',
+        version: ver,
+      });
+    } catch (err) {
+      // 2026-10-09: startServer 不再库层 process.exit;前台路径在这里保持
+      // 一直以来的两条友好提示 + exit(1)(daemon 子进程走同一入口)
+      if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+        stdout.write(`port ${port} is already in use - hmh web may already be running.\n`);
+        stdout.write(`open http://127.0.0.1:${port} in a browser, or start with --port=<another>.\n`);
+        process.exit(1);
+      }
+      throw err;
+    }
     return; // startServer keeps the process alive
   }
   if (cmd === 'pipeline') {
