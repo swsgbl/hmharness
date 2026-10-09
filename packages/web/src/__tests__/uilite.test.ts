@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables, zhTask, classifyToolPhase, hasPlanText } from '../uilite.ts';
+import { fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, uiLiteSource, extractPlan, extractDeliverables, zhTask, classifyToolPhase, hasPlanText, esc } from '../uilite.ts';
+
+test('esc: HTML-escapes all dangerous characters (P0-A XSS closure)', () => {
+  assert.equal(esc('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+  assert.equal(esc('"><img onerror=alert(1)>'), '&quot;&gt;&lt;img onerror=alert(1)&gt;');
+  assert.equal(esc("'<iframe>"), '&#39;&lt;iframe&gt;');
+  assert.equal(esc('a&b'), 'a&amp;b');
+  assert.equal(esc(null), '');
+  assert.equal(esc(undefined), '');
+  assert.equal(esc(0), '0');
+  assert.equal(esc(42), '42');
+  // double-escape safety: already-escaped strings get their & escaped again (correct behavior)
+  assert.equal(esc('&lt;'), '&amp;lt;');
+});
 
 test('run-state 2.0: classifyToolPhase separates verification-shaped tools', () => {
   assert.equal(classifyToolPhase('harmony_build'), 'verifying');

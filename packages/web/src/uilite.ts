@@ -321,6 +321,19 @@ export function hasPlanText(text: string): boolean {
   return extractPlan(String(text)).length >= 2;
 }
 
+/** HTML-escape a string for safe interpolation into innerHTML contexts.
+ *  The P0-A XSS audit found data-originated strings (actionType, error
+ *  messages, environment IDs, skill names) concatenated into innerHTML -
+ *  this helper closes that class. Pure function, no dependencies. */
+export function esc(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function uiLiteSource(): string {
   // __name polyfill: tsx/esbuild (keep-names) rewrites inner function decls as
   // `var f = __name(function f(){...})` INSIDE the serialized bodies - the
@@ -330,6 +343,6 @@ export function uiLiteSource(): string {
   return [prelude,
     tokLine, renderInlineBlocks, inlineMd,
     fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask,
-    classifyToolPhase, hasPlanText]
+    classifyToolPhase, hasPlanText, esc]
     .map(function (f) { return typeof f === 'string' ? f : f.toString(); }).join('\n');
 }

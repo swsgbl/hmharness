@@ -1387,7 +1387,7 @@ ${uiLiteSource()}
   }
   function loadFs(path) {
     var list = document.getElementById('wsp-list');
-    list.innerHTML = '<div class="hint">' + (L ? L.loading : '...') + '</div>';
+    list.innerHTML = '<div class="hint">' + esc((L ? L.loading : '...')) + '</div>';
     fetch('/api/fs' + (path ? '?path=' + encodeURIComponent(path) : '')).then(function (r) {
       return r.json().then(function (d) { return { ok: r.ok, d: d }; });
     }).then(function (res) {
@@ -1418,7 +1418,7 @@ ${uiLiteSource()}
         list.innerHTML += '<div class="hint">' + L.none2 + '</div>';
       }
       window.__AN.stagger('.wsp-item', list);
-    }).catch(function (e) { list.innerHTML = '<div class="hint err">' + String(e) + '</div>'; });
+    }).catch(function (e) { list.innerHTML = '<div class="hint err">' + esc(String(e)) + '</div>'; });
   }
   function submitPick() {
     if (!pickPath) return;
@@ -1469,9 +1469,9 @@ ${uiLiteSource()}
       var worldEl = document.getElementById('cog-world');
       if (wm && wm.beliefs && wm.beliefs.length) {
         worldEl.innerHTML = wm.beliefs.slice(0, 8).map(function (b) {
-          return '<span class="ob ' + (b.confidence >= 0.6 ? 'ok' : b.confidence >= 0.3 ? 'tb' : 'err') + '">' + b.actionType + ' ' + (b.confidence * 100).toFixed(0) + '%<small>×' + b.evidenceCount + '</small></span>';
+          return '<span class="ob ' + (b.confidence >= 0.6 ? 'ok' : b.confidence >= 0.3 ? 'tb' : 'err') + '">' + esc(b.actionType) + ' ' + (b.confidence * 100).toFixed(0) + '%<small>×' + b.evidenceCount + '</small></span>';
         }).join(' ') +
-          '<div class="hint" style="margin-top:6px">' + wm.stepsReplayed + ' 步回放 · 校准 ' + (wm.calibration.meanError !== undefined ? '误差 ' + wm.calibration.meanError : '暂无预测') + ' · 可信动作 [' + (wm.plannerGate.trusted || []).join(',') + ']</div>';
+          '<div class="hint" style="margin-top:6px">' + wm.stepsReplayed + ' 步回放 · 校准 ' + (wm.calibration.meanError !== undefined ? '误差 ' + wm.calibration.meanError : '暂无预测') + ' · 可信动作 [' + (wm.plannerGate.trusted || []).map(esc).join(',') + ']</div>';
       } else {
         worldEl.innerHTML = '<div class="hint">暂无信念——任务轨迹积累后自动生成（预测先行=无泄漏回放）</div>';
       }
@@ -1481,7 +1481,7 @@ ${uiLiteSource()}
         if (!c.predictedSteps) { el.innerHTML = '<div class="hint">尚无带预测的轨迹——探索/迁移实验自动记录预测</div>'; return; }
         var rows = (c.rows || []).slice(0, 6).map(function (row) {
           var cls = row.reliability >= 0.75 ? 'ok' : row.reliability >= 0.5 ? 'tb' : 'err';
-          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + row.actionType + '</span> 可靠度 ' + (row.reliability * 100).toFixed(0) + '% <small>×' + row.predictions + ' 预测</small></div>';
+          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + esc(row.actionType) + '</span> 可靠度 ' + (row.reliability * 100).toFixed(0) + '% <small>×' + row.predictions + ' 预测</small></div>';
         }).join('');
         el.innerHTML = '<div class="hint" style="margin-bottom:4px">总体 ' + (c.overallReliability * 100).toFixed(1) + '% 可靠（' + c.predictedSteps + '/' + c.totalSteps + ' 步带预测）</div>' + rows +
           '<div class="hint" style="margin-top:4px">校准维=harness 实证价值所在（迁移 +0.4166，全谱系唯一正读数）</div>';
@@ -1518,9 +1518,9 @@ ${uiLiteSource()}
       var last = d.evolutionLastEvent;
       document.getElementById('cog-audit').innerHTML =
         '<span class="ob ' + (d.evolutionAuditEvents ? 'ok' : 'none') + '">' + (d.evolutionAuditEvents || 0) + ' 条事件</span>' +
-        (last ? '<div class="hint" style="margin-top:6px">最近: ' + String(last.event) + ' · ' + String(last.candidateId || '') + '</div>' : '<div class="hint" style="margin-top:6px">进化轮次结束后自动追加（promoted/rejected/rolled-back 全记录）</div>');
+        (last ? '<div class="hint" style="margin-top:6px">最近: ' + esc(String(last.event)) + ' · ' + esc(String(last.candidateId || '')) + '</div>' : '<div class="hint" style="margin-top:6px">进化轮次结束后自动追加（promoted/rejected/rolled-back 全记录）</div>');
       document.getElementById('cog-env').innerHTML = (d.environments || []).map(function (e) {
-        return '<span class="ob ok">' + e.id + ' <small>v' + e.version + '</small></span>';
+        return '<span class="ob ok">' + esc(e.id) + ' <small>v' + e.version + '</small></span>';
       }).join(' ') + '<div class="hint" style="margin-top:6px">环境适配器（terminal 原生 / harmonyos hdc / browser CDP / desktop / arc3 骨架）</div>';
       // lazy sections: goal drift timeline (time-ordered trend) + skill candidates
       api('/api/cognitive/drift?order=time').then(function (r) { return r.json(); }).then(function (dd) {
@@ -1530,12 +1530,12 @@ ${uiLiteSource()}
         // mini timeline: newest last, each run a colored dot scaled by drift
         var dots = views.map(function (v) {
           var cls = v.driftScore >= 0.7 ? 'err' : v.driftScore >= 0.3 ? 'tb' : 'ok';
-          return '<span class="ob ' + cls + '" title="' + String(v.goalDescription).slice(0, 60).replace(/"/g, '') + ' · 漂移 ' + v.driftScore.toFixed(2) + '">' + v.driftScore.toFixed(1) + '</span>';
+          return '<span class="ob ' + cls + '" title="' + esc(String(v.goalDescription).slice(0, 60)) + ' · 漂移 ' + v.driftScore.toFixed(2) + '">' + v.driftScore.toFixed(1) + '</span>';
         }).join(' → ');
         var worst = views.slice().sort(function (a, b) { return b.driftScore - a.driftScore; })[0];
         el.innerHTML =
           '<div style="margin-bottom:4px">' + dots + '</div>' +
-          '<div class="hint">时间线（旧→新），最重漂移 ' + worst.driftScore.toFixed(2) + ' [' + worst.recommendation + ']：' + String(worst.goalDescription).slice(0, 50) + '</div>';
+          '<div class="hint">时间线（旧→新），最重漂移 ' + worst.driftScore.toFixed(2) + ' [' + esc(worst.recommendation) + ']：' + esc(String(worst.goalDescription).slice(0, 50)) + '</div>';
       }).catch(function () {
         document.getElementById('cog-drift').innerHTML = '<div class="hint">加载失败</div>';
       });
@@ -1543,7 +1543,7 @@ ${uiLiteSource()}
         var cands = dd.candidates || [];
         document.getElementById('cog-skills').innerHTML = cands.length
           ? cands.map(function (c) {
-              return '<div style="margin:2px 0"><span class="ob tb">' + c.status + '</span> ' + c.procedure.join(' → ') + ' <small>×' + c.evidenceTrajectories + ' 轨迹</small></div>';
+                  return '<div style="margin:2px 0"><span class="ob tb">' + esc(c.status) + '</span> ' + esc(c.procedure.join(' → ')) + ' <small>×' + c.evidenceTrajectories + ' 轨迹</small></div>';
             }).join('') + '<div class="hint" style="margin-top:4px">晋升仍需过基准门禁（verify → promote）</div>'
           : '<div class="hint">暂无候选——需要≥2 条含≥2 步成功动作序列的轨迹</div>';
       }).catch(function () {
@@ -1578,7 +1578,7 @@ ${uiLiteSource()}
         var html = exps.slice(-8).reverse().map(function (e) {
           var cls = e.verdict === 'positive' ? 'ok' : e.verdict === 'negative' ? 'err' : 'tb';
           var cal = e.calibrationDelta !== undefined && e.calibrationDelta > 0 ? ' <small>校准 +' + e.calibrationDelta + '</small>' : '';
-          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + e.sourceEnv + ' → ' + e.targetEnv + ' ' + e.verdict + '</span> ' +
+          return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + esc(e.sourceEnv) + ' → ' + esc(e.targetEnv) + ' ' + esc(e.verdict) + '</span> ' +
             '<small>' + e.actionOverlap.length + ' 重叠动作</small>' + cal + '</div>';
         }).join('');
         el.innerHTML = html + '<div class="hint" style="margin-top:4px">正迁移=源知识改善目标预测；无重叠=诚实不构成检验</div>';
@@ -1592,7 +1592,7 @@ ${uiLiteSource()}
         if (!list.length) { el.innerHTML = '<div class="hint">暂无轨迹——跑任务/探索后自动生成</div>'; return; }
         var sel = '<select id="cog-replay-sel" style="background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;max-width:100%">' +
           list.map(function (t) {
-            return '<option value="' + t.id + '">' + (t.success ? '✓' : '✗') + ' ' + t.id.slice(0, 34) + ' · ' + t.actions + ' 步 · ' + t.environmentId + '</option>';
+            return '<option value="' + esc(t.id) + '">' + (t.success ? '✓' : '✗') + ' ' + esc(t.id.slice(0, 34)) + ' · ' + t.actions + ' 步 · ' + esc(t.environmentId) + '</option>';
           }).join('') + '</select>';
         el.innerHTML = sel + '<div id="cog-replay-body" class="hint" style="margin-top:6px">选择上方轨迹查看逐步回放</div>';
         document.getElementById('cog-replay-sel').onchange = function () { loadReplay(this.value); };
@@ -1629,11 +1629,11 @@ ${uiLiteSource()}
   }
   function loadBoard() {
     var grid = document.getElementById('board-grid');
-    grid.innerHTML = '<div class="hint">' + L.loading + '</div>';
+    grid.innerHTML = '<div class="hint">' + esc(L.loading) + '</div>';
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (d) {
       grid.innerHTML = '';
       var list = (d.sessions || []).slice(0, 24);
-      if (!list.length) { grid.innerHTML = '<div class="hint">' + L.none2 + '</div>'; return; }
+      if (!list.length) { grid.innerHTML = '<div class="hint">' + esc(L.none2) + '</div>'; return; }
       list.forEach(function (s) {
         var card = document.createElement('div');
         card.className = 'card';
@@ -1650,7 +1650,7 @@ ${uiLiteSource()}
         grid.appendChild(card);
       });
       window.__AN.stagger('.card', grid);
-    }).catch(function (e) { grid.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+    }).catch(function (e) { grid.innerHTML = '<div class="err">' + esc(String(e)) + '</div>'; });
   }
   /* Extension bridge row: renders FIRST and regardless of hdc — the user's
      real browser is a device too (green=connected, amber=bridge up but no
@@ -1667,7 +1667,7 @@ ${uiLiteSource()}
   }
   function loadDevices() {
     var box = document.getElementById('dev-body');
-    box.innerHTML = '<div class="hint">' + L.loading + '</div>';
+    box.innerHTML = '<div class="hint">' + esc(L.loading) + '</div>';
     // extension status first (fast local probe), then the hdc inventory —
     // the ext row must survive the hdc empty/absent early-returns
     fetch('/api/extension/status').then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (st) {
@@ -1759,7 +1759,7 @@ ${uiLiteSource()}
   function renderSkills() {
     var box = document.getElementById('sk-body');
     box.innerHTML = '';
-    if (!state) { box.innerHTML = '<div class="hint">' + L.loading + '</div>'; return; }
+    if (!state) { box.innerHTML = '<div class="hint">' + esc(L.loading) + '</div>'; return; }
     var h1 = document.createElement('h3'); h1.className = 'sec'; h1.textContent = L.skActive;
     box.appendChild(h1);
     if (!state.skills.active.length) box.appendChild(Object.assign(document.createElement('div'), { className: 'hint', textContent: L.noSkills }));
@@ -2178,7 +2178,7 @@ ${uiLiteSource()}
     });
 
     if (!groupOrder.length) {
-      groupsEl.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + L.none2 + '</div>';
+      groupsEl.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:6px">' + esc(L.none2) + '</div>';
     }
     // legacy elements are unused now (superseded by per-project groups)
     if (other) other.style.display = 'none';
@@ -2288,7 +2288,7 @@ ${uiLiteSource()}
       var ft = document.getElementById('ftree');
       if (!ft.getAttribute('data-loaded')) {
         ft.setAttribute('data-loaded', '1');
-        ft.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+        ft.innerHTML = '<div class="hint">' + esc((L ? L.loading : '…')) + '</div>';
         loadTree((state && state.workspace && state.workspace.path) || '', ft);
       }
     }
@@ -2303,7 +2303,7 @@ ${uiLiteSource()}
   function loadEvidencePane() {
     var ev = document.getElementById('eview');
     if (!ev) return;
-    ev.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+    ev.innerHTML = '<div class="hint">' + esc((L ? L.loading : '…')) + '</div>';
     fetch('/api/cognitive').then(function (r) { return r.json(); }).then(function (c) {
       var rows = [];
       if (c && c.model) rows.push(['模型', c.model]);
@@ -2423,7 +2423,7 @@ ${uiLiteSource()}
         }
         var box = document.createElement('div');
         box.className = 'fkids';
-        box.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+        box.innerHTML = '<div class="hint">' + esc((L ? L.loading : '…')) + '</div>';
         row.after(box);
         ic.textContent = '\\uD83D\\uDCC2';
         loadTree(path, box);
@@ -2443,20 +2443,20 @@ ${uiLiteSource()}
         var d = res.d;
         (d.dirs || []).forEach(function (dir) { box.appendChild(fileRow(dir.name, dir.path, dir.path, 'dir')); });
         (d.files || []).forEach(function (f) { box.appendChild(fileRow(f.name, f.rel, f.path, 'file')); });
-        if (!(d.dirs || []).length && !(d.files || []).length) box.innerHTML = '<div class="hint">' + L.none2 + '</div>';
+        if (!(d.dirs || []).length && !(d.files || []).length) box.innerHTML = '<div class="hint">' + esc(L.none2) + '</div>';
       })
-      .catch(function (e) { if (box.isConnected) box.innerHTML = '<div class="hint err">' + String(e) + '</div>'; });
+      .catch(function (e) { if (box.isConnected) box.innerHTML = '<div class="hint err">' + esc(String(e)) + '</div>'; });
   }
   function openPreview(rel) {
     openRight('preview');
     var box = document.getElementById('pview');
-    box.innerHTML = '<div class="hint">' + (L ? L.loading : '…') + '</div>';
+    box.innerHTML = '<div class="hint">' + esc((L ? L.loading : '…')) + '</div>';
     fetch('/api/fs/read?path=' + encodeURIComponent(rel))
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         var d = res.d || {};
         if (!res.ok || d.error) {
-          box.innerHTML = '<div class="err">' + (d.error || L.pvNotFile) + '</div>';
+          box.innerHTML = '<div class="err">' + esc((d.error || L.pvNotFile)) + '</div>';
           return;
         }
         if (d.binary) {
@@ -2472,7 +2472,7 @@ ${uiLiteSource()}
         pre.textContent = d.text || '';
         box.appendChild(h); box.appendChild(pre);
       })
-      .catch(function (e) { box.innerHTML = '<div class="err">' + String(e) + '</div>'; });
+      .catch(function (e) { box.innerHTML = '<div class="err">' + esc(String(e)) + '</div>'; });
   }
   // clickable file paths inside the chat: a path-looking <code> opens the preview tab.
   // Relative paths AND Windows/POSIX absolute paths (the old regex rejected the
