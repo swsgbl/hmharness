@@ -12,7 +12,7 @@ import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import {
   homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
@@ -385,6 +385,43 @@ export async function startServer(opts: {
     if (sseRing.length > 200) sseRing.splice(0, sseRing.length - 200);
   };
   const sseRing: Array<{ id: number; event: string; data: unknown }> = [];
+
+  // ---- desktop bridge envelopes (2026-10-10, HMH Desktop 阶段E) ----
+  // desktop 模式下,run 生命周期事件同时以 EventEnvelope 形状发出
+  // (event: hmh;schemaVersion/eventId/sessionId/runId/seq/occurredAt/kind),
+  // 与既有事件名并存迁移。高频 line/delta 不是 run 生命周期,不造假映射,
+  // 继续只走原事件名。信封同样进 sseRing → Last-Event-ID 断线补拉生效。
+  const envSeqByRun = new Map<string, number>();
+  const sendEnvelope = (
+    sessionId: string,
+    runId: string,
+    kind: 'run.started' | 'tool.started' | 'tool.completed' | 'approval.required' | 'run.completed' | 'run.failed',
+    payload: Record<string, unknown>,
+  ): void => {
+    if (!desktop) return;
+    const key = `${sessionId}\0${runId}`;
+    const seq = (envSeqByRun.get(key) ?? 0) + 1;
+    envSeqByRun.set(key, seq);
+    if (envSeqByRun.size > 500) envSeqByRun.delete(envSeqByRun.keys().next().value as string);
+    for (const res of sseClients) {
+      sseSend(res, 'hmh', {
+        schemaVersion: 1,
+        eventId: randomUUID(),
+        sessionId,
+        runId,
+        seq,
+        occurredAt: new Date().toISOString(),
+        kind,
+        payload,
+      });
+    }
+  };
+  const preview = (v: unknown, max = 2000): string => {
+    try { return JSON.stringify(v ?? {}).slice(0, max); } catch { return String(v).slice(0, max); }
+  };
+  const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+
   const broadcast = (event: string, data: unknown) => {
     for (const r of sseClients) sseSend(r, event, data);
   };
@@ -423,7 +460,11 @@ export async function startServer(opts: {
       } catch { /* not a known rollout - fresh thread */ }
     }
     const resume = item.fresh ? [] : thread.conversation;
-    broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue, sessionId: sid, cwd: thread.cwd });
+    // desktop envelope run id: one per task attempt (restart-safe: a retried
+    // task is a NEW run; the desktop EventStore keys dedup by eventId anyway)
+    const runId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    broadcast('busy', { busy: true, task: item.text, mode: item.mode, fromQueue, sessionId: sid, cwd: thread.cwd, runId });
+    sendEnvelope(sid, runId, 'run.started', { task: item.text, mode: item.mode });
 
     const { spawn } = await import('node:child_process');
     const { createInterface: rlCreate } = await import('node:readline');
@@ -479,8 +520,14 @@ export async function startServer(opts: {
       const kind = String(ev.kind ?? '');
       if (kind === 'line') broadcast('line', { text: ev.text, sessionId: sid });
       else if (kind === 'delta') broadcast('delta', { kind: ev.k, chunk: ev.chunk, sessionId: sid });
-      else if (kind === 'tool') broadcast('tool', { name: ev.name, args: ev.args, sessionId: sid });
-      else if (kind === 'toolResult') broadcast('toolResult', { name: ev.name, isError: ev.isError === true, preview: String(ev.output ?? '').slice(0, 300), full: String(ev.output ?? '').slice(0, 8000), sessionId: sid });
+      else if (kind === 'tool') {
+        broadcast('tool', { name: ev.name, args: ev.args, sessionId: sid });
+        sendEnvelope(sid, runId, 'tool.started', { name: String(ev.name ?? ''), argsPreview: preview(ev.args) });
+      }
+      else if (kind === 'toolResult') {
+        broadcast('toolResult', { name: ev.name, isError: ev.isError === true, preview: String(ev.output ?? '').slice(0, 300), full: String(ev.output ?? '').slice(0, 8000), sessionId: sid });
+        sendEnvelope(sid, runId, 'tool.completed', { name: String(ev.name ?? ''), isError: ev.isError === true, outputPreview: String(ev.output ?? '').slice(0, 2000) });
+      }
       else if (kind === 'injected') broadcast('injected', { text: ev.text, sessionId: sid });
       else if (kind === 'approvalDone') broadcast('approvalDone', { name: ev.name, args: ev.args, granted: ev.granted === true, sessionId: sid });
       else if (kind === 'approvalReq') {
@@ -495,19 +542,41 @@ export async function startServer(opts: {
         }, APPROVAL_TIMEOUT_MS);
         exec.pending = { name: String(ev.name ?? ''), args: ev.args as Record<string, unknown>, resolve: send, timer, id };
         broadcast('approvalReq', { name: ev.name, args: ev.args, sessionId: sid });
+        sendEnvelope(sid, runId, 'approval.required', {
+          approvalId: String(id),
+          tool: String(ev.name ?? ''),
+          argsPreview: preview(ev.args),
+          risk: `执行工具 ${String(ev.name ?? '')}(参数见上);批准后由 runtime 在沙箱内执行`,
+        });
       } else if (kind === 'final') {
+        sawFinal = true;
         const msgs = (ev.messages ?? []) as ChatMessage[];
         thread.conversation = msgs.length
           ? msgs
           : [...resume, { role: 'user', content: item.text }];
         thread.rolloutId = String(ev.sessionId ?? sid);
         broadcast('final', {
-          text: ev.text, sessionId: sid, turns: ev.turns, toolUses: ev.toolUses, usage: ev.usage,
+          text: ev.text, sessionId: sid, runId, turns: ev.turns, toolUses: ev.toolUses, usage: ev.usage,
           turnsInThread: Math.floor(thread.conversation.length / 2),
+        });
+        sendEnvelope(sid, runId, 'run.completed', {
+          text: String(ev.text ?? ''),
+          turns: Number(ev.turns ?? 0),
+          toolUses: Number(ev.toolUses ?? 0),
+          ...(isRecord(ev.usage) ? { usage: ev.usage as Record<string, number> } : {}),
         });
       } else if (kind === 'error') {
         exec.authError = isProviderAuthError(String(ev.error ?? ''));
         broadcast('error', { message: String(ev.error ?? '').slice(0, 400), sessionId: sid });
+        // task-level failure → run.failed;the 6 bridge codes are reused
+        // (provider auth/balance → AUTH_FAILED, anything else → RUNTIME_CRASHED)
+        sendEnvelope(sid, runId, 'run.failed', {
+          error: {
+            code: exec.authError ? 'AUTH_FAILED' : 'RUNTIME_CRASHED',
+            message: String(ev.error ?? '').slice(0, 400),
+            retryable: !exec.authError,
+          },
+        });
       }
     };
 
@@ -519,13 +588,20 @@ export async function startServer(opts: {
     let stderrTail = '';
     child.stderr?.on('data', (d: Buffer) => { stderrTail = (stderrTail + d.toString()).slice(-600); });
 
+    let sawFinal = false; // relay('final') sets it; child exit without it = crashed run
     const finish = async (code: number) => {
       if (exec.pending) { clearTimeout(exec.pending.timer); exec.pending = null; }
       exec.busy = false;
       exec.proc = null;
       exec.stdin = null;
-      if (code !== 0 && stderrTail.trim()) {
-        broadcast('error', { message: 'task child exit ' + code + ': ' + stderrTail.trim().slice(0, 300), sessionId: sid });
+      if (code !== 0 && !sawFinal) {
+        const msg = stderrTail.trim() ? 'task child exit ' + code + ': ' + stderrTail.trim().slice(0, 300) : 'task child exit ' + code;
+        broadcast('error', { message: msg, sessionId: sid });
+        // no final event ever arrived: the desktop reducer would sit in
+        // 'running' forever - close the run envelope explicitly
+        sendEnvelope(sid, runId, 'run.failed', {
+          error: { code: 'RUNTIME_CRASHED', message: msg, retryable: true },
+        });
       }
       broadcast('busy', { busy: false, sessionId: sid });
       broadcast('state', await stateObject());
