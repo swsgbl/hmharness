@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,4 +130,78 @@ test('短 token(<32)→ 拒绝启动(exit 2)', async () => {
   });
   assert.equal(code, 2);
   await rm(home, { recursive: true, force: true });
+});
+
+test('/api/diff:git 工作区返回只读变更,非 git 返回 git:false(M4 Diff 面板)', async () => {
+  // 临时 git 仓:一个已修改文件 + 一个未跟踪文件
+  const repo = await mkdtemp(join(tmpdir(), 'hmh-diff-'));
+  await writeFile(join(repo, 'a.txt'), 'one\n', 'utf8');
+  const git = (args: string[]) =>
+    new Promise<void>((resolve, reject) => {
+      import('node:child_process').then(({ execFile }) =>
+        execFile('git', args, { cwd: repo, timeout: 8_000, windowsHide: true }, (err) => (err ? reject(err) : resolve())));
+    });
+  try {
+    await git(['init', '-q']);
+    await git(['config', 'user.email', 't@t']);
+    await git(['config', 'user.name', 't']);
+    await git(['add', 'a.txt']);
+    await git(['commit', '-q', '-m', 'init']);
+    await writeFile(join(repo, 'a.txt'), 'one\ntwo\n', 'utf8');
+    await writeFile(join(repo, 'b.txt'), 'new\n', 'utf8');
+  } catch {
+    await rm(repo, { recursive: true, force: true });
+    assert.fail('git fixture 准备失败');
+  }
+
+  const home = await mkdtemp(join(tmpdir(), 'hmh-desktop-host-'));
+  await mkdir(join(home, 'sessions'), { recursive: true });
+  // cwd=repo(临时仓)时 bare 'tsx' 无法从 cwd 解析 —— 传绝对 file URL
+  // (Windows 绝对路径直接给 --import 会被当成 'g:' 协议,必须 pathToFileURL)
+  const { createRequire } = await import('node:module');
+  const { pathToFileURL } = await import('node:url');
+  const tsxUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
+  const child = spawn(process.execPath, ['--import', tsxUrl, hostTs], {
+    cwd: repo, // server cwd = wsRoot → diff 面向该仓
+    env: { ...process.env, HMH_HOME: home, HMH_DESKTOP_TOKEN: TOKEN },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  const port = await new Promise<number | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), 30_000);
+    let buf = '';
+    child.stdout!.on('data', (d: Buffer) => {
+      buf += d.toString();
+      const idx = buf.indexOf('\n');
+      if (idx > 0) {
+        try {
+          const v = JSON.parse(buf.slice(0, idx)) as { hmhDesktopHostReady?: boolean; port?: number };
+          if (v.hmhDesktopHostReady === true && typeof v.port === 'number') {
+            clearTimeout(timer);
+            resolve(v.port);
+          }
+        } catch { /* not json */ }
+      }
+    });
+    child.on('exit', () => { clearTimeout(timer); resolve(null); });
+  });
+  try {
+    assert.notEqual(port, null, 'desktop-host 启动');
+    const r = await fetch(`http://127.0.0.1:${port}/api/diff`, { headers: { 'x-hmh-key': TOKEN } });
+    assert.equal(r.status, 200);
+    const d = (await r.json()) as { git: boolean; changed: Array<{ state: string; path: string }>; stat: string };
+    assert.equal(d.git, true);
+    const paths = d.changed.map((c) => c.path);
+    assert.ok(paths.includes('a.txt'), '修改的文件在列表');
+    assert.ok(paths.includes('b.txt'), '未跟踪文件在列表');
+    assert.match(d.stat, /a\.txt/, 'diff --stat 输出');
+    // 非 git 目录 → git:false 不报错
+    const r2 = await fetch(`http://127.0.0.1:${port}/api/diff?sessionId=nope`, { headers: { 'x-hmh-key': TOKEN } });
+    assert.equal(r2.status, 200);
+  } finally {
+    child.kill();
+    await new Promise((r) => setTimeout(r, 300));
+    await rm(home, { recursive: true, force: true });
+    await rm(repo, { recursive: true, force: true });
+  }
 });

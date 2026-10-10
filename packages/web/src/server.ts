@@ -1188,6 +1188,34 @@ export async function startServer(opts: {
         json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/diff') {
+        // 工作区变更(只读,HMH Desktop Diff 面板/M4):会话 cwd 的 git
+        // status --porcelain + diff --stat。非 git 目录返回 git:false,
+        // 不报错(UI 显示"非 git 工作区")。绝不写任何状态。
+        const sidDiff = url.searchParams.get('sessionId') ?? '';
+        const thDiff = sessionThreads.get(sidDiff);
+        const cwdDiff = thDiff?.cwd ?? wsRoot();
+        const run = (args: string[]): Promise<{ ok: boolean; out: string }> =>
+          new Promise((resolve) => {
+            execFile('git', ['-c', 'core.quotepath=false', ...args], { cwd: cwdDiff, timeout: 8_000, windowsHide: true, maxBuffer: 512 * 1024 }, (err, stdout) => {
+              if (err || typeof stdout !== 'string') resolve({ ok: false, out: '' });
+              else resolve({ ok: true, out: stdout });
+            });
+          });
+        const status = await run(['status', '--porcelain']);
+        if (!status.ok) {
+          json(res, 200, { git: false, cwd: cwdDiff, changed: [], stat: '' });
+          return;
+        }
+        const stat = await run(['diff', 'HEAD', '--stat']);
+        const changed = status.out.split(/\r?\n/).filter((l) => l.trim()).slice(0, 400)
+          .map((l) => ({
+            state: l.slice(0, 2).trim(),
+            path: l.slice(3),
+          }));
+        json(res, 200, { git: true, cwd: cwdDiff, changed, stat: stat.out.slice(0, 8_000) });
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/fs') {
         // Directory browser backing the workspace picker: lists drives
         // (no path) or the subdirectories of one absolute path. Read-only,
