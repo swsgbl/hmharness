@@ -118,3 +118,87 @@ test('sanitizeToolCalls unit: empty, truncated, undefined become {}; valid untou
   ]);
   assert.deepEqual(out.map((c) => c.function.arguments), ['{}', '{}', '{}', '{"q":1}']);
 });
+
+/* ---- v0.23.34 hardening contract(02 号路线图 P0):非对象 arguments、
+   取消、provider 400、错误可捕获不逃逸 ---- */
+
+test('非对象 arguments(unit):"str"/null/[1,2]/42 都改写为 {},对象原样', () => {
+  const out = sanitizeToolCalls([
+    { id: 'a', type: 'function' as const, function: { name: 'x', arguments: '"just a string"' } },
+    { id: 'b', type: 'function' as const, function: { name: 'x', arguments: 'null' } },
+    { id: 'c', type: 'function' as const, function: { name: 'x', arguments: '[1,2]' } },
+    { id: 'd', type: 'function' as const, function: { name: 'x', arguments: '42' } },
+    { id: 'e', type: 'function' as const, function: { name: 'x', arguments: '{"q":1}' } },
+  ]);
+  assert.deepEqual(out.map((c) => c.function.arguments), ['{}', '{}', '{}', '{}', '{"q":1}']);
+});
+
+test('非对象 arguments(runLoop 级):跳过执行 + 明确报错 + 任务存活 + 重放 {}', async () => {
+  const executed = { n: 0 };
+  const reg = new Registry();
+  reg.register(searchTool(executed));
+  const seen: SeenMessages = [];
+  const r = await runLoop({
+    provider: fakeProvider, registry: reg,
+    messages: [{ role: 'user', content: 'go' }],
+    ctx: { cwd: '.', home: '.' },
+    chatImpl: recordingChat([
+      { calls: [{ name: 'web_search', args: '"just a string"' }], text: null },
+      { text: 'recovered' },
+    ], seen) as never,
+  });
+  assert.equal(r.reason, 'final', '非对象参数不杀任务');
+  assert.equal(executed.n, 0, '非对象参数的调用不执行');
+  const errResult = r.messages.filter((m) => m.role === 'tool');
+  assert.match(String(errResult[0].content), /arguments must be valid JSON/i, '模型收到明确指引');
+  const replayed = seen[1].filter((m) => m.role === 'assistant' && m.tool_calls)[0];
+  assert.equal(replayed.tool_calls![0].function.arguments, '{}', '重放前已消毒');
+});
+
+test('取消(signal):下一轮边界停止,reason=interrupted,不抛异常逃逸', async () => {
+  const executed = { n: 0 };
+  const reg = new Registry();
+  reg.register(searchTool(executed));
+  const ac = new AbortController();
+  const seen: SeenMessages = [];
+  const slowChat = async (_p: unknown, _m: never[]) => {
+    await new Promise((r) => setTimeout(r, 20));
+    ac.abort(); // 用户在模型响应期间取消
+    const step = { calls: [{ name: 'web_search', args: '{"query":"x"}' }], text: null };
+    const calls = step.calls.map((c, j) => ({ id: `c_${j}`, type: 'function' as const, function: { name: c.name, arguments: c.args } }));
+    return { message: { role: 'assistant' as const, content: null, tool_calls: calls }, usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  };
+  const r = await runLoop({
+    provider: fakeProvider, registry: reg,
+    messages: [{ role: 'user', content: 'long task' }],
+    ctx: { cwd: '.', home: '.' },
+    signal: ac.signal,
+    chatImpl: slowChat as never,
+  });
+  void seen;
+  assert.equal(r.reason, 'interrupted', '取消后以 interrupted 收场而非异常');
+  assert.ok(Array.isArray(r.messages), '消息数组完整(会话可导出/续跑)');
+});
+
+test('provider 400(chat 抛错):runLoop 以可捕获异常结束,不静默挂起', async () => {
+  const reg = new Registry();
+  reg.register(searchTool({ n: 0 }));
+  const failingChat = async (): Promise<never> => {
+    const err = new Error('HTTP 400: {"error":{"message":"Assistant tool call arguments must be valid JSON"}}') as Error & { status?: number };
+    err.status = 400;
+    throw err;
+  };
+  await assert.rejects(
+    runLoop({
+      provider: fakeProvider, registry: reg,
+      messages: [{ role: 'user', content: 'go' }],
+      ctx: { cwd: '.', home: '.' },
+      chatImpl: failingChat as never,
+    }),
+    (err: unknown) => {
+      assert.match(String((err as Error).message), /HTTP 400/);
+      return true;
+    },
+    'provider 错误必须是可捕获的 rejection(调用方决定恢复动作),而不是挂起或吞掉',
+  );
+});

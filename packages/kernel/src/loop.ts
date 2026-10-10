@@ -58,8 +58,17 @@ export interface LoopResult {
 export function sanitizeToolCalls<T extends { function: { arguments: string } }>(calls: T[]): T[] {
   return calls.map((c) => {
     if (!c.function?.arguments) return { ...c, function: { ...c.function, arguments: '{}' } };
-    try { JSON.parse(c.function.arguments); return c; }
-    catch { return { ...c, function: { ...c.function, arguments: '{}' } }; }
+    try {
+      // Tool arguments must be a JSON OBJECT: "str" / null / [1,2] / 42 all
+      // parse fine but leave tools reading undefined fields (v0.23.34
+      // hardening - "空/截断/非对象 arguments"). Rewritten to '{}' like the
+      // rest: valid on the wire, harmless to execute.
+      const parsed: unknown = JSON.parse(c.function.arguments);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return { ...c, function: { ...c.function, arguments: '{}' } };
+      }
+      return c;
+    } catch { return { ...c, function: { ...c.function, arguments: '{}' } }; }
   });
 }
 
@@ -239,8 +248,13 @@ export async function runLoop(opts: {
       let args: Record<string, unknown> = {};
       let badArgs = false;
       if (rawArgs) {
-        try { args = JSON.parse(rawArgs) as Record<string, unknown>; }
-        catch { badArgs = true; }
+        try {
+          const parsed: unknown = JSON.parse(rawArgs);
+          // valid JSON but NOT an object ("str"/null/[1,2]/42): tools would
+          // read undefined fields - treat like unparseable (skip + clear msg)
+          if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) badArgs = true;
+          else args = parsed as Record<string, unknown>;
+        } catch { badArgs = true; }
       } else {
         // Empty-string arguments are invalid JSON to every provider too (they
         // 400 on replay). Executing with {} used to produce a confusing shell

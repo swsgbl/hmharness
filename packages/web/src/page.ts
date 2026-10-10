@@ -1391,7 +1391,7 @@ ${uiLiteSource()}
     fetch('/api/fs' + (path ? '?path=' + encodeURIComponent(path) : '')).then(function (r) {
       return r.json().then(function (d) { return { ok: r.ok, d: d }; });
     }).then(function (res) {
-      if (!res.ok) { list.innerHTML = '<div class="hint err">' + ((res.d && res.d.error) || 'failed') + '</div>'; return; }
+      if (!res.ok) { list.innerHTML = '<div class="hint err">' + esc((res.d && res.d.error) || 'failed') + '</div>'; return; }
       var d = res.d;
       pickPath = d.path || '';
       document.getElementById('wsp-path').value = d.path || '';
@@ -1505,7 +1505,7 @@ ${uiLiteSource()}
           var cls = t.verdict === 'improving' ? 'ok' : t.verdict === 'degrading' ? 'err' : 'tb';
           var spark = t.buckets.map(function (b) {
             var h = Math.max(2, Math.round(b.reliability * 28));
-            return '<div style="display:inline-block;width:14px;margin-right:2px;background:var(--line);border-radius:2px 2px 0 0;height:' + h + 'px;vertical-align:bottom" title="' + b.at.slice(0, 10) + ' ' + (b.reliability * 100).toFixed(0) + '% (n=' + b.predictions + ')"></div>';
+            return '<div style="display:inline-block;width:14px;margin-right:2px;background:var(--line);border-radius:2px 2px 0 0;height:' + h + 'px;vertical-align:bottom" title="' + esc(b.at.slice(0, 10)) + ' ' + (b.reliability * 100).toFixed(0) + '% (n=' + b.predictions + ')"></div>';
           }).join('');
           var delta = t.reliabilityDelta === null ? '' : (t.reliabilityDelta >= 0 ? ' +' : ' ') + (t.reliabilityDelta * 100).toFixed(1) + '%';
           html += '<div style="margin:4px 0"><span class="ob ' + cls + '">' + name + '</span>' + spark + '<small>' + delta + ' ' + t.verdict + '</small></div>';
@@ -1554,16 +1554,16 @@ ${uiLiteSource()}
         var liveT = dd.live;
         var html = liveT && liveT.nodes && liveT.nodes.length
           ? '<div class="hint" style="margin-bottom:4px">当前拓扑: ' + liveT.nodes.map(function (n) {
-              return '<span class="ob ' + (n.status === 'done' ? 'ok' : n.status === 'running' ? 'tb' : n.status === 'failed' ? 'err' : 'none') + '">' + n.role + '·' + n.status + '</span>';
+              return '<span class="ob ' + (n.status === 'done' ? 'ok' : n.status === 'running' ? 'tb' : n.status === 'failed' ? 'err' : 'none') + '">' + esc(n.role) + '·' + esc(n.status) + '</span>';
             }).join(' ') + '</div>' : '';
         html += events.length
           ? events.slice(-8).reverse().map(function (e) {
               var cls = e.event === 'spawn.done' ? 'ok' : e.event === 'spawn.failed' ? 'err' : 'tb';
-              var label = e.event === 'team.created' ? 'team · ' + String(e.goal).slice(0, 40)
-                : e.event === 'spawn.started' ? e.nodeId + ' [' + e.role + '] 预算' + e.budgetUnits
-                : e.event === 'spawn.done' ? e.nodeId + ' [' + e.role + '] ' + e.durationMs + 'ms'
-                : e.nodeId + ' [' + e.role + '] 失败';
-              return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + String(e.at).slice(11, 19) + '</span> ' + label + '</div>';
+              var label = e.event === 'team.created' ? 'team · ' + esc(String(e.goal).slice(0, 40))
+                : e.event === 'spawn.started' ? esc(e.nodeId) + ' [' + esc(e.role) + '] 预算' + e.budgetUnits
+                : e.event === 'spawn.done' ? esc(e.nodeId) + ' [' + esc(e.role) + '] ' + e.durationMs + 'ms'
+                : esc(e.nodeId) + ' [' + esc(e.role) + '] 失败';
+              return '<div style="margin:2px 0"><span class="ob ' + cls + '">' + esc(String(e.at).slice(11, 19)) + '</span> ' + label + '</div>';
             }).join('')
           : '<div class="hint">暂无记录——跑一个带 spawn_agent 的任务后自动生成（角色契约+共享预算+不可变审计）</div>';
         document.getElementById('cog-team').innerHTML = html;
@@ -1618,10 +1618,10 @@ ${uiLiteSource()}
         var cls = s.outcome === 'success' ? 'ok' : s.outcome === 'failure' ? 'err' : 'none';
         var pred = s.prediction ? ' <small>预测 ' + Math.round(s.prediction.confidence * 100) + '%</small>' : '';
         var dur = s.durationMs !== undefined ? ' <small>' + s.durationMs + 'ms</small>' : '';
-        return '<div style="margin:1px 0"><span class="ob ' + cls + '">' + s.step + '</span> ' + s.actionType + pred + dur + '</div>';
+        return '<div style="margin:1px 0"><span class="ob ' + cls + '">' + s.step + '</span> ' + esc(s.actionType) + pred + dur + '</div>';
       }).join('');
       body.innerHTML =
-        '<div class="hint" style="margin-bottom:4px">' + (v.goal ? '目标: ' + String(v.goal).slice(0, 60) + ' · ' : '') + v.environmentId + ' · 耗时 ' + Math.round((v.metrics.elapsedMs || 0) / 1000) + 's' + (v.metrics.brierScore !== undefined ? ' · Brier ' + v.metrics.brierScore : '') + '</div>' +
+        '<div class="hint" style="margin-bottom:4px">' + (v.goal ? '目标: ' + esc(String(v.goal).slice(0, 60)) + ' · ' : '') + esc(v.environmentId) + ' · 耗时 ' + Math.round((v.metrics.elapsedMs || 0) / 1000) + 's' + (v.metrics.brierScore !== undefined ? ' · Brier ' + v.metrics.brierScore : '') + '</div>' +
         (steps || '<div class="hint">（0 步）</div>');
     }).catch(function () {
       body.innerHTML = '<div class="hint err">回放失败</div>';
@@ -2161,7 +2161,7 @@ ${uiLiteSource()}
       var defOpen = isCur || idx === 0 || !!f;
       var open = Object.prototype.hasOwnProperty.call(grpOpen, key) ? grpOpen[key] : defOpen;
       head.innerHTML = '<span class="pcaret">' + (open ? '\\u25BE' : '\\u25B8') + '</span>'
-        + '<span class="pname">' + projName(g.path) + '</span>'
+        + '<span class="pname">' + esc(projName(g.path)) + '</span>'
         + '<span class="pcount">' + g.items.length + '</span>';
       groupsEl.appendChild(head);
       var body = document.createElement('div');
@@ -2439,7 +2439,7 @@ ${uiLiteSource()}
       .then(function (res) {
         if (!box.isConnected) return;
         box.innerHTML = '';
-        if (!res.ok) { box.innerHTML = '<div class="hint err">' + ((res.d && res.d.error) || 'failed') + '</div>'; return; }
+        if (!res.ok) { box.innerHTML = '<div class="hint err">' + esc((res.d && res.d.error) || 'failed') + '</div>'; return; }
         var d = res.d;
         (d.dirs || []).forEach(function (dir) { box.appendChild(fileRow(dir.name, dir.path, dir.path, 'dir')); });
         (d.files || []).forEach(function (f) { box.appendChild(fileRow(f.name, f.rel, f.path, 'file')); });
