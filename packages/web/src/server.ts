@@ -395,7 +395,7 @@ export async function startServer(opts: {
   const sendEnvelope = (
     sessionId: string,
     runId: string,
-    kind: 'run.started' | 'tool.started' | 'tool.completed' | 'approval.required' | 'run.completed' | 'run.failed',
+    kind: 'run.started' | 'tool.started' | 'tool.completed' | 'approval.required' | 'artifact.created' | 'run.completed' | 'run.failed',
     payload: Record<string, unknown>,
   ): void => {
     if (!desktop) return;
@@ -421,6 +421,25 @@ export async function startServer(opts: {
   };
   const isRecord = (v: unknown): v is Record<string, unknown> =>
     typeof v === 'object' && v !== null && !Array.isArray(v);
+
+  /** 只读收集一个目录的 git 变更(status --porcelain + diff --stat)。
+   *  供 /api/diff(Diff 面板)与 desktop 桥的 artifact.created(交付物)共用;
+   *  非 git 目录返回 {git:false},永不写状态。 */
+  const collectGitChanges = async (cwd: string): Promise<{ git: boolean; changed: Array<{ state: string; path: string }>; stat: string }> => {
+    const run = (args: string[]): Promise<{ ok: boolean; out: string }> =>
+      new Promise((resolve) => {
+        execFile('git', ['-c', 'core.quotepath=false', ...args], { cwd, timeout: 8_000, windowsHide: true, maxBuffer: 512 * 1024 }, (err, stdout) => {
+          if (err || typeof stdout !== 'string') resolve({ ok: false, out: '' });
+          else resolve({ ok: true, out: stdout });
+        });
+      });
+    const status = await run(['status', '--porcelain']);
+    if (!status.ok) return { git: false, changed: [], stat: '' };
+    const stat = await run(['diff', 'HEAD', '--stat']);
+    const changed = status.out.split(/\r?\n/).filter((l) => l.trim()).slice(0, 400)
+      .map((l) => ({ state: l.slice(0, 2).trim(), path: l.slice(3) }));
+    return { git: true, changed, stat: stat.out.slice(0, 8_000) };
+  };
 
   const broadcast = (event: string, data: unknown) => {
     for (const r of sseClients) sseSend(r, event, data);
@@ -559,12 +578,34 @@ export async function startServer(opts: {
           text: ev.text, sessionId: sid, runId, turns: ev.turns, toolUses: ev.toolUses, usage: ev.usage,
           turnsInThread: Math.floor(thread.conversation.length / 2),
         });
-        sendEnvelope(sid, runId, 'run.completed', {
-          text: String(ev.text ?? ''),
-          turns: Number(ev.turns ?? 0),
-          toolUses: Number(ev.toolUses ?? 0),
-          ...(isRecord(ev.usage) ? { usage: ev.usage as Record<string, number> } : {}),
-        });
+        // desktop 桥:交付物先于终态(artifact.created ← 任务在会话 cwd 留下的
+        // git 变更;Desktop 的终态不回退规则保证 completed 不被拉回 running)
+        if (desktop) {
+          const done = async (): Promise<void> => {
+            try {
+              const changes = await collectGitChanges(thread.cwd);
+              for (const c of changes.changed.slice(0, 50)) {
+                sendEnvelope(sid, runId, 'artifact.created', {
+                  artifact: { relPath: c.path, kind: 'file', title: c.path },
+                });
+              }
+            } catch { /* git 不可用:跳过交付物,不影响终态 */ }
+            sendEnvelope(sid, runId, 'run.completed', {
+              text: String(ev.text ?? ''),
+              turns: Number(ev.turns ?? 0),
+              toolUses: Number(ev.toolUses ?? 0),
+              ...(isRecord(ev.usage) ? { usage: ev.usage as Record<string, number> } : {}),
+            });
+          };
+          void done();
+        } else {
+          sendEnvelope(sid, runId, 'run.completed', {
+            text: String(ev.text ?? ''),
+            turns: Number(ev.turns ?? 0),
+            toolUses: Number(ev.toolUses ?? 0),
+            ...(isRecord(ev.usage) ? { usage: ev.usage as Record<string, number> } : {}),
+          });
+        }
       } else if (kind === 'error') {
         exec.authError = isProviderAuthError(String(ev.error ?? ''));
         broadcast('error', { message: String(ev.error ?? '').slice(0, 400), sessionId: sid });
@@ -1195,25 +1236,8 @@ export async function startServer(opts: {
         const sidDiff = url.searchParams.get('sessionId') ?? '';
         const thDiff = sessionThreads.get(sidDiff);
         const cwdDiff = thDiff?.cwd ?? wsRoot();
-        const run = (args: string[]): Promise<{ ok: boolean; out: string }> =>
-          new Promise((resolve) => {
-            execFile('git', ['-c', 'core.quotepath=false', ...args], { cwd: cwdDiff, timeout: 8_000, windowsHide: true, maxBuffer: 512 * 1024 }, (err, stdout) => {
-              if (err || typeof stdout !== 'string') resolve({ ok: false, out: '' });
-              else resolve({ ok: true, out: stdout });
-            });
-          });
-        const status = await run(['status', '--porcelain']);
-        if (!status.ok) {
-          json(res, 200, { git: false, cwd: cwdDiff, changed: [], stat: '' });
-          return;
-        }
-        const stat = await run(['diff', 'HEAD', '--stat']);
-        const changed = status.out.split(/\r?\n/).filter((l) => l.trim()).slice(0, 400)
-          .map((l) => ({
-            state: l.slice(0, 2).trim(),
-            path: l.slice(3),
-          }));
-        json(res, 200, { git: true, cwd: cwdDiff, changed, stat: stat.out.slice(0, 8_000) });
+        const d = await collectGitChanges(cwdDiff);
+        json(res, 200, { git: d.git, cwd: cwdDiff, changed: d.changed, stat: d.stat });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/fs') {
