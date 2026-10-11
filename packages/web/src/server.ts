@@ -708,6 +708,8 @@ export async function startServer(opts: {
     }
     return {
       model: resolveProvider(cfg, 'chat').model,
+      // current chat routing target (desktop model picker highlights this)
+      chatProvider: cfg.routing?.chat ?? '',
       home,
       locale: cfg.locale ?? 'zh',
       busy: anyBusy(),
