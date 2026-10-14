@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -204,4 +204,72 @@ test('/api/diff:git 工作区返回只读变更,非 git 返回 git:false(M4 Diff
     await rm(home, { recursive: true, force: true });
     await rm(repo, { recursive: true, force: true });
   }
+});
+
+test('单实例(P0-C):同 HMH_HOME 第二实例拒启(exit 3)不杀首实例;退出释放锁;陈旧锁回收', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-desktop-host-'));
+  await mkdir(join(home, 'sessions'), { recursive: true });
+  const spawnHost = () =>
+    spawn(process.execPath, ['--import', 'tsx', hostTs], {
+      cwd: here,
+      env: { ...process.env, HMH_HOME: home, HMH_DESKTOP_TOKEN: TOKEN },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+  const waitReady = (child: ReturnType<typeof spawn>) =>
+    new Promise<number | null>((resolve) => {
+      const timer = setTimeout(() => resolve(null), 30_000);
+      createInterface({ input: child.stdout! }).on('line', (line: string) => {
+        try {
+          const v = JSON.parse(line) as { hmhDesktopHostReady?: boolean; port?: number };
+          if (v.hmhDesktopHostReady === true && typeof v.port === 'number') {
+            clearTimeout(timer);
+            resolve(v.port);
+          }
+        } catch { /* not json */ }
+      });
+      child.on('exit', () => { clearTimeout(timer); resolve(null); });
+    });
+
+  // 1) 首实例正常起
+  const first = spawnHost();
+  const port1 = await waitReady(first);
+  assert.notEqual(port1, null, '首实例启动');
+
+  // 2) 同 home 第二实例 → exit 3 + 拒绝语义说明(绝不杀既有实例)
+  const second = spawnHost();
+  let stderr2 = '';
+  second.stderr!.on('data', (d: Buffer) => { stderr2 += d.toString(); });
+  const code2 = await new Promise<number | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), 20_000);
+    second.on('exit', (c) => { clearTimeout(timer); resolve(c); });
+  });
+  assert.equal(code2, 3, '第二实例拒启 exit 3');
+  assert.match(stderr2, /another desktop-host/);
+
+  // 3) 首实例未受任何影响,照常服务
+  const still = await fetch(`http://127.0.0.1:${port1}/api/state`, { headers: { 'x-hmh-key': TOKEN } });
+  assert.equal(still.status, 200, '首实例未被触碰(不误杀是 P0-C 契约)');
+
+  // 4) 优雅退出后锁释放
+  const sd = await fetch(`http://127.0.0.1:${port1}/api/desktop/shutdown`, { method: 'POST', headers: { 'x-hmh-key': TOKEN } });
+  assert.equal(sd.status, 200);
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, 10_000);
+    first.on('exit', () => { clearTimeout(timer); resolve(); });
+  });
+  const lockAfter = await readFile(join(home, 'desktop-host.lock'), 'utf8').catch(() => '');
+  assert.equal(lockAfter, '', '退出后锁已释放');
+
+  // 5) 陈旧锁(持有者已死)自动回收,新实例照常启动且锁记实际端口
+  await writeFile(join(home, 'desktop-host.lock'), JSON.stringify({ pid: 999999, port: 1234 }) + '\n');
+  const third = spawnHost();
+  const port3 = await waitReady(third);
+  assert.notEqual(port3, null, '陈旧锁被回收,新实例启动');
+  const lock3 = JSON.parse(await readFile(join(home, 'desktop-host.lock'), 'utf8')) as { pid: number; port: number };
+  assert.equal(lock3.port, port3, '锁内端口=实际绑定端口');
+  assert.equal(lock3.pid, third.pid, '锁内 pid=当前实例');
+  third.kill();
+  await new Promise((r) => setTimeout(r, 300));
+  await rm(home, { recursive: true, force: true });
 });
