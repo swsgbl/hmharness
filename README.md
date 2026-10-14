@@ -9,6 +9,10 @@
 
 ![hmh CLI demo](docs/assets/hmh-demo.gif)
 
+## 产品线：桌面端 HMH Desktop
+
+图形工作台在独立仓库 [swsgbl/hmh-desktop](https://github.com/swsgbl/hmh-desktop)（Electron 桌面壳）：hmharness 仍是唯一 Agent/Cognitive Runtime，桌面端经 loopback+port0+token 桥连接本仓库的 runtime，共享同一 HMH_HOME（配置/Provider/会话历史）。装过 hmh CLI 的机器会被桌面端自动发现，零配置直连。
+
 ## 特性一览
 
 | 领域 | 能力 |
