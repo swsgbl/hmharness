@@ -20,6 +20,9 @@ export interface LoopEvents {
   onToolResult?(name: string, output: string, isError: boolean): void;
   /** Called when a tool requested approval. granted=false means denied. */
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
+  /** Called when the pre-execution action gate was consulted (v0.24 P2A):
+   *  allowed=false means the call was refused before execution. */
+  onGate?(name: string, args: Record<string, unknown>, allowed: boolean, reason?: string): void;
   /** Fired when an injected user message entered the working transcript
    *  (web Ctrl+Enter / TUI Enter-while-running). The message is appended
    *  after the previous tool batch, before the next model call. */
@@ -29,6 +32,19 @@ export interface LoopEvents {
 
 export interface LoopApproval {
   ask(toolName: string, args: Record<string, unknown>): Promise<boolean>;
+}
+
+/** Pre-execution action gate (v0.24 P2A live intervention point). The loop
+ *  consults the gate BEFORE a tool call executes; a refusal becomes the tool
+ *  result (the model sees the reason and can re-plan) and the tool never
+ *  runs. This is the hook a learned world model uses to act on its
+ *  predictions — calibration only becomes task value if it can change
+ *  behavior at execution time. */
+export interface LoopToolGate {
+  check(name: string, args: Record<string, unknown>): Promise<
+    | { allowed: true }
+    | { allowed: false; reason: string }
+  >;
 }
 
 export interface LoopResult {
@@ -86,6 +102,11 @@ export async function runLoop(opts: {
    *  model's context window (window.ts registry / provider.contextWindow). */
   maxContextChars?: number;
   approval?: LoopApproval;
+  /** Pre-execution action gate (v0.24 P2A): consulted BEFORE approval — an
+   *  automated gate should not wake the human dialog for a call it already
+   *  blocks. A refusal never executes the tool; the reason becomes its tool
+   *  result so the model can choose another path. */
+  toolGate?: LoopToolGate;
   events?: LoopEvents;
   /** Injectable model call (tests pass a fake; production uses provider.chat). */
   chatImpl?: typeof chat;
@@ -275,14 +296,32 @@ export async function runLoop(opts: {
           : `empty tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON)`;
         p.isError = true;
         p.skip = true;
-      } else if (tool.needsApproval?.(args, ctx)) {
-        // Safe default: with no gate wired in, risky tools are denied.
-        const granted = opts.approval ? await opts.approval.ask(name, args) : false;
-        events?.onApproval?.(name, args, granted);
-        if (!granted) {
-          p.output = 'User declined this action. Ask how to proceed or find a non-destructive alternative.';
+      } else {
+        // v0.24 P2A intervention point: the gate runs BEFORE approval (an
+        // automated refusal should not queue a human dialog) and BEFORE
+        // execution. A refusal never executes the tool; the reason becomes
+        // its tool result so the model sees WHY and can re-plan. An ALLOW
+        // falls through to the normal approval path — the gate never
+        // substitutes for the human dialog on risky tools.
+        let refused: string | null = null;
+        if (opts.toolGate) {
+          const verdict = await opts.toolGate.check(name, args);
+          events?.onGate?.(name, args, verdict.allowed, verdict.allowed ? undefined : verdict.reason);
+          if (!verdict.allowed) refused = verdict.reason;
+        }
+        if (refused !== null) {
+          p.output = `[action gate] ${refused}`;
           p.isError = true;
           p.skip = true;
+        } else if (tool.needsApproval?.(args, ctx)) {
+          // Safe default: with no gate wired in, risky tools are denied.
+          const granted = opts.approval ? await opts.approval.ask(name, args) : false;
+          events?.onApproval?.(name, args, granted);
+          if (!granted) {
+            p.output = 'User declined this action. Ask how to proceed or find a non-destructive alternative.';
+            p.isError = true;
+            p.skip = true;
+          }
         }
       }
       planned.push(p);
