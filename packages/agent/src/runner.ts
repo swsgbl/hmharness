@@ -43,6 +43,7 @@ import { baseTools } from './tools.ts';
 import { buildSystemPrompt } from './prompt.ts';
 import { strings } from './i18n.ts';
 import { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';
+import { buildConditionedGate } from './gate.ts';
 import { withTopologyGovernance } from './topology-live.ts';
 
 /** Flatten the config.json shape into the runtime discriminated union. */
@@ -506,6 +507,12 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     ]);
     return r.message.content ?? '';
   };
+  // v0.24 P2A research: opt-in conditioned action gate (config gate.enabled,
+  // DEFAULT OFF — the 66-run live arc: mechanism + selectivity proven, task
+  // gain unproven, ~2x token cost on non-failing runs; production A/B only)
+  const gateTau = cfg.gate?.tau ?? 0.7;
+  const actionGate = cfg.gate?.enabled === true ? await buildConditionedGate(ctx.home, gateTau) : undefined;
+  if (actionGate) traj.emit('gate.enabled', 'system', { tau: gateTau });
   const result = await runLoop({
     provider: chatProvider,
     registry: opts.registry,
@@ -522,6 +529,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     // poll-shaped steering: drained at every turn boundary (codex semantics)
     injections: injectPoll,
     approval: spawnBase.current.approval,
+    toolGate: actionGate,
     events: {
       onDelta: (kind, chunk) => events.onDelta?.(kind, chunk),
       onInjected: (message) => {
@@ -554,6 +562,11 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         traj.emit(granted ? 'tool.approved' : 'tool.denied', 'system', { name });
         events.onApproval?.(name, args, granted);
       },
+      onGate: (name, _args, allowed, reason) => {
+        // v0.24 P2A telemetry: every gate consult lands in the trajectory —
+        // production A/B reads these events, not lab reconstructions
+        traj.emit('gate.consulted', 'system', { name, allowed, reason: reason ? brief(reason, 200) : undefined });
+      },
       onAssistant: async (m) => {
         // stamp the event when the message lands, not after the session
         // write drains - awaiting first made model.responded land AFTER
@@ -574,6 +587,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // the task ended (or died): late pushes must queue for the NEXT task instead
   // of silently vanishing into a channel nothing drains
   if (injectChannel) injectChannel.active = false;
+  if (actionGate) traj.emit('gate.summary', 'system', actionGate.stats());
   traj.finish(
     { success: result.reason === 'final', reason: result.reason },
     { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },

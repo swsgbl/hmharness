@@ -102,6 +102,13 @@ export interface HmhConfig {
   locale?: 'zh' | 'en';
   /** UI theme preference: 'dark' (default) | 'light' | 'system'. */
   theme?: 'dark' | 'light' | 'system';
+  /** Action gate (v0.24 P2A research, 2026-10-15): when enabled, a
+   *  sequence-conditioned world-model gate consults before every tool call
+   *  and refuses historically-risky patterns (read_file->edit_file style).
+   *  DEFAULT OFF: live experiments (66 runs) showed zero task gain on
+   *  non-failing populations at ~2x token cost — opt-in for production A/B
+   *  telemetry only. tau = minimum acceptable success rate (default 0.7). */
+  gate?: { enabled?: boolean; tau?: number };
   /** Run a background evolution cycle after every N recorded insights
    *  (default 3; 0 disables). Tier 3 of the feedback ladder: Tier 1 = raw
    *  error self-notes (every task, zero cost), Tier 2 = one model-call
