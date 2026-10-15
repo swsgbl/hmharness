@@ -244,7 +244,88 @@ const MODIFY_TASKS: Task[] = [
   },
 ];
 const SUITE = process.env.P2A_SUITE ?? 'create';
-const ACTIVE = SUITE === 'modify' ? MODIFY_TASKS : TASKS;
+// hard-suite (P2A_SUITE=hard): tasks that reproduce the corpus's REAL edit
+// failure modes — precise navigation in a large file, cross-file
+// consistency, deep JSON surgery, disambiguation among similar lines.
+// Simple modify tasks never fail (any model, clean workspace), so a
+// protective gate has nothing to protect; these give it failure
+// opportunities the corpus actually contains.
+const bigLines = (i: number) => `line ${i + 1}: ${i % 7 === 0 ? 'alpha' : 'beta'}`;
+const itemsLine = (n: number) => `id=${n} name=${n === 7 ? 'seventh' : 'item' + n} status=${n === 5 ? 'pending' : 'active'}`;
+const HARD_TASKS: Task[] = [
+  {
+    id: 'big-file-edit',
+    prompt: 'The file big.txt has 200 numbered lines. Change ONLY line 140 so it says "line 140: gamma" instead of its current content. Every other line must stay exactly as it is, and the file must still have exactly 200 lines.',
+    setup: async (ws) => {
+      const f = await import('node:fs/promises');
+      await f.writeFile(join(ws, 'big.txt'), Array.from({ length: 200 }, (_, i) => bigLines(i)).join('\n') + '\n', 'utf8');
+    },
+    verify: (ws) => {
+      const p = join(ws, 'big.txt');
+      if (!existsSync(p)) return { ok: false, detail: 'big.txt missing' };
+      const lines = readFileSync(p, 'utf8').replace(/\r\n/g, '\n').split('\n').filter((l, i, a) => i < a.length - 1 || l !== '');
+      if (lines.length !== 200) return { ok: false, detail: `line count ${lines.length} != 200` };
+      for (let i = 0; i < 200; i++) {
+        const want = i === 139 ? 'line 140: gamma' : bigLines(i);
+        if (lines[i] !== want) return { ok: false, detail: `line ${i + 1} wrong: ${JSON.stringify(lines[i])}` };
+      }
+      return { ok: true, detail: 'exact 200-line edit' };
+    },
+  },
+  {
+    id: 'two-file-version',
+    prompt: 'The current directory has package.json and about.txt, both carrying version 1.0.0. Bump the version to 2.0.0 in BOTH files (package.json must stay valid JSON; about.txt is plain text mentioning the version).',
+    setup: async (ws) => {
+      const f = await import('node:fs/promises');
+      await f.writeFile(join(ws, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0' }, null, 2) + '\n', 'utf8');
+      await f.writeFile(join(ws, 'about.txt'), 'App version 1.0.0\nReleased 2026\n', 'utf8');
+    },
+    verify: (ws) => {
+      try {
+        const j = JSON.parse(readFileSync(join(ws, 'package.json'), 'utf8'));
+        if (j.version !== '2.0.0' || j.name !== 'app') return { ok: false, detail: 'package.json wrong: ' + JSON.stringify(j).slice(0, 50) };
+      } catch (e) { return { ok: false, detail: 'package.json invalid: ' + String(e).slice(0, 40) }; }
+      const t = readFileSync(join(ws, 'about.txt'), 'utf8');
+      const ok = t.includes('2.0.0') && !t.includes('1.0.0') && t.includes('Released 2026');
+      return { ok, detail: ok ? 'both bumped' : 'about.txt: ' + JSON.stringify(t.slice(0, 50)) };
+    },
+  },
+  {
+    id: 'nested-json',
+    prompt: 'In data.json, change ONLY the value at path a.b.c.d from 1 to 2. Keep everything else identical and the file valid JSON (a.b.c.e, a.b.f, and the array g must be untouched).',
+    setup: async (ws) => {
+      const f = await import('node:fs/promises');
+      await f.writeFile(join(ws, 'data.json'), JSON.stringify({ a: { b: { c: { d: 1, e: 2 }, f: 3 } }, g: [1, 2, 3] }, null, 2) + '\n', 'utf8');
+    },
+    verify: (ws) => {
+      try {
+        const j = JSON.parse(readFileSync(join(ws, 'data.json'), 'utf8')) as { a?: { b?: { c?: { d?: unknown; e?: unknown }, f?: unknown } }, g?: unknown };
+        const ok = j.a?.b?.c?.d === 2 && j.a?.b?.c?.e === 2 && j.a?.b?.f === 3 && JSON.stringify(j.g) === '[1,2,3]';
+        return { ok, detail: ok ? 'surgical edit' : 'wrong: ' + JSON.stringify(j).slice(0, 60) };
+      } catch { return { ok: false, detail: 'invalid JSON' }; }
+    },
+  },
+  {
+    id: 'similar-lines',
+    prompt: 'The file items.txt has 12 entries, one per line, each shaped like "id=N name=... status=...". Change the status of the entry with id=7 from active to archived. Do not touch any other entry (note: id=5 has status=pending — leave that alone).',
+    setup: async (ws) => {
+      const f = await import('node:fs/promises');
+      await f.writeFile(join(ws, 'items.txt'), Array.from({ length: 12 }, (_, i) => itemsLine(i + 1)).join('\n') + '\n', 'utf8');
+    },
+    verify: (ws) => {
+      const p = join(ws, 'items.txt');
+      if (!existsSync(p)) return { ok: false, detail: 'items.txt missing' };
+      const lines = readFileSync(p, 'utf8').replace(/\r\n/g, '\n').split('\n').filter((l, i, a) => i < a.length - 1 || l !== '');
+      if (lines.length !== 12) return { ok: false, detail: `line count ${lines.length} != 12` };
+      for (let i = 0; i < 12; i++) {
+        const want = i === 6 ? 'id=7 name=seventh status=archived' : itemsLine(i + 1);
+        if (lines[i] !== want) return { ok: false, detail: `line ${i + 1} wrong: ${JSON.stringify(lines[i])}` };
+      }
+      return { ok: true, detail: 'disambiguated edit' };
+    },
+  },
+];
+const ACTIVE = SUITE === 'modify' ? MODIFY_TASKS : SUITE === 'hard' ? HARD_TASKS : TASKS;
 console.log(`suite=${SUITE} (${ACTIVE.length} tasks)`);
 
 // ---- 3. provider (production chat route by default; P2A_PROVIDER switches
