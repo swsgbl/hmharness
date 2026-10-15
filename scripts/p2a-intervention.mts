@@ -72,11 +72,68 @@ function gateFor(name: string, args: Record<string, unknown>) {
   return { allowed: true as const };
 }
 
+// ---- 1b. context-conditioned gate (v0.24 follow-up): sequence depth-1 ----
+// The corpus probe (p2a-context-probe.mts) found pairs whose success rate
+// diverges from the type baseline (read_file->edit_file 0.56 vs 0.83). This
+// gate uses RAW rates with an honesty backoff: a pair or type below
+// MIN_SUPPORT carries no verdict (falls through to the coarser level; at
+// the coarsest level no-evidence = allow). The pair verdict overrides the
+// type verdict in BOTH directions (worse pair blocks where the type passes;
+// better pair passes where the type blocks).
+const MIN_SUPPORT = Number(process.env.P2A_MIN_SUPPORT ?? 10);
+const typeStat = new Map<string, { s: number; f: number }>();
+const pairStat = new Map<string, { s: number; f: number }>();
+{
+  const bump = (m: Map<string, { s: number; f: number }>, k: string, ok: boolean) => {
+    const e = m.get(k) ?? { s: 0, f: 0 };
+    if (ok) e.s++; else e.f++;
+    m.set(k, e);
+  };
+  for (const t of train) {
+    let prev: string | null = null;
+    for (const s of t.steps) {
+      const type = String((s.action as { type?: unknown }).type ?? '?');
+      if (s.outcome === 'success' || s.outcome === 'failure') {
+        bump(typeStat, type, s.outcome === 'success');
+        if (prev !== null) bump(pairStat, `${prev}->${type}`, s.outcome === 'success');
+      }
+      prev = type;
+    }
+  }
+}
+function conditionedGateFactory() {
+  let lastType: string | null = null; // last ALLOWED action type (executions, not refusals, change the world)
+  return (name: string): { allowed: true } | { allowed: false; reason: string } => {
+    const pair = lastType !== null ? pairStat.get(`${lastType}->${name}`) : undefined;
+    const pairN = pair ? pair.s + pair.f : 0;
+    const type = typeStat.get(name);
+    const typeN = type ? type.s + type.f : 0;
+    let v: { allowed: true } | { allowed: false; reason: string };
+    if (pairN >= MIN_SUPPORT) {
+      const pr = pair!.s / pairN;
+      v = pr < TAU
+        ? { allowed: false, reason: `the learned world model predicts ${lastType}->${name} fails often in similar contexts (pair success ${pr.toFixed(2)} < ${TAU}, ${pairN} observations); choose a different approach or verify prerequisites first` }
+        : { allowed: true };
+    } else if (typeN >= MIN_SUPPORT) {
+      const tr = type!.s / typeN;
+      v = tr < TAU
+        ? { allowed: false, reason: `the learned world model predicts this action type (${name}) tends to fail (success ${tr.toFixed(2)} < ${TAU}, ${typeN} observations); choose a different approach or verify prerequisites first` }
+        : { allowed: true };
+    } else {
+      v = { allowed: true }; // no evidence = explore signal, not 0% success
+    }
+    if (v.allowed) lastType = name;
+    return v;
+  };
+}
+
 // ---- 2. task suite: deterministic prompts + EXTERNAL verifiers ----
 interface Task {
   id: string;
   prompt: string;
   verify: (ws: string) => { ok: boolean; detail: string };
+  /** optional workspace seeding (modify-suite: the file to edit pre-exists) */
+  setup?: (ws: string) => Promise<void>;
 }
 const eq = (a: string, b: string) => a.replace(/\r\n/g, '\n').trim() === b.trim();
 const TASKS: Task[] = [
@@ -143,6 +200,53 @@ const TASKS: Task[] = [
   },
 ];
 
+// modify-suite (P2A_SUITE=modify): tasks that REQUIRE touching an EXISTING
+// file — the regime where the corpus's one strongly divergent pair
+// (read_file->edit_file 0.56 vs 0.83) actually occurs. Create-from-scratch
+// tasks never hit it (the model just write_file's), which is why the
+// create-suite at tau=.7 produced zero gate consults.
+const MODIFY_TASKS: Task[] = [
+  {
+    id: 'edit-existing',
+    prompt: 'The file app.txt in the current directory contains the text v1. Change its content to v2 (exactly v2, nothing else).',
+    setup: async (ws) => { await import('node:fs/promises').then((f) => f.writeFile(join(ws, 'app.txt'), 'v1\n', 'utf8')); },
+    verify: (ws) => {
+      const p = join(ws, 'app.txt');
+      if (!existsSync(p)) return { ok: false, detail: 'app.txt missing' };
+      const ok = eq(readFileSync(p, 'utf8'), 'v2');
+      return { ok, detail: ok ? 'edited to v2' : 'content: ' + JSON.stringify(readFileSync(p, 'utf8').slice(0, 30)) };
+    },
+  },
+  {
+    id: 'append-line',
+    prompt: 'The file log.txt contains two lines: a and b. Append a third line c (keep a and b intact).',
+    setup: async (ws) => { await import('node:fs/promises').then((f) => f.writeFile(join(ws, 'log.txt'), 'a\nb\n', 'utf8')); },
+    verify: (ws) => {
+      const p = join(ws, 'log.txt');
+      if (!existsSync(p)) return { ok: false, detail: 'log.txt missing' };
+      const ok = eq(readFileSync(p, 'utf8'), 'a\nb\nc');
+      return { ok, detail: ok ? 'appended' : 'content: ' + JSON.stringify(readFileSync(p, 'utf8').slice(0, 30)) };
+    },
+  },
+  {
+    id: 'fix-json',
+    prompt: 'The file data.json contains {"n":1}. Change n to 2, keeping valid JSON and no other changes.',
+    setup: async (ws) => { await import('node:fs/promises').then((f) => f.writeFile(join(ws, 'data.json'), '{"n":1}\n', 'utf8')); },
+    verify: (ws) => {
+      const p = join(ws, 'data.json');
+      if (!existsSync(p)) return { ok: false, detail: 'data.json missing' };
+      try {
+        const j = JSON.parse(readFileSync(p, 'utf8'));
+        const ok = j.n === 2 && Object.keys(j).length === 1;
+        return { ok, detail: ok ? 'n=2' : 'wrong: ' + JSON.stringify(j).slice(0, 40) };
+      } catch { return { ok: false, detail: 'invalid JSON' }; }
+    },
+  },
+];
+const SUITE = process.env.P2A_SUITE ?? 'create';
+const ACTIVE = SUITE === 'modify' ? MODIFY_TASKS : TASKS;
+console.log(`suite=${SUITE} (${ACTIVE.length} tasks)`);
+
 // ---- 3. provider (production chat route, glm) ----
 const cfg = JSON.parse(readFileSync(join(HOME, 'config.json'), 'utf8')) as {
   providers: Record<string, { baseUrl: string; apiKey: string; model: string }>;
@@ -153,20 +257,30 @@ const provider = { name: 'glm', baseUrl: glm.baseUrl, apiKey: glm.apiKey, model:
 
 // ---- 4. run the paired experiment ----
 interface RunResult {
-  task: string; arm: 'A' | 'B'; ok: boolean; detail: string;
+  task: string; arm: 'A' | 'B' | 'C'; ok: boolean; detail: string;
   turns: number; toolUses: number; refusals: number;
   promptTokens: number; completionTokens: number; reason: string;
 }
 const results: RunResult[] = [];
-const ARMS: Array<{ id: 'A' | 'B'; gate: boolean }> = [{ id: 'A', gate: false }, { id: 'B', gate: true }];
+// A = no gate; B = type-granularity gate (WM EMA confidence); C = sequence-
+// conditioned gate (raw pair/type rates, honest backoff). C answers whether
+// context conditioning adds selectivity where B is inert.
+const ARMS: Array<{ id: 'A' | 'B' | 'C'; gate: null | 'type' | 'conditioned' }> = [
+  { id: 'A', gate: null },
+  { id: 'B', gate: 'type' },
+  { id: 'C', gate: 'conditioned' },
+];
 let wsCounter = 0;
-for (const task of TASKS) {
+for (const task of ACTIVE) {
   for (const arm of ARMS) {
     const ws = join(tmpdir(), `p2a-live-${Date.now()}-${wsCounter++}`);
     mkdirSync(ws, { recursive: true });
     const home2 = join(ws, '_home'); mkdirSync(home2, { recursive: true });
+    if (task.setup) await task.setup(ws);
     let refusals = 0;
     let gateChecks = 0;
+    // a FRESH conditioned-gate sequence state per run (pair context resets with the workspace)
+    const conditioned = conditionedGateFactory();
     try {
       const reg: Registry = nativeRegistry(0);
       const r = await runLoop({
@@ -177,7 +291,14 @@ for (const task of TASKS) {
         maxTotalTurns: MAX_TURNS,
         approval: { ask: async () => true },
         toolGate: arm.gate
-          ? { check: async (name, args) => { gateChecks++; const v = gateFor(name, args); if (!v.allowed) refusals++; return v; } }
+          ? { check: async (name, args) => {
+              gateChecks++;
+              const v = arm.gate === 'conditioned'
+                ? conditioned(name)
+                : gateFor(name, args);
+              if (!v.allowed) refusals++;
+              return v;
+            } }
           : undefined,
       });
       const v = task.verify(ws);
@@ -199,31 +320,30 @@ for (const task of TASKS) {
 
 // ---- 5. paired report (preregistered: primary = task success) ----
 console.log('\n=== P2A v3 LIVE intervention — paired results ===');
-const aSucc = results.filter((r) => r.arm === 'A' && r.ok).length;
-const bSucc = results.filter((r) => r.arm === 'B' && r.ok).length;
-const aRef = results.filter((r) => r.arm === 'A').reduce((n, r) => n + r.refusals, 0);
-const bRef = results.filter((r) => r.arm === 'B').reduce((n, r) => n + r.refusals, 0);
-const aTok = results.filter((r) => r.arm === 'A').reduce((n, r) => n + r.promptTokens + r.completionTokens, 0);
-const bTok = results.filter((r) => r.arm === 'B').reduce((n, r) => n + r.promptTokens + r.completionTokens, 0);
-const aTurns = results.filter((r) => r.arm === 'A').reduce((n, r) => n + r.turns, 0);
-const bTurns = results.filter((r) => r.arm === 'B').reduce((n, r) => n + r.turns, 0);
-const n = TASKS.length;
-console.log(`arm A (no gate):      ${aSucc}/${n} tasks, turns=${aTurns}, refused=${aRef}, tokens=${aTok}`);
-console.log(`arm B (learned gate): ${bSucc}/${n} tasks, turns=${bTurns}, refused=${bRef}, tokens=${bTok}`);
-// paired sign on the primary metric
-let bBetter = 0, bWorse = 0, ties = 0;
-for (const task of TASKS) {
-  const a = results.find((r) => r.task === task.id && r.arm === 'A');
-  const b = results.find((r) => r.task === task.id && r.arm === 'B');
-  if (!a || !b) continue;
-  if (a.ok !== b.ok) { b.ok ? bBetter++ : bWorse++; } else ties++;
+const n = ACTIVE.length;
+const LABEL: Record<'A' | 'B' | 'C', string> = { A: 'no gate', B: 'type gate (WM EMA)', C: 'conditioned gate (pair/type)' };
+for (const armId of ['A', 'B', 'C'] as const) {
+  const rs = results.filter((r) => r.arm === armId);
+  const succ = rs.filter((r) => r.ok).length;
+  const turns = rs.reduce((x, r) => x + r.turns, 0);
+  const ref = rs.reduce((x, r) => x + r.refusals, 0);
+  const tok = rs.reduce((x, r) => x + r.promptTokens + r.completionTokens, 0);
+  console.log(`arm ${armId} (${LABEL[armId]}): ${succ}/${n} tasks, turns=${turns}, refused=${ref}, tokens=${tok}`);
 }
-console.log(`paired primary (success): B better=${bBetter}, B worse=${bWorse}, ties=${ties}`);
-console.log(`gate consulted ${(() => { let x = 0; results.forEach((r) => { if (r.arm === 'B') x += r.refusals; }); return x; })()} refusal(s) at tau=${TAU}`);
-if (bWorse > 0 && bBetter === 0) console.log('VERDICT: live gating HURT task outcomes at this tau — the gate is too blunt at action-type granularity; report honestly (v0.24 finding).');
-else if (bBetter > 0 && bWorse === 0) console.log('VERDICT: live gating HELPED every divergent pair — first interventional evidence that learned predictions change task outcomes.');
-else if (bBetter === 0 && bWorse === 0) console.log('VERDICT: no divergence on these tasks (both arms equal) — NEEDS-DATA: harder task set or lower tau.');
-else console.log(`VERDICT: mixed (${bBetter} better / ${bWorse} worse) — extend task set and seeds before any claim.`);
+for (const gated of ['B', 'C'] as const) {
+  let better = 0, worse = 0, ties = 0;
+  for (const task of ACTIVE) {
+    const a = results.find((r) => r.task === task.id && r.arm === 'A');
+    const g = results.find((r) => r.task === task.id && r.arm === gated);
+    if (!a || !g) continue;
+    if (a.ok !== g.ok) { g.ok ? better++ : worse++; } else ties++;
+  }
+  console.log(`paired A vs ${gated}: ${gated} better=${better}, worse=${worse}, ties=${ties}`);
+  if (worse > 0 && better === 0) console.log(`  VERDICT ${gated}: gating HURT at tau=${TAU} — honest negative.`);
+  else if (better > 0 && worse === 0) console.log(`  VERDICT ${gated}: gating HELPED every divergent pair at tau=${TAU}.`);
+  else if (better === 0 && worse === 0) console.log(`  VERDICT ${gated}: no divergence on this suite at tau=${TAU} — NEEDS-DATA.`);
+  else console.log(`  VERDICT ${gated}: mixed (${better} better / ${worse} worse) — extend tasks/seeds before any claim.`);
+}
 
 // raw per-run lines for the research repro pack
 console.log('\nraw:');
