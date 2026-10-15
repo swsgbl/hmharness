@@ -247,13 +247,18 @@ const SUITE = process.env.P2A_SUITE ?? 'create';
 const ACTIVE = SUITE === 'modify' ? MODIFY_TASKS : TASKS;
 console.log(`suite=${SUITE} (${ACTIVE.length} tasks)`);
 
-// ---- 3. provider (production chat route, glm) ----
+// ---- 3. provider (production chat route by default; P2A_PROVIDER switches
+// the population — the weak-model arm is where corpus read->edit failures
+// actually came from, so that is where a protective gate could show
+// task-level gains the strong population cannot) ----
+const PROV_ID = process.env.P2A_PROVIDER ?? 'glm';
 const cfg = JSON.parse(readFileSync(join(HOME, 'config.json'), 'utf8')) as {
   providers: Record<string, { baseUrl: string; apiKey: string; model: string }>;
 };
-const glm = cfg.providers['glm'];
-if (!glm?.apiKey) { console.error('provider glm not configured'); process.exit(1); }
-const provider = { name: 'glm', baseUrl: glm.baseUrl, apiKey: glm.apiKey, model: glm.model } as never;
+const glm = cfg.providers[PROV_ID];
+if (!glm?.apiKey) { console.error(`provider ${PROV_ID} not configured`); process.exit(1); }
+console.log(`provider: ${PROV_ID} (${glm.model})`);
+const provider = { name: PROV_ID, baseUrl: glm.baseUrl, apiKey: glm.apiKey, model: glm.model } as never;
 
 // ---- 4. run the paired experiment ----
 interface RunResult {
