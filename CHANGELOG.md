@@ -1,3 +1,7 @@
+## [0.23.35] - 2026-10-16
+
+P0-C 契约闭环+v0.24/v0.29 研究成果生产化：①desktop-host 单实例守卫——HMH_HOME/desktop-host.lock 记 pid+port（绝不记 token 材料），同 home 已有活实例拒启 exit 3 且绝不杀既有进程，优雅退出释放锁，陈旧锁自动回收——v33 审计 P0-C 六条契约（临时端口/loopback 强制/env 高熵 token 全路由/优雅关闭/不误杀/单实例）全闭环；②kernel LoopToolGate 执行前动作门（拒绝→[action gate] 理由成工具结果，模型可见可换路；ALLOW 照走审批；onGate 可观测；重复拒绝计入 idle）+生产 opt-in：config gate:{enabled,tau} 默认 OFF——agent/gate.ts 条件化策略为实验与生产同一实现（配对≥10 双向覆写/类型≥10 回退/无证据放行/拒绝不推进序列态），轨迹三遥测事件（gate.enabled/consulted/summary）供生产 A/B 读取——v0.24 全弧 66 次真实模型运行的交付形态；③v0.29 长时运行压测仪器（scripts/longrun-soak.mts：孪生对照×5 注入崩溃×每百步 checkpoint，状态漂移/重复执行/账本损坏/预算耗尽四类故障全过）+checkpoint 恢复游标契约（重复执行陷阱实锤：朴素重放置信度漂移 0.8055 vs 0.8571，state.version 即现成游标）
+
 ## [0.23.34] - 2026-10-15
 
 P0 安全硬化+外部可验证性（v33 审计路线 v0.23.34/v0.27/v0.28 三段汇收）：①Web XSS 残留 sink 全关（loadReplay goal/team/分组头/fs 错误/sparkline 等 9 处改 esc() 转义+page-xss 通用扫描测试守门）与非对象工具参数硬化（"str"/null/数组/数字不再穿透 sanitizeToolCalls）；②Sandbox 2.1 对抗测试套件——DNS-rebinding 相似主机、子域通配边界、URL userinfo/fragment 欺骗、路径穿越、异盘符、跨主体秘密、引用格式伪造、撤销令牌重放、授予混淆，九种真实攻击载荷全被阻；③Desktop 宿主桥：desktop-host 入口（OS 分配临时端口+每次启动高熵 token+优雅关闭，不抢占 7788）、EventEnvelope 事件信封流（runId/per-run seq/断线重放）、只读 /api/diff（git status+stat）、artifact.created 交付物流、stateObject chatProvider 只读字段；④研究可复现性打包器——自包含 JSON 含数据集指纹（sha256）/代码版本/逐种子原始结果/完整实验配置/复现指引，真实运行 6 种子 world_model 6/6 晋升（符号检验 p=0.0156）
