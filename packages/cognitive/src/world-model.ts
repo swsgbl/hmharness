@@ -417,7 +417,15 @@ export class WorldModel {
 
   /** WM checkpoint: a serializable snapshot that fromCheckpoint() can restore
    *  exactly — the state, the rolling accuracy counters, and the transitions
-   *  (the replay/revision evidence, capped to the most recent N). */
+   *  (the replay/revision evidence, capped to the most recent N).
+   *
+   *  RESUME CURSOR CONTRACT (v0.29 soak finding, 2026-10-15): the restoring
+   *  runtime must replay the durable log FROM THE CHECKPOINT POSITION, never
+   *  from zero — replaying already-applied updates double-counts evidence and
+   *  drifts beliefs (measured: confidence 0.8055 vs 0.8571 after one
+   *  crash+full-replay cycle; scripts/longrun-soak.mts F1/F2 pins both the
+   *  trap and the guarded-equivalence proof). `state.version` is a usable
+   *  cursor: updates applied since snapshot = version - checkpointed version. */
   checkpoint(maxTransitions = 1000): string {
     return JSON.stringify({
       kind: 'hmharness-world-model-checkpoint',
