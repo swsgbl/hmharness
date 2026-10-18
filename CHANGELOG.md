@@ -1,3 +1,7 @@
+## [0.23.36] - 2026-10-18
+
+v33 审计 4.1 架构演进落地+MCP 扩展暴露：①Web server 按路由域拆分六模块——routes/{cognitive(8),settings(7),filesystem(9),remote(8),sessions 运行控制(6),sessions-meta(6)}，44 条路由中 38 条出仓，server.ts 从 116K 降至 65K（-44%）；全部逐字搬运+依赖注入（可变态引用/闭包 setter/按请求快照/活引用 Map 四型）+每域真服务器冒烟测试锁定 API 合约；驻留=task 主入口与 slash-command 执行核心（runOne/execFor/reg 宿主）+桌面桥/SSE/状态装配；②MCP 面暴露浏览器扩展工具族——默认只读三件（status/tabs/page_read），extension_page_act 仅在 HMH_MCP_EXTENSION_ACT=1 显式开启（其审批门在 agent 运行器而非 stdio 面）；迟连桥补注册（MCP 宿主启动时列一次工具的语义下，浏览器后开不留盲区）；每调用经桥 HTTP 重查，无浏览器时诚实失败
+
 ## [0.23.35] - 2026-10-16
 
 P0-C 契约闭环+v0.24/v0.29 研究成果生产化：①desktop-host 单实例守卫——HMH_HOME/desktop-host.lock 记 pid+port（绝不记 token 材料），同 home 已有活实例拒启 exit 3 且绝不杀既有进程，优雅退出释放锁，陈旧锁自动回收——v33 审计 P0-C 六条契约（临时端口/loopback 强制/env 高熵 token 全路由/优雅关闭/不误杀/单实例）全闭环；②kernel LoopToolGate 执行前动作门（拒绝→[action gate] 理由成工具结果，模型可见可换路；ALLOW 照走审批；onGate 可观测；重复拒绝计入 idle）+生产 opt-in：config gate:{enabled,tau} 默认 OFF——agent/gate.ts 条件化策略为实验与生产同一实现（配对≥10 双向覆写/类型≥10 回退/无证据放行/拒绝不推进序列态），轨迹三遥测事件（gate.enabled/consulted/summary）供生产 A/B 读取——v0.24 全弧 66 次真实模型运行的交付形态；③v0.29 长时运行压测仪器（scripts/longrun-soak.mts：孪生对照×5 注入崩溃×每百步 checkpoint，状态漂移/重复执行/账本损坏/预算耗尽四类故障全过）+checkpoint 恢复游标契约（重复执行陷阱实锤：朴素重放置信度漂移 0.8055 vs 0.8571，state.version 即现成游标）
