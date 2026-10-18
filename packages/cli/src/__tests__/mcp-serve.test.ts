@@ -4,6 +4,7 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { McpClient } from '@hmharness/kernel';
+import { ExtensionBridgeServer } from '@hmharness/extension';
 
 /* Loopback test: hmharness' OWN McpClient talks to hmharness' OWN MCP server
  * (hmh mcp-serve). Protocol both ends proven in one process pair. */
@@ -74,6 +75,66 @@ test('mcp-serve: HMH_MCP_TOOLS narrows the exposed surface', async () => {
     assert.deepEqual(tools.map((t) => t.name), ['harmony_ops_status']);
   } finally {
     client.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('mcp-serve: healthy bridge (no browser yet) exposes the READ-ONLY extension trio; page_act stays gated', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-mcpserve-ext-'));
+  const bridge = new ExtensionBridgeServer({ home });
+  const { port } = await bridge.start(0);
+  try {
+    // MCP host starts while the browser is closed: state file says healthy,
+    // connected=false — the trio must still be there (each call re-checks).
+    const client = new McpClient('hmharness-selftest', {
+      type: 'stdio',
+      command: process.execPath,
+      args: ['--import', 'tsx', MAIN, 'mcp-serve'],
+      env: { HMH_HOME: home },
+    });
+    await client.connect(15_000);
+    try {
+      const names = (await client.listTools()).map((t) => t.name);
+      assert.ok(names.includes('extension_status'), 'status exposed');
+      assert.ok(names.includes('extension_tabs'), 'tabs exposed');
+      assert.ok(names.includes('extension_page_read'), 'page_read exposed');
+      assert.ok(!names.includes('extension_page_act'), 'page_act stays OFF by default — approval lives in the agent runner, not on this stdio surface');
+      // a real call through the whole MCP surface: honest status, bridge port visible
+      const st = await client.callTool('extension_status', {}, 30_000);
+      assert.match(st.output, new RegExp(`127\\.0\\.0\\.1:${port}`));
+      // and the read tools fail HONESTLY (no browser connected) instead of hanging
+      const tabs = await client.callTool('extension_tabs', {}, 30_000);
+      assert.equal(tabs.isError, true);
+      assert.match(tabs.output, /未连接/);
+    } finally {
+      client.close();
+    }
+  } finally {
+    await bridge.stop();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('mcp-serve: HMH_MCP_EXTENSION_ACT=1 is the explicit opt-in for page_act', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-mcpserve-ext-'));
+  const bridge = new ExtensionBridgeServer({ home });
+  await bridge.start(0);
+  try {
+    const client = new McpClient('hmharness-selftest', {
+      type: 'stdio',
+      command: process.execPath,
+      args: ['--import', 'tsx', MAIN, 'mcp-serve'],
+      env: { HMH_HOME: home, HMH_MCP_EXTENSION_ACT: '1' },
+    });
+    await client.connect(15_000);
+    try {
+      const names = (await client.listTools()).map((t) => t.name);
+      assert.ok(names.includes('extension_page_act'), 'opt-in exposes the act tool');
+    } finally {
+      client.close();
+    }
+  } finally {
+    await bridge.stop();
     await rm(home, { recursive: true, force: true });
   }
 });

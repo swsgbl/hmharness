@@ -42,7 +42,17 @@ function exposedFilter(): (t: Tool) => boolean {
     const pats = raw.split(',').map((s) => s.trim()).filter(Boolean);
     return (t) => pats.some((p) => t.name === p || t.name.startsWith(p.endsWith('_') || p.endsWith('-') ? p : p + '_'));
   }
-  return (t) => t.name.startsWith('harmony_');
+  // The user's REAL browser via the extension bridge: read-only trio by
+  // default. extension_page_act moves the user's logged-in pages and its
+  // per-call approval gate lives in the agent runner, NOT on this stdio
+  // surface — so it ships ONLY behind an explicit opt-in.
+  const allowAct = process.env.HMH_MCP_EXTENSION_ACT === '1';
+  return (t) =>
+    t.name.startsWith('harmony_')
+    || t.name === 'extension_status'
+    || t.name === 'extension_tabs'
+    || t.name === 'extension_page_read'
+    || (allowAct && t.name === 'extension_page_act');
 }
 
 export async function serveMcp(): Promise<void> {
@@ -52,6 +62,20 @@ export async function serveMcp(): Promise<void> {
   void realLog;
 
   const { reg } = await buildRegistry({ mcp: false, announce: false });
+  // MCP hosts list tools ONCE at startup; a browser opened later must not
+  // leave the extension family invisible until the next host restart. If the
+  // agent's registry skipped it (bridge healthy but no extension connected
+  // YET), register on a healthy bridge alone — every call re-checks over
+  // HTTP and fails honestly with the next step when no browser is there.
+  if (!reg.list().some((t) => t.name === 'extension_status')) {
+    try {
+      const { discoverExtensionBridgeSync, extensionTools } = await import('@hmharness/extension');
+      const { pageReadSink } = await import('@hmharness/agent');
+      if (discoverExtensionBridgeSync(homeDir()).healthy) {
+        reg.registerAll(extensionTools({ home: homeDir(), onPageRead: pageReadSink(homeDir()) }));
+      }
+    } catch { /* extension optional: never block the MCP surface */ }
+  }
   const tools = reg.list().filter(exposedFilter());
   const byName = new Map(tools.map((t) => [t.name, t]));
   const ctx = { cwd: process.cwd(), home: homeDir() };

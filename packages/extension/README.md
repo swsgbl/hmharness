@@ -25,6 +25,10 @@ hmh extension uninstall            # 全量撤销安装
 
 浏览器侧栏里**直接和智能体对话**:点扩展图标 →「打开对话面板(侧栏)」。面板消息走 `/v1/chat`(与上行同款令牌鉴权),CLI 侧大脑 = 用户配置的 provider(routing `chat`)+ 工具环 `page_read` / `page_act` —— 模型可以读取你当前标签页、并在你眼前操作它。会话历史按浏览器来源隔离、只存内存(桥停即清)。`hmh extension serve`/`start` 才有大脑;裸桥(如测试)对 `/v1/chat` 诚实回 503。
 
+## MCP 面:任何 AI 客户端都能用你的浏览器(互操作)
+
+桥健康时,`hmh mcp-serve` 自动暴露**只读三件**给 MCP 宿主(Claude Code / Codex 等,配置见根 README):`extension_status` / `extension_tabs` / `extension_page_read` —— 外部 AI 客户端可以列出并读取你真实浏览器的标签页。`extension_page_act`(在你的真实浏览器上动手)**默认不暴露**:它的逐次批准门在 agent 运行器里,MCP stdio 面没有那个交互层——需要时显式开 `HMH_MCP_EXTENSION_ACT=1`(自担:外部客户端将可操作你已登录的页面)。MCP 主机启动时浏览器未开没关系:桥活着就登记,每次调用实时复查、扩展不在就诚实报错并给出下一步。
+
 ## 常驻安装通道(2026-10 真机实证;`hmh extension install` 自动分轨)
 
 | 浏览器 | 通道 | 说明 |

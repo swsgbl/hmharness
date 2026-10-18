@@ -13,6 +13,7 @@ export {
 export { buildSystemPrompt } from './prompt.ts';
 export { strings, type Locale, type Strings } from './i18n.ts';
 export { makeSpawnTool, MAX_SPAWN_DEPTH, type SpawnBase } from './spawn.ts';
+export { pageReadSink } from './code-wm-recorder.ts';
 export { withTopologyGovernance, mapRole, liveTopologySnapshot, teamLog } from './topology-live.ts';
 export {
   buildRegistry,

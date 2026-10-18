@@ -20,7 +20,7 @@
 import type { Tool } from '@hmharness/kernel';
 import type { PageAct, RawPageData, TabInfo } from './protocol.ts';
 import { agentCommand, bridgeFromState, type BridgeHandle } from './client.ts';
-import { isPaired } from './token.ts';
+import { isPaired, pairedCount } from './token.ts';
 import { discoverExtensionBridge } from './registry.ts';
 import { formatPageSnapshot, summarizePage } from './page.ts';
 
@@ -44,7 +44,7 @@ const WRAP = (err: unknown): { output: string; isError: boolean } => ({
 function ensure(ctx: ExtensionToolContext): BridgeHandle {
   const handle = bridgeFromState(ctx.home);
   if (!handle) {
-    throw new Error('hmh 扩展桥未运行 — 终端执行 hmh extension serve,再在浏览器扩展 popup 里配对连接');
+    throw new Error('hmh 扩展桥未运行 — 终端执行 hmh extension start(后台常驻),浏览器打开后自动连接');
   }
   return handle;
 }
@@ -70,7 +70,7 @@ export function extensionTools(ctx: ExtensionToolContext): Tool[] {
           const paired = await isPaired(ctx.home);
           const lines = [
             `桥: 127.0.0.1:${probe.port} ${probe.healthy ? '运行中' : '失联'}`,
-            `配对: ${paired ? '已配对' : '未配对(hmh extension pair)'}`,
+            `配对: ${paired ? `已授权 ${await pairedCount(ctx.home)} 台浏览器` : '未授权(浏览器打开装有扩展的页面即自动授权)'}`,
             `扩展: ${probe.connected ? `已连接${probe.browser ? ' · ' + probe.browser : ''}${probe.extVersion ? ' v' + probe.extVersion : ''}` : '未连接(浏览器扩展 popup 里连接)'}`,
           ];
           return { output: lines.join('\n') };
