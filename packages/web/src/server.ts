@@ -28,6 +28,7 @@ import {
   insideRoot, toRel, fuzzyScore, parseImageDataUrl, buildAttachmentsPrefix, buildImagePrefix,
   isBinaryHead, SKIP_DIRS, MAX_SEARCH_DEPTH, MAX_SEARCH_ENTRIES, MAX_SEARCH_RESULTS, type SearchHit,
 } from './fs-utils.ts';
+import { handleCognitiveRoute } from './routes/cognitive.ts';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;
 
@@ -1000,93 +1001,9 @@ export async function startServer(opts: {
         json(res, 200, { ok: true });
         return;
       }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/drift') {
-        try {
-          const { analyzeGoalDrift } = await import('@hmharness/cognitive');
-          const order = url.searchParams.get('order') === 'time' ? 'time' : 'score';
-          json(res, 200, { views: (await analyzeGoalDrift(home, 100, order)).slice(0, 12) });
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/skills') {
-        try {
-          const { skillCandidatesFromHistory } = await import('@hmharness/cognitive');
-          json(res, 200, { candidates: (await skillCandidatesFromHistory(home)).slice(0, 8) });
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/trajectories') {
-        try {
-          const { listTrajectoryIds } = await import('@hmharness/cognitive');
-          json(res, 200, { trajectories: await listTrajectoryIds(home, 30) });
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/replay') {
-        try {
-          const { replayTrajectory } = await import('@hmharness/cognitive');
-          const id = url.searchParams.get('id') ?? 'latest';
-          const view = await replayTrajectory(home, id);
-          if (!view) { json(res, 404, { error: `trajectory '${id}' not found` }); return; }
-          json(res, 200, view);
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/transfer') {
-        try {
-          const { readFile } = await import('node:fs/promises');
-          const { join: j } = await import('node:path');
-          const text = await readFile(join(home, 'cognitive', 'transfer.jsonl'), 'utf8');
-          const experiments = text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l)).slice(-50);
-          json(res, 200, { experiments });
-        } catch {
-          json(res, 200, { experiments: [] });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/team') {
-        try {
-          const { teamLog, liveTopologySnapshot } = await import('@hmharness/agent');
-          json(res, 200, { events: await teamLog(40), live: liveTopologySnapshot() });
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive/calibration') {
-        try {
-          const { calibrationReport, calibrationTrend } = await import('@hmharness/cognitive');
-          const env = url.searchParams.get('env') ?? undefined;
-          if (url.searchParams.get('trend') === '1') {
-            json(res, 200, await calibrationTrend(home, 5, env));
-          } else {
-            json(res, 200, await calibrationReport(home));
-          }
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
-      if (req.method === 'GET' && url.pathname === '/api/cognitive') {
-        // research dashboard seed (blueprint RD-001..008): read-only status
-        // of the cognitive subsystems — memory layers, trajectory store,
-        // evolution audit tail, environment registry.
-        try {
-          const { cognitiveStatus } = await import('@hmharness/cognitive');
-          json(res, 200, await cognitiveStatus(home));
-        } catch (err) {
-          json(res, 500, { error: String(err).slice(0, 200) });
-        }
-        return;
-      }
+      // cognitive panel routes live in routes/cognitive.ts (web split slice 1);
+      // read-only projections of HMH_HOME stores — same paths/shapes as always
+      if (await handleCognitiveRoute(req, url, res, { home, json })) return;
       if (desktop && req.method === 'POST' && url.pathname === '/api/desktop/shutdown') {
         // desktop bridge graceful stop: the desktop supervisor calls this
         // (token-gated above) BEFORE falling back to killing its own child.
