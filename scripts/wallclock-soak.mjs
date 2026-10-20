@@ -57,6 +57,10 @@ const report = {
   polls, stateOk, cogOk, errors5xx,
   heapMinMB: Math.round(heapMin / 1e6), heapMaxMB: Math.round(heapMax / 1e6), heapGrowthMB: Math.round((heapMax - heapMin) / 1e6),
   bad: bad.slice(0, 10),
+  // two-axis verdict: the zero-error bar conflates client-fetch health with
+  // server health. serverHealth isolates the ORIGINAL question (drift/leak/
+  // crash over the window); pass keeps the strict preregistered bar.
+  serverHealth: stateOk + errors5xx === polls && !bad.some((b) => /state (4|5)\d\d/.test(b)) && (heapMax - heapMin) < 150 * 1e6 && upMs >= HOURS * 3_600_000 * 0.99,
   pass: errors5xx === 0 && stateOk === polls && (heapMax - heapMin) < 150 * 1e6 && upMs >= HOURS * 3_600_000 * 0.99,
 };
 // RESULT FILE FIRST — everything after this is best-effort
