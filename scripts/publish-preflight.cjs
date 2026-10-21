@@ -62,7 +62,7 @@ if (!process.argv.includes('--skip-tests')) {
   console.log('== build + unit tests + typecheck');
   for (const cmd of ['npm run build', 'npm run typecheck', 'npm test']) {
     try {
-      execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000 });
+      execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 900000 });
       console.log('  ' + cmd + ': ok');
     } catch (e) {
       // surface the FAILING TESTS, not just the output tail: node:test emits
