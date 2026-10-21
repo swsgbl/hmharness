@@ -1,3 +1,7 @@
+## [0.23.37] - 2026-10-21
+
+ARC-AGI-3 证据链完备+墙钟压测仪器：①arc3 研究仪器三件（scripts/arc3-{calibration,multiseed,temporal-curve}.mts）——语料 31→111 条（1582 步）全程：随机分割六档晋升恒 5/5（均值 0.971-0.994，p=0.0313）；时间维曲线（训练于过去评分于当桶的部署形态）Brier 1.0→0.0077；与迁移实验 +0.4166（LLM 未参与）三形态一致=harness 层校准净贡献终局定论；②墙钟压测仪器 scripts/wallclock-soak.mjs——2h 档全过（120min 零中断，堆 +5MB）；8h 档三跑两轴终审（服务器侧 PASS：三跑零重启/堆 ≤+10MB/成功连接全 200；本机零错误不可达：宿主网络事件以 ~1%/h 注入聚集连接故障，retry-ok 注记归因）；serverHealth 独立判定轴入仪器；③AGENTS.md 仓库级 AI 协作指引（AEO 基础）；④生产 A/B 启动（gate:{enabled,tau:0.4} 选择性）
+
 ## [0.23.36] - 2026-10-18
 
 v33 审计 4.1 架构演进落地+MCP 扩展暴露：①Web server 按路由域拆分六模块——routes/{cognitive(8),settings(7),filesystem(9),remote(8),sessions 运行控制(6),sessions-meta(6)}，44 条路由中 38 条出仓，server.ts 从 116K 降至 65K（-44%）；全部逐字搬运+依赖注入（可变态引用/闭包 setter/按请求快照/活引用 Map 四型）+每域真服务器冒烟测试锁定 API 合约；驻留=task 主入口与 slash-command 执行核心（runOne/execFor/reg 宿主）+桌面桥/SSE/状态装配；②MCP 面暴露浏览器扩展工具族——默认只读三件（status/tabs/page_read），extension_page_act 仅在 HMH_MCP_EXTENSION_ACT=1 显式开启（其审批门在 agent 运行器而非 stdio 面）；迟连桥补注册（MCP 宿主启动时列一次工具的语义下，浏览器后开不留盲区）；每调用经桥 HTTP 重查，无浏览器时诚实失败
