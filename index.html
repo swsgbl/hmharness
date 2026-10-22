@@ -125,7 +125,7 @@ footer li{list-style:none;margin:6px 0}
 
 <section id="features"><div class="wrap">
   <h2 class="sec" data-i18n="feat_title">不继承任何上游,全部自持</h2>
-  <p class="secdesc" data-i18n="feat_desc">11 包单仓:零依赖内核 + 经验自进化(用得越多越聪明) + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。</p>
+  <p class="secdesc" data-i18n="feat_desc">16 包单仓:零依赖内核 + 经验自进化(用得越多越聪明) + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。</p>
   <div class="grid">
     <div class="card"><div class="ic">🏗️</div><h3 data-i18n="c1_h">参数化工程脚手架</h3><p data-i18n="c1_p"><code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。</p></div>
     <div class="card"><div class="ic">🖥️</div><h3 data-i18n="c2_h">模拟器全生命周期(零 IDE)</h3><p data-i18n="c2_p"><code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。</p></div>
@@ -165,6 +165,14 @@ footer li{list-style:none;margin:6px 0}
 <section id="install" style="padding-top:30px"><div class="wrap">
   <h2 class="sec" data-i18n="ins_title">四步上手</h2>
   <p class="secdesc" data-i18n="ins_desc">Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。</p>
+  <div class="steps" aria-label="Install paths">
+    <div class="step"><div class="n">A</div><div style="flex:1"><div class="cap" data-i18n="route_npm_h">标准桌面:直接用 npm</div><pre>npm install -g @hmharness/cli</pre></div></div>
+    <div class="step"><div class="n">B</div><div style="flex:1"><div class="cap" data-i18n="route_source_h">贡献者 / 源码优先</div><pre>git clone https://github.com/swsgbl/hmharness.git
+npm install &amp;&amp; npm run build</pre><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="route_source_docs">完整贡献安装文档</a></div></div>
+    <div class="step"><div class="n">C</div><div style="flex:1"><div class="cap" data-i18n="route_board_h">KaihongOS / OpenHarmony 板端</div><pre>node scripts/install-kaihongos.cjs</pre></div></div>
+  </div>
+  <p class="secdesc" data-i18n="ins_verify">安装后先运行 <code>hmh check | devices</code> 验证工具链与设备；反馈环境问题时请附脱敏输出。</p>
+  <p class="secdesc" data-i18n="ins_standard">下面是标准 npm 路径的四步流程；源码与板端边界见仓库 README 和板端指南。</p>
   <div class="steps">
     <div class="step"><div class="n">1</div><div style="flex:1"><div class="cap" data-i18n="ins1">npm 安装(已发布,零构建)</div><pre>npm install -g @hmharness/cli   # Node >= 22</pre></div></div>
     <div class="step"><div class="n">2</div><div style="flex:1"><div class="cap" data-i18n="ins2">初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)</div><pre>hmh init
@@ -218,6 +226,7 @@ hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.en.md" target="_blank" rel="noopener">README(English)</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="f_contrib">参与贡献</a></li>
       <li><a href="faq.html" data-i18n="f_faq">常见问题 FAQ</a></li>
+      <li><a href="https://github.com/swsgbl/hmharness/discussions/4" target="_blank" rel="noopener" data-i18n="f_feedback">环境反馈</a></li>
       <li><a href="llms.txt">llms.txt</a></li>
     </ul></div>
   </div>
@@ -305,7 +314,7 @@ const I18N = {
     term_tagline: '网页端已就绪 → http://127.0.0.1:7788',
     term_prompt: '创建鸿蒙工程 my-app:登录页+首页,构建装进模拟器跑起来',
     feat_title: '不继承任何上游,全部自持',
-    feat_desc: '11 包单仓:零依赖内核 + 经验自进化(用得越多越聪明) + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。',
+    feat_desc: '16 包单仓:零依赖内核 + 经验自进化(用得越多越聪明) + 鸿蒙原生域 + 运维看家 + 执行层 + 双前端。while 循环内核、上下文压缩、审批门禁、会话审计全部自研,MCP 生态即插即用。',
     c1_h: '参数化工程脚手架', c1_p: '<code>harmony_project_create</code> 一次调用生成多页面 + feature HAP + har 库的任意结构;hvigor 真实构建验证。',
     c2_h: '模拟器全生命周期(零 IDE)', c2_p: '<code>harmony_emulator_*</code> 直接驱动官方无头 CLI:发现/目录/创建/启动/停止/删除,全系机型与变体即刻部署,无需打开 DevEco Studio。',
     c3_h: '构建 · 装机 · 运行', c3_p: 'hvigor 构建、hdc 安装/启动/日志/卸载、仓颉 <code>cjpm</code> 构建、官方 <code>codelinter</code> 门禁 —— 设备写操作全部走审批。',
@@ -327,6 +336,12 @@ const I18N = {
     s1: '单仓 16 包', s2: '运行时依赖(内核)', s3: '单元测试(CI 全绿)', s4: '环境适配器',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
+    route_npm_h: '标准桌面:直接用 npm',
+    route_source_h: '贡献者 / 源码优先',
+    route_source_docs: '完整贡献安装文档',
+    route_board_h: 'KaihongOS / OpenHarmony 板端',
+    ins_verify: '安装后先运行 <code>hmh check | devices</code> 验证工具链与设备；反馈环境问题时请附脱敏输出。',
+    ins_standard: '下面是标准 npm 路径的四步流程；源码与板端边界见仓库 README 和板端指南。',
     ins1: 'npm 安装(已发布,零构建)',
     ins2: '初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)',
     ins3: '一条命令起飞:全屏 TUI,网页端自动就绪',
@@ -338,7 +353,7 @@ const I18N = {
     mod_title: '模型无关 · 按用途路由',
     mod_desc: '任意 OpenAI 兼容厂商:GLM / DeepSeek / 通义 / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio……chat、vision、evolve、bench 各走各的,密钥只存在本机 HMH_HOME。',
     f_repo: 'GitHub 仓库', f_arch: '架构设计', f_road: '路线图',
-    f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献', f_faq: '常见问题 FAQ',
+    f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献', f_faq: '常见问题 FAQ', f_feedback: '环境反馈',
     legal: '<b>非官方声明:</b>hmharness 是独立社区开源项目(MIT),与华为(Huawei)、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有,此处仅为描述性合理使用。本项目为净室(clean-room)重写,不继承任何上游运行时能力;自进化机制参考 Darwin Gödel Machine、GDPevo、Penguin Harness 等公开研究思想(无代码复制)。<br>© 2026 hmharness contributors · MIT License',
     _langBtn: 'EN'
   },
@@ -352,7 +367,7 @@ const I18N = {
     term_tagline: 'web UI ready -> http://127.0.0.1:7788',
     term_prompt: 'Create HarmonyOS project my-app (login + home pages), build it and run it on the emulator',
     feat_title: 'Nothing inherited. Everything home-grown.',
-    feat_desc: 'Eleven packages in one repo: a zero-dependency kernel, experience-driven self-evolution (it gets smarter the more you use it), the HarmonyOS native domain, the ops keeper, the execution layer, and two frontends. The loop kernel, context compression, approval gates and session audit are all first-party; MCP plugs the wider ecosystem in.',
+    feat_desc: 'Sixteen packages in one repo: a zero-dependency kernel, experience-driven self-evolution (it gets smarter the more you use it), the HarmonyOS native domain, the ops keeper, the execution layer, and two frontends. The loop kernel, context compression, approval gates and session audit are all first-party; MCP plugs the wider ecosystem in.',
     c1_h: 'Parameterized Scaffolding', c1_p: '<code>harmony_project_create</code> generates any structure of multi-page + feature HAP + HAR libraries in one call; verified against real hvigor builds.',
     c2_h: 'Full Emulator Lifecycle, No IDE', c2_p: '<code>harmony_emulator_*</code> drives the official headless CLI directly: discover / catalog / create / start / stop / delete — every device model and variant on demand, without opening DevEco Studio.',
     c3_h: 'Build · Install · Run', c3_p: 'hvigor builds, hdc install/launch/logs/uninstall, Cangjie <code>cjpm</code> builds, and the official <code>codelinter</code> gate — every device write goes through approval.',
@@ -374,6 +389,12 @@ const I18N = {
     s1: 'packages in one repo', s2: 'runtime deps (kernel)', s3: 'unit tests (CI green)', s4: 'environment adapters',
     ins_title: 'Quick Start in Four Steps',
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
+    route_npm_h: 'Standard desktop: use npm',
+    route_source_h: 'Contributors / source-first users',
+    route_source_docs: 'Full contributor install guide',
+    route_board_h: 'KaihongOS / OpenHarmony boards',
+    ins_verify: 'After installation, run <code>hmh check | devices</code> to verify the toolchain and device list; attach sanitized output when reporting environment issues.',
+    ins_standard: 'The four steps below are the standard npm path; see the README and board guide for source and board boundaries.',
     ins1: 'Install via npm (published, zero build)',
     ins2: 'Init and configure a provider (any OpenAI-compatible endpoint; multi-provider routing optional)',
     ins3: 'One command to fly: fullscreen TUI, web UI auto-linked',
@@ -385,7 +406,7 @@ const I18N = {
     mod_title: 'Model-Agnostic, Routed by Purpose',
     mod_desc: 'Any OpenAI-compatible provider: GLM / DeepSeek / Qwen / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio… chat, vision, evolve and bench each take their own route; keys never leave HMH_HOME on your machine.',
     f_repo: 'GitHub Repository', f_arch: 'Architecture', f_road: 'Roadmap',
-    f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing', f_faq: 'FAQ',
+    f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing', f_faq: 'FAQ', f_feedback: 'Environment feedback',
     legal: '<b>Non-affiliation notice:</b> hmharness is an independent community open-source project (MIT). It is not affiliated with, endorsed by, or cooperating with Huawei or the OpenAtom Foundation. "HarmonyOS", "OpenHarmony", "DevEco Studio" and related names and marks belong to their respective owners; used here descriptively under fair use. This project is a clean-room rewrite that inherits no upstream runtime capability; self-evolution mechanisms reference public research ideas from Darwin Gödel Machine, GDPevo and Penguin Harness (no code copied).<br>© 2026 hmharness contributors · MIT License',
     _langBtn: '中文'
   }

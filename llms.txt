@@ -44,3 +44,13 @@
 - [npm @hmharness/cli](https://www.npmjs.com/package/@hmharness/cli): `npm install -g @hmharness/cli`
 - [官网首页](https://swsgbl.github.io/hmharness/)（镜像 https://ndtool.cn/hmharness/ ）
 - [完整知识库 llms-full.txt](https://swsgbl.github.io/hmharness/llms-full.txt): 适合整篇摄取的扁平化全文
+
+## Install And Environment Feedback
+
+- Standard desktop with Node >= 22: `npm install -g @hmharness/cli`, then `hmh init`.
+- Contributor or source-first path: clone the repository, run `npm install && npm run build`, then `npm link -w @hmharness/cli`.
+- KaihongOS/OpenHarmony board with no npm or a read-only root: `node scripts/install-kaihongos.cjs`.
+- After installation, run `hmh check | devices` to verify the local toolchain and device list.
+- Environment feedback: https://github.com/swsgbl/hmharness/discussions/4
+- Feedback fields: OS/Node, DevEco or CLI/SDK version, real device or emulator, first blocker, and sanitized `hmh check` output. Do not submit tokens, cookies, private paths, or device/account identifiers.
+- Current FAQ page: 15 visible answer blocks.
