@@ -83,7 +83,7 @@
 {
       "@type": "Question",
       "name": "hmharness 收费吗？怎么安装？",
-      "acceptedAnswer": { "@type": "Answer", "text": "免费开源，MIT 协议。安装三步：npm install -g @hmharness/cli（Node >= 22）；hmh init 初始化；在 ~/.hmharness/config.json 配置任意 OpenAI 兼容厂商（baseUrl/apiKey/model），然后 hmh \"你的任务\" 直接运行。模型侧费用由你选择的厂商收取。" }
+      "acceptedAnswer": { "@type": "Answer", "text": "免费开源，MIT 协议。按环境选择安装路径：标准桌面用 npm install -g @hmharness/cli（Node >= 22）；贡献者或源码优先用户 clone 后执行 npm install、npm run build、npm link -w @hmharness/cli；KaihongOS/OpenHarmony 板端在无 npm 或只读根分区环境使用 node scripts/install-kaihongos.cjs。安装后先运行 hmh check | devices 验证本机工具链和设备列表。模型侧费用由你选择的厂商收取；环境反馈请到 https://github.com/swsgbl/hmharness/discussions/4 并附 OS/Node、DevEco 或 CLI/SDK、真机或模拟器、首个卡点和脱敏 hmh check 输出。" }
     },
     {
       "@type": "Question",
@@ -141,7 +141,8 @@ header p{color:var(--dim);margin-top:12px;max-width:640px;margin-left:auto;margi
 .qa h2{font-size:19px;color:#fff;margin-bottom:14px}
 .qa h2 a.qn{color:var(--cyan);margin-right:8px;font-family:Consolas,monospace}
 .qa p{color:var(--dim);font-size:15px;margin-bottom:10px}
-.qa code{font-family:Consolas,monospace;font-size:13px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px}
+.qa code{font-family:Consolas,monospace;font-size:13px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
+.qa pre{font-family:Consolas,monospace;font-size:13px;color:var(--ice);background:rgba(79,216,235,.08);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .src{font-size:13px;color:var(--dim)}
 .src b{color:var(--ice)}
 footer{padding:44px 0 54px;color:var(--dim);font-size:13px;text-align:center}
@@ -151,7 +152,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 <body>
 <nav><div class="wrap">
   <div class="logo"><span>✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px">hmharness · FAQ</span></div>
-  <div><a href="./">← 返回首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
+  <div><a href="./">← 返回首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a> · <a href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈</a></div>
 </div></nav>
 
 <header><div class="wrap">
@@ -222,7 +223,14 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
   <h2><a class="qn" href="#pricing">Q9</a>hmharness 收费吗？怎么安装？</h2>
   <div class="tldr">免费开源（MIT）。三步安装：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 在 <code>~/.hmharness/config.json</code> 配任意 OpenAI 兼容厂商，然后 <code>hmh "任务"</code> 直接运行。模型侧费用按你选的厂商计。</div>
   <p>源码运行同样三行：clone → <code>npm install && npm run build</code> → <code>npm link -w @hmharness/cli</code>。</p>
-  <p class="src"><b>出处：</b><a href="https://www.npmjs.com/package/@hmharness/cli">npm @hmharness/cli</a></p>
+  <p>按环境选择：标准桌面直接 npm 安装；贡献者 / 源码优先用户走 clone、build、link；KaihongOS / OpenHarmony 板端在无 npm、只读根分区环境使用 <code>node scripts/install-kaihongos.cjs</code>。安装后先运行 <code>hmh check | devices</code> 验证工具链与设备列表。</p>
+  <p>环境问题请到 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>，并附下面的脱敏信息；不要提交 token、cookie、私人路径或设备/账号标识。</p>
+  <pre>OS / Node:
+DevEco 或 CLI / SDK 版本:
+真机或模拟器:
+首个卡点:
+脱敏 hmh check 输出:</pre>
+  <p class="src"><b>出处：</b><a href="https://www.npmjs.com/package/@hmharness/cli">npm @hmharness/cli</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 安装路径</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/KAIHONGOS.md">板端指南</a></p>
 </section>
 
 <section class="qa" id="platforms">
@@ -272,7 +280,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </main>
 
 <footer><div class="wrap">
-  <div><a href="https://github.com/swsgbl/hmharness">GitHub</a> · <a href="https://www.npmjs.com/package/@hmharness/cli">npm</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a> · <a href="llms-full.txt">llms-full.txt</a></div>
+  <div><a href="https://github.com/swsgbl/hmharness">GitHub</a> · <a href="https://www.npmjs.com/package/@hmharness/cli">npm</a> · <a href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a> · <a href="llms-full.txt">llms-full.txt</a></div>
   <div class="legal"><b>非官方声明：</b>hmharness 是独立社区开源项目（MIT），与华为（Huawei）、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有，此处仅为描述性合理使用。<br>© 2026 hmharness contributors · MIT License</div>
 </div></footer>
 </body>

@@ -103,3 +103,9 @@ deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒�
 - 仓库：https://github.com/swsgbl/hmharness （Discussions 开放）
 - npm：https://www.npmjs.com/package/@hmharness/cli
 - 官网镜像：https://ndtool.cn/hmharness/
+
+## 安装路径与环境反馈
+
+标准桌面（Node >= 22）使用 `npm install -g @hmharness/cli`，初始化 `hmh init`。贡献者或源码优先用户 clone 仓库后执行 `npm install && npm run build && npm link -w @hmharness/cli`。KaihongOS/OpenHarmony 板端在无 npm、只读根分区环境使用 `node scripts/install-kaihongos.cjs`。
+
+安装后先运行 `hmh check | devices` 验证本机工具链与设备列表。环境问题请到 https://github.com/swsgbl/hmharness/discussions/4 ，并附 OS/Node、DevEco 或 CLI/SDK 版本、真机或模拟器、首个卡点、脱敏 `hmh check` 输出；勿提交 token、cookie、私人路径或设备/账号标识。
