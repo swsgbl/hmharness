@@ -168,8 +168,7 @@ footer li{list-style:none;margin:6px 0}
   <div class="steps" aria-label="Install paths">
     <div class="step"><div class="n">A</div><div style="flex:1"><div class="cap" data-i18n="route_npm_h">标准桌面:直接用 npm</div><pre>npm install -g @hmharness/cli</pre></div></div>
     <div class="step"><div class="n">B</div><div style="flex:1"><div class="cap" data-i18n="route_source_h">贡献者 / 源码优先</div><pre>git clone https://github.com/swsgbl/hmharness.git
-npm install &amp;&amp; npm run build
-npm link -w @hmharness/cli</pre></div></div>
+npm install &amp;&amp; npm run build</pre><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="route_source_docs">完整贡献安装文档</a></div></div>
     <div class="step"><div class="n">C</div><div style="flex:1"><div class="cap" data-i18n="route_board_h">KaihongOS / OpenHarmony 板端</div><pre>node scripts/install-kaihongos.cjs</pre></div></div>
   </div>
   <p class="secdesc" data-i18n="ins_verify">安装后先运行 <code>hmh check | devices</code> 验证工具链与设备；反馈环境问题时请附脱敏输出。</p>
@@ -339,6 +338,7 @@ const I18N = {
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
     route_npm_h: '标准桌面:直接用 npm',
     route_source_h: '贡献者 / 源码优先',
+    route_source_docs: '完整贡献安装文档',
     route_board_h: 'KaihongOS / OpenHarmony 板端',
     ins_verify: '安装后先运行 <code>hmh check | devices</code> 验证工具链与设备；反馈环境问题时请附脱敏输出。',
     ins_standard: '下面是标准 npm 路径的四步流程；源码与板端边界见仓库 README 和板端指南。',
@@ -391,6 +391,7 @@ const I18N = {
     ins_desc: 'Node >= 22 plus the HarmonyOS toolchain (hvigorw / hdc / DevEco or CLI equivalents). Any OpenAI-compatible provider works.',
     route_npm_h: 'Standard desktop: use npm',
     route_source_h: 'Contributors / source-first users',
+    route_source_docs: 'Full contributor install guide',
     route_board_h: 'KaihongOS / OpenHarmony boards',
     ins_verify: 'After installation, run <code>hmh check | devices</code> to verify the toolchain and device list; attach sanitized output when reporting environment issues.',
     ins_standard: 'The four steps below are the standard npm path; see the README and board guide for source and board boundaries.',
