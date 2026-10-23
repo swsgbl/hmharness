@@ -58,7 +58,7 @@
 
 ## 2026-10-22(四十九) · 侧栏=完整智能体:导航/文件/命令 + 自主接力长任务
 
-**动机**:用户贴出与侧栏的真实对话实录——AI 答"我没有 VPN 工具,能力只有两个",两次撞"工具调用太多已停下",GitHub 打不开只能求用户手动开。用户定调三连:①"插件里的 hmh 应该是 hmh CLI 的所有能力,只是显示在浏览器里";②"hmharness 初衷是超长周期任务";③"交代一个任务它自己干完交付,不要我老是指挥继续"。
+**动机**:用户贴出与侧栏的真实对话实录——AI 答"我没有 VPN 工具,能力只有两个",两次撞"工具调用太多已停下",GitHub 打不开只能求用户手动开。对话实录三连:①"插件里的 hmh 应该是 hmh CLI 的所有能力,只是显示在浏览器里";②"hmharness 初衷是超长周期任务";③"交代一个任务它自己干完交付,不要我老是指挥继续"。
 
 **关键决策**:
 - **CLI 自己的工具实现,不是复制品**:serve 侧直接实例化 agent 的 readFileTool/writeFileTool/listDirTool/runCommandTool 单例(同款 DENY_PATTERNS/preflight/失败重复守卫),页面能力走本桥新增 `page.goto`(http/https 双端强制,拒绝 file:/javascript:)+ `tabs.list`。
