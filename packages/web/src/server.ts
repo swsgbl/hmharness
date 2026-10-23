@@ -118,7 +118,7 @@ function issueMobileCookie(res: ServerResponse, remote: string): void {
     if (trustedLanIps.size > 32) trustedLanIps.delete(trustedLanIps.values().next().value as string);
   }
   persistMobileSessions();
-  res.setHeader('set-cookie', `${MOBILE_COOKIE}=${cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
+  res.setHeader('set-cookie', `${MOBILE_COOKIE}=${cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=315360000`);
 }
 /** Paired phones survive a server restart (no re-scan): the session store
     lives next to config.json. Restarted with a fresh process otherwise. */

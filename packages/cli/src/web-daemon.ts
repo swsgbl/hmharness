@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { openSync, readFileSync, unlinkSync, writeFileSync, closeSync } from 'node:fs';
+import { openSync, readFileSync, unlinkSync, writeFileSync, closeSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
 
@@ -239,4 +239,116 @@ export function startWebDaemon(port = DEFAULT_WEB_PORT, entry = process.argv[1],
   const pid = readWebPid();
   if (pid && alive(pid)) return { already: true, pid };
   return { already: false, pid: spawnWebDaemon(port, entry, extraArgs) };
+}
+
+/* ---- Boot auto-start (2026-10-23 user request) ----
+ * The web daemon normally starts lazily — when a CLI command or the TUI
+ * brings it up. For phone remote control to work "even when no app is
+ * open", the daemon must come up at LOGIN with no user action.
+ *
+ * Windows: a .cmd shortcut in the user's Startup folder (no admin rights
+ *   needed, starts at every logon).
+ * macOS: a LaunchAgent plist (~/Library/LaunchAgents).
+ * Linux: a systemd user unit (loginctl enable-linger for boot-start).
+ * All three run `node <entry> web start --port=<port>` invisibly.
+ */
+
+function startupDir(): string {
+  if (process.platform === 'win32') {
+    return join(process.env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup');
+  }
+  if (process.platform === 'darwin') {
+    return join(process.env.HOME ?? '', 'Library', 'LaunchAgents');
+  }
+  return join(process.env.HOME ?? '', '.config', 'systemd', 'user');
+}
+
+function autostartLabel(): string {
+  return 'hmharness-web-daemon';
+}
+
+/** Install the boot auto-start for the CURRENT user. Idempotent. */
+export function installWebDaemonAutostart(port = DEFAULT_WEB_PORT, entry = process.argv[1]): string {
+  const dir = startupDir();
+
+  if (process.platform === 'win32') {
+    mkdirSync(dir, { recursive: true });
+    const cmdPath = join(dir, `${autostartLabel()}.cmd`);
+    const nodeExe = process.execPath.replace(/\\/g, '\\\\');
+    const entryPath = entry.replace(/\\/g, '\\\\');
+    writeFileSync(cmdPath, [
+      `@echo off`,
+      `"${nodeExe}" "${entryPath}" web start --port=${port} > NUL 2>&1`,
+    ].join('\r\n'), 'utf8');
+    return cmdPath;
+  }
+
+  if (process.platform === 'darwin') {
+    mkdirSync(dir, { recursive: true });
+    const plist = join(dir, `${autostartLabel()}.plist`);
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${autostartLabel()}</string>
+  <key>ProgramArguments</key><array>
+    <string>${process.execPath}</string>
+    <string>${entry}</string>
+    <string>web</string>
+    <string>start</string>
+    <string>--port=${port}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>${join(homeDir(), 'web.log')}</string>
+  <key>StandardErrorPath</key><string>${join(homeDir(), 'web.log')}</string>
+</dict></plist>`;
+    writeFileSync(plist, xml, 'utf8');
+    return plist;
+  }
+
+  // Linux: systemd user unit
+  mkdirSync(dir, { recursive: true });
+  const unit = join(dir, `${autostartLabel()}.service`);
+  writeFileSync(unit, [
+    `[Unit]`,
+    `Description=hmharness web daemon (phone remote control)`,
+    ``,
+    `[Service]`,
+    `Type=oneshot`,
+    `RemainAfterExit=yes`,
+    `ExecStart=${process.execPath} ${entry} web start --port=${port}`,
+    ``,
+    `[Install]`,
+    `WantedBy=default.target`,
+  ].join('\n'), 'utf8');
+  try { execSync('systemctl --user daemon-reload', { timeout: 10_000 }); } catch { /* best effort */ }
+  try { execSync(`systemctl --user enable ${autostartLabel()}`, { timeout: 10_000 }); } catch { /* best effort */ }
+  return unit;
+}
+
+/** Remove the boot auto-start. Returns the removed file path or ''. */
+export function uninstallWebDaemonAutostart(): string {
+  const dir = startupDir();
+  const candidates = [
+    join(dir, `${autostartLabel()}.cmd`),
+    join(dir, `${autostartLabel()}.plist`),
+    join(dir, `${autostartLabel()}.service`),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) {
+      try { unlinkSync(c); } catch { /* locked */ }
+      if (process.platform === 'linux') {
+        try { execSync(`systemctl --user disable ${autostartLabel()}`, { timeout: 10_000 }); } catch { /* best effort */ }
+      }
+      return c;
+    }
+  }
+  return '';
+}
+
+/** Check if the boot auto-start is installed. */
+export function webDaemonAutostartInstalled(): boolean {
+  const dir = startupDir();
+  return existsSync(join(dir, `${autostartLabel()}.cmd`))
+    || existsSync(join(dir, `${autostartLabel()}.plist`))
+    || existsSync(join(dir, `${autostartLabel()}.service`));
 }

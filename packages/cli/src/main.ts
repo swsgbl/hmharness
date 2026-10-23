@@ -27,7 +27,7 @@ import { readFile } from 'node:fs/promises';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid } from './web-daemon.ts';
+import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid, ensureWebDaemon } from './web-daemon.ts';
 import {
   chat,
   homeDir,
@@ -1081,12 +1081,52 @@ flags:
       bridge.onConnectionChange = (connected) => {
         stdout.write(connected ? '\n  ✓ 浏览器扩展已连接\n' : '\n  ✗ 浏览器扩展断开\n');
       };
-      // 侧栏对话面板的大脑:工具环走本桥,provider 走用户配置(routing chat)
-      bridge.onChat = (input) => answerChatTurn(input, {
-        readPage: () => bridge.command('page.read', undefined, 20_000),
-        act: (a) => bridge.command('page.act', { act: a }, 20_000),
-        log: (l) => stdout.write(`  ${DIM(l)}\n`),
-      });
+      // 侧栏对话面板的大脑(round 52):与 BrowserOS 面板收敛为同一个智能体
+      // ——runAgentTask(完整工具注册表+真实系统提示词[记忆/技能/洞察]+按
+      // 浏览器隔离的会话延续);审批门=对话式确认;步骤流实时上屏。旧的
+      // 紧凑循环留作 agent 不可用时的降级路径。
+      const tctx = { cwd: process.cwd(), home: homeDir() };
+      const stepOf = (input: { origin?: string }) => (l: string) => {
+        bridge.noteChatActivity(input.origin ?? 'anon', l);
+        stdout.write(`  ${DIM('· ' + l)}\n`);
+      };
+      let agentBrain: ((input: { origin?: string; message: string; page?: unknown; history?: unknown[] }) => Promise<string>) | null = null;
+      try {
+        const { buildRegistry, runAgentTask } = await import('@hmharness/agent');
+        const { answerWithAgentTurn } = await import('./extension-agent-brain.ts');
+        let cached: Awaited<ReturnType<typeof buildRegistry>> | null = null;
+        agentBrain = (input) => answerWithAgentTurn(input as never, {
+          buildRegistry: async () => (cached ??= await buildRegistry({ mcp: true, announce: false })),
+          buildRegistryNative: async () => buildRegistry({ mcp: false, announce: false }),
+          runAgentTask: runAgentTask as never,
+          ctx: tctx,
+          goto: (url) => bridge.command('page.goto', { url }, 20_000),
+          readPage: () => bridge.command('page.read', undefined, 20_000),
+          step: stepOf(input as { origin?: string }),
+          log: (l) => stdout.write(`  ${DIM(l)}\n`),
+        });
+        stdout.write('  大脑: 完整 agent(与 BrowserOS/acp-serve 同源)\n');
+      } catch (err) {
+        stdout.write(`  大脑: 紧凑循环(agent 不可用: ${String(err instanceof Error ? err.message : err).slice(0, 80)})\n`);
+      }
+      if (agentBrain) {
+        bridge.onChat = (input) => agentBrain!(input);
+      } else {
+        const { readFileTool, writeFileTool, listDirTool, runCommandTool } = await import('@hmharness/agent');
+        bridge.onChat = (input) => answerChatTurn(input, {
+          workspace: process.cwd(),
+          readPage: () => bridge.command('page.read', undefined, 20_000),
+          act: (a) => bridge.command('page.act', { act: a }, 20_000),
+          goto: (url) => bridge.command('page.goto', { url }, 20_000),
+          listTabs: () => bridge.command('tabs.list', undefined, 20_000),
+          readFile: (p) => readFileTool.execute({ path: p }, tctx),
+          writeFile: (p, c) => writeFileTool.execute({ path: p, content: c }, tctx),
+          listDir: (p) => listDirTool.execute({ path: p || '.' }, tctx),
+          runCommand: (cmd, t) => runCommandTool.execute({ command: cmd, ...(t ? { timeout_ms: t } : {}) }, tctx),
+          log: (l) => stdout.write(`  ${DIM(l)}\n`),
+          step: stepOf(input),
+        });
+      }
       bridge.onAutoPair = (origin) => {
         stdout.write(`\n  ✓ 扩展自动授权: ${origin}（零操作连接）\n`);
       };
@@ -1733,6 +1773,24 @@ flags:
     }
     const t = await uiStrings();
     const sub = rest.find((a) => !a.startsWith('-'));
+    if (sub === 'install-daemon') {
+      // boot auto-start (2026-10-23): the web daemon starts at LOGIN with
+      // no terminal/app needed — phone remote control is always reachable.
+      const { installWebDaemonAutostart } = await import('./web-daemon.ts');
+      const path = installWebDaemonAutostart(port, process.argv[1]);
+      stdout.write(`✓ 远程控制守护已设为开机自启（登录即启动，无需打开任何应用）\n`);
+      stdout.write(`  启动项: ${path}\n`);
+      stdout.write(DIM(`  移除: hmh web uninstall-daemon\n`));
+      const ok = await ensureWebDaemon(port);
+      if (ok) stdout.write(`✓ 守护已启动 · 手机随时可连\n`);
+      return;
+    }
+    if (sub === 'uninstall-daemon') {
+      const { uninstallWebDaemonAutostart } = await import('./web-daemon.ts');
+      const removed = uninstallWebDaemonAutostart();
+      stdout.write(removed ? `已移除开机自启: ${removed}\n` : `（未安装）\n`);
+      return;
+    }
     if (sub === 'stop') {
       stdout.write(stopWebDaemon() ? t.webStopped + '\n' : t.webNotRunning + '\n');
       return;
