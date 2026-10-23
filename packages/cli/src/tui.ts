@@ -13,6 +13,7 @@
 import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
+import { parseMouse, isMousePrefix, dispatchClick, clearRegions, addClickRegion } from './tui-mouse.ts';
 import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
@@ -327,6 +328,8 @@ export class TuiRuntime {
   /** bracketed-paste accumulator: non-null while the 201~ end marker has
    *  not arrived yet; everything buffered is literal insert-on-completion */
   private pasteBuf: string | null = null;
+  /** partial SGR mouse report held across stdin reads (ConPTY fragmentation) */
+  private mouseBuf: string | null = null;
   /** restores the console methods and process handlers captured by the
    *  TUI's terminal ownership (see installConsoleRedirection) */
   private restoreConsole: (() => void) | null = null;
@@ -361,7 +364,7 @@ export class TuiRuntime {
     // keys itself - no click capture, native selection stays native.
     // Bracketed paste (?2004h): multi-line pastes arrive delimited and
     // insert as one reviewable input instead of auto-submitting per line.
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1007h\x1b[?2004h');
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1007h\x1b[?2004h\x1b[?1000h\x1b[?1002h\x1b[?1006h');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -510,6 +513,9 @@ export class TuiRuntime {
       const sel = from + i === st.selected;
       const plain = truncateTo(formatRow(vis[from + i], sel, W - 1), W - 1);
       frame.push(sel ? '\x1b[7m' + plain + ' '.repeat(Math.max(0, W - 1 - strWidth(plain))) + '\x1b[27m' : ' ' + plain);
+      // mouse click region: this row picks that session
+      const pickRow = frame.length - 1;
+      addClickRegion(pickRow, 0, W - 1, () => { st.selected = from + i; this.pickerInput('return'); });
     }
     if (st.loading) frame.push(DIM('  ' + (vis.length === 0 ? t.pickerLoading : t.pickerMore)));
     else if (vis.length === 0) frame.push(DIM('  ' + (st.query ? t.pickerNoMatch : t.pickerEmpty)));
@@ -1086,6 +1092,39 @@ export class TuiRuntime {
   }
 
   private onKey(data: string): void {
+    // SGR mouse events (dsh-TUI style, 2026-10-22): intercept BEFORE any
+    // key processing — the terminal sends ESC[<btn;col;rowM/m sequences that
+    // would otherwise leak into the input as garbage. A click dispatches to
+    // the region registry; wheel drives the transcript scroll; all other
+    // mouse reports (press, drag, right/middle) are consumed silently.
+    {
+      let chunk = data;
+      for (;;) {
+        if (chunk === '' || chunk[0] !== '\x1b') break;
+        if (!isMousePrefix(chunk)) break;
+        const parsed = parseMouse(chunk);
+        if (parsed) {
+          const [ev, rest] = parsed;
+          if (ev.kind === 'click') dispatchClick(ev.col, ev.row);
+          else if (ev.kind === 'wheel') this.wheelScroll(ev.wheelUp);
+          chunk = rest;
+          continue;
+        }
+        // partial SGR prefix (ConPTY fragmentation): hold in the mouse buf
+        if (/^\x1b\[<\d*$/.test(chunk)) { this.mouseBuf = chunk; return; }
+        break;
+      }
+      if (this.mouseBuf !== null) {
+        const joined = this.mouseBuf + chunk;
+        this.mouseBuf = null;
+        if (joined !== data) { this.onKey(joined); return; }
+        chunk = joined;
+      }
+      if (chunk !== data) {
+        if (chunk === '') return;
+        data = chunk;
+      }
+    }
     // bracketed paste (T22): buffer until the 201~ end marker, then insert
     // the sanitized body at the caret; keys/bytes outside the markers keep
     // flowing through the normal path (recursion depth stays 1: indexOf
@@ -1330,6 +1369,22 @@ export class TuiRuntime {
 
   /** insert literal (sanitized paste) text at the caret - the same path
    *  printable typing takes, so caret/history/palette side-effects match */
+  /** Mouse wheel drives the transcript scroll (same as arrow keys: 3 lines). */
+  private wheelScroll(up: boolean): void {
+    if (this.overlay) { this.overlay.top = Math.max(0, this.overlay.top + (up ? -3 : 3)); this.dirty = true; return; }
+    if (up) {
+      if (this.scrollFromBottom < this.totalLines()) {
+        this.scrollFromBottom = Math.min(this.totalLines(), this.scrollFromBottom + 3);
+        this.dirty = true;
+      }
+    } else {
+      if (this.scrollFromBottom > 0) {
+        this.scrollFromBottom = Math.max(0, this.scrollFromBottom - 3);
+        this.dirty = true;
+      }
+    }
+  }
+
   private insertText(text: string): void {
     if (!text) return;
     this.input = this.input.slice(0, this.caret) + text + this.input.slice(this.caret);
@@ -1347,6 +1402,7 @@ export class TuiRuntime {
     const W = stdout.columns || 100;
     const H = stdout.rows || 30;
     const frame: string[] = [];
+    clearRegions(); // mouse click regions are re-registered fresh each frame
     if (this.resumeModal) {
       this.renderResumePicker(frame, W, H);
       this.flushFrame(frame, H);
@@ -1409,6 +1465,10 @@ export class TuiRuntime {
       const argsTxt = JSON.stringify(this.approval.args);
       frame.push(YELLOW(this.t.tuiApproval) + ' ' + YELLOW(BOLD(this.approval.name)) + ' ' + DIM(truncateTo(argsTxt, Math.max(0, W - 24))));
       frame.push(`  [y] ${GREEN(this.t.tuiApprove)}   [n] ${RED(this.t.tuiDeny)}   ${DIM(this.t.tuiApprovalHint)}`);
+      // mouse click regions for the approval buttons
+      const apprRow = frame.length - 1;
+      addClickRegion(apprRow, 2, 5, () => this.approvalResolve?.(true));
+      addClickRegion(apprRow, 12, 15, () => this.approvalResolve?.(false));
       frame.push(DIM('─'.repeat(W)));
     }
 
