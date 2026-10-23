@@ -1,3 +1,7 @@
+## [0.23.38] - 2026-10-23
+
+交互三连+远程控制永久化：①**默认多模态策略**——多模态主模型原生收图（ChatMessage.images→OpenAI image_url 组包，content 保持纯文本零破坏），仅 supportsVision:false 显式标记的文本模型走描述链（用户报障"全部转辅助识别"根因修复）；②**TUI 鼠标支持**（dsh-TUI 对标）——SGR 鼠标跟踪+点击区注册，命令面板行/审批卡[y][n]/会话选卡行可点击，滚轮转滚转录；③**远程控制永久化**——配对 cookie 30天→10年（实际永久），hmh web install-daemon 开机自启（Windows Startup/macOS LaunchAgent/Linux systemd user，登录即守护在线零窗口），uninstall-daemon 移除；④扩展桥 page.goto+侧栏 agent 大脑接线（代集成并行会话 21h 静默 WIP）
+
 ## [0.23.37] - 2026-10-21
 
 ARC-AGI-3 证据链完备+墙钟压测仪器：①arc3 研究仪器三件（scripts/arc3-{calibration,multiseed,temporal-curve}.mts）——语料 31→111 条（1582 步）全程：随机分割六档晋升恒 5/5（均值 0.971-0.994，p=0.0313）；时间维曲线（训练于过去评分于当桶的部署形态）Brier 1.0→0.0077；与迁移实验 +0.4166（LLM 未参与）三形态一致=harness 层校准净贡献终局定论；②墙钟压测仪器 scripts/wallclock-soak.mjs——2h 档全过（120min 零中断，堆 +5MB）；8h 档三跑两轴终审（服务器侧 PASS：三跑零重启/堆 ≤+10MB/成功连接全 200；本机零错误不可达：宿主网络事件以 ~1%/h 注入聚集连接故障，retry-ok 注记归因）；serverHealth 独立判定轴入仪器；③AGENTS.md 仓库级 AI 协作指引（AEO 基础）；④生产 A/B 启动（gate:{enabled,tau:0.4} 选择性）
