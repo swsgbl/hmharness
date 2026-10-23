@@ -47,6 +47,7 @@ export type BridgeCommand =
   | { id: string; kind: 'tabs.list' }
   | { id: string; kind: 'page.read'; tabId?: number }
   | { id: string; kind: 'page.act'; tabId?: number; act: PageAct }
+  | { id: string; kind: 'page.goto'; tabId?: number; url: string }
   | { id: string; kind: 'ping' };
 
 /** Extension -> bridge uplink messages (POST /v1/uplink bodies). */

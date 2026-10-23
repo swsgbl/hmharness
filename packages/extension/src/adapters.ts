@@ -28,7 +28,7 @@
 export type ExtensionTarget = 'chromium' | 'firefox' | 'safari';
 export const EXTENSION_TARGETS: ExtensionTarget[] = ['chromium', 'firefox', 'safari'];
 
-export const EXTENSION_VERSION = '0.23.22'; // bump with package releases
+export const EXTENSION_VERSION = '0.23.30'; // bump with package releases
 export const GECKO_ID = 'bridge@hmharness.dev';
 
 /**
@@ -108,13 +108,20 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
     // popup can substitute for the manifest declaration.
     host_permissions: [`http://127.0.0.1:${opts.port}/*`, '<all_urls>'],
     action: {
-      default_title: 'hmharness 桥接',
+      default_title: 'hmharness 浏览器助手',
       default_popup: 'popup.html',
     },
   };
   if (target === 'chromium') {
     return {
       ...common,
+      // one-click sidebar (the ChatGPT-extension UX): WITHOUT the popup the
+      // toolbar click opens the side panel directly (setPanelBehavior at SW
+      // boot); the right-click menu keeps a native "打开侧栏" fallback.
+      // "sidePanel" PERMISSION is what makes chrome.sidePanel exist at all —
+      // its absence hid the panel button entirely (round 47 field bug).
+      action: { default_title: 'hmharness 浏览器助手' },
+      permissions: [...common.permissions, 'sidePanel'],
       minimum_chrome_version: '116',
       background: { service_worker: 'background.js' },
       side_panel: { default_path: 'sidepanel.html' },
@@ -124,7 +131,7 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
     return {
       ...common,
       background: { scripts: ['background.js'] },
-      sidebar_action: { default_panel: 'sidepanel.html', default_title: 'hmharness 桥接', open_at_install: false },
+      sidebar_action: { default_panel: 'sidepanel.html', default_title: 'hmharness 浏览器助手', open_at_install: false },
       browser_specific_settings: { gecko: { id: GECKO_ID, strict_min_version: '121' } },
     };
   }
@@ -145,6 +152,11 @@ export function validateManifest(target: ExtensionTarget, manifest: Record<strin
   if (target === 'chromium') {
     if (!m.background?.service_worker) problems.push('chromium needs background.service_worker');
     if (!m.side_panel?.default_path) problems.push('chromium needs side_panel');
+    // the side_panel KEY alone is not enough: without the "sidePanel"
+    // PERMISSION the chrome.sidePanel API stays undefined and every path to
+    // the panel (button + setPanelBehavior) silently disappears (round 47)
+    if (!Array.isArray(m.permissions) || !m.permissions.includes('sidePanel')) problems.push('chromium needs the sidePanel PERMISSION or the panel is unreachable');
+    if (m.action?.default_popup) problems.push('chromium must NOT pin default_popup — toolbar click must open the side panel directly (a popup would win over openPanelOnActionClick)');
   }
   if (target === 'firefox') {
     if (m.background?.service_worker) problems.push('firefox must NOT declare background.service_worker (event page scripts only)');

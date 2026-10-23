@@ -41,7 +41,7 @@
     return binding;
   }
   async function saveBinding() {
-    try { await api.storage.local.set({ port: binding.port, token: binding.token }); } catch (e) { /* storage refused — session-only */ }
+    try { await api.storage.local.set({ port: binding.port, token: binding.token }); dbg('save ok token=' + (binding.token ? binding.token.slice(0, 8) : 'none')); } catch (e) { dbg('save ERR ' + e); }
   }
 
   // ------------------------------------------------------------------ badge
@@ -70,11 +70,14 @@
       body: JSON.stringify(msg),
     });
     if (r.status === 401) {
-      // token revoked server-side: drop it, honest re-pair needed
+      // token revoked server-side: drop it and SELF-HEAL via auto-pair
+      // (the throw alone used to strand the worker unpaired until the
+      // 30s alarm — which never fires on some suspended workers)
       binding.token = undefined;
       await saveBinding();
       badge('unpaired');
-      throw new Error('令牌已被服务端吊销 — 重新配对');
+      void announceAndAutoPair();
+      throw new Error('令牌已被服务端吊销 — 已自动重新配对');
     }
     if (!r.ok) throw new Error('uplink HTTP ' + r.status);
   }
@@ -97,6 +100,7 @@
    *  `hmh extension serve` the extension connects without a restart. */
   async function announceAndAutoPair() {
     if (binding.token) { void attach(); return; }
+    dbg('announcing…');
     try {
       const j = await (await fetch(baseUrl() + '/v1/announce', {
         method: 'POST',
@@ -107,11 +111,14 @@
         binding.token = j.token;
         await saveBinding();
         badge('on');
+        dbg('granted token=' + j.token.slice(0, 8) + ' attaching');
         void attach();
         return;
       }
+      dbg('announce NO grant: ' + JSON.stringify(j).slice(0, 120));
       badge('unpaired'); // bridge reachable but did not grant (non-extension origin should not happen here)
     } catch (e) {
+      dbg('announce ERR ' + e);
       badge('unpaired'); // bridge not running — alarm retries
     }
   }
@@ -141,10 +148,16 @@
         cache: 'no-store',
       });
       if (res.status === 401) {
+        // STALE TOKEN SELF-HEAL (round 45, forensics-proven): clear it and
+        // go straight to auto-pair — announce mints a fresh token and
+        // re-attaches. scheduleReconnect here was a DEAD END (attach with
+        // no token returns immediately; recovery then depended on the 30s
+        // alarm, which never fires on some engines' suspended workers).
+        dbg('attach 401 — self-heal');
         binding.token = undefined;
         await saveBinding();
         badge('unpaired');
-        scheduleReconnect();
+        void announceAndAutoPair();
         return;
       }
       if (!res.ok || !res.body) throw new Error('events HTTP ' + res.status);
@@ -279,6 +292,14 @@
       const out = r && r[0] && r[0].result;
       if (!out) throw new Error('页面读取无结果（受保护页面或需要授权）');
       return out;
+    }
+    if (cmd.kind === 'page.goto') {
+      // navigate the tab — http/https only, never script-ish schemes
+      const url = String(cmd.url || '');
+      if (!/^https?:\/\//i.test(url)) throw new Error('page.goto 只允许 http/https 地址');
+      const tabId = await activeTabId(cmd.tabId);
+      await api.tabs.update(tabId, { url });
+      return { ok: true, navigating: url };
     }
     if (cmd.kind === 'page.act') {
       if (!cmd.act || !cmd.act.action) throw new Error('page.act 缺少 action');
@@ -450,6 +471,19 @@
   /** best-effort bye on manual disconnect (token already cleared — fire-and-forget with the old token value is impossible, so the bridge simply sees the SSE close) */
   async function uplinkDisconnected() { /* the SSE 'close' event IS the bye */ }
 
+  // TEMPORARY round-45 forensics: beam SW-side step markers to the bridge's
+  // /v1/dbg route (no token mint side effects). Remove after the real-profile
+  // attach mystery is closed.
+  function dbg(step, extra) {
+    try {
+      void fetch(baseUrl() + '/v1/dbg', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ step, extra: String(extra ?? ''), at: Date.now() }),
+      }).catch(() => undefined);
+    } catch (e) { /* beacon is best-effort */ }
+  }
+
   // ------------------------------------------------------------- lifecycle
 
   api.runtime.onStartup.addListener(() => { void loadBinding().then(() => attach()); });
@@ -487,6 +521,16 @@
     try { api.tabs[ev].addListener(() => pushTabsSoon()); } catch (e) { /* */ }
   }
 
+  // ONE-CLICK SIDEPANEL (round 47, the ChatGPT-extension UX): the toolbar
+  // icon opens the chat side panel DIRECTLY — no status popup in between.
+  // Chromium only; Firefox reaches the sidebar via the popup's button
+  // (sidebarAction.open) and Safari stays popup-only.
+  try {
+    if (api.sidePanel && typeof api.sidePanel.setPanelBehavior === 'function') {
+      void api.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
+    }
+  } catch (e) { /* panel behavior is a convenience, never fatal */ }
+
   // first load of this context (worker start or event page load)
-  void loadBinding().then(() => { if (binding.token) void attach(); else void announceAndAutoPair(); });
+  void loadBinding().then(() => { dbg('boot token=' + (binding.token ? binding.token.slice(0, 8) : 'none') + ' port=' + (binding.port ?? 'def')); if (binding.token) void attach(); else void announceAndAutoPair(); });
 })();

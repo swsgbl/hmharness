@@ -71,6 +71,17 @@ body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction
 .msg.user { align-self: flex-end; border-color: #3c4a63; background: #243043; }
 .msg.bot { align-self: flex-start; }
 .msg.thinking { color: var(--dim); font-style: italic; }
+.stop-btn {
+  font-size: 12px; padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--err); color: var(--err); background: transparent;
+  cursor: pointer; font-style: normal;
+}
+.page-chip {
+  color: var(--dim); font-size: 12px; padding: 4px 8px; margin-bottom: 8px;
+  border: 1px dashed var(--line); border-radius: 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.page-chip:empty { display: none; }
 .composer { margin-bottom: 6px; }
 .tools-row button { padding: 5px 9px; font-size: 12px; }
 body.chat-layout pre#out { max-height: 120px; }

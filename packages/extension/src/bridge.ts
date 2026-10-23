@@ -89,6 +89,8 @@ export interface ChatTurnInput {
   message: string;
   page?: { url?: string; title?: string };
   history: ChatTurn[];
+  /** the requesting extension origin — keys confirmation state per browser */
+  origin?: string;
 }
 
 const EXTENSION_ORIGIN = /^(chrome|moz|safari)-extension:\/\/[^/?#]+/i;
@@ -123,6 +125,25 @@ export class ExtensionBridgeServer {
   /** per-origin chat history — in-memory only, dies with the bridge (the
    *  transcript is the user's conversation, not a fact we persist) */
   private readonly chatLog = new Map<string, ChatTurn[]>();
+  /** per-origin LIVE activity ring (round 50): every brain step lands here;
+   *  the panel polls GET /v1/chat/activity while a turn runs — no more
+   *  "正在执行 1000s" black boxes. */
+  private readonly chatActivity = new Map<string, string[]>();
+
+  /** append one activity line for a chat origin (ring of 40, newest last) */
+  noteChatActivity(origin: string, line: string): void {
+    const key = origin || 'anon';
+    const ring = this.chatActivity.get(key) ?? [];
+    ring.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
+    while (ring.length > 40) ring.shift();
+    this.chatActivity.set(key, ring);
+    this.lastActiveOrigin = key;
+  }
+
+  /** the origin that most recently produced activity — the activity GET
+   *  falls back to it when the caller's own ring is empty (contexts that
+   *  legitimately can't send an Origin header must not see a silent blank) */
+  private lastActiveOrigin = '';
   /** last tabs.push payload — surfaced in status for humans, not used by tools */
   lastTabs: TabInfo[] = [];
 
@@ -196,6 +217,7 @@ export class ExtensionBridgeServer {
   command(kind: 'ping', timeoutMs?: number): Promise<unknown>;
   command(kind: 'page.read', opts?: { tabId?: number; timeoutMs?: number }): Promise<unknown>;
   command(kind: 'page.act', opts?: { tabId?: number; act: import('./protocol.ts').PageAct; timeoutMs?: number }): Promise<unknown>;
+  command(kind: 'page.goto', opts?: { tabId?: number; url: string; timeoutMs?: number }): Promise<unknown>;
   command(kind: string, opts?: Record<string, unknown>, timeoutMs?: number): Promise<unknown>;
   async command(kind: string, a?: number | { tabId?: number; act?: import('./protocol.ts').PageAct; timeoutMs?: number }, b?: number): Promise<unknown> {
     if (!this.live) throw new Error('没有已连接的浏览器扩展 — 打开扩展 popup 配对并连接（hmh extension status 查看）');
@@ -271,9 +293,26 @@ export class ExtensionBridgeServer {
       }
       return this.json(res, 200, { ok: true, ...(token ? { token } : {}) });
     }
+    if (req.method === 'POST' && url === '/v1/dbg') {
+      // TEMPORARY round-45 forensics sink: SW-side step beacons. Loopback
+      // only (guardHost), prints when HMH_BRIDGE_DEBUG=1, always 200.
+      if (process.env.HMH_BRIDGE_DEBUG === '1') {
+        const chunks: Buffer[] = [];
+        for await (const ch of req) chunks.push(ch as Buffer);
+        console.error(`[sw-dbg] ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`);
+      }
+      return this.json(res, 200, { ok: true });
+    }
     if (req.method === 'GET' && url === '/v1/events') {
       if (!this.guardOrigin(req, res)) return;
-      if (!(await this.authorized(req, res))) return;
+      // ATTACH FORENSICS (temporary, round 45 debugging): the SW was
+      // announcing but never attaching on a real profile — see exactly what
+      // arrives. stderr-only, no secrets (token prefix).
+      const dbg = process.env.HMH_BRIDGE_DEBUG === '1';
+      if (dbg) console.error(`[bridge] events attach: origin=${req.headers.origin ?? '-'} ua=${(req.headers['user-agent'] ?? '').slice(0, 40)} token=${(req.headers.authorization ?? '').slice(7, 19)}…`);
+      const ok = await this.authorized(req, res);
+      if (dbg && !ok) console.error('[bridge] events attach REJECTED (401)');
+      if (!ok) return;
       return this.attachSse(req, res);
     }
     if (req.method === 'POST' && url === '/v1/uplink') {
@@ -283,6 +322,29 @@ export class ExtensionBridgeServer {
       if (!msg) return;
       await this.handleUplink(msg);
       return this.json(res, 200, { ok: true });
+    }
+    if (req.method === 'OPTIONS') {
+      // CORS preflight (round 53): extension pages with host permissions
+      // bypass CORS entirely, but any context that DOES preflight must not
+      // get a 404 that silently kills the activity feed
+      if (!this.guardOrigin(req, res)) return;
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': req.headers.origin ?? '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, content-type',
+        'Access-Control-Max-Age': '86400',
+      });
+      res.end();
+      return;
+    }
+    if (req.method === 'GET' && url === '/v1/chat/activity') {
+      // live brain steps for the waiting panel (round 50): token-gated like chat
+      if (!this.guardOrigin(req, res)) return;
+      if (!(await this.authorized(req, res))) return;
+      const key = req.headers.origin ?? 'anon';
+      const own = this.chatActivity.get(key) ?? [];
+      const lines = own.length > 0 ? own : (this.chatActivity.get(this.lastActiveOrigin) ?? []);
+      return this.json(res, 200, { ok: true, lines });
     }
     if (req.method === 'POST' && url === '/v1/chat') {
       // BROWSER chat panel (round 45): the ChatGPT-extension-style loop —
@@ -305,12 +367,15 @@ export class ExtensionBridgeServer {
         title: typeof body.page.title === 'string' ? body.page.title.slice(0, 300) : undefined,
       } : undefined;
       try {
-        const reply = (await this.onChat({ message, page, history })).slice(0, 8000);
+        this.noteChatActivity(key, `任务开始: ${message.slice(0, 60)}`);
+        const reply = (await this.onChat({ message, page, history, origin: key })).slice(0, 8000);
         history.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
         while (history.length > 16) history.shift();
         this.chatLog.set(key, history);
+        this.noteChatActivity(key, '任务回合完成');
         return this.json(res, 200, { ok: true, reply });
       } catch (err) {
+        this.noteChatActivity(key, `任务出错: ${String(err instanceof Error ? err.message : err).slice(0, 120)}`);
         return this.json(res, 500, { ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 300) });
       }
     }

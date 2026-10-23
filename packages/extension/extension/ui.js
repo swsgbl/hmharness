@@ -110,14 +110,22 @@
     chatEl.scrollTop = chatEl.scrollHeight;
   }
 
-  function think(on) {
+  function think(on, label, stopBtn) {
     let t = chatEl?.querySelector('.thinking');
     if (!chatEl) return;
     if (on && !t) {
       t = document.createElement('div');
       t.className = 'msg bot thinking';
-      t.textContent = '正在思考…';
+      t.style.whiteSpace = 'pre-wrap';
       chatEl.append(t);
+    }
+    if (on && t) {
+      t.textContent = '';
+      t.append(document.createTextNode(label || '正在思考…'));
+      if (stopBtn) {
+        stopBtn.style.marginTop = '6px';
+        t.append(document.createElement('br'), stopBtn);
+      }
     } else if (!on && t) t.remove();
     chatEl.scrollTop = chatEl.scrollHeight;
   }
@@ -129,7 +137,34 @@
     try { void api.storage.session.set({ hmhChat: chatMsgs.slice(-20) }); } catch (e) { /* session storage refused */ }
   }
 
+  // current-page context: the sidepanel belongs to a window — its active tab
+  // IS the page the user is looking at. Sent with every chat message.
+  async function currentPage() {
+    try {
+      const tabs = await api.tabs.query({ active: true, currentWindow: true });
+      const t = tabs && tabs[0];
+      if (!t || !t.url) return undefined;
+      return { url: String(t.url).slice(0, 500), title: String(t.title ?? '').slice(0, 300) };
+    } catch (e) { return undefined; }
+  }
+
+  function renderPageChip(page) {
+    let chip = document.getElementById('page-chip');
+    if (!page) { if (chip) chip.textContent = ''; return; }
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'page-chip';
+      chip.className = 'page-chip';
+      const statusEl = document.querySelector('.status');
+      statusEl?.after(chip);
+    }
+    chip.textContent = '正在阅读: ' + (page.title || page.url);
+  }
+
   if (chatEl && chatInput && chatSend) {
+    (async () => { renderPageChip(await currentPage()); })();
+    api.tabs?.onActivated?.addListener?.(() => { void currentPage().then(renderPageChip); });
+    api.tabs?.onUpdated?.addListener?.(() => { void currentPage().then(renderPageChip); });
     (async () => {
       try {
         const { hmhChat } = await api.storage.session.get('hmhChat');
@@ -139,36 +174,96 @@
       if (!chatMsgs.length) push('bot', '已就绪。可以问我当前页面的事(我会先读取页面),或让我帮你点击/输入/滚动。');
     })();
 
-    async function sendChat() {
+    // AUTONOMOUS CONTINUATION: when the brain exhausts a request's round
+    // budget mid-task it ends with this sentinel — strip it, show progress,
+    // auto-send 「继续」. The user hands over a task; the panel chains
+    // segments until the work is DONE. Never fires on confirmation asks
+    // (those need the human).
+    const CONT = '[[hmh:auto-continue]]';
+    let autoChains = 0;
+    const autoSend = (label) => { setTimeout(() => { autoChains++; void sendChat('继续', true); }, 900); return label; };
+
+    async function sendChat(forcedText, isAuto) {
       if (chatBusy) return;
-      const text = chatInput.value.trim();
+      const text = String(forcedText ?? chatInput.value).trim();
       if (!text) return;
-      chatInput.value = '';
-      push('user', text);
+      if (!isAuto) { chatInput.value = ''; autoChains = 0; }
+      push(isAuto ? 'bot' : 'user', isAuto ? '(自动继续…)' : text);
       chatBusy = true;
       chatSend.disabled = true;
-      think(true);
+      const t0 = Date.now();
+      // LIVE activity (round 50): while the brain works, poll its step feed
+      // and render into the thinking bubble — no more silent 1000s waits.
+      // STOP aborts OUR fetch; the server finishes its turn in the background
+      // (history keeps the result), the panel is free immediately.
+      let abort = null;
+      let lastLines = '';
+      const stopBtn = document.createElement('button');
+      stopBtn.textContent = '停止';
+      stopBtn.className = 'stop-btn';
+      stopBtn.onclick = () => { autoChains = 0; if (abort) abort.abort(); };
+      const tick = setInterval(async () => {
+        const secs = Math.round((Date.now() - t0) / 1000);
+        let feed = '';
+        try {
+          const st = await send({ type: 'hmh-status' });
+          const { token } = await api.storage.local.get('token');
+          if (token) {
+            const r = await fetch(`http://127.0.0.1:${st.port || 7789}/v1/chat/activity`, { headers: { authorization: 'Bearer ' + token } });
+            const j = await r.json().catch(() => ({}));
+            if (j.ok && Array.isArray(j.lines)) feed = j.lines.slice(-4).map((l) => ' · ' + l).join('\n');
+          }
+        } catch (e) { feed = ' · (活动流无响应——桥可能重启中)'; }
+        if (feed !== lastLines) { lastLines = feed; }
+        think(true, `正在执行… ${secs}s\n${feed}`, stopBtn);
+      }, 2500);
+      think(true, '正在执行… 0s', stopBtn);
       try {
         const st = await send({ type: 'hmh-status' });
         const { token } = await api.storage.local.get('token');
         if (!token) {
           push('bot', '尚未连接桥 — 终端执行 hmh extension start 后再试(30 秒内自动连上)。');
         } else {
-          const r = await fetch(`http://127.0.0.1:${st.port || 7789}/v1/chat`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
-            body: JSON.stringify({ message: text }),
-          });
+          abort = new AbortController();
+          const bail = setTimeout(() => { try { abort.abort(); } catch (e) { /* already gone */ } }, 420_000);
+          let r;
+          try {
+            r = await fetch(`http://127.0.0.1:${st.port || 7789}/v1/chat`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+              body: JSON.stringify({ message: text, page: await currentPage() }),
+              signal: abort.signal,
+            });
+          } finally { clearTimeout(bail); }
           const j = await r.json().catch(() => ({}));
-          push('bot', j.ok ? String(j.reply) : `✗ ${j.error || 'HTTP ' + r.status}`);
+          if (j.ok) {
+            let reply = String(j.reply);
+            if (reply.includes(CONT) && autoChains < 20) {
+              reply = reply.split(CONT)[0].trim() + '\n(任务继续中,无需操作…)';
+              push('bot', reply);
+              autoSend();
+            } else {
+              if (reply.includes(CONT)) reply = reply.split(CONT)[0].trim() + '\n(连续接力已达上限 — 回复「继续」手动接续。)';
+              push('bot', reply);
+              autoChains = 0;
+            }
+          } else {
+            push('bot', `✗ ${j.error || 'HTTP ' + r.status}`);
+            autoChains = 0;
+          }
         }
       } catch (e) {
-        push('bot', '桥无响应 — 终端执行 hmh extension start(后台常驻)后再试。');
+        if (String(e).includes('abort') || (e && e.name === 'AbortError')) {
+          push('bot', (Date.now() - t0 > 415_000) ? '(等待超时(7 分钟)——这一段可能仍在后台;重新发一次你的要求即可,对话记忆都在。)' : '(已停止等待——后台仍会完成这一段,结果已进对话记忆;可继续对话。)');
+        } else {
+          push('bot', '桥无响应 — 终端执行 hmh extension start(后台常驻)后再试。');
+        }
+        autoChains = 0;
       }
       chatBusy = false;
       chatSend.disabled = false;
       think(false);
-      chatInput.focus();
+      if (!isAuto) chatInput.focus();
     }
 
     chatSend.addEventListener('click', () => { void sendChat(); });

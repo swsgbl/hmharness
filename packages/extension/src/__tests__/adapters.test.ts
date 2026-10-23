@@ -2,16 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EXTENSION_TARGETS, GECKO_ID, manifestFor, validateManifest } from '../adapters.ts';
 
-test('adapters: chromium manifest — MV3 service worker + side panel + chrome floor', () => {
+test('adapters: chromium manifest — MV3 service worker + one-click side panel + chrome floor', () => {
   const m = manifestFor('chromium', { port: 7789 }) as Record<string, any>;
   assert.equal(m.manifest_version, 3);
   assert.equal(m.background.service_worker, 'background.js');
   assert.equal(m.side_panel.default_path, 'sidepanel.html');
-  assert.equal(m.action.default_popup, 'popup.html');
+  // one-click UX (round 47): toolbar click opens the panel DIRECTLY — a
+  // default_popup would win over openPanelOnActionClick and bury the chat
+  assert.equal(m.action.default_popup, undefined, 'chromium must not pin a popup');
   assert.equal(m.minimum_chrome_version, '116');
   assert.deepEqual(m.host_permissions, ['http://127.0.0.1:7789/*', '<all_urls>']);
   assert.ok(m.permissions.includes('scripting'));
   assert.ok(m.permissions.includes('activeTab'));
+  // without the sidePanel PERMISSION the API stays undefined and the panel
+  // is unreachable (the round-47 field bug this line pins shut)
+  assert.ok(m.permissions.includes('sidePanel'), 'chromium needs the sidePanel permission');
   assert.deepEqual(validateManifest('chromium', m), []);
 });
 
