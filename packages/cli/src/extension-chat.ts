@@ -164,7 +164,11 @@ function systemPrompt(input: ChatTurnInput, pageBlock: string, deps: ChatBrainDe
 /** PROACTIVE page context (round 48): read the user's current tab BEFORE the
  *  model runs, so even a tool-call-less model already HAS the page. A failed
  *  read becomes an honest note in the prompt, never a silent blank. */
-export async function readPageContext(deps: ChatBrainDeps): Promise<string> {
+/** PROACTIVE page context (round 48): read the user's current tab BEFORE the
+ *  model runs, so even a tool-call-less model already HAS the page. A failed
+ *  read becomes an honest note in the prompt, never a silent blank.
+ *  Takes only the readPage sliver — the full brain deps are not needed. */
+export async function readPageContext(deps: Pick<ChatBrainDeps, 'readPage'>): Promise<string> {
   try {
     const raw = await deps.readPage();
     if (!raw || typeof raw !== 'object') return '【当前页面】读取无结果(受保护页面或站点权限未授予)。';

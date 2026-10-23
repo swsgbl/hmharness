@@ -390,9 +390,9 @@ test('bridge: /v1/chat/activity — live step feed for the waiting panel, token-
     bridge.onChat = async (input) => { bridge.noteChatActivity(input.origin ?? 'anon', '步骤一'); return '答:' + input.message; };
     await fetch(`http://127.0.0.1:${port}/v1/chat`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${t}`, origin: 'chrome-extension://act1' }, body: JSON.stringify({ message: 'hi' }) });
     const feed = await (await fetch(`http://127.0.0.1:${port}/v1/chat/activity`, { headers: { authorization: `Bearer ${t}`, origin: 'chrome-extension://act1' } })).json();
-    assert.ok(feed.lines.some((l) => /任务开始/.test(l)));
-    assert.ok(feed.lines.some((l) => /步骤一/.test(l)));
-    assert.ok(feed.lines.some((l) => /任务回合完成/.test(l)));
+    assert.ok((feed.lines as string[]).some((l) => /任务开始/.test(l)));
+    assert.ok((feed.lines as string[]).some((l) => /步骤一/.test(l)));
+    assert.ok((feed.lines as string[]).some((l) => /任务回合完成/.test(l)));
   } finally {
     await bridge.stop();
     await rm(home, { recursive: true, force: true });

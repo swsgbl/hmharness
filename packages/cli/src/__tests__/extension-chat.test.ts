@@ -88,7 +88,7 @@ test('brain: page_goto + tabs — navigation is first-class, scheme-gated both e
   const deps = {
     readPage: async () => ({}),
     act: async () => ({}),
-    goto: async (u) => { gotos.push(u); return { ok: true, navigating: u }; },
+    goto: async (u: string) => { gotos.push(u); return { ok: true, navigating: u }; },
     listTabs: async () => [{ id: 1, title: 'T', url: 'https://x', active: true, index: 0, windowId: 1 }],
   };
   const reply = await runChatTurn(CFG, { message: '打开告警页', history: [] }, deps, impl as never);
@@ -105,8 +105,8 @@ test('brain: run_command and write_file wait for 「确认」 — nothing runs u
   const deps = {
     readPage: async () => ({}),
     act: async () => ({}),
-    runCommand: async (cmd) => { ran.push(cmd); return { output: `out:${cmd}` }; },
-    writeFile: async (path, content) => { wrote.push({ path, content }); return { output: 'written' }; },
+    runCommand: async (cmd: string) => { ran.push(cmd); return { output: `out:${cmd}` }; },
+    writeFile: async (path: string, content: string) => { wrote.push({ path, content }); return { output: 'written' }; },
   };
   const { impl, calls } = fakeChat([
     { tool_calls: [{ id: 'r', name: 'run_command', args: { command: 'npm install' } }, { id: 'w', name: 'write_file', args: { path: 'pkg.json', content: '{}' } }] },
