@@ -76,7 +76,22 @@ export async function chat(
   opts: ChatOptions = {},
 ): Promise<ChatResponse> {
   const streaming = typeof opts.onDelta === 'function';
-  const body: Record<string, unknown> = { model: cfg.model, messages };
+  // Native image attachments (multimodal chat, 2026-10-22): a user message
+  // carrying `images` becomes OpenAI image_url content parts on the wire -
+  // the model sees the actual image. `content` stays plain text everywhere
+  // else (transcript/compaction/preview); the transformation is wire-only.
+  const wire = messages.map((m) =>
+    m.role === 'user' && m.images && m.images.length > 0
+      ? {
+          role: m.role,
+          content: [
+            ...(m.content ? [{ type: 'text', text: m.content }] : []),
+            ...m.images.map((url) => ({ type: 'image_url', image_url: { url } })),
+          ],
+        }
+      : { role: m.role, content: m.content, ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}), ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}), ...(m.name ? { name: m.name } : {}) },
+  );
+  const body: Record<string, unknown> = { model: cfg.model, messages: wire };
   if (tools && tools.length > 0) body.tools = tools;
   if (streaming) {
     body.stream = true;

@@ -45,6 +45,15 @@ export interface Tool {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | null;
+  /** Native image attachments (data URLs) for MULTIMODAL chat models
+   * (2026-10-22 default-multimodal policy): the provider assembles these
+   * into OpenAI image_url content parts on the wire, so the chat model
+   * sees the actual image instead of a pre-described text summary. Only
+   * user messages carry them; content stays plain text for every
+   * downstream consumer (transcript/compaction/preview are untouched).
+   * Text-only chat models never set this - they keep the describe-chain
+   * detour (chatVision prefix). */
+  images?: string[];
   tool_calls?: Array<{
     id: string;
     type: 'function';
@@ -52,6 +61,17 @@ export interface ChatMessage {
   }>;
   tool_call_id?: string;
   name?: string;
+}
+
+/**
+ * Default-multimodal policy (2026-10-22): the CHAT model is assumed to see
+ * images natively unless its provider is explicitly marked
+ * `supportsVision: false`. Callers use this to decide between sending
+ * images as native attachments (multimodal) and the describe-chain detour
+ * (text-only) - never unconditionally describing.
+ */
+export function chatSeesImages(p: ProviderConfig): boolean {
+  return p.supportsVision !== false;
 }
 
 /** Connection settings for an OpenAI-compatible endpoint. */

@@ -31,6 +31,10 @@ interface Payload {
   home: string;
   resumeMessages?: Array<{ role: string; content: unknown }>;
   goal?: string | null;
+  /** Native image data URLs for multimodal chat models (2026-10-22): the
+   * server only sets this when the CHAT provider sees images; text-only
+   * chats get their images described into the task text instead. */
+  images?: string[];
 }
 
 function emit(obj: Record<string, unknown>): void {
@@ -79,6 +83,7 @@ async function main(): Promise<void> {
 
   const result = await runAgentTask({
     task: payload.task,
+    images: payload.images,
     registry: reg,
     cfg,
     yes: payload.yes,

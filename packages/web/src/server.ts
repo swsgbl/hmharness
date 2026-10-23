@@ -15,7 +15,7 @@ import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import {
-  homeDir, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
+  homeDir, chatSeesImages, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
   saveProvider, deleteProvider, patchConfig, getGoal, setGoal, isProviderAuthError,
   findSessionFile, listSessions, exportSessionMarkdown, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
@@ -285,7 +285,7 @@ export async function startServer(opts: {
   // cwd isolation (no global chdir), crash containment, daemon death does
   // not kill the run. busy/queue/approval/inject/breaker are ALL per
   // session now; the old global single slot is gone.
-  interface QueuedItem { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string }
+  interface QueuedItem { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string; images?: string[] }
   interface SessionExec {
     busy: boolean;
     queue: QueuedItem[];
@@ -522,6 +522,7 @@ export async function startServer(opts: {
         home,
         resumeMessages: resume,
         goal: item.fresh ? undefined : await getGoal(home, thread.rolloutId ?? sid),
+        ...(item.images && item.images.length ? { images: item.images } : {}),
       }), 'utf8');
     } catch (err) {
       broadcast('error', { message: 'payload write failed: ' + String(err).slice(0, 200), sessionId: sid });
@@ -994,74 +995,97 @@ export async function startServer(opts: {
         }
         // ---- image attachments: vision chain describes each, then temp files go ----
         let imagePrefix = '';
+        // NATIVE IMAGES for multimodal chat (2026-10-22 default-multimodal
+        // policy): when the CHAT provider sees images, attachments ride the
+        // first user message as native image_url parts - the model looks at
+        // the actual pixels. No describe detour, no temp files, no vision
+        // chain. ONLY a text-only chat model (supportsVision:false) falls
+        // back to the describe-chain prefix below.
+        let nativeImages: string[] = [];
+        const chatMultimodal = chatSeesImages(resolveProvider(cfg, 'chat'));
         if (Array.isArray(body.images)) {
-          const parsed: Array<{ name: string; dataUrl: string; ext: 'png' | 'jpg' | 'webp'; buffer: Buffer }> = [];
-          for (const im of body.images.slice(0, 3)) {
-            const obj = (im ?? {}) as { name?: unknown; dataUrl?: unknown };
-            const dataUrl = typeof obj.dataUrl === 'string' ? obj.dataUrl : '';
-            const p = parseImageDataUrl(dataUrl);
-            if (!p) continue; // malformed / oversized items dropped
-            parsed.push({
-              name: typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : `image-${parsed.length + 1}`,
-              dataUrl,
-              ext: p.ext,
-              buffer: p.buffer,
-            });
-          }
-          if (Array.isArray(body.images) && body.images.length > 0 && parsed.length === 0) {
-            json(res, 400, { error: 'no valid image (data:image/(png|jpeg|jpg|webp);base64, and <= 6 MB)' });
-            return;
-          }
-          if (parsed.length > 0) {
-            const tmpDir = join(home, 'tmp');
-            await mkdir(tmpDir, { recursive: true });
-            const chain = visionProviderChain(cfg);
-            const tmpFiles: string[] = [];
-            for (let i = 0; i < parsed.length; i++) {
-              const tmpPath = join(tmpDir, `att-${Date.now()}-${i}.${parsed[i].ext}`);
-              await writeFile(tmpPath, parsed[i].buffer);
-              tmpFiles.push(tmpPath);
+          if (chatMultimodal) {
+            for (const im of body.images.slice(0, 3)) {
+              const obj = (im ?? {}) as { name?: unknown; dataUrl?: unknown };
+              const dataUrl = typeof obj.dataUrl === 'string' ? obj.dataUrl : '';
+              if (!parseImageDataUrl(dataUrl)) continue; // same validity gate
+              nativeImages.push(dataUrl);
+              const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : `image-${nativeImages.length}`;
+              imagePrefix += `[image attached: ${name} - sent natively to the multimodal model]\n`;
             }
-            try {
+            if (Array.isArray(body.images) && body.images.length > 0 && nativeImages.length === 0) {
+              json(res, 400, { error: 'no valid image (data:image/(png|jpeg|jpg|webp);base64, and <= 6 MB)' });
+              return;
+            }
+          } else {
+            const parsed: Array<{ name: string; dataUrl: string; ext: 'png' | 'jpg' | 'webp'; buffer: Buffer }> = [];
+            for (const im of body.images.slice(0, 3)) {
+              const obj = (im ?? {}) as { name?: unknown; dataUrl?: unknown };
+              const dataUrl = typeof obj.dataUrl === 'string' ? obj.dataUrl : '';
+              const p = parseImageDataUrl(dataUrl);
+              if (!p) continue; // malformed / oversized items dropped
+              parsed.push({
+                name: typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : `image-${parsed.length + 1}`,
+                dataUrl,
+                ext: p.ext,
+                buffer: p.buffer,
+              });
+            }
+            if (Array.isArray(body.images) && body.images.length > 0 && parsed.length === 0) {
+              json(res, 400, { error: 'no valid image (data:image/(png|jpeg|jpg|webp);base64, and <= 6 MB)' });
+              return;
+            }
+            if (parsed.length > 0) {
+              const tmpDir = join(home, 'tmp');
+              await mkdir(tmpDir, { recursive: true });
+              const chain = visionProviderChain(cfg);
+              const tmpFiles: string[] = [];
               for (let i = 0; i < parsed.length; i++) {
-                const { name, dataUrl } = parsed[i];
-                const n = i + 1;
-                if (chain.length === 0) {
-                  imagePrefix += buildImagePrefix(n, name, null);
-                  continue;
-                }
-                // seeImageTool.execute's chain discipline: walk the vision
-                // chain, skip refusal answers, fall through on errors
-                const errors: string[] = [];
-                let desc: string | null = null;
-                for (const provider of chain) {
-                  try {
-                    const answer = await chatVision(provider, 'Describe this image precisely and concisely.', dataUrl);
-                    if (isVisionRefusal(answer)) {
-                      errors.push(`${provider.model}: cannot see images (replied "${answer.trim().slice(0, 60)}")`);
-                      continue;
-                    }
-                    desc = answer;
-                    break;
-                  } catch (err) {
-                    errors.push(`${provider.model}: ${String(err).slice(0, 120)}`);
-                  }
-                }
-                imagePrefix += buildImagePrefix(n, name, desc ?? `(image ${n} could not be described: ${errors.join('; ')})`);
+                const tmpPath = join(tmpDir, `att-${Date.now()}-${i}.${parsed[i].ext}`);
+                await writeFile(tmpPath, parsed[i].buffer);
+                tmpFiles.push(tmpPath);
               }
-            } finally {
-              // temp files are deleted whether or not the vision calls landed
-              for (const f of tmpFiles) {
-                try {
-                  await rm(f, { force: true });
-                } catch {
-                  /* best-effort cleanup */
+              try {
+                for (let i = 0; i < parsed.length; i++) {
+                  const { name, dataUrl } = parsed[i];
+                  const n = i + 1;
+                  if (chain.length === 0) {
+                    imagePrefix += buildImagePrefix(n, name, null);
+                    continue;
+                  }
+                  // seeImageTool.execute's chain discipline: walk the vision
+                  // chain, skip refusal answers, fall through on errors
+                  const errors: string[] = [];
+                  let desc: string | null = null;
+                  for (const provider of chain) {
+                    try {
+                      const answer = await chatVision(provider, 'Describe this image precisely and concisely.', dataUrl);
+                      if (isVisionRefusal(answer)) {
+                        errors.push(`${provider.model}: cannot see images (replied "${answer.trim().slice(0, 60)}")`);
+                        continue;
+                      }
+                      desc = answer;
+                      break;
+                    } catch (err) {
+                      errors.push(`${provider.model}: ${String(err).slice(0, 120)}`);
+                    }
+                  }
+                  imagePrefix += buildImagePrefix(n, name, desc ?? `(image ${n} could not be described: ${errors.join('; ')})`);
+                }
+              } finally {
+                // temp files are deleted whether or not the vision calls landed
+                for (const f of tmpFiles) {
+                  try {
+                    await rm(f, { force: true });
+                  } catch {
+                    /* best-effort cleanup */
+                  }
                 }
               }
             }
           }
         }
-        // composed text (references first, then images, then the user text) is
+// composed text (references first, then images, then the user text) is
         // what runs, queues, and echoes in the 'busy' SSE event
         const composed = prefix + imagePrefix + text;
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
@@ -1070,7 +1094,7 @@ export async function startServer(opts: {
         // fresh session starts clean. The thread state lives server-side; the
         // browser view is just a projection of it.
         const sidIn = typeof (body as { sessionId?: unknown }).sessionId === 'string' ? String((body as { sessionId?: unknown }).sessionId).slice(0, 80) : undefined;
-        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn };
+        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn, ...(nativeImages.length ? { images: nativeImages } : {}) };
         // W15: queueing is PER SESSION. A busy session queues the follow-up;
         // every OTHER session still starts immediately - sessions never wait
         // on each other (dsh parity). A session without an id gets a fresh

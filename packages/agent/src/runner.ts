@@ -6,6 +6,7 @@
  * approval gate construction.
  */
 import {
+  chatSeesImages,
   homeDir,
   loadConfig,
   resolveProvider,
@@ -354,6 +355,11 @@ export interface InjectPoll {
 
 export interface AgentTaskOptions {
   task: string;
+  /** Native image attachments (data URLs) for multimodal chat models:
+   * passed through to the first user message when the chat provider sees
+   * images (default-multimodal policy, 2026-10-22). Text-only providers
+   * never get these - the caller describes images into text instead. */
+  images?: string[];
   registry: Registry;
   cfg?: HmhConfig;
   ctx?: ToolContext;
@@ -484,10 +490,14 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     onLine: (l) => events.onLine?.(l),
   };
 
+  // default-multimodal (2026-10-22): only attach images natively when the
+  // chat model can actually see them; a text-only chat model must receive
+  // text the caller already described
+  const nativeImages = chatSeesImages(resolveProvider(cfg, 'chat')) ? opts.images : undefined;
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
     ...(opts.resumeMessages ?? []),
-    { role: 'user', content: opts.task },
+    { role: 'user', content: opts.task, ...(nativeImages && nativeImages.length ? { images: nativeImages } : {}) },
   ];
 
   const toolsUsed: string[] = [];
