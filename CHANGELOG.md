@@ -1,3 +1,7 @@
+## [0.23.39] - 2026-10-24
+
+TUI 鼠标点击假死根修+/config 密钥配置通道：①**鼠标假死根因**——终端报点击=按下(M)+释放(m)两序列，v0.23.38 的 parseMouse 对按下返回 null→按下序列的 ESC 漏入按键处理→面板被当 Esc 关掉→点击无反应。修复：完整报告永远不返 null（按下/拖拽返 ignore 被消费）+X10 兼容+部分头缓冲；面板行的 addClickRegion 在编辑中丢失已找回。②**新 /config 命令**：一键密钥配置——provider 列表(点击行直达)+编辑表单(名称/地址/模型/密钥，掩码显示，空密钥=保留)+kernel saveProvider 接线；i18n 14 键双语
+
 ## [0.23.38] - 2026-10-23
 
 交互三连+远程控制永久化：①**默认多模态策略**——多模态主模型原生收图（ChatMessage.images→OpenAI image_url 组包，content 保持纯文本零破坏），仅 supportsVision:false 显式标记的文本模型走描述链（用户报障"全部转辅助识别"根因修复）；②**TUI 鼠标支持**（dsh-TUI 对标）——SGR 鼠标跟踪+点击区注册，命令面板行/审批卡[y][n]/会话选卡行可点击，滚轮转滚转录；③**远程控制永久化**——配对 cookie 30天→10年（实际永久），hmh web install-daemon 开机自启（Windows Startup/macOS LaunchAgent/Linux systemd user，登录即守护在线零窗口），uninstall-daemon 移除；④扩展桥 page.goto+侧栏 agent 大脑接线（代集成并行会话 21h 静默 WIP）
