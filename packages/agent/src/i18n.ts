@@ -106,6 +106,21 @@ export interface Strings {
   /** palette footer key hint: how to drive the slash/model picker (TUI) */
   panelHint: string;
   cmdModelPreset: (name: string, envVar: string) => string;
+  /* --- /config modal (TUI one-stop provider/key editor, 2026-10-24) --- */
+  cmdConfig: string;
+  cfgTitle: string;
+  cfgListHint: string;
+  cfgNewRow: string;
+  cfgColUse: string;
+  cfgFieldName: string;
+  cfgFieldBaseUrl: string;
+  cfgFieldModel: string;
+  cfgFieldKey: string;
+  cfgFormHint: string;
+  cfgKeyNote: string;
+  cfgSavedOk: string;
+  cfgBackRow: string;
+  cfgSaveRow: string;
   cmdProvidersListed: string;
   /** tail hint after a bare /providers listing (TUI) */
   cmdProvidersScanHint: string;
@@ -273,6 +288,20 @@ const zh: Strings = {
   cmdModelHint: '切换 chat 路由: /model <name>',
   panelHint: '↑↓/滚轮/点击 选择 · Enter 确认 · Esc 关闭',
   cmdModelPreset: (name, envVar) => `${name} 尚未配置 — 设置 ${envVar} 后运行 /providers scan 添加`,
+  cmdConfig: '配置 API 密钥 / 模型（可视化编辑）',
+  cfgTitle: '配置 · Providers',
+  cfgListHint: '↑↓ 选择 · Enter 编辑 · Esc 关闭 · 鼠标点击行直达',
+  cfgNewRow: '+ 新增 provider…',
+  cfgColUse: '用途',
+  cfgFieldName: '名称',
+  cfgFieldBaseUrl: '地址',
+  cfgFieldModel: '模型',
+  cfgFieldKey: 'API 密钥',
+  cfgFormHint: 'Enter 下一项（末项=保存） · Esc 返回 · 点击行跳转',
+  cfgKeyNote: '留空 = 保留已存密钥；输入新值 = 覆盖',
+  cfgSavedOk: '✓ 已保存',
+  cfgBackRow: '← 返回列表',
+  cfgSaveRow: '✓ 保存并返回',
   cmdProvidersListed: '未探测到新的本地厂商(环境变量/opencode 配置)',
   cmdProvidersScanHint: '/providers scan 将它们写入配置',
   thinkingLabel: '[思考中] ',
@@ -430,6 +459,20 @@ const en: Strings = {
   cmdModelHint: 'switch chat route: /model <name>',
   panelHint: '↑↓ / wheel / click to select · Enter confirms · Esc closes',
   cmdModelPreset: (name, envVar) => `${name} not configured - set ${envVar}, then run /providers scan`,
+  cmdConfig: 'Configure API keys / models (visual editor)',
+  cfgTitle: 'Settings · Providers',
+  cfgListHint: '↑↓ select · Enter edit · Esc close · click a row',
+  cfgNewRow: '+ add provider…',
+  cfgColUse: 'use',
+  cfgFieldName: 'name',
+  cfgFieldBaseUrl: 'baseURL',
+  cfgFieldModel: 'model',
+  cfgFieldKey: 'API key',
+  cfgFormHint: 'Enter next field (last saves) · Esc back · click a field row',
+  cfgKeyNote: 'blank keeps the stored key; typing overwrites',
+  cfgSavedOk: '✓ saved',
+  cfgBackRow: '← back to list',
+  cfgSaveRow: '✓ save & back',
   cmdProvidersListed: 'no new local providers detected (env vars / opencode config)',
   cmdProvidersScanHint: '/providers scan writes them into the config',
   thinkingLabel: '[thinking] ',

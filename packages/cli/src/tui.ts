@@ -14,7 +14,7 @@ import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { parseMouse, isMousePrefix, dispatchClick, clearRegions, addClickRegion } from './tui-mouse.ts';
-import { loadConfig, homeDir, resolveProvider, listProviders, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type SessionSummary } from '@hmharness/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, saveProvider, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type HmhConfig, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
@@ -96,11 +96,34 @@ interface Entry {
 /* ---------------- slash commands + mouse wheel (pure, testable) ---------------- */
 
 /** desc keys index into Strings (agent i18n); matched by name at runtime. */
+
+/** a provider row in the /config modal list */
+export type ConfigProviderRow = { name: string; model: string; baseUrl: string; purposes: string };
+
+/** Build the /config provider table from config: purposes from routing
+ *  (chat/vision/evolve/bench/judge). Pure — unit-testable. */
+export function configProviderRows(cfg: HmhConfig): ConfigProviderRow[] {
+  const purposesOf = (name: string): string => {
+    const r = cfg.routing ?? {};
+    const tags: string[] = [];
+    for (const [purpose, target] of Object.entries(r)) {
+      if (target === name) tags.push(purpose);
+    }
+    return tags.join('/');
+  };
+  const entries = Object.entries(cfg.providers ?? {});
+  if (entries.length === 0) {
+    const p = cfg.provider;
+    return p?.baseUrl ? [{ name: 'default', model: p.model, baseUrl: p.baseUrl, purposes: 'chat' }] : [];
+  }
+  return entries.map(([name, p]) => ({ name, model: p.model, baseUrl: p.baseUrl, purposes: purposesOf(name) || '—' }));
+}
 export const COMMANDS: Array<{ name: string; key: string }> = [
   { name: '/help', key: 'cmdHelp' },
   { name: '/tools', key: 'cmdTools' },
   { name: '/skills', key: 'cmdSkills' },
   { name: '/model', key: 'cmdModel' },
+  { name: '/config', key: 'cmdConfig' },
   { name: '/lang', key: 'cmdLang' },
   { name: '/yolo', key: 'cmdYolo' },
   { name: '/providers', key: 'cmdProviders' },
@@ -429,6 +452,39 @@ export class TuiRuntime {
     token: number;
   } | null = null;
 
+  /* ---------------- /config: one-stop provider & key editor ---------------- */
+
+  private configListRows: ConfigProviderRow[] = [];
+  private configModal:
+    | { mode: 'list'; sel: number; rows: ConfigProviderRow[]; note: string; busy: boolean }
+    | { mode: 'form'; orig: string; fields: { name: string; baseUrl: string; model: string; key: string }; fi: number; note: string; busy: boolean }
+    | null = null;
+  private saveProviderCb: ((name: string, patch: { baseUrl: string; model: string; apiKey?: string }) => Promise<{ ok: boolean; rows: ConfigProviderRow[]; error?: string }>) | null = null;
+
+  /** Driver wires the real save (kernel saveProvider) + list refresh here. */
+  onSaveProvider(fn: NonNullable<TuiRuntime['saveProviderCb']>): void {
+    this.saveProviderCb = fn;
+  }
+
+  /** Open the modal with a provider snapshot (driver loads it). */
+  openConfigModal(rows: ConfigProviderRow[]): void {
+    this.configModal = { mode: 'list', sel: 0, rows, note: '', busy: false };
+    this.dirty = true;
+  }
+
+  /** Headless-test probe: modal shape for assertions. */
+  configProbe(): { open: boolean; mode: string; rows: string[]; sel: number; fields?: Array<{ label: string; value: string; masked: boolean }>; fi?: number; note: string } {
+    const m = this.configModal;
+    if (!m) return { open: false, mode: '', rows: [], sel: -1, note: '' };
+    if (m.mode === 'list') return { open: true, mode: 'list', rows: m.rows.map((r) => r.name), sel: m.sel, note: m.note };
+    const labels = [this.t.cfgFieldName, this.t.cfgFieldBaseUrl, this.t.cfgFieldModel, this.t.cfgFieldKey];
+    const vals = [m.fields.name, m.fields.baseUrl, m.fields.model, m.fields.key];
+    return {
+      open: true, mode: 'form', rows: [], sel: -1, fi: m.fi, note: m.note,
+      fields: labels.map((label, i) => ({ label, value: i === 3 ? '•'.repeat(vals[i].length) : vals[i], masked: i === 3 })),
+    };
+  }
+
   openResumePicker(): Promise<{ kind: 'resume'; row: SessionSummary } | { kind: 'close' } | null> {
     if (this.resumeModal) return Promise.resolve(null);
     return new Promise((resolve) => {
@@ -526,6 +582,155 @@ export class TuiRuntime {
     const pos = vis.length ? st.selected + 1 : 0;
     const posLine = t.pickerPos(pos, vis.length, vis.length ? String(Math.round((pos / vis.length) * 100)) : '0');
     frame.push(' '.repeat(Math.max(0, W - posLine.length - 1)) + DIM(posLine));
+  }
+
+  /* ---------------- /config modal: render + input ---------------- */
+
+  /** Full-frame provider editor: list view (click/Enter a row to edit) or
+   *  form view (fields, key masked, blank key = keep stored). Mouse clicks
+   *  dispatch through the shared region registry like every other modal. */
+  private renderConfigModal(frame: string[], W: number, H: number): void {
+    const m = this.configModal!;
+    const t = this.t;
+    const count = ` ${m.mode === 'list' ? String((m as { rows: ConfigProviderRow[] }).rows.length) : '编辑'} `;
+    frame.push(truncateTo(BOLD(' ' + t.cfgTitle) + ' '.repeat(Math.max(1, W - strWidth(t.cfgTitle) - count.length - 1)) + DIM(count), W));
+    frame.push(DIM('─'.repeat(W)));
+
+    if (m.mode === 'list') {
+      frame.push(DIM(truncateTo(`  ${t.cfgFieldName.padEnd(12)}${t.cfgFieldModel.padEnd(16)}${t.cfgFieldBaseUrl.padEnd(30)}${t.cfgColUse}`, W - 1)));
+      const rows = m.rows;
+      const listH = Math.max(3, H - 6);
+      const from = rows.length > listH - 1 ? Math.max(0, Math.min(m.sel - Math.floor((listH - 1) / 2), rows.length - (listH - 1))) : 0;
+      for (let i = 0; i < listH - 1 && from + i < rows.length; i++) {
+        const gi = from + i;
+        const r = rows[gi];
+        const sel = gi === m.sel;
+        const line = truncateTo(`  ${r.name.padEnd(12)}${r.model.slice(0, 15).padEnd(16)}${r.baseUrl.replace(/^https?:\/\//, '').slice(0, 28).padEnd(30)}${r.purposes}`, W - 1);
+        frame.push(sel ? '\x1b[7m' + line + ' '.repeat(Math.max(0, W - 1 - strWidth(line))) + '\x1b[27m' : ' ' + line);
+        const row = frame.length - 1;
+        addClickRegion(row, 0, W - 1, () => { this.openConfigForm(gi); });
+      }
+      const newLine = '  ' + CYAN(t.cfgNewRow);
+      frame.push(m.sel === rows.length ? '\x1b[7m' + newLine + ' '.repeat(Math.max(0, W - 1 - strWidth(newLine))) + '\x1b[27m' : ' ' + newLine);
+      addClickRegion(frame.length - 1, 0, W - 1, () => { this.openConfigForm(-1); });
+      if (m.note) frame.push(m.note.startsWith('✓') ? GREEN(m.note) : RED(truncateTo(m.note, W - 1)));
+      frame.push(DIM('─'.repeat(W)));
+      frame.push(DIM(truncateTo('  ' + t.cfgListHint, W - 1)));
+      return;
+    }
+
+    // form view
+    const labels = [t.cfgFieldName, t.cfgFieldBaseUrl, t.cfgFieldModel, t.cfgFieldKey];
+    const vals = [m.fields.name, m.fields.baseUrl, m.fields.model, m.fields.key];
+    for (let i = 0; i < 4; i++) {
+      const active = i === m.fi;
+      const shown = i === 3 ? '•'.repeat(vals[i].length) : vals[i];
+      const caret = active ? '▏' : ' ';
+      const body = `  ${labels[i].padEnd(10)}${caret}${shown}`;
+      const line = active ? CYAN(truncateTo(body, W - 1)) : DIM(truncateTo(body, W - 1));
+      frame.push(line);
+      addClickRegion(frame.length - 1, 0, W - 1, () => { if (this.configModal?.mode === 'form') { this.configModal.fi = i; this.dirty = true; } });
+    }
+    frame.push(DIM(truncateTo('  ' + t.cfgKeyNote, W - 1)));
+    if (m.note) frame.push(m.note.startsWith('✓') ? GREEN(m.note) : RED(truncateTo(m.note, W - 1)));
+    frame.push(DIM('─'.repeat(W)));
+    const back = '  ' + DIM(t.cfgBackRow);
+    const save = '  ' + GREEN(BOLD(t.cfgSaveRow));
+    frame.push(back);
+    addClickRegion(frame.length - 1, 0, W - 1, () => { if (this.configModal?.mode === 'form') { this.configModal = { mode: 'list', sel: 0, rows: this.configListRows, note: '', busy: false }; this.dirty = true; } });
+    frame.push(save);
+    addClickRegion(frame.length - 1, 0, W - 1, () => { void this.saveConfigForm(); });
+    frame.push(DIM(truncateTo('  ' + t.cfgFormHint, W - 1)));
+  }
+
+  /** Open the edit form for row gi (-1 = new provider). Keeps a snapshot of
+   *  the list for the back button (refreshed again after every save). */
+  private openConfigForm(gi: number): void {
+    const m = this.configModal;
+    if (!m || m.mode !== 'list') return;
+    this.configListRows = m.rows;
+    const r = gi >= 0 ? m.rows[gi] : undefined;
+    this.configModal = {
+      mode: 'form',
+      orig: r?.name ?? '',
+      fields: { name: r?.name ?? '', baseUrl: r?.baseUrl ?? 'https://', model: r?.model ?? '', key: '' },
+      fi: gi >= 0 ? 1 : 0, // editing existing: start at baseUrl (name rarely changes)
+      note: '',
+      busy: false,
+    };
+    this.dirty = true;
+  }
+
+  /** Validate + persist the form via the driver-wired save callback. */
+  private async saveConfigForm(): Promise<void> {
+    const m = this.configModal;
+    if (!m || m.mode !== 'form' || m.busy) return;
+    if (!m.fields.name.trim() || !m.fields.baseUrl.trim() || !m.fields.model.trim()) {
+      m.note = '名称 / 地址 / 模型 均不能为空';
+      this.dirty = true;
+      return;
+    }
+    m.busy = true;
+    this.dirty = true;
+    const res = this.saveProviderCb
+      ? await this.saveProviderCb(m.fields.name.trim(), { baseUrl: m.fields.baseUrl.trim(), model: m.fields.model.trim(), ...(m.fields.key ? { apiKey: m.fields.key } : {}) })
+      : { ok: false, rows: [], error: 'save not wired' };
+    const listRows = res.rows.length ? res.rows : this.configListRows;
+    if (res.ok) {
+      this.configModal = { mode: 'list', sel: Math.max(0, listRows.findIndex((r) => r.name === m.fields.name.trim())), rows: listRows, note: this.t.cfgSavedOk + ' · ' + m.fields.name.trim(), busy: false };
+    } else {
+      m.busy = false;
+      m.note = res.error ?? 'save failed';
+    }
+    this.dirty = true;
+  }
+
+  /** Keyboard input for the config modal (modal owns every event). */
+  private configInput(data: string): void {
+    const m = this.configModal;
+    if (!m || m.busy) return;
+    if (data === '\x1b' || data === '\x03') { // Esc / Ctrl-C
+      if (m.mode === 'form') {
+        const rows = this.configListRows;
+        this.configModal = { mode: 'list', sel: 0, rows, note: '', busy: false };
+      } else {
+        this.configModal = null;
+      }
+      this.dirty = true;
+      return;
+    }
+    if (m.mode === 'list') {
+      const total = m.rows.length + 1; // + new-provider row
+      if (data === '\x1b[A' || data === 'k') { m.sel = Math.max(0, m.sel - 1); this.dirty = true; return; }
+      if (data === '\x1b[B' || data === 'j') { m.sel = Math.min(total - 1, m.sel + 1); this.dirty = true; return; }
+      if (data === '\r' || data === '\n') { this.openConfigForm(m.sel >= m.rows.length ? -1 : m.sel); return; }
+      return;
+    }
+    // form mode
+    const labels = [this.t.cfgFieldName, this.t.cfgFieldBaseUrl, this.t.cfgFieldModel, this.t.cfgFieldKey];
+    void labels;
+    if (data === '\x1b[A') { m.fi = Math.max(0, m.fi - 1); this.dirty = true; return; } // up = prev field
+    if (data === '\x1b[B' || data === '\t') { // down/tab = next; on last, save
+      if (m.fi < 3) { m.fi++; this.dirty = true; } else void this.saveConfigForm();
+      return;
+    }
+    if (data === '\r' || data === '\n') { void this.saveConfigForm(); return; } // Enter saves from any field
+    if (data === '\x7f' || data === '\b') { // backspace on the active field
+      const keys = ['name', 'baseUrl', 'model', 'key'] as const;
+      const f = keys[m.fi];
+      m.fields[f] = m.fields[f].slice(0, -1);
+      this.dirty = true;
+      return;
+    }
+    // printable run: append to the active field (name disallows spaces)
+    const run = data.replace(/[\x00-\x1f\x7f]/g, '');
+    if (run) {
+      const keys = ['name', 'baseUrl', 'model', 'key'] as const;
+      const f = keys[m.fi];
+      const add = f === 'name' ? run.replace(/\s/g, '') : run;
+      m.fields[f] += add;
+      this.dirty = true;
+    }
   }
 
   /** Ctrl+R history-search modal (B4): query line + matching entries,
@@ -1092,11 +1297,13 @@ export class TuiRuntime {
   }
 
   private onKey(data: string): void {
-    // SGR mouse events (dsh-TUI style, 2026-10-22): intercept BEFORE any
-    // key processing — the terminal sends ESC[<btn;col;rowM/m sequences that
-    // would otherwise leak into the input as garbage. A click dispatches to
-    // the region registry; wheel drives the transcript scroll; all other
-    // mouse reports (press, drag, right/middle) are consumed silently.
+    // SGR mouse events (dsh-TUI style, 2026-10-22; press-fix 2026-10-24):
+    // intercept BEFORE any key processing. A click is PRESS+RELEASE - the
+    // press must be CONSUMED (v0.23.38 let it fall through: the leading ESC
+    // closed the palette, so clicks acted like Esc and "didn't work").
+    // parseMouse now returns kind:'ignore' for press/drag/other-button
+    // reports; every complete mouse report is consumed here. X10 legacy
+    // reports (ESC[M + 3 bytes) parse as clicks on left press.
     {
       let chunk = data;
       for (;;) {
@@ -1107,11 +1314,15 @@ export class TuiRuntime {
           const [ev, rest] = parsed;
           if (ev.kind === 'click') dispatchClick(ev.col, ev.row);
           else if (ev.kind === 'wheel') this.wheelScroll(ev.wheelUp);
+          // 'ignore' = press/drag/other-button: consumed, no event
           chunk = rest;
           continue;
         }
-        // partial SGR prefix (ConPTY fragmentation): hold in the mouse buf
-        if (/^\x1b\[<\d*$/.test(chunk)) { this.mouseBuf = chunk; return; }
+        // partial report head (ConPTY fragmentation): hold for the rest
+        if (/^\x1b\[<\d*$/.test(chunk) || /^\x1b\[M?$/.test(chunk)) {
+          this.mouseBuf = chunk;
+          return;
+        }
         break;
       }
       if (this.mouseBuf !== null) {
@@ -1169,6 +1380,9 @@ export class TuiRuntime {
       if (key !== null) this.pickerInput(key);
       return;
     }
+    // config modal owns every event while open (/config: provider list +
+    // edit form; mouse-clickable rows via the shared region registry)
+    if (this.configModal) { this.configInput(data); return; }
     // M2 modals own the keys while open (history search, transcript overlay,
     // @-file palette) — each closes on its own Esc
     if (this.histSearch) { this.histKey(data); return; }
@@ -1408,6 +1622,11 @@ export class TuiRuntime {
       this.flushFrame(frame, H);
       return;
     }
+    if (this.configModal) {
+      this.renderConfigModal(frame, W, H);
+      this.flushFrame(frame, H);
+      return;
+    }
     if (this.histSearch) {
       this.renderHistSearch(frame, W, H);
       this.flushFrame(frame, H);
@@ -1490,6 +1709,9 @@ export class TuiRuntime {
         const c = cmdHits[gi];
         const sel = gi === this.cmdIdx;
         frame.push(truncateTo((sel ? '› ' : '  ') + (sel ? CYAN(c.name) : DIM(c.name)) + '  ' + DIM(truncateTo(c.desc, 46)), W - 1));
+        // mouse click region: this palette row selects + runs the command
+        const palRow = frame.length - 1;
+        addClickRegion(palRow, 0, W - 1, () => { this.cmdIdx = gi; this.pickHighlighted(); });
       }
       frame.push(DIM(truncateTo('  ' + this.t.panelHint, W - 1)));
     }
@@ -1764,6 +1986,18 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     fullToolLog.push({ name: 'shell', output: String(r.output).slice(0, 4000) });
   }
 
+  // /config save channel: kernel saveProvider + refreshed rows back to the
+  // modal; blank key = keep stored (saveProvider contract)
+  rt.onSaveProvider(async (name, patch) => {
+    try {
+      const fresh = await saveProvider(name, patch);
+      cfg = { ...cfg, provider: fresh.provider, providers: fresh.providers, routing: fresh.routing };
+      rt.setModelChoices(listProviders(cfg).map((p) => ({ name: p.name, desc: `${p.model}${p.purposes.length ? ' (' + p.purposes.join('/') + ')' : ''}` })));
+      return { ok: true, rows: configProviderRows(cfg) };
+    } catch (err) {
+      return { ok: false, rows: [], error: String(err instanceof Error ? err.message : err).slice(0, 160) };
+    }
+  });
   rt.onSubmit(() => {
     const line = rt.consumeInput().trim();
     if (!line) {
@@ -2468,6 +2702,11 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       } finally {
         rt.setBusy(false);
       }
+      return;
+    }
+    if (line === '/config' || line.startsWith('/config')) {
+      // one-stop visual editor: providers + API keys, mouse-clickable rows
+      rt.openConfigModal(configProviderRows(cfg));
       return;
     }
     if (line === '/providers' || line === '/providers scan') {

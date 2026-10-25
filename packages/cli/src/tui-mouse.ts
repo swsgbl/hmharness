@@ -1,25 +1,28 @@
 /**
- * @hmharness/cli - tui-mouse (2026-10-22, dsh-TUI style mouse support)
+ * @hmharness/cli - tui-mouse (2026-10-22; press-consumption fix 2026-10-24)
  *
  * SGR mouse tracking (DECSET 1000+1002+1006): the terminal reports
- * ESC[<button;col;row M (press) / m (release) sequences. This module
- * parses them, maintains a clickable-region registry populated during
- * render, and dispatches clicks on left-button release (dsh-TUI's click
- * contract: release without drag = click).
+ * ESC[<button;col;rowM (press) / m (release). A LEFT-BUTTON RELEASE without
+ * drag is a click (dsh-TUI's contract). CRITICAL LESSON (v0.23.38 shipped a
+ * dead click path): a click is reported as TWO sequences - press then
+ * release. The press sequence MUST be consumed too; letting it fall through
+ * to key handling made the leading ESC close the palette, so every click
+ * behaved like Esc and clicks "didn't work". parseMouse therefore returns
+ * kind:'ignore' for consumed-but-not-click reports (press, drag, non-left
+ * buttons) - NEVER null for a complete mouse report.
  *
- * Region registration: the renderer registers (row, colStart, colEnd, fn)
- * for each interactive element while drawing. Regions are cleared at the
- * start of every frame, so the registry is always one frame fresh.
+ * X10 fallback (mode 1000 terminals without SGR): ESC[M + 3 raw bytes.
+ * X10 has no per-button release; a left PRESS is treated as the click.
  */
 
-/** Enable SGR mouse tracking (click + drag + wheel). */
+/** Enable mouse tracking: 1000 (press/release/wheel) + 1002 (drag) + 1006 (SGR). */
 export const ENABLE_MOUSE = '\x1b[?1000h\x1b[?1002h\x1b[?1006h';
 
 /** Disable all mouse tracking modes. */
 export const DISABLE_MOUSE = '\x1b[?1006l\x1b[?1002l\x1b[?1000l';
 
 export interface ParsedMouse {
-  kind: 'click' | 'wheel';
+  kind: 'click' | 'wheel' | 'ignore';
   col: number; // 0-indexed terminal column
   row: number; // 0-indexed terminal row
   wheelUp: boolean; // wheel kind only
@@ -29,36 +32,55 @@ export interface ParsedMouse {
 const SGR_MOUSE_RE = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])/;
 
 /**
- * Try to parse an SGR mouse sequence from the head of the input chunk.
- * Returns [event, rest-of-chunk] or null if the chunk doesn't start with one.
- * ConPTY can split reports across stdin reads; a partial prefix
- * (ESC[<digits;) is held by the caller until more data arrives.
+ * Try to parse ONE mouse sequence from the head of the chunk.
+ * Returns [event, rest-of-chunk] or null when the chunk does not START with
+ * a complete mouse report. Complete-but-uninteresting reports (press, drag,
+ * non-left buttons) return kind:'ignore' so the caller consumes them -
+ * returning null for those is how v0.23.38 broke clicks.
  */
 export function parseMouse(chunk: string): [ParsedMouse, string] | null {
   const m = SGR_MOUSE_RE.exec(chunk);
-  if (!m) return null;
-  const button = parseInt(m[1], 10);
-  const col = parseInt(m[2], 10) - 1; // SGR is 1-indexed, we 0-index
-  const row = parseInt(m[3], 10) - 1;
-  const isRelease = m[4] === 'm';
-  const rest = chunk.slice(m[0].length);
-
-  // wheel: button bit 6 set (0x40), low bits 0=up 1=down
-  if ((button & 0x40) !== 0) {
-    return [{ kind: 'wheel', col, row, wheelUp: (button & 0x01) === 0 }, rest];
+  if (m) {
+    const button = parseInt(m[1], 10);
+    const col = parseInt(m[2], 10) - 1; // SGR is 1-indexed, we 0-index
+    const row = parseInt(m[3], 10) - 1;
+    const isRelease = m[4] === 'm';
+    const rest = chunk.slice(m[0].length);
+    // wheel: button bit 6 set; low bits 0=up 1=down
+    if ((button & 0x40) !== 0) {
+      return [{ kind: 'wheel', col, row, wheelUp: (button & 0x01) === 0 }, rest];
+    }
+    // left button (low bits 0) RELEASE = click
+    if ((button & 0x03) === 0 && isRelease) {
+      return [{ kind: 'click', col, row, wheelUp: false }, rest];
+    }
+    // press / drag-motion / right / middle: consumed, no event
+    return [{ kind: 'ignore', col, row, wheelUp: false }, rest];
   }
-  // left-button (button bits 0-1 = 0) release = click
-  if ((button & 0x03) === 0 && isRelease) {
-    return [{ kind: 'click', col, row, wheelUp: false }, rest];
+  // X10 legacy report: ESC[M + Cb/Cx/Cy raw bytes (each +32)
+  if (chunk.startsWith('\x1b[M') && chunk.length >= 6) {
+    const button = chunk.charCodeAt(3) - 32;
+    const col = chunk.charCodeAt(4) - 32 - 1; // X10 coords are 1-indexed like SGR
+    const row = chunk.charCodeAt(5) - 32 - 1;
+    const rest = chunk.slice(6);
+    if ((button & 0x40) !== 0) {
+      return [{ kind: 'wheel', col, row, wheelUp: (button & 0x01) === 0 }, rest];
+    }
+    // X10 cannot say WHICH button released; a left PRESS is the best click
+    // signal available (drag pairs would double-fire, motion bit excludes)
+    if ((button & 0x20) === 0 && (button & 0x03) === 0) {
+      return [{ kind: 'click', col, row, wheelUp: false }, rest];
+    }
+    return [{ kind: 'ignore', col, row, wheelUp: false }, rest];
   }
-  // press events, right/middle button, drag-motion: consumed silently
   return null;
 }
 
 /** True if the chunk LOOKS like the start of a mouse report (may be partial). */
 export function isMousePrefix(chunk: string): boolean {
-  // complete report or a partial prefix (ConPTY fragmentation)
-  return /^\x1b\[<\d+(?:;\d*){0,2}[Mm]?/.test(chunk) || /^\x1b\[<\d*$/.test(chunk);
+  return /^\x1b\[<\d+(?:;\d*){0,2}[Mm]?/.test(chunk)
+    || /^\x1b\[<\d*$/.test(chunk)
+    || chunk === '\x1b[M'.slice(0, chunk.length) && chunk.length >= 2; // partial X10 head
 }
 
 // ---- clickable-region registry ----
