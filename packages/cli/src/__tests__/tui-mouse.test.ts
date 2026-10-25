@@ -23,10 +23,19 @@ test('parseMouse: wheel up/down parse to wheel events', () => {
   assert.equal(down.wheelUp, false, 'button 65 = wheel down');
 });
 
-test('parseMouse: press events and non-left buttons consumed silently (null)', () => {
-  assert.equal(parseMouse('\x1b[<0;10;5M'), null, 'left press = not a click');
-  assert.equal(parseMouse('\x1b[<2;10;5m'), null, 'right release = not a click');
-  assert.equal(parseMouse('\x1b[<32;10;5M'), null, 'drag motion = not a click');
+test('parseMouse: press events and non-left buttons consumed as ignore (NOT null — the v0.23.39 fix)', () => {
+  // v0.23.38 BUG: returning null for press let the leading ESC leak into
+  // key handling and close the palette. The fix: complete reports return
+  // kind:'ignore' so the caller consumes them silently.
+  const press = parseMouse('\x1b[<0;10;5M');
+  assert.ok(press, 'press returns a result (not null)');
+  assert.equal(press![0].kind, 'ignore', 'left press = consumed, not a click');
+  const right = parseMouse('\x1b[<2;10;5m');
+  assert.ok(right, 'right release returns a result');
+  assert.equal(right![0].kind, 'ignore', 'right release = consumed, not a click');
+  const drag = parseMouse('\x1b[<32;10;5M');
+  assert.ok(drag, 'drag returns a result');
+  assert.equal(drag![0].kind, 'ignore', 'drag motion = consumed, not a click');
 });
 
 test('parseMouse: returns the rest of the chunk after the report', () => {
