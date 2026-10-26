@@ -147,3 +147,39 @@ test('deleteProvider: removes a provider and clears routing keys that point at i
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('loadConfig derives the legacy top-level provider from routing - a fossil key never ships out', async () => {
+  // regression: /evolve in the TUI called chat(cfg.provider) with the raw
+  // top-level block; after a key rotation the routed chat kept working while
+  // every evolve trap failed HTTP 401. loadConfig must make the merged
+  // config self-consistent instead of returning the museum piece.
+  const home = await mkdtemp(join(tmpdir(), 'hmh-fossil-'));
+  const prev = process.env.HMH_HOME;
+  process.env.HMH_HOME = home;
+  try {
+    await writeFile(join(home, 'config.json'), JSON.stringify({
+      provider: { baseUrl: 'https://old/v4', apiKey: 'fossil-key', model: 'old-model' },
+      providers: {
+        live: { baseUrl: 'https://live/v4', apiKey: 'live-key', model: 'live-model' },
+      },
+      routing: { chat: 'live', evolve: 'live' },
+    }), 'utf8');
+    const cfg = await loadConfig();
+    assert.equal(cfg.provider.apiKey, 'live-key', 'top-level provider follows the chat route');
+    assert.equal(cfg.provider.baseUrl, 'https://live/v4');
+    assert.equal(cfg.provider.model, 'live-model');
+    // purpose resolution still lands on the same provider
+    assert.equal(resolveProvider(cfg, 'evolve').apiKey, 'live-key');
+    // no routing -> the configured top-level block passes through untouched
+    await writeFile(join(home, 'config.json'), JSON.stringify({
+      provider: { baseUrl: 'https://solo/v1', apiKey: 'solo-key', model: 'solo' },
+    }), 'utf8');
+    const solo = await loadConfig();
+    assert.equal(solo.provider.apiKey, 'solo-key');
+    assert.equal(solo.provider.model, 'solo');
+  } finally {
+    if (prev === undefined) delete process.env.HMH_HOME;
+    else process.env.HMH_HOME = prev;
+    await rm(home, { recursive: true, force: true });
+  }
+});

@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-10-27(五十四) · /evolve 全线 401:化石 provider 字段与路由解析的双轨分裂
+
+**动机**:用户运行 `/evolve`,全部 trap(cjk-trap×5、fadv×5、teach-calc×5、x×8、hex×4……约 40 项)逐条报 `HTTP 401 身份验证失败`;而同一 TUI 里普通对话完全正常。密钥是刚换的新 key,直连实测 HTTP 200。
+
+**根因(双轨分裂)**:config.json 存在两套 provider 表达——providers 表(新,routing 指向)与顶层 legacy `provider` 字段(旧,密钥轮换后成了化石,存的是过期 key)。普通对话/agent 走 `resolveProvider(cfg,'chat')`(providers 表,新 key)一切正常;TUI 的 `/evolve`、`/bench` 却把 `cfg.provider`(化石)直接传给 `chat()`——每个 trap 请求带着过期 key 出门,全线 401。CLI 的 `hmh evolve`(makeCaseRunner)早已正确解析,所以只有 TUI 快路径中招。
+
+**修复(三层,0.23.41)**:①kernel `loadConfig()` 在 routing 可解析时把顶层 provider **派生**为路由结果——化石字段从根上不可能再过期,一次治愈所有 legacy 消费方(REPL 头显、adaptiveContextChars 预算、会话元数据、web 横幅);②TUI `/bench`、`/evolve` 改用 `resolveProvider(cfg,'bench'/'evolve')` 目的路由;③`hmh evolve` 命令头显同步。另:用户机器 config 数据当场同步修复(顶层 provider ← providers.glm 新 key),已装 0.23.40 实测旧路径调用即恢复"成功"。
+
+**验证**:新增回归测试"化石 key 永不出厂"(旧 key 断言被派生覆盖 + 无 routing 时透传),954/954 零回退;真实 API 双路径(旧 cfg.provider 路径 + resolveProvider(evolve))均 HTTP 200。**教训:同一份配置不允许两个真相源——凡 routing 存在,legacy 字段必须是派生值而非独立存储;调用方一律走目的路由解析,永不直接读裸字段。**
+
+**同轮附带(扩展真机测试僵尸根除)**:全量套件里 firefox 子测试"announce surfaced the moz-extension origin"闪断——诊断日志抓到现行:Quark 的看守进程逃逸 `taskkill /T`,僵尸扩展跨子测试/跨 run 重连共享 bridge(auto-pair 设计对真扩展无法拒识),抢下 `live` 后 firefox 的 moz 断言读到 chrome-extension:// 冒名值。修复:teardown 按**本测试临时 profile 标记**精确清扫(只杀自己 spawn 的进程,绝不按镜像名——用户日常浏览器同镜像)+ firefox 子测试定序最前;连跑两遍 8/8 全绿,进程残留零。
+
+---
+
 ## 2026-10-22(五十三) · 三处现场修复:CORS 预检/活动流回退/注册表组装挂起
 
 **动机**:用户实测"正在执行 888s 无输出",但服务端日志证明任务本身高质量完成(诊断回复与 BrowserOS 同级)——全是可观测与初始化问题。用户同时问:为什么插件不走 ACP?

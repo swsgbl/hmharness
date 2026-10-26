@@ -2787,7 +2787,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
           // plain model call keeps the TUI bench fast; loop cases fall back
           // to the dedicated `hmh bench` command
           if (c.tools) return "(skipped in tui; run 'hmh bench')";
-          const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+          const r = await chat(resolveProvider(cfg, 'bench'), [{ role: 'user', content: c.prompt }]);
           return r.message.content ?? '';
         });
         for (const r of results) rt.addText(`${r.pass ? GREEN('PASS') : YELLOW('FAIL')} ${r.name} — ${r.detail}`);
@@ -2805,10 +2805,10 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
         const { chat } = await import('@hmharness/kernel');
         const report = await runEvolution({
           home,
-          provider: cfg.provider,
+          provider: resolveProvider(cfg, 'evolve'),
           runCase: async (c) => {
             if (c.tools) return t.cmdEvolveHint;
-            const r = await chat(cfg.provider, [{ role: 'user', content: c.prompt }]);
+            const r = await chat(resolveProvider(cfg, 'evolve'), [{ role: 'user', content: c.prompt }]);
             return r.message.content ?? '';
           },
           log: (l) => rt.addText(l, 'dim'),

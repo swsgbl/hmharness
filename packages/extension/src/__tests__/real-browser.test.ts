@@ -101,6 +101,23 @@ const killTree = (pid: number): void => {
   } catch { /* already gone */ }
 };
 
+/** Some chromium-family builds (observed: Quark's watchdog children) survive
+ *  taskkill /T, outlive the subtest, and their extensions re-attach to the
+ *  next run's bridge — one such zombie flipped a later firefox subtest's
+ *  origin assert to chrome-extension://. Sweep by OUR temp-profile marker
+ *  (only spawns of this test carry it on their command line); NEVER by
+ *  image name — the user's daily browser shares that. $PID exclusion: the
+ *  sweep's own powershell command line contains the marker string. */
+const killProfileSpawns = (): void => {
+  if (process.platform !== 'win32') return;
+  try {
+    execSync(
+      `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'ext-real-' -and $_.ProcessId -ne $PID } | ForEach-Object { taskkill /PID $_.ProcessId /T /F }"`,
+      { stdio: 'ignore', timeout: 30_000 },
+    );
+  } catch { /* none left */ }
+};
+
 const waitFor = async (fn: () => Promise<boolean> | boolean, ms: number): Promise<boolean> => {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
@@ -274,6 +291,7 @@ async function firefoxFlow(
       assert.ok(act.isError, 'un-granted Firefox MUST refuse page acting');
     } finally {
       if (proc?.pid) killTree(proc.pid);
+      killProfileSpawns();
       mar?.close();
       await unpair(home).catch(() => undefined); // next subtest starts unpaired
       await sleep(800);
@@ -307,7 +325,17 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
     assert.ok(builtFf, 'firefox build produced a dir');
     await bridge.start(PORT);
 
-    for (const b of browsers) {
+    // Firefox FIRST, deterministically (not discovery order): the moz-origin
+    // assert is the only scheme-strict one in this file, and some
+    // chromium-family browsers (observed: Quark) survive killTree — their
+    // zombie extensions keep re-announcing and re-attaching to the shared
+    // bridge, stealing `live` with a chrome-extension:// origin. A firefox
+    // run placed after them races that impostor and loses flakily.
+    // Chromium subtests only require A chrome-extension:// origin, which a
+    // zombie of the same family can never falsify.
+    const gecko = browsers.filter((b) => b.name === 'firefox');
+    const rest = browsers.filter((b) => b.name !== 'firefox');
+    for (const b of [...gecko, ...rest]) {
       if (b.name === 'firefox') {
         await firefoxFlow(t, b, { home, bridge, builtDir: builtFf.dir });
         continue;
@@ -480,6 +508,7 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
           assert.ok(act.output.includes('scrolled'));
         } finally {
           if (proc?.pid) killTree(proc.pid);
+          killProfileSpawns(); // watchdog escapees must not outlive the subtest
           await cdp?.close().catch(() => undefined); // the CDP WebSocket must not hold the runner open
           await unpair(home).catch(() => undefined); // next subtest starts unpaired
           await sleep(800);
@@ -489,6 +518,7 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
     }
   } finally {
     await bridge.stop().catch(() => undefined);
+    killProfileSpawns(); // leave NOTHING behind for the next run
     if (prevHome === undefined) delete process.env.HMH_HOME; else process.env.HMH_HOME = prevHome;
     await sleep(500);
     for (const d of [home, outDir]) {

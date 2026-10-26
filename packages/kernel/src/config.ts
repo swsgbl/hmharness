@@ -39,7 +39,16 @@ export async function loadConfig(): Promise<HmhConfig> {
   const file = join(home, 'config.json');
   try {
     const raw = JSON.parse(await readFile(file, 'utf8')) as HmhConfig;
-    return applyLocaleOverride({ ...defaultConfig(), ...raw, provider: { ...defaultConfig().provider, ...raw.provider } });
+    const merged: HmhConfig = { ...defaultConfig(), ...raw, provider: { ...defaultConfig().provider, ...raw.provider } };
+    // The legacy top-level `provider` is DERIVED from the routed provider
+    // whenever routing resolves. A fossil `provider` block holding a
+    // rotated-away API key once made every TUI /evolve and /bench call fail
+    // with HTTP 401 while normal (routed) chat kept working - the config as
+    // loaded must be self-consistent, not a museum of past keys.
+    const chatRoute = merged.routing?.chat ?? merged.routing?.evolve;
+    const routed = chatRoute ? merged.providers?.[chatRoute] : undefined;
+    if (routed?.baseUrl) merged.provider = { ...routed };
+    return applyLocaleOverride(merged);
   } catch {
     return applyLocaleOverride(defaultConfig());
   }

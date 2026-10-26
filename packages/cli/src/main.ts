@@ -710,7 +710,7 @@ flags:
     const maxCycles = Number(rest.find((a) => a.startsWith('--cycles='))?.slice(9) ?? 0);
     const t = await uiStrings();
     const runCycle = async (n: number) => {
-      stdout.write(CYAN('evolve') + DIM(` · ${t.evolveCycle(cfg.provider.model, n)}${everyMin ? '' : ' (one-shot)'}\n`));
+      stdout.write(CYAN('evolve') + DIM(` · ${t.evolveCycle(resolveProvider(cfg, 'evolve').model, n)}${everyMin ? '' : ' (one-shot)'}\n`));
       const report = await runEvolution({
         home: homeDir(),
         provider: resolveProvider(cfg, 'evolve'),
