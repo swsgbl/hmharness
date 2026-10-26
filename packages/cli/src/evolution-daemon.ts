@@ -65,7 +65,11 @@ function runHmh(args, timeoutMs) {
 }
 async function cycle() {
   try {
-    const evo = await runHmh(['evolve'], 600000);
+    // 30min: a HEALTHY evolve cycle does 40+ real judge/model calls and can
+    // exceed the old 10min cap — the 401 era finished in seconds (every trap
+    // failed fast), so 600s never bit until the fix landed and real work
+    // resumed. The cap must cover real work, not the failure mode.
+    const evo = await runHmh(['evolve'], 1800000);
     console.log(stamp(), 'evolve cycle done', evo.err ? ('err ' + String(evo.err).slice(0, 120)) : '');
   } catch (e) { console.error(stamp(), 'evolve error:', String(e).slice(0, 200)); }
   // finetune gate after every evolve cycle - the command itself decides
