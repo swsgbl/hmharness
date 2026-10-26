@@ -21,7 +21,7 @@ import {
   mineWorkflows,
   type CognitiveTrajectory,
 } from '../packages/cognitive/src/index.ts';
-import { createHash } from 'node:crypto';
+import { contentFingerprint } from '../packages/evaluation/src/research-repro.ts';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
@@ -40,11 +40,10 @@ for (const t of usable) byEnv.set(t.environment.id, (byEnv.get(t.environment.id)
 const env = [...byEnv.entries()].sort((a, b) => b[1] - a[1])[0][0];
 const pool = usable.filter((t) => t.environment.id === env);
 
-// dataset fingerprint
-const datasetFingerprint = createHash('sha256')
-  .update(pool.map((t) => t.id).sort().join('\n'))
-  .digest('hex')
-  .slice(0, 16);
+// Content-sensitive dataset fingerprint (canonical JSON + full SHA-256).
+// Sorting records makes the digest insensitive to storage listing order, while
+// actions, outcomes, states and metrics are included in each trajectory.
+const datasetFingerprint = contentFingerprint(pool);
 
 // code version
 import { readFileSync } from 'node:fs';
@@ -54,10 +53,10 @@ interface SeedResult {
   seed: string;
   trainCount: number;
   holdoutCount: number;
-  brierTrained: number;
-  brierFresh: number;
+  brierTrained: number | null;
+  brierFresh: number | null;
   checked: number;
-  evidence: number;
+  evidence: number | null;
   decision: string;
   skillEvidence: number;
   skillDecision: string;
@@ -81,17 +80,22 @@ for (const seed of SEEDS) {
     for (const traj of holdout) {
       if (traj.environment.id !== env) continue;
       for (const step of traj.steps) {
+        // Unknown is not a negative label; missing/indeterminate outcomes
+        // must not be silently scored as failures.
+        if (step.outcome === 'unknown') continue;
         const p = wm.predict({ action: step.action });
         const binary = step.outcome === 'success' ? 1 : 0;
         sum += (p.confidence - binary) ** 2;
         checked++;
       }
     }
-    return { checked, brier: checked > 0 ? Number((sum / checked).toFixed(4)) : 0 };
+    return { checked, brier: checked > 0 ? Number((sum / checked).toFixed(4)) : null };
   };
   const t = score(learned);
   const f = score(fresh);
-  const evidence = f.brier > 0 ? Number(((f.brier - t.brier) / f.brier).toFixed(3)) : 0;
+  const evidence = t.brier !== null && f.brier !== null && t.checked > 0 && f.checked > 0 && f.brier > 0
+    ? Number(((f.brier - t.brier) / f.brier).toFixed(3))
+    : null;
 
   // skill arm
   const candidates = mineWorkflows(train);
@@ -120,7 +124,7 @@ for (const seed of SEEDS) {
     brierFresh: f.brier,
     checked: t.checked,
     evidence,
-    decision: evidence >= 0.6 ? 'promote' : 'reject',
+    decision: evidence === null ? 'needs-data' : evidence >= 0.6 ? 'promote' : 'reject',
     skillEvidence,
     skillDecision: skillEvidence >= 0.6 ? 'promote' : 'reject',
   });
@@ -129,6 +133,8 @@ for (const seed of SEEDS) {
 
 // sign test
 const wmPromoted = results.filter((r) => r.decision === 'promote').length;
+const measuredEvidence = results.map((r) => r.evidence).filter((v): v is number => v !== null);
+const allSeedsMeasured = measuredEvidence.length === SEEDS.length;
 const binomUpper = (k: number, n: number): number => {
   let p = 0;
   for (let j = k; j <= n; j++) {
@@ -157,14 +163,18 @@ const report = {
     seeds: SEEDS,
     bar: 0.6,
     gateThreshold: 0.5,
+    datasetFingerprintAlgorithm: 'canonical-json-content-sha256-v1',
+    unknownOutcomePolicy: 'exclude-from-binary-brier-score',
+    independenceCaveat: 'seeded holdouts overlap; the sign-test statistic is descriptive until tested on disjoint task-level or time-separated holdouts',
   },
   perSeedResults: results,
   summary: {
     worldModel: {
       promoted: `${wmPromoted}/${SEEDS.length}`,
-      meanEvidence: Number((results.reduce((s, r) => s + r.evidence, 0) / results.length).toFixed(3)),
-      minEvidence: Math.min(...results.map((r) => r.evidence)),
-      signTestP: binomUpper(wmPromoted, SEEDS.length),
+      measuredSeeds: measuredEvidence.length,
+      meanEvidence: measuredEvidence.length > 0 ? Number((measuredEvidence.reduce((s, v) => s + v, 0) / measuredEvidence.length).toFixed(3)) : null,
+      minEvidence: measuredEvidence.length > 0 ? Math.min(...measuredEvidence) : null,
+      signTestP: allSeedsMeasured ? binomUpper(wmPromoted, measuredEvidence.length) : null,
     },
     skill: {
       meanEvidence: Number((results.reduce((s, r) => s + r.skillEvidence, 0) / results.length).toFixed(3)),
