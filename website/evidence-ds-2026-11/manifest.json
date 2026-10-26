@@ -11,24 +11,24 @@
   "provenance": "Historical copied snapshot; directory month is an archive label, not a collection month. Do not cite this as November data. Tasks are self-authored; this is mechanism-validation evidence, not an external benchmark.",
   "files": {
     "index.html": {
-      "gitBlobSha1": "1e1021ec23951059c2b6384c4f12870091c3285e",
+      "gitBlobSha1": "8dfbe5aed54a7f0d4c97c530f1641f75656ba1e2",
       "nonblankLines": 127,
       "requiredMarker": "历史归档副本（非当月新数据）"
     },
     "raw/log.jsonl": {
-      "gitBlobSha1": "5d23003d991bc319897ffa8f56ffabcd4fd49342",
+      "gitBlobSha1": "ec3f9f4e29b37af6fe1bff4e8e8055f9c26c2187",
       "nonblankLines": 105,
       "firstTime": "2026-08-26T17:42:17.903Z",
       "lastTime": "2026-09-15T09:26:28.528Z"
     },
     "raw/insights.jsonl": {
-      "gitBlobSha1": "5ad7d25884811ababa7a89ecdbee441051ebd894",
+      "gitBlobSha1": "b08555fe56f7e99851638f1c66cd82e1a21d3c0a",
       "nonblankLines": 489,
       "firstTime": "2026-08-26T11:57:15.342Z",
       "lastTime": "2026-09-15T09:26:28.523Z"
     },
     "raw/pareto-entries.jsonl": {
-      "gitBlobSha1": "440002206697af8547447f73e82d20d0c9725b35",
+      "gitBlobSha1": "add11730fbc1f8b1562f49931805e8bf8782f026",
       "nonblankLines": 7,
       "firstTime": "2026-09-14T05:27:01.461Z",
       "lastTime": "2026-09-15T09:27:45.461Z"
