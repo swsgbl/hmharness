@@ -31,6 +31,7 @@ import {
 import { readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { seededShuffle } from '../packages/evaluation/src/research-repro.ts';
 
 const HOME = process.env.HMH_HOME ?? join(homedir(), '.hmharness');
 const TAU = Number(process.env.P2A_TAU ?? 0.5);
@@ -47,7 +48,7 @@ const all = await loadTrajectories(HOME, 1000);
 const usable = all.filter((t) => t.steps.length > 0 && t.environment.id === 'terminal');
 if (usable.length < 40) { console.error(`NEEDS-DATA: only ${usable.length} terminal trajectories with steps — train the corpus first`); process.exit(1); }
 const rng = mulberry32(hashSeed('p2a-intervention-' + SEED));
-const shuffled = [...usable].sort(() => rng() - 0.5);
+const shuffled = seededShuffle(usable, rng);
 const train = shuffled.slice(0, Math.floor(shuffled.length * 0.7));
 // second arg is the ENVIRONMENT ID (replay filters on it) - passing a path
 // here silently replays NOTHING (bit us once: an empty WM blanket-refused)
