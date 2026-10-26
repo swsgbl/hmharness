@@ -21,6 +21,20 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: install
         run: npm install
+      # 2026-10-26 根修:全新 install 时 npm 会给子包装"嵌套实体 @hmharness/*"
+      # (registry 旧版,如 agent 下 kernel@0.23.39 无 signal 字段)遮蔽根
+      # workspace 链接 → tsc 读到过时声明(0.23.33 起所有 CI failure 的真根因;
+      # traceResolution 实证解析到 packages/agent/node_modules/...)。
+      # 清掉嵌套副本,让解析回退到根 junction(本地开发一直如此,故从未触发)。
+      - name: purge nested @hmharness copies (restore workspace links)
+        run: |
+          Get-ChildItem -Path packages -Directory | ForEach-Object {
+            $nested = Join-Path $_.FullName 'node_modules/@hmharness'
+            if (Test-Path $nested) {
+              Write-Host "purging $nested"
+              Remove-Item -Recurse -Force $nested
+            }
+          }
       # 2026-10-26 修复:CI 从 0.23.33 起 publish 全 failure——checkout 无构建
       # 产物,preflight 的 shipped-impl 检查(web/cli dist)必挂。build 产出
       # dist(拓扑序+fix-dts)。另:全新环境首跑偶发 agent 撞 fix-dts 重写
