@@ -1,3 +1,7 @@
+## [0.23.40] - 2026-10-26
+
+执行器挂死根修（桌面/鸿蒙客户端实测三次实发的"空壳会话永久 busy"）：①**根因**——busy 仅在任务子进程 exit 时清除，/api/interrupt 只向 stdin 写 abort，而该信号不进入飞行中的 provider.chat（chat 自建 AbortController 只接 timeoutMs 计时器）；provider 以 keep-alive ping 挂起 SSE 流时 180s 流空闲保护被持续刷新 → chat 永不返回、子进程永不退出 → busy 永久 true、interrupt 返回 200 但无效（仅重启 web 守护可清）。②**三层修复（最小侵入）**——kernel: ChatOptions.signal 外部取消贯穿飞行中的 fetch 与流读取，abort 后立即失败不重试，loop 每次模型调用与 compaction 摘要均传递 signal；web: interrupt 同时拒绝停靠审批+写 abort，5s 宽限后同一子进程仍 busy 则 kill 兜底（exit→finish→busy 清）；busy 先于 spawn 置位造成的 interrupt 竞态丢失 → abortIntent 锁存、spawn 后补投。③**测试**——新增 interrupt-stuck（挂起 provider→interrupt→busy 清）与 interrupt-race（spawn 前中断竞态）两个测试文件；全量 953/953 零回退；scripts/repro-stuck.mjs 复现实测：修复前永久 busy，修复后 interrupt 后 busy 0s 清除。板级安装器 FALLBACK_PINS 同步 0.23.39（publish.cjs 常规）。
+
 ## [0.23.39] - 2026-10-24
 
 TUI 鼠标点击假死根修+/config 密钥配置通道：①**鼠标假死根因**——终端报点击=按下(M)+释放(m)两序列，v0.23.38 的 parseMouse 对按下返回 null→按下序列的 ESC 漏入按键处理→面板被当 Esc 关掉→点击无反应。修复：完整报告永远不返 null（按下/拖拽返 ignore 被消费）+X10 兼容+部分头缓冲；面板行的 addClickRegion 在编辑中丢失已找回。②**新 /config 命令**：一键密钥配置——provider 列表(点击行直达)+编辑表单(名称/地址/模型/密钥，掩码显示，空密钥=保留)+kernel saveProvider 接线；i18n 14 键双语
