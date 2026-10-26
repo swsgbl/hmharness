@@ -28,7 +28,7 @@
 export type ExtensionTarget = 'chromium' | 'firefox' | 'safari';
 export const EXTENSION_TARGETS: ExtensionTarget[] = ['chromium', 'firefox', 'safari'];
 
-export const EXTENSION_VERSION = '0.23.30'; // bump with package releases
+export const EXTENSION_VERSION = '0.23.31'; // bump with package releases
 export const GECKO_ID = 'bridge@hmharness.dev';
 
 /**

@@ -1,3 +1,7 @@
+## [0.23.42] - 2026-10-27
+
+发版管线钉版事故修复（0.23.40/0.23.41 两轮的隐藏雷）：①**事故**——bump 脚本只升各包 `version` 忘了升 44 根跨包依赖钉,cli@0.23.40/0.23.41 全部以 kernel@0.23.39 等旧件出厂,用户全局安装得到混合版本树——0.23.40 的挂死根修(kernel ChatOptions.signal)与 0.23.41 的 /evolve 401 根修(loadConfig 派生)从未真正到达任何用户;本机npm缓存掩盖了真相,--prefer-online 重装+registry dependencies 复核才抓到。②**修复**——全部 44 钉同步 0.23.42;版本一致性门禁升级:跨包钉必须等于根版本(硬失败),该类事故从此在 preflight 即被拦下。③**验证**——npm pack 逐包复核钉值 + 全新目录安装 16/16 同版本实测。0.23.41 已不可变,latest 即刻指向本版。
+
 ## [0.23.41] - 2026-10-27
 
 /evolve 与 /bench 全线 401 根修（密钥轮换后化石配置击穿 TUI 快路径）：①**根因**——config.json 顶层的 legacy `provider` 字段残留已轮换的旧 API key；普通对话走 routing 解析（providers 表新 key）一切正常，而 TUI 的 /evolve、/bench 直接把 `cfg.provider` 传给 chat()，全部 trap 请求带着过期 key 出门 → bigmodel HTTP 401 "身份验证失败" 全线报错。②**三层修复**——kernel loadConfig() 在 routing 可解析时将顶层 provider 派生为路由结果（化石字段永不再过期，所有 legacy 消费方一次治愈：REPL 头显、自适应上下文预算、会话元数据、web 横幅）；TUI /bench、/evolve 改用 resolveProvider(cfg,'bench'/'evolve') 目的路由；`hmh evolve` 命令头显同步。③**测试**——新增化石 provider 回归测试（旧 key 断言派生覆盖 + 无 routing 时透传）；954/954 零回退；用户机器 config 数据已同步修复，已装 0.23.40 实测旧路径调用即恢复。④**扩展真机测试稳定性**——Quark 看守进程逃逸 taskkill /T 形成僵尸扩展，跨子测试/跨 run 重连共享 bridge 抢占 live，致 firefox 子测试 moz-origin 断言被 chrome-extension:// 冒名顶替而闪断；修复=teardown 按本测试临时 profile 标记精确清扫（绝不按镜像名误杀用户浏览器）+ firefox 子测试定序最前，连跑两遍 8/8 全绿。

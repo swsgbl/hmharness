@@ -10,6 +10,7 @@
  */
 import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { openSync, readFileSync, unlinkSync, writeFileSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
@@ -153,4 +154,75 @@ export function startExtensionDaemon(port = DEFAULT_EXTENSION_PORT, entry = proc
   const pid = readExtensionPid();
   if (pid && alive(pid)) return { already: true, pid };
   return { already: false, pid: spawnExtensionDaemon(entry, port) };
+}
+
+// --------------------------------------------------------------- watchdog
+
+/** Path of the watchdog pid file under HMH_HOME. */
+export function watchdogPidPath(): string {
+  return join(homeDir(), 'extension-watchdog.pid');
+}
+
+/**
+ * Watchdog body (runs INSIDE the detached watchdog process): probe the
+ * bridge every 60s; dead or stale → respawn it. Idempotent by design —
+ * a second watchdog exits when the pid file already names a live process.
+ * The bridge dying must never be a state the user can observe (round 54:
+ * "插件又不能用了" = the daemon had silently died and nothing revived it).
+ */
+export async function runWatchdogLoop(port: number, entry: string): Promise<never> {
+  const wp = watchdogPidPath();
+  try {
+    const existing = Number(readFileSync(wp, 'utf8').trim());
+    if (Number.isFinite(existing) && existing > 0 && existing !== process.pid && alive(existing)) {
+      process.exit(0); // another watchdog is on duty
+    }
+  } catch { /* no pid file yet */ }
+  writeFileSync(wp, String(process.pid));
+  for (;;) {
+    try {
+      const served = await probeExtensionDaemon(port);
+      const pid = readExtensionPid();
+      const stale = pid > 0 && alive(pid) && recordedVersion() !== cliVersion();
+      if (!served.up || stale) {
+        if (stale) stopExtensionDaemon(port);
+        await waitExtensionPortFree(port, 3000);
+        spawnExtensionDaemon(entry, port);
+      }
+    } catch { /* a watchdog that throws is a watchdog that dies — never */ }
+    await new Promise((r) => setTimeout(r, 60_000));
+  }
+}
+
+/** Spawn the watchdog detached (no window). Safe to call repeatedly. */
+export function startWatchdog(port = DEFAULT_EXTENSION_PORT, entry = process.argv[1]): number {
+  try {
+    const wp = watchdogPidPath();
+    const existing = Number(readFileSync(wp, 'utf8').trim());
+    if (Number.isFinite(existing) && existing > 0 && alive(existing)) return existing;
+  } catch { /* none yet */ }
+  const log = openSync(join(homeDir(), 'extension-watchdog.log'), 'a');
+  const child = spawn(process.execPath, [
+    '-e',
+    `import('${pathToFileURL(entry).href.replace(/main\.js$/, 'extension-daemon.js')}').then(m => m.runWatchdogLoop(${port}, ${JSON.stringify(entry)}))`,
+  ], { detached: true, stdio: ['ignore', log, log], windowsHide: true });
+  child.unref();
+  try { closeSync(log); } catch { /* gone */ }
+  return child.pid ?? 0;
+}
+
+/** Stop the watchdog (used by `extension stop` — it must not resurrect). */
+export function stopWatchdog(): boolean {
+  try {
+    const wp = watchdogPidPath();
+    const pid = Number(readFileSync(wp, 'utf8').trim());
+    if (Number.isFinite(pid) && pid > 0 && alive(pid)) {
+      if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+      else process.kill(pid);
+      try { unlinkSync(wp); } catch { /* absent */ }
+      return true;
+    }
+    try { unlinkSync(wp); } catch { /* absent */ }
+  } catch { /* none */ }
+  return false;
 }

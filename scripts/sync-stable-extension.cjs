@@ -1,15 +1,18 @@
-// one-off: sync changed extension payload files into the stable install dirs
-// (payload root is nested: extension-install/<kind>/<kind>/)
+// sync full built payload (v0.23.31) into the stable install dirs used by
+// user browsers + rebuild XPI, then re-verify consistency
 const fs = require('fs'), path = require('path');
-const src = 'G:/hmharness/packages/extension/extension';
-for (const kind of ['chromium', 'firefox']) {
-  const dst = path.join('C:/Users/hongfu/.hmharness/extension-install', kind, kind);
-  if (!fs.existsSync(dst)) { console.log(kind, 'payload dir missing'); continue; }
-  for (const f of fs.readdirSync(dst)) {
-    const a = path.join(src, f), b = path.join(dst, f);
-    if (!fs.existsSync(a)) { console.log(kind, f, '(browser-specific, skip)'); continue; }
-    const same = fs.readFileSync(a).equals(fs.readFileSync(b));
-    if (!same) { fs.copyFileSync(a, b); console.log(kind, f, 'UPDATED'); }
+const LIVE = 'C:/Users/hongfu/.hmharness/extension-live-2';
+// chromium stable dir + firefox stable dir + XPI
+for (const [kind, payloadDir] of [['chromium', LIVE + '/chromium'], ['firefox', LIVE + '/firefox']]) {
+  const dst = `C:/Users/hongfu/.hmharness/extension-install/${kind}/${kind}`;
+  fs.mkdirSync(dst, { recursive: true });
+  for (const f of fs.readdirSync(payloadDir)) {
+    const a = path.join(payloadDir, f), b = path.join(dst, f);
+    const stat = fs.statSync(a);
+    if (stat.isFile()) { fs.copyFileSync(a, b); }
   }
+  console.log(kind, 'synced:', fs.readdirSync(dst).join(', '));
 }
-console.log('stable install dirs synced');
+console.log('stable dirs synced from live-2 (single source of truth)');
+const mv = JSON.parse(fs.readFileSync('C:/Users/hongfu/.hmharness/extension-install/chromium/chromium/manifest.json', 'utf8'));
+console.log('stable chromium manifest v' + mv.version);

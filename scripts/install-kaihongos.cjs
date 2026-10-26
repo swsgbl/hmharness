@@ -63,9 +63,9 @@ let PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
 // The release bot keeps versions synced; the NAMES must cover the full
 // first-party set so the offline path cannot produce an incomplete tree.
 const FALLBACK_PINS = {
-  cli: '0.23.41', web: '0.23.41', agent: '0.23.41', kernel: '0.23.41',
-  sandbox: '0.23.41', evolution: '0.23.41', 'domain-ops': '0.23.41',
-  evaluation: '0.23.41', observability: '0.23.41', 'domain-harmony': '0.23.41',
+  cli: '0.23.42', web: '0.23.42', agent: '0.23.42', kernel: '0.23.42',
+  sandbox: '0.23.42', evolution: '0.23.42', 'domain-ops': '0.23.42',
+  evaluation: '0.23.42', observability: '0.23.42', 'domain-harmony': '0.23.42',
 };
 
 // ---------- helpers ---------------------------------------------------------

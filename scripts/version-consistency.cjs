@@ -29,8 +29,20 @@ const problems = [];
 const warnings = [];
 
 for (const p of SET) {
-  const pv = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', p, 'package.json'), 'utf8')).version;
-  if (pv !== v) problems.push(`packages/${p} at ${pv}, root at ${v}`);
+  const pj = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', p, 'package.json'), 'utf8'));
+  if (pj.version !== v) problems.push(`packages/${p} at ${pj.version}, root at ${v}`);
+  // 2026-10-27 hard gate: cross-package pins MUST equal the release version.
+  // 0.23.40/0.23.41 shipped with pins stranded two versions back — fresh
+  // installs resolved cli@new over kernel@old, and both releases' headline
+  // fixes never reached a single user. Stale pins are now a preflight STOP,
+  // not a warning.
+  for (const key of ['dependencies', 'devDependencies']) {
+    for (const [dep, spec] of Object.entries(pj[key] ?? {})) {
+      if (dep.startsWith('@hmharness/') && spec !== '*' && spec !== v) {
+        problems.push(`packages/${p} pins ${dep} at ${spec}, release at ${v} (mixed-version install)`);
+      }
+    }
+  }
 }
 
 const cl = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
