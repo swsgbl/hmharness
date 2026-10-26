@@ -50,5 +50,7 @@ jobs:
           exit 0
       - name: website guard (inline JS syntax + zh/en i18n symmetry + install cmd)
         run: node scripts/check-website.cjs
+      - name: frozen evidence verifier contract tests
+        run: node --test scripts/verify-evidence-archives.test.mjs
       - name: frozen evidence provenance gate
         run: node scripts/verify-evidence-archives.mjs
