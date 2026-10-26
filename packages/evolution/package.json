@@ -15,8 +15,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/cognitive": "0.23.39",
-    "@hmharness/kernel": "0.23.39"
+    "@hmharness/cognitive": "0.23.40",
+    "@hmharness/kernel": "0.23.40"
   },
   "files": [
     "dist"
