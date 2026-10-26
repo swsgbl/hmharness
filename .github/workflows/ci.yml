@@ -27,7 +27,9 @@ jobs:
       - name: built CLI smoke (no model needed)
         run: node packages/cli/dist/main.js skills
       - name: npm publish preflight (ordered-set check, never publishes)
-        run: node scripts/publish-preflight.cjs 2>&1 | tee preflight-output.log
+        # Build, typecheck and unit tests already ran above; avoid running the same suite twice.
+        # Keep per-package freshness, dependency, npm pack and secret checks enabled.
+        run: node scripts/publish-preflight.cjs --skip-tests 2>&1 | tee preflight-output.log
       - name: test failure excerpts (flaky forensics)
         if: failure()
         shell: pwsh
