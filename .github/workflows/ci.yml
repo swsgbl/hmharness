@@ -48,3 +48,5 @@ jobs:
           exit 0
       - name: website guard (inline JS syntax + zh/en i18n symmetry + install cmd)
         run: node scripts/check-website.cjs
+      - name: frozen evidence snapshot provenance and integrity
+        run: node scripts/verify-evidence-archives.mjs
