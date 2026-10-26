@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "snapshotId": "evidence-ds-2026-10",
+  "status": "historical-archive-copy",
+  "directoryMonth": "2026-10",
+  "generatedAt": "2026-09-15T05:18:53.914Z",
+  "dataWindow": {
+    "start": "2026-08-26T17:42:17.903Z",
+    "end": "2026-09-14T18:13:08.550Z"
+  },
+  "provenance": "Historical copied snapshot; directory month is an archive label, not a collection month. Do not cite this as October data. Tasks are self-authored; this is mechanism-validation evidence, not an external benchmark.",
+  "files": {
+    "index.html": {
+      "gitBlobSha1": "089d5488143fd79c5982bced17a98ac5854da72b",
+      "nonblankLines": 127,
+      "requiredMarker": "历史归档副本（非当月新数据）"
+    },
+    "raw/log.jsonl": {
+      "gitBlobSha1": "36a33194e84d468ff8decce382ac1466f452275d",
+      "nonblankLines": 103,
+      "firstTime": "2026-08-26T17:42:17.903Z",
+      "lastTime": "2026-09-14T18:13:08.550Z"
+    },
+    "raw/insights.jsonl": {
+      "gitBlobSha1": "ac188da43c17beda5fc1695aac748bbe635229b8",
+      "nonblankLines": 485,
+      "firstTime": "2026-08-26T11:57:15.342Z",
+      "lastTime": "2026-09-15T03:10:06.837Z"
+    },
+    "raw/pareto-entries.jsonl": {
+      "gitBlobSha1": "fdeb4b27cdcdf45670ad1159cd1c836d42863ebb",
+      "nonblankLines": 4,
+      "firstTime": "2026-09-14T05:27:01.461Z",
+      "lastTime": "2026-09-14T05:27:44.821Z"
+    }
+  }
+}
