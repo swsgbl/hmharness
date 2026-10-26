@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+发布一致性 P0：发现 v0.23.40 的 package.json 内部依赖声明与 package-lock.json 仍停留在 0.23.39，干净 CI 因此解析到旧 kernel 类型；本分支统一 16 个 workspace 包的内部依赖与 lockfile，并加入 scripts/check-workspace-versions.mjs，作为 prebuild 与 test 的版本契约守卫。修复后 GitHub Actions 的 install/build/typecheck 已通过，完整测试与其余 smoke/preflight 任务仍以最新 Actions 结论为准。
+
 研究可复现性 P0：①新增 canonical JSON + 内容级完整 SHA-256 轨迹数据集指纹；同一批轨迹仅排序变化不改变指纹，动作/结果/状态/指标变化会改变指纹；②研究复现包记录 git commit，未知 outcome 从二分类 Brier 计分排除，零有效样本输出 NEEDS-DATA/null 而非假 0；③P2A 干预实验改用固定种子 Fisher–Yates 洗牌，基础原语新增单测。CI 与完整运行证据需由 Draft PR 自动化验证，不在静态审查中冒充 PASS。
 
 ## [0.23.40] - 2026-10-26
