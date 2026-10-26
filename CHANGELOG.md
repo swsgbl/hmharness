@@ -1,3 +1,7 @@
+## [Unreleased]
+
+研究可复现性 P0：①新增 canonical JSON + 内容级完整 SHA-256 轨迹数据集指纹；同一批轨迹仅排序变化不改变指纹，动作/结果/状态/指标变化会改变指纹；②研究复现包记录 git commit，未知 outcome 从二分类 Brier 计分排除，零有效样本输出 NEEDS-DATA/null 而非假 0；③P2A 干预实验改用固定种子 Fisher–Yates 洗牌，基础原语新增单测。CI 与完整运行证据需由 Draft PR 自动化验证，不在静态审查中冒充 PASS。
+
 ## [0.23.40] - 2026-10-26
 
 执行器挂死根修（桌面/鸿蒙客户端实测三次实发的"空壳会话永久 busy"）：①**根因**——busy 仅在任务子进程 exit 时清除，/api/interrupt 只向 stdin 写 abort，而该信号不进入飞行中的 provider.chat（chat 自建 AbortController 只接 timeoutMs 计时器）；provider 以 keep-alive ping 挂起 SSE 流时 180s 流空闲保护被持续刷新 → chat 永不返回、子进程永不退出 → busy 永久 true、interrupt 返回 200 但无效（仅重启 web 守护可清）。②**三层修复（最小侵入）**——kernel: ChatOptions.signal 外部取消贯穿飞行中的 fetch 与流读取，abort 后立即失败不重试，loop 每次模型调用与 compaction 摘要均传递 signal；web: interrupt 同时拒绝停靠审批+写 abort，5s 宽限后同一子进程仍 busy 则 kill 兜底（exit→finish→busy 清）；busy 先于 spawn 置位造成的 interrupt 竞态丢失 → abortIntent 锁存、spawn 后补投。③**测试**——新增 interrupt-stuck（挂起 provider→interrupt→busy 清）与 interrupt-race（spawn 前中断竞态）两个测试文件；全量 953/953 零回退；scripts/repro-stuck.mjs 复现实测：修复前永久 busy，修复后 interrupt 后 busy 0s 清除。板级安装器 FALLBACK_PINS 同步 0.23.39（publish.cjs 常规）。
