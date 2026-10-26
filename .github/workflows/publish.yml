@@ -29,11 +29,17 @@ jobs:
         id: build_first
         continue-on-error: true
         run: npm run build
-      - name: build retry (fresh-env race)
+      # 挂点恒在 agent(全新环境首跑的声明解析时序;单包续跑实证必过,
+      # 前序包 dist 已建好——从挂点续跑,不动生产 build 链)
+      - name: build resume from failure point
         if: steps.build_first.outcome == 'failure'
         run: |
-          Start-Sleep -Seconds 10
-          npm run build
+          npm run build -w @hmharness/agent
+          node scripts/fix-dts.mjs
+          npm run build -w @hmharness/web
+          node scripts/fix-dts.mjs
+          npm run build -w @hmharness/cli
+          node scripts/fix-dts.mjs
       - name: 'publish (ordered set, kernel through cli + codexhost-bridge)'
         run: node scripts/publish.cjs
         env:
