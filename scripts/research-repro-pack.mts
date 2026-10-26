@@ -35,6 +35,10 @@ function hashSeed(s: string): number { let h = 2166136261; for (let i = 0; i < s
 
 const all = await loadTrajectories(HOME, 1000);
 const usable = all.filter((t) => t.steps.length > 0);
+if (usable.length === 0) {
+  console.error('NEEDS-DATA: no usable trajectories found; cannot select an environment or score a model');
+  process.exit(1);
+}
 const byEnv = new Map<string, number>();
 for (const t of usable) byEnv.set(t.environment.id, (byEnv.get(t.environment.id) ?? 0) + 1);
 const env = [...byEnv.entries()].sort((a, b) => b[1] - a[1])[0][0];
