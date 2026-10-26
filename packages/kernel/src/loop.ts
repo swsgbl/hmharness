@@ -210,6 +210,9 @@ export async function runLoop(opts: {
 
     const chatRes = await modelCall(provider, compacted, tools, {
       onDelta: events?.onDelta,
+      // the abort must pierce the in-flight call, not just turn boundaries -
+      // a hung provider stream otherwise holds the session busy forever
+      ...(opts.signal ? { signal: opts.signal } : {}),
     });
     usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
     usage.completionTokens += chatRes.usage?.completion_tokens ?? 0;

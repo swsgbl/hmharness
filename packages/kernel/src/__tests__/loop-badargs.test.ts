@@ -202,3 +202,25 @@ test('provider 400(chat 抛错):runLoop 以可捕获异常结束,不静默挂起
     'provider 错误必须是可捕获的 rejection(调用方决定恢复动作),而不是挂起或吞掉',
   );
 });
+
+test('取消(signal):abort signal 传入 chat 调用(飞行中的请求可被打断)', async () => {
+  // 2026-10-26 卡死缺陷的契约面:signal 只在轮边界检查是不够的——飞行中
+  // 的 provider 调用也必须收到 signal,否则挂起的流(keep-alive ping 永不
+  // [DONE])无视 interrupt,会话 busy 永久。见 provider-abort.test.ts。
+  const reg = new Registry();
+  let seenSignal: AbortSignal | undefined;
+  const spyChat = async (_p: unknown, _m: never[], _t?: unknown, o?: { signal?: AbortSignal }) => {
+    seenSignal = o?.signal;
+    return { message: { role: 'assistant' as const, content: 'done' }, usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  };
+  const ac = new AbortController();
+  const r = await runLoop({
+    provider: fakeProvider, registry: reg,
+    messages: [{ role: 'user', content: 'x' }],
+    ctx: { cwd: '.', home: '.' },
+    signal: ac.signal,
+    chatImpl: spyChat as never,
+  });
+  assert.equal(r.reason, 'final');
+  assert.equal(seenSignal, ac.signal, 'chat 拿到的是调用方的 signal 本体');
+});

@@ -60,6 +60,13 @@ export function parseRetryAfterMs(raw: string | null | undefined, maxMs = 120_00
 
 export interface ChatOptions {
   timeoutMs?: number;
+  /** External cancellation (web /api/interrupt, TUI Esc): pierces the
+   *  in-flight fetch AND its stream reader. Without this link a hung call -
+   *  e.g. a keep-alive-only SSE stream that bumps the idle guard forever -
+   *  ignores the abort and holds the session busy until timeoutMs x retries
+   *  (the 2026-10-26 stuck-executor field reports). A user abort is never
+   *  retried: intent outranks the resilience loop. */
+  signal?: AbortSignal;
   /** Streaming callback; presence switches the request to stream:true.
    *  kind 'reset' carries an empty chunk and means: the previous attempt died
    *  mid-stream and is being retried - discard what you streamed for it. */
@@ -113,9 +120,17 @@ export async function chat(
   // and mid-stream socket cuts should NEVER kill a long-running task).
   const MAX_RETRIES = opts.retry?.attempts ?? 6;
   const BASE_MS = opts.retry?.baseMs ?? 3000;
+  const external = opts.signal;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // user cancellation outranks resilience: never start (or retry) after abort
+    if (external?.aborted) throw new Error('provider: request aborted (external signal)');
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
+    // the external signal links into this attempt's controller so the abort
+    // pierces the in-flight fetch and its stream reader, not just turn
+    // boundaries (a hung stream otherwise outlives the idle guard)
+    const onExternalAbort = () => ctrl.abort();
+    if (external) external.addEventListener('abort', onExternalAbort, { once: true });
     // Did this attempt stream anything to the UI before dying? A mid-stream
     // cut leaves partial deltas on screen; retrying would duplicate them, so
     // clients are told to drop the partial block first (DeltaKind 'reset').
@@ -170,6 +185,9 @@ export async function chat(
       };
     } catch (err) {
       lastError = String(err);
+      // the caller cancelled: fail now, never retry (a follow-up attempt
+      // would only hang the session again against the user's intent)
+      if (external?.aborted) throw new Error(`provider: request aborted (external signal): ${lastError.slice(0, 120)}`);
       // transient (network, timeout, connection reset, mid-stream cut): retry
       if (TRANSIENT_RE.test(lastError)) {
         // the attempt already painted partial text: tell clients to drop it so
@@ -181,6 +199,7 @@ export async function chat(
       }
       throw err; // permanent error (bad JSON, logic error): don't retry
     } finally {
+      if (external) external.removeEventListener('abort', onExternalAbort);
       clearTimeout(timer);
     }
   }

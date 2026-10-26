@@ -97,6 +97,16 @@ async function main(): Promise<void> {
       const id = ++approvalSeq;
       approvals.set(id, resolve);
       emit({ kind: 'approvalReq', id, name, args });
+      // an abort while THIS promise pends must resolve it (denied): the
+      // daemon-side interrupt/deny does it, but a lost stdin or a crashed
+      // daemon would otherwise park the child here forever, holding the
+      // session busy (double-resolve is a no-op on a settled promise)
+      const onAbort = () => {
+        if (approvals.get(id) === resolve) approvals.delete(id);
+        resolve(false);
+      };
+      if (abort.signal.aborted) onAbort();
+      else abort.signal.addEventListener('abort', onAbort, { once: true });
     }),
     events: {
       onLine: (text) => emit({ kind: 'line', text }),

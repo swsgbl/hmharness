@@ -18,10 +18,36 @@ import { setGoal } from '@hmharness/kernel';
 
 export type JsonFn = (res: ServerResponse, status: number, body: unknown) => void;
 
+/** After /api/interrupt writes the abort, the child gets this long to act on
+ *  it (in-flight fetch pierce is immediate; a lost/foreign child is slower).
+ *  If the session is STILL busy on the SAME process by then, kill it: busy
+ *  otherwise only clears on child exit, which a network-hung child never
+ *  reaches - the 2026-10-26 "empty session busy forever" field reports. */
+const INTERRUPT_KILL_GRACE_MS = 5_000;
+
+/** Arm the kill backstop for a delivered abort: if the session is STILL busy
+ *  on the SAME child once the grace period passes, kill it - busy only
+ *  clears on child exit, and a network-hung child never exits on its own.
+ *  The proc identity check never touches a NEXT task's restarted child.
+ *  Shared by /api/interrupt and server.ts's spawn-time intent replay. */
+export function armInterruptBackstop(exec: SessionExecLike, proc: { kill(): void } | null): void {
+  setTimeout(() => {
+    if (exec.busy && exec.proc === proc && proc) {
+      try { proc.kill(); } catch { /* already gone */ }
+    }
+  }, INTERRUPT_KILL_GRACE_MS).unref();
+}
+
 export interface SessionExecLike {
   busy: boolean;
   queue: Array<{ text: string }>;
   stdin: Writable | null;
+  /** The session's child process (kill backstop only - see /api/interrupt). */
+  proc: { kill(): void } | null;
+  /** Latched by /api/interrupt while the child/stdin is still coming up;
+   *  server.ts runOne replays it the moment stdin exists, so an interrupt
+   *  racing the spawn is never lost. */
+  abortIntent?: boolean;
   pending: { timer: ReturnType<typeof setTimeout>; resolve: (granted: boolean) => void } | null;
 }
 
@@ -73,11 +99,26 @@ export async function handleSessionsRoute(
     const sidIn = typeof ibody.sessionId === 'string' ? ibody.sessionId.slice(0, 80) : '';
     const running = [...executors.entries()].filter(([, e]) => e.busy);
     const target = sidIn && executors.get(sidIn)?.busy ? executors.get(sidIn)! : running.length === 1 ? running[0][1] : null;
-    if (!target?.stdin) {
+    if (!target) {
       json(res, 200, { ok: false, busy: anyBusy(), running: running.length });
       return true;
     }
-    try { target.stdin.write(JSON.stringify({ type: 'abort' }) + '\n'); } catch { /* child gone */ }
+    // latch the intent BEFORE touching stdin: an interrupt racing the spawn
+    // (busy latched, child/stdin not yet up) must survive to delivery -
+    // runOne replays it the moment stdin exists
+    target.abortIntent = true;
+    // a parked approval is part of the run: deny it too, or a child waiting
+    // on the dialog survives the interrupt until the 5-min approval timeout
+    if (target.pending) {
+      const p = target.pending;
+      target.pending = null;
+      clearTimeout(p.timer);
+      p.resolve(false);
+    }
+    if (target.stdin) {
+      try { target.stdin.write(JSON.stringify({ type: 'abort' }) + '\n'); } catch { /* child gone */ }
+    } // else: spawn in flight - the latched intent is replayed on spawn
+    armInterruptBackstop(target, target.proc);
     json(res, 200, { ok: true });
     return true;
   }

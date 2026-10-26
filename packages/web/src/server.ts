@@ -32,7 +32,7 @@ import { handleCognitiveRoute } from './routes/cognitive.ts';
 import { handleSettingsRoute } from './routes/settings.ts';
 import { handleFilesystemRoute } from './routes/filesystem.ts';
 import { handleRemoteRoute } from './routes/remote.ts';
-import { handleSessionsRoute } from './routes/sessions.ts';
+import { handleSessionsRoute, armInterruptBackstop } from './routes/sessions.ts';
 import { handleSessionsMetaRoute } from './routes/sessions-meta.ts';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;
@@ -291,6 +291,9 @@ export async function startServer(opts: {
     queue: QueuedItem[];
     proc: import('node:child_process').ChildProcess | null;
     stdin: import('node:stream').Writable | null;
+    /** latched by /api/interrupt while this exec's child/stdin is still
+     *  coming up; replayed below the moment spawn hands over stdin */
+    abortIntent: boolean;
     pending: (PendingApproval & { id: number }) | null;
     authError: boolean;
   }
@@ -298,7 +301,7 @@ export async function startServer(opts: {
   const execFor = (sid: string): SessionExec => {
     let e = executors.get(sid);
     if (!e) {
-      e = { busy: false, queue: [], proc: null, stdin: null, pending: null, authError: false };
+      e = { busy: false, queue: [], proc: null, stdin: null, abortIntent: false, pending: null, authError: false };
       executors.set(sid, e);
     }
     return e;
@@ -541,6 +544,14 @@ export async function startServer(opts: {
     child.unref();
     exec.proc = child;
     exec.stdin = child.stdin;
+    // an interrupt that raced the spawn (busy latched before stdin existed)
+    // must not be lost: deliver the abort now and arm the same kill backstop
+    // /api/interrupt uses
+    if (exec.abortIntent) {
+      exec.abortIntent = false;
+      try { child.stdin?.write(JSON.stringify({ type: 'abort' }) + '\n'); } catch { /* gone */ }
+      armInterruptBackstop(exec, child);
+    }
 
     const relay = (ev: Record<string, unknown>) => {
       const kind = String(ev.kind ?? '');
@@ -642,6 +653,7 @@ export async function startServer(opts: {
       exec.busy = false;
       exec.proc = null;
       exec.stdin = null;
+      exec.abortIntent = false; // never poison the NEXT task's run
       if (code !== 0 && !sawFinal) {
         const msg = stderrTail.trim() ? 'task child exit ' + code + ': ' + stderrTail.trim().slice(0, 300) : 'task child exit ' + code;
         broadcast('error', { message: msg, sessionId: sid });

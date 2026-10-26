@@ -514,7 +514,7 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     const r = await chatFn(chatProvider, [
       { role: 'system', content: 'You compress evicted agent transcript content into a dense factual digest. Keep: what was done, key results, paths, versions, decisions, errors and their fixes. Drop: raw listings, repetition, fluff. Max 120 words. Plain text bullets, no preamble.' },
       { role: 'user', content: (input.previousDigest ? `PREVIOUS DIGEST (merge, keep still-relevant facts):\n${input.previousDigest}\n\n` : '') + `NEWLY EVICTED CONTENT:\n${input.evicted.join('\n---\n').slice(0, 24_000)}` },
-    ]);
+    ], undefined, { signal: opts.signal });
     return r.message.content ?? '';
   };
   // v0.24 P2A research: opt-in conditioned action gate (config gate.enabled,
