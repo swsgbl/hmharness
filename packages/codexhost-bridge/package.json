@@ -15,8 +15,8 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@hmharness/agent": "0.23.39",
-    "@hmharness/kernel": "0.23.39"
+    "@hmharness/agent": "0.23.40",
+    "@hmharness/kernel": "0.23.40"
   },
   "engines": {
     "node": ">=22"
