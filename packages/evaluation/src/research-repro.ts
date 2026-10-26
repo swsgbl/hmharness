@@ -7,7 +7,9 @@ import { createHash } from 'node:crypto';
  * for signing untrusted data or handling cyclic objects.
  */
 export function canonicalJson(value: unknown): string {
-  return JSON.stringify(normalize(value));
+  const serialized = JSON.stringify(normalize(value));
+  if (serialized === undefined) throw new TypeError('value cannot be represented as canonical JSON');
+  return serialized;
 }
 
 function normalize(value: unknown): unknown {
