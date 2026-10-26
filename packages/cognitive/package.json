@@ -26,6 +26,6 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@hmharness/kernel": "0.23.39"
+    "@hmharness/kernel": "0.23.40"
   }
 }
