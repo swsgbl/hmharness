@@ -10,7 +10,7 @@
  * key experiments with their published seeds, then packages:
  *   - experiment metadata (seed, split ratio, environment, dates)
  *   - code version (from package.json + git if available)
- *   - dataset fingerprint (trajectory count, per-env counts, id hash)
+ *   - dataset fingerprint (trajectory count, per-env counts, full content hash)
  *   - per-seed raw results (not just means)
  *   - the summary verdicts
  */
@@ -51,7 +51,12 @@ const datasetFingerprint = contentFingerprint(pool);
 
 // code version
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+let codeCommit: string | null = null;
+try {
+  codeCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
+} catch { /* source archive or non-git execution: leave commit unknown */ }
 
 interface SeedResult {
   seed: string;
@@ -154,6 +159,7 @@ const report = {
   version: 1,
   generatedAt: new Date().toISOString(),
   codeVersion: pkg.version,
+  codeCommit,
   environment: env,
   datasetFingerprint,
   datasetStats: {
