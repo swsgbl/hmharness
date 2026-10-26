@@ -9,3 +9,5 @@ export * from './self-benchmark.ts';
 export * from './metrics.ts';
 export * from './benchmark-layers.ts';
 export * from './research-gate.ts';
+
+export * from './research-repro.ts';
