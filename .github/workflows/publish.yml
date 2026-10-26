@@ -21,6 +21,11 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: install
         run: npm install
+      # 2026-10-26 修复:CI 从 0.23.33 起 publish 全 failure——checkout 无构建
+      # 产物,preflight 的 shipped-impl 检查(web/cli dist)必挂。build 产出
+      # dist(拓扑序+fix-dts),preflight 要求 dist 比 src 新由此满足。
+      - name: build
+        run: npm run build
       - name: 'publish (ordered set, kernel through cli + codexhost-bridge)'
         run: node scripts/publish.cjs
         env:
