@@ -25,8 +25,15 @@ jobs:
       # 产物,preflight 的 shipped-impl 检查(web/cli dist)必挂。build 产出
       # dist(拓扑序+fix-dts)。另:全新环境首跑偶发 agent 撞 fix-dts 重写
       # kernel 声明的竞态(单包重跑即过,复现实证)——失败重试一次。
-      - name: build (retry once on fresh-env race)
-        run: npm run build || (Write-Host "::warning::build race hit, retrying" ; Start-Sleep 10 ; npm run build)
+      - name: build
+        id: build_first
+        continue-on-error: true
+        run: npm run build
+      - name: build retry (fresh-env race)
+        if: steps.build_first.outcome == 'failure'
+        run: |
+          Start-Sleep -Seconds 10
+          npm run build
       - name: 'publish (ordered set, kernel through cli + codexhost-bridge)'
         run: node scripts/publish.cjs
         env:
