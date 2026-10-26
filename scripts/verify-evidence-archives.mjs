@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = process.env.HMH_EVIDENCE_ROOT
+  ? resolve(process.env.HMH_EVIDENCE_ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MONTHS = ['2026-09', '2026-10', '2026-11'];
 const failures = [];
 let inspected = 0;
