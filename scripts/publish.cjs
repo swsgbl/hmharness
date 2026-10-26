@@ -109,9 +109,14 @@ const REG = 'https://registry.npmjs.org';
 }
 
 // 0. preflight first - never publish a broken set
+// timeout 30min: preflight = build + typecheck + FULL npm test; the CI
+// windows runner took 8m54s once and >10m the next (the extension
+// real-browser teardown sweeps add ~40s) - the old 600s cap killed the
+// preflight SILENTLY at exactly +600s (no FAIL output, only this abort
+// line), which read like a test failure and cost a forensics round.
 console.log('--- preflight ---');
 try {
-  execSync('node scripts/publish-preflight.cjs' + (ONLY ? ' ' + ONLY : ''), { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', timeout: 600000 });
+  execSync('node scripts/publish-preflight.cjs' + (ONLY ? ' ' + ONLY : ''), { cwd: ROOT, encoding: 'utf8', stdio: 'inherit', timeout: 1_800_000 });
 } catch {
   console.error('preflight failed - publish aborted');
   process.exit(1);
