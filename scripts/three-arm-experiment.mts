@@ -133,6 +133,30 @@ function setWritable(dir: string, writable: boolean): void {
   for (const f of readdirSync(dir)) chmodSync(join(dir, f), writable ? 0o666 : 0o444);
 }
 
+/** MUST stay byte-identical to evolution/skills.ts#parseDescription: the
+ *  gate's baseline injection (skillsToPrompt over listSkills) and this
+ *  driver's A/B/C snapshot injection must extract the SAME description
+ *  strings, or the gate's baseline is not the main experiment's arm A
+ *  (found 2026-10-27 mid-phase0: 5/34 skills diverged; that run was voided). */
+function parseDescriptionLikeSkillsTs(text: string): string {
+  const fm = text.match(/^---\n([\s\S]*?)\n---/);
+  if (fm) {
+    const m = fm[1].match(/^description:\s*(.+)$/m);
+    if (m) return m[1].trim().slice(0, 120);
+  }
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (t && !t.startsWith('#') && !t.startsWith('---')) return t.slice(0, 120);
+  }
+  return '';
+}
+
+function snapshotEntries(dir: string): SkillSnapshotEntry[] {
+  return readdirSync(dir).filter((d) => {
+    try { return statSync(join(dir, d, 'SKILL.md')).isFile(); } catch { return false; }
+  }).sort().map((d) => ({ name: d, description: parseDescriptionLikeSkillsTs(readFileSync(join(dir, d, 'SKILL.md'), 'utf8')) }));
+}
+
 /* ---------------- the frozen runner (shared by all arms + gate) ---------------- */
 
 function makeRunner(provider: { baseUrl: string; apiKey: string; model: string }) {
@@ -219,13 +243,7 @@ function cmdSetup(): void {
   // skill snapshot: the real home's active library, copied verbatim
   rmSync(SNAPSHOT_DIR, { recursive: true, force: true });
   cpSync(join(REAL_HOME, 'skills', 'active'), SNAPSHOT_DIR, { recursive: true });
-  const snapshot: SkillSnapshotEntry[] = readdirSync(SNAPSHOT_DIR).filter((d) => {
-    try { return statSync(join(SNAPSHOT_DIR, d, 'SKILL.md')).isFile(); } catch { return false; }
-  }).sort().map((d) => {
-    const md = readFileSync(join(SNAPSHOT_DIR, d, 'SKILL.md'), 'utf8');
-    const m = md.match(/^description:\s*(.+)$/m) ?? md.match(/^#\s*.+\n+(.+)$/m);
-    return { name: d, description: (m?.[1] ?? '').trim().slice(0, 120) };
-  });
+  const snapshot: SkillSnapshotEntry[] = snapshotEntries(SNAPSHOT_DIR);
 
   // protect dir: read-only copies of the holdout tasks (evolution never writes here)
   rmSync(PROTECT_DIR, { recursive: true, force: true });
@@ -557,13 +575,7 @@ async function cmdPhase3(): Promise<void> {
 }
 
 function loadSnapshot(): SkillSnapshotEntry[] {
-  return readdirSync(SNAPSHOT_DIR).filter((d) => {
-    try { return statSync(join(SNAPSHOT_DIR, d, 'SKILL.md')).isFile(); } catch { return false; }
-  }).sort().map((d) => {
-    const md = readFileSync(join(SNAPSHOT_DIR, d, 'SKILL.md'), 'utf8');
-    const m = md.match(/^description:\s*(.+)$/m) ?? md.match(/^#\s*.+\n+(.+)$/m);
-    return { name: d, description: (m?.[1] ?? '').trim().slice(0, 120) };
-  });
+  return snapshotEntries(SNAPSHOT_DIR);
 }
 
 function assertSame(phase: string, before: string, after: string, what: string): void {

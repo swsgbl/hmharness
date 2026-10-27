@@ -1,0 +1,5 @@
+unica Определю точное имя инструмента, прочитав соответствующий скилл.车的 竖read_file(path="G:\hmharness-wtC\website\evidence\experiments\three-arm-2026-10-27\skills\harmony-build-doctor-windows-invocation\SKILL.md")ądek🎀 心️脱下の **`harmony_build_doctor`**
+
+该工具专门对已知的 HarmonyOS 构建失败家族（failure families）进行分类诊断。它通过分析构建日志中的错误签名，将失败归入已知类别并给出对应的修复建议，而不是让你从零开始排查陌生报错。
+
+使用提示（Windows 环境）：调用时注意正确的调用方式（参见技能 `harmony-build-doctor-windows-invocation`），避免因命令找不到或参数错误而被静默跳过。把失败的构建日志（或 hvigor 输出）交给它即可获得失败家族分类。

@@ -1,0 +1,1 @@
+**`harmony_emulator`** — this tool family manages emulator lifecycle (start/stop, state verification, snapshots) directly from the command line, without needing to open DevEco Studio.
