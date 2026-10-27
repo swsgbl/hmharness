@@ -1,0 +1,3 @@
+`harmony_emulator_*`
+
+该工具族（如 `harmony_emulator_start`、`harmony_emulator_stop` 等模拟器生命周期管理工具）可以在不打开 DevEco Studio 的情况下独立管理鸿蒙模拟器的启动、停止等状态。配合 `hdc list targets` 三角验证（参见 `harmony-emulator-state-triangulation` 技能）可以确认模拟器实际状态。

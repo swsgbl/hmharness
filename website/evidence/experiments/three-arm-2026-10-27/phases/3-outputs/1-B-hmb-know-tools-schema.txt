@@ -1,0 +1,3 @@
+`harmony_schema_check`
+
+它作为轻量的 pre-build 配置门禁，把 `module.json5` 与 SDK schema 进行校验（该技能对应说明见 harmony-schema-check-restore-verification）。

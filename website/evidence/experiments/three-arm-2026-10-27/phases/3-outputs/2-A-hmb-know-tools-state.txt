@@ -1,0 +1,142 @@
+我来查一下 hmharness CLI 的实际命令定义，确认快照/恢复相关的子命令。 
+
+ 以上内容均由 AI 生成，仅供参考 _absent"> 
+ 以上内容均由 AI 生成，仅供参考</div>
+
+ 以下是根据您的要求生成的回答： 
+ 以上内容均由 AI 生成，仅供参考</div><div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div></div> 是 `hmh evolution snapshot`。
+
+补充说明：
+- **作用**：将 HMH_HOME 下的 `skills/`、`memory/`、`insights/` 打包成带时间戳的快照（tar.gz），存放在 `HMH_HOME/snapshots/`，用于进化状态损坏或误删后的恢复。
+- **配套命令**：`hmh evolution restore <snapshot-file>` 可从指定快照恢复；`hmh evolution snapshots` 可列出已有快照。
+- 通常在执行有风险的自进化操作（如 skill 降级、批量重写 insights）前建议先手动 snapshot 一次。
+
+<div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div></div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考 _absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ 以上内容均由 AI 生成，仅供参考</div><div style_border_none padding_none margin_none display_none class="_absent">
+
+ <div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div>
+
+ <div style_border_none padding_none margin_none display_none class="_absent"><div style_border_none padding_none margin_none display_none class="_absent">
+
+ </div></div></div></div>
+
+ 以上内容均由 AI 生成，仅供参考</div></div></div></div></div>

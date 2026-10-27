@@ -1,0 +1,3 @@
+**`harmony_emulator_`**
+
+The `harmony_emulator_*` tool family (e.g., `harmony_emulator_start` / `harmony_emulator_stop`) manages emulator lifecycle headlessly — no DevEco Studio GUI required. Complementary state checks use `hdc list targets` and `hdc uitest dumpLayout` for ground-truth verification.

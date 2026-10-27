@@ -1,0 +1,3 @@
+**onWindowStageCreate**
+
+In the UIAbility lifecycle, this is the callback that fires when the ability's window stage is created — the point where you typically `loadContent()` your pages. It fills the role Android gives to `onStart()` (the full HarmonyOS mapping: `onCreate` → onCreate, `onStart` → onWindowStageCreate, `onResume`/`onPause` → onForeground/onBackground, `onDestroy` → onDestroy).

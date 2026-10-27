@@ -1,0 +1,3 @@
+`harmony_build_doctor`
+
+(One note: per the skill `harmony-build-doctor-windows-invocation`, on Windows the bare command can return no parseable output — if you want, share the actual error text and I can run the proper diagnosis for you.)

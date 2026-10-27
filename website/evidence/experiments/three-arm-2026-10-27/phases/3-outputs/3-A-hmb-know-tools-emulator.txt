@@ -1,0 +1,3 @@
+`harmony_emulator`
+
+该工具族（前缀 `harmony_emulator_*`，如 start/stop 等操作）用于独立管理模拟器生命周期，无需依赖 DevEco Studio。配套技能 `harmony-emulator-state-ground-truth` 和 `harmony-emulator-state-triangulation` 提供了状态核验的注意事项（单一 `hdc list targets` 不足以确认模拟器状态，需三角验证）。

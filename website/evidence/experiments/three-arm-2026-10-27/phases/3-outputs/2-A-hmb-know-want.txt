@@ -1,0 +1,3 @@
+**Want**
+
+(In HarmonyOS/OpenHarmony, the `Want` object — like Android's Intent — carries navigation and launch parameters such as `abilityName`, `bundleName`, URI, and custom `parameters` when starting or switching between abilities, e.g. `context.startAbility(want)`.)

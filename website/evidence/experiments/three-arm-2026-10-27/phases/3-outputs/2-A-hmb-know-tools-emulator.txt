@@ -1,0 +1,3 @@
+**`harmony_emulator`**
+
+The `harmony_emulator_*` tool family (e.g., start/stop/state checks) manages the HarmonyOS emulator lifecycle directly from the harness via hdc — no need to open DevEco Studio. This is consistent with the skill library guidance (e.g., `harmony-emulator-state-triangulation`), which relies on those tools plus `hdc list targets`/`netstat` for ground truth rather than the IDE.

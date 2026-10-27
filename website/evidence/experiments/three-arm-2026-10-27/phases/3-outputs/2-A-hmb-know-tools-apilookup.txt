@@ -1,0 +1,54 @@
+快速核实一下工具名，避免凭印象回答。我来查一下框架里注册的工具。
+
+
+不被支持的工具调用
+
+
+Unsupported call: {"tool":"search_tool_documentation","args":{"query":"SDK API symbol lookup file:line evidence"}}
+
+
+Unsupported call: {"tool":"search_tool_documentation","args":{"query":"harmony SDK symbol lookup"}}
+
+
+工具调用
+
+Tool details
+
+
+Tool details
+
+search
+
+工具信息:
+search(pattern, options): Glob 文件模式匹配，返回匹配的路径。使用可选 options 对象。
+参数:
+- pattern: string — Glob 文件模式
+- options: object — 可选选项
+返回值: string[] — 匹配的文件路径数组
+工具调用成功
+
+
+G:\hmharness-wtC\src\tools\harmony-sdk-symbol-lookup.cjs
+G:\hmharness-wtC\src\tools\harmony-api-index.cjs
+G:\hmharness-wtC\src\tools\harmony-sdk-api-docs.cjs
+G:\hmharness-wtC\src\tools\harmony-api-usage-scan.cjs
+
+
+找到了。确认一下这个工具的准确名称和输出形态。
+
+
+Tool details for: harmony-sdk-symbol-lookup.cjs
+名称: harmony_sdk_symbol_lookup
+描述: 在已安装的 HarmonyOS SDK 中查找 API 符号（类、方法、接口等），返回 file:line 证据。支持精确匹配与模糊搜索，可限定模块或 d.ts 文件范围。
+输出包含: 符号名、所在文件路径、行号、签名摘要。
+
+对应的命令行包装: `hmh sdk symbol-lookup <symbol>`
+
+相关技能: sdk-symbol-evidence
+工具信息加载完毕
+
+The user asks which tool looks up an SDK API symbol with file:line evidence. Answer with the tool name.
+
+**`harmony_sdk_symbol_lookup`**
+
+它可以再 HarmonyOS SDK 安装目录（`@ohos.*.d.ts` 文件）中查找类、方法、接口等符号，并返回精确的文件路径和行号作为证据，支持精确/模糊匹配，还可限定模块范围。命令行等价形式是 `hmh sdk symbol-lookup <symbol>`。
