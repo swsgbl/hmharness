@@ -1,0 +1,70 @@
+{
+  "ranAt": "2026-10-27T14:44:27.332Z",
+  "outcome": {
+    "name": "exact-output-only",
+    "action": "rejected",
+    "reason": "bench regression on a previously passing case",
+    "baseline": {
+      "passRate": 0.5384615384615384,
+      "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:pass cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+    },
+    "candidate": {
+      "passRate": 0.5,
+      "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+    },
+    "lineage": {
+      "parentInsights": [],
+      "scores": {
+        "train": 0.5
+      },
+      "metaModel": "glm-5.3",
+      "decidedAt": "2026-10-27T14:44:27.307Z"
+    }
+  },
+  "full": {
+    "time": "2026-10-27T14:36:30.876Z",
+    "model": "glm-5.3",
+    "seededCases": [
+      "toolchain-report.task",
+      "reply-determinism.task",
+      "toolchain-ohpm-status.task"
+    ],
+    "insightCount": 0,
+    "noteCount": 0,
+    "proposals": [
+      {
+        "name": "exact-output-only",
+        "description": "(three-arm experiment candidate)",
+        "skill_md": "# Exact-output replies\n\nWhen a task asks for an exact string, a single word/number, or one of a fixed option set, the final reply is that token and nothing else.\n\n- Send the answer as your entire final message: no greeting, no explanation, no restatement, no labels, no units unless requested.\n- Do all reasoning silently (thinking or tool calls), never in the visible reply.\n- Copy the target character-for-character from the prompt. Never \"fix\" or improve it:\n  - Keep punctuation exactly as given: ASCII vs full-width (`,` vs `，`; `!` vs `！`), straight vs curly quotes.\n  - Keep spacing exactly: leading and trailing spaces, double spaces, double commas, no space after a colon.\n  - Keep surrounding quotes and trailing periods when the prompt says they are part of the answer.\n- Do not wrap answers in backticks or code fences; characters you add make it wrong. Fence only if the target itself is a fenced block.\n- If a leading/trailing space is required, output it raw; never let formatting habits trim it.\n- If the prompt says \"any\" (e.g., any 6-digit hex), emit one bare valid instance — no wrapper, no prefix.\n- If a file must be read first, call the read tool, then reply with only the requested token copied verbatim from the file.\n- For math, finish computing, then reply with only the number in the exact requested format (integer, one decimal place, etc.).\n- For choice tasks (e.g., GO or NO-GO), reply with one listed option verbatim.\n- Before sending, reread the prompt's target and diff it against your reply one character at a time; silently correct any mismatch instead of annotating it."
+      }
+    ],
+    "outcomes": [
+      {
+        "name": "exact-output-only",
+        "action": "rejected",
+        "reason": "bench regression on a previously passing case",
+        "baseline": {
+          "passRate": 0.5384615384615384,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:pass cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.5,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.5
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-27T14:44:27.307Z"
+        }
+      }
+    ],
+    "memoryDistilled": null,
+    "budget": {
+      "cyclesToday": 0
+    },
+    "estTokens": 411
+  }
+}
