@@ -18,6 +18,7 @@ const crypto = require('node:crypto');
 const os = require('node:os');
 const fs = require('fs');
 const path = require('path');
+const { registrySkipDecision } = require('./publish-registry-skip-policy.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const ORDER = ['kernel', 'observability', 'evaluation', 'sandbox', 'cognitive', 'environments', 'browser', 'extension', 'evolution', 'domain-harmony', 'domain-ops', 'lsp', 'agent', 'web', 'cli', 'codexhost-bridge'];
@@ -184,14 +185,14 @@ async function sameAsRegistry(pkgJson, dir) {
   // agent/i18n, domain-ops, evolution reward-model)
   try {
     const r = await fetch('https://registry.npmjs.org/' + pkgJson.name);
-    if (!r.ok) return { ok: true };
+    if (!r.ok) return { ok: false, reason: 'registry packument request failed with HTTP ' + r.status };
     const pack = await r.json();
     const ver = pack.versions && pack.versions[pkgJson.version];
-    if (!ver || !ver.dist || !ver.dist.tarball) return { ok: true };
+    if (!ver || !ver.dist || !ver.dist.tarball) return { ok: false, reason: 'registry version entry is missing dist.tarball for ' + pkgJson.name + '@' + pkgJson.version };
     const packOut = execSync('npm pack --silent', { cwd: dir, encoding: 'utf8' });
     // npm pack prints the produced filename (scoped @hmharness/cli -> hmharness-cli-x.y.z.tgz)
     const produced = (packOut || '').trim().split('\n').filter(Boolean).slice(-1)[0];
-    if (!produced) return { ok: true };
+    if (!produced) return { ok: false, reason: 'npm pack did not return a local tarball path' };
     const localTgz = path.join(dir, produced);
     const dl = path.join(os.tmpdir(), 'hmh-registry-' + Date.now() + '.tgz');
     const buf = Buffer.from(await (await fetch(ver.dist.tarball)).arrayBuffer());
@@ -202,9 +203,9 @@ async function sameAsRegistry(pkgJson, dir) {
     fs.rmSync(localTgz, { force: true });
     const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
     const diffs = [...keys].filter((k) => a[k] !== b[k]);
-    return diffs.length ? { ok: false, diffs: diffs.slice(0, 8) } : { ok: true };
+    return diffs.length ? { ok: false, diffs: diffs.slice(0, 8), reason: 'local tarball differs from the published registry tarball' } : { ok: true, verified: true };
   } catch (e) {
-    return { ok: true, note: 'compare unavailable: ' + String(e.message).slice(0, 80) };
+    return { ok: false, reason: 'registry comparison unavailable: ' + String(e.message).slice(0, 120) };
   }
 }
 
@@ -227,14 +228,21 @@ for (const name of ONLY ? [ONLY] : ORDER) {
   const versionAlreadyLive = live === pkg.version || (await versionExistsOnNpm(pkg.name, pkg.version));
   if (versionAlreadyLive) {
     const same = await sameAsRegistry(pkg, dir);
-    if (!same.ok) {
-      console.error('\n!!! @hmharness/' + name + ' ' + pkg.version + ' is already on npm but the LOCAL source differs:');
-      console.error('    ' + (same.diffs || []).join('\n    '));
-      console.error('    This is the changed-source-without-bump trap (agent/i18n, domain-ops, evolution).');
-      console.error('    Bump the package version (and dependents\' pins) or pass --force-skip-check to override.');
-      if (!process.argv.includes('--force-skip-check')) process.exit(1);
+    const decision = registrySkipDecision(same, process.argv.includes('--force-skip-check'));
+    if (!decision.skip) {
+      console.error('\n!!! @hmharness/' + name + ' ' + pkg.version + ' is already on npm, but registry content could NOT be verified:');
+      if (same.diffs && same.diffs.length) console.error('    differing files: ' + same.diffs.join(', '));
+      if (decision.reason) console.error('    reason: ' + decision.reason);
+      console.error('    Refusing to skip this package without a verified byte-for-byte content match.');
+      console.error('    Retry the registry comparison or use --force-skip-check only after recording the explicit risk.');
+      process.exit(1);
     }
-    console.log('\n--- skip @hmharness/' + name + ' ' + pkg.version + ' (already on npm, content verified identical' + (same.note ? '; ' + same.note : '') + ') ---');
+    if (decision.verified) {
+      console.log('\n--- skip @hmharness/' + name + ' ' + pkg.version + ' (already on npm, content verified identical) ---');
+    } else {
+      console.error('\n!!! FORCE SKIP UNVERIFIED @hmharness/' + name + ' ' + pkg.version + ': ' + decision.reason);
+      console.log('\n--- skip @hmharness/' + name + ' ' + pkg.version + ' (FORCED; registry content NOT verified) ---');
+    }
     continue;
   }
   const args = ['publish', '--access', 'public', '--registry', REG];
