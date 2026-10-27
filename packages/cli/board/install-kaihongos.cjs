@@ -259,6 +259,11 @@ function healHookSource() {
     '  _HMH_HEAL_NODE="${HNODE:-' + path.join(BOARD_HOME, 'dsh-pack/node/bin/node.bin') + '}"',
     '  if [ -x "$_HMH_HEAL_NODE" ]; then',
     '    HMH_BOARD_HOME="' + BOARD_HOME + '" \\',
+    // jitless self-contained: this hook can run BEFORE the launcher exports
+    // NODE_OPTIONS="--jitless" (apikeys.env is sourced first) — on RWX-forbidden
+    // boards a JIT node crashes here (V8 errno check, observed on the VM).
+    // jitless is harmless on JIT-capable boards for a ~0.1s heal check.
+    '      NODE_OPTIONS="--jitless${NODE_OPTIONS:+ $NODE_OPTIONS}" \\',
     '      "$_HMH_HEAL_NODE" ' + path.join(HMH_HOME, 'heal-tree.cjs') + ' >>' + path.join(HMH_HOME, 'heal.log') + ' 2>&1 \\',
     '      || echo "hmh: self-heal could not complete (see ' + path.join(HMH_HOME, 'heal.log') + ') — starting anyway" >&2',
     '  fi',
