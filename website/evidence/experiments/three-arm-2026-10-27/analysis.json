@@ -1,0 +1,368 @@
+{
+  "experimentId": "three-arm-main-experiment-2026-10-27",
+  "generatedAt": "2026-10-27T15:51:42.817Z",
+  "datasetHash": "d8e690894095dc98fa068c6a3cd85055bfa5a718aada1ab7ee0e7ab4cb4dbacd",
+  "cDeployable": false,
+  "cPlaceholderCount": 165,
+  "candidate": {
+    "name": "character-exact-replies",
+    "sha": "1a2d8188eb1a8fccad11ec8c2ad29e9f753e03dce0fa3d62877b94fb46a32810",
+    "gateOutcome": "rejected",
+    "gateRejectedReason": "bench regression on a previously passing case"
+  },
+  "stats": {
+    "A:train": {
+      "runs": 96,
+      "pass": 51,
+      "rate": 0.5313,
+      "tokens": 323305,
+      "wallMsAvg": 4038,
+      "toolCalls": 24,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 3,
+      "brier": 0.3705,
+      "crashRate": 0
+    },
+    "A:protect": {
+      "runs": 69,
+      "pass": 58,
+      "rate": 0.8406,
+      "tokens": 190248,
+      "wallMsAvg": 7191,
+      "toolCalls": 0,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 1,
+      "brier": 0.1525,
+      "crashRate": 0
+    },
+    "A:all": {
+      "runs": 165,
+      "pass": 109,
+      "rate": 0.6606,
+      "tokens": 513553,
+      "wallMsAvg": 5356,
+      "toolCalls": 24,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 4,
+      "brier": 0.2805,
+      "crashRate": 0
+    },
+    "B:train": {
+      "runs": 96,
+      "pass": 55,
+      "rate": 0.5729,
+      "tokens": 345245,
+      "wallMsAvg": 5119,
+      "toolCalls": 24,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 3,
+      "brier": 0.3343,
+      "crashRate": 0
+    },
+    "B:protect": {
+      "runs": 69,
+      "pass": 58,
+      "rate": 0.8406,
+      "tokens": 180509,
+      "wallMsAvg": 3529,
+      "toolCalls": 0,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 0,
+      "brier": 0.1173,
+      "crashRate": 0
+    },
+    "B:all": {
+      "runs": 165,
+      "pass": 113,
+      "rate": 0.6848,
+      "tokens": 525754,
+      "wallMsAvg": 4454,
+      "toolCalls": 24,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 3,
+      "brier": 0.2448,
+      "crashRate": 0
+    },
+    "C:train": {
+      "runs": 0,
+      "pass": 0,
+      "rate": 0,
+      "tokens": null,
+      "wallMsAvg": 0,
+      "toolCalls": 0,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 0,
+      "brier": null,
+      "crashRate": 0
+    },
+    "C:protect": {
+      "runs": 0,
+      "pass": 0,
+      "rate": 0,
+      "tokens": null,
+      "wallMsAvg": 0,
+      "toolCalls": 0,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 0,
+      "brier": null,
+      "crashRate": 0
+    },
+    "C:all": {
+      "runs": 0,
+      "pass": 0,
+      "rate": 0,
+      "tokens": null,
+      "wallMsAvg": 0,
+      "toolCalls": 0,
+      "recoveries": 0,
+      "crashes": 0,
+      "falseCompletion": 0,
+      "brier": null,
+      "crashRate": 0
+    }
+  },
+  "mainEndpoint": {
+    "comparison": "C-vs-A",
+    "split": "protect",
+    "armX": "C",
+    "armY": "A",
+    "rateX": 0,
+    "rateY": 0,
+    "diff": 0,
+    "bootstrap": {
+      "mean": null,
+      "ciLo": null,
+      "ciHi": null,
+      "width": null,
+      "nTasks": 0
+    },
+    "mcnemarPerSeed": [
+      {
+        "seed": 1,
+        "p": 1,
+        "discordant": 0,
+        "xOnly": 0,
+        "yOnly": 0
+      },
+      {
+        "seed": 2,
+        "p": 1,
+        "discordant": 0,
+        "xOnly": 0,
+        "yOnly": 0
+      },
+      {
+        "seed": 3,
+        "p": 1,
+        "discordant": 0,
+        "xOnly": 0,
+        "yOnly": 0
+      }
+    ],
+    "discordantCells": 0,
+    "significant": false,
+    "needsData": [
+      "only 0 paired tasks (<15)",
+      "only 0 discordant cells (<8) — exact test underpowered"
+    ]
+  },
+  "exploratory": [
+    {
+      "comparison": "B-vs-A",
+      "split": "protect",
+      "armX": "B",
+      "armY": "A",
+      "rateX": 0.8406,
+      "rateY": 0.8406,
+      "diff": 0,
+      "bootstrap": {
+        "mean": 0,
+        "ciLo": -0.0725,
+        "ciHi": 0.058,
+        "width": 0.1304,
+        "nTasks": 23
+      },
+      "mcnemarPerSeed": [
+        {
+          "seed": 1,
+          "p": 1,
+          "discordant": 2,
+          "xOnly": 1,
+          "yOnly": 1
+        },
+        {
+          "seed": 2,
+          "p": 1,
+          "discordant": 3,
+          "xOnly": 1,
+          "yOnly": 2
+        },
+        {
+          "seed": 3,
+          "p": 1,
+          "discordant": 3,
+          "xOnly": 2,
+          "yOnly": 1
+        }
+      ],
+      "discordantCells": 8,
+      "significant": false,
+      "needsData": []
+    },
+    {
+      "comparison": "C-vs-A",
+      "split": "train",
+      "armX": "C",
+      "armY": "A",
+      "rateX": 0,
+      "rateY": 0,
+      "diff": 0,
+      "bootstrap": {
+        "mean": null,
+        "ciLo": null,
+        "ciHi": null,
+        "width": null,
+        "nTasks": 0
+      },
+      "mcnemarPerSeed": [
+        {
+          "seed": 1,
+          "p": 1,
+          "discordant": 0,
+          "xOnly": 0,
+          "yOnly": 0
+        },
+        {
+          "seed": 2,
+          "p": 1,
+          "discordant": 0,
+          "xOnly": 0,
+          "yOnly": 0
+        },
+        {
+          "seed": 3,
+          "p": 1,
+          "discordant": 0,
+          "xOnly": 0,
+          "yOnly": 0
+        }
+      ],
+      "discordantCells": 0,
+      "significant": false,
+      "needsData": [
+        "only 0 paired tasks (<15)",
+        "only 0 discordant cells (<8) — exact test underpowered"
+      ]
+    },
+    {
+      "comparison": "B-vs-A",
+      "split": "train",
+      "armX": "B",
+      "armY": "A",
+      "rateX": 0.5729,
+      "rateY": 0.5313,
+      "diff": 0.0417,
+      "bootstrap": {
+        "mean": 0.0417,
+        "ciLo": -0.0417,
+        "ciHi": 0.1458,
+        "width": 0.1875,
+        "nTasks": 32
+      },
+      "mcnemarPerSeed": [
+        {
+          "seed": 1,
+          "p": 1,
+          "discordant": 3,
+          "xOnly": 2,
+          "yOnly": 1
+        },
+        {
+          "seed": 2,
+          "p": 1,
+          "discordant": 3,
+          "xOnly": 2,
+          "yOnly": 1
+        },
+        {
+          "seed": 3,
+          "p": 0.5,
+          "discordant": 2,
+          "xOnly": 2,
+          "yOnly": 0
+        }
+      ],
+      "discordantCells": 8,
+      "significant": false,
+      "needsData": []
+    }
+  ],
+  "nullFlux": {
+    "train": {
+      "flipRate": 0.1563,
+      "tasks": 32,
+      "flippedTaskIds": [
+        "beh-t8-n",
+        "cjk-ex-12",
+        "cjk-trap-3",
+        "train-choice-2",
+        "train-exact-cn"
+      ]
+    },
+    "protect": {
+      "flipRate": 0.1739,
+      "tasks": 23,
+      "flippedTaskIds": [
+        "hmb-canary-exact-3",
+        "hmb-know-hap",
+        "hmb-know-tools-emulator",
+        "hmb-know-tools-screen"
+      ]
+    }
+  },
+  "cost": {
+    "tokensA": 513553,
+    "tokensC": 0,
+    "costGrowth": null
+  },
+  "gate": {
+    "verdict": "NEEDS-DATA",
+    "gates": [],
+    "reason": "C arm not deployable: the evolution gate rejected every candidate version (this IS the honest outcome of the persistent-evolution path)"
+  },
+  "disagreements": {
+    "C-vs-A-protect": {
+      "xWon": [],
+      "aWon": []
+    },
+    "B-vs-A-protect": {
+      "xWon": [
+        "1:hmb-know-hap",
+        "2:hmb-know-tools-apilookup",
+        "3:hmb-know-hap",
+        "3:hmb-know-tools-apilookup"
+      ],
+      "aWon": [
+        "1:hmb-know-tools-apilookup",
+        "2:hmb-know-hap",
+        "2:hmb-know-tools-screen",
+        "3:hmb-know-tools-screen"
+      ]
+    },
+    "C-vs-A-train": {
+      "xWon": [],
+      "aWon": []
+    }
+  },
+  "predictions": {
+    "count": 165
+  }
+}

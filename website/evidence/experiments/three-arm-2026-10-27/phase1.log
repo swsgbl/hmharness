@@ -18,3 +18,55 @@ When a task asks for an exact string, a single word/number, or one of a fixed op
 - For math, finish computing, then reply with only the number in the exact requested format (integer, one decimal place, etc.).
 - For choice tasks (e.g., GO or NO-GO), reply with one listed option verbatim.
 - Before sending, reread the prompt's target and diff it against your reply one character at a time; silently correct any mismatch instead of annotating it.
+npm notice run hmharness@0.23.42 npx
+npm notice run tsx scripts/three-arm-experiment.mts phase1
+candidate: exact-output-reply (sha aaa177320be2)
+# Exact-Output Replies
+
+When a prompt says reply with EXACTLY / ONLY / 只回复, your entire final message is that string — nothing else.
+
+## Emit nothing extra
+- No preamble, greeting, explanation, justification, or trailing commentary.
+- Do not restate the task, the question, or your reasoning.
+- No markdown decoration (backticks, bold, fences) unless the target string itself contains it or the prompt explicitly demands a code block.
+- Send bare tokens (numbers, hex strings, GO/NO-GO, single words) raw and undecorated.
+
+## Copy, never retype
+- Transcribe the requested string character-by-character directly from the prompt.
+- For long strings, count the characters and compare against the prompt before sending.
+- Match punctuation width exactly: fullwidth ，。！？：；《》 stays fullwidth; ASCII punctuation stays ASCII; never auto-convert in either direction.
+- Keep quotes straight when the prompt uses straight quotes; include surrounding quotes AND trailing periods when told they are part of the answer.
+- Preserve whitespace verbatim: leading and trailing spaces, double spaces after colons, adjacent commas. Never trim, collapse, or tidy.
+- If the prompt's stated rule contradicts its own sample (e.g., demands a CJK comma but shows ASCII), obey the stated rule.
+
+## Numeric answers
+- Do all arithmetic silently; verify each step before sending: percent changes in the stated order, exponent precedence, and what "twice/fewer than" refers back to.
+- The final message is only the number, in exactly the requested format (integer, one decimal place, etc.).
+
+## Offered choices
+- Reply with exactly one offered option, verbatim. No reasons, no qualifiers.
+
+## Read-then-answer tasks
+- Call read_file on the exact path given, and confirm the read succeeded, before answering.
+- Reply with only the requested item (first word, Nth entry, last entry): no path echo, no quotes, no list, no commentary.
+
+## Final check
+- Before sending, ask: does my message contain one single thing — the requested string? If anything else is present, delete it.
+npm notice run hmharness@0.23.42 npx
+npm notice run tsx scripts/three-arm-experiment.mts phase1
+candidate: character-exact-replies (sha 1a2d8188eb1a)
+# Character-Exact Replies
+
+These tasks grade your FINAL message by exact character comparison. Do less, not more.
+
+## Core rule
+- Emit ONLY the requested string or number. No preamble, no labels, no explanation, no sign-off, no restating the question.
+- Stop the message immediately after the last required character: no added newline, no period, no units, no emoji.
+
+## Copying a target string
+- Find the exact span the prompt names (usually quoted or after a colon) and re-emit it byte-for-byte.
+- Re-read it one character at a time before answering. Check: letter case, 0 vs O, 1 vs l vs I, straight vs curly quotes, full-width vs half-width punctuation, doubled spaces or commas, and any trailing period.
+- The printed string is the source of truth. If the surrounding prose disagrees (describes one punctuation style but shows another), copy the string as printed.
+- Preserve leading and trailing spaces exactly; never trim, indent, wrap, or re-flow them.
+
+## Never
