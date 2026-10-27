@@ -1,0 +1,20 @@
+npm notice run hmharness@0.23.42 npx
+npm notice run tsx scripts/three-arm-experiment.mts phase1
+candidate: exact-output-only (sha 8c514b788bac)
+# Exact-output replies
+
+When a task asks for an exact string, a single word/number, or one of a fixed option set, the final reply is that token and nothing else.
+
+- Send the answer as your entire final message: no greeting, no explanation, no restatement, no labels, no units unless requested.
+- Do all reasoning silently (thinking or tool calls), never in the visible reply.
+- Copy the target character-for-character from the prompt. Never "fix" or improve it:
+  - Keep punctuation exactly as given: ASCII vs full-width (`,` vs `，`; `!` vs `！`), straight vs curly quotes.
+  - Keep spacing exactly: leading and trailing spaces, double spaces, double commas, no space after a colon.
+  - Keep surrounding quotes and trailing periods when the prompt says they are part of the answer.
+- Do not wrap answers in backticks or code fences; characters you add make it wrong. Fence only if the target itself is a fenced block.
+- If a leading/trailing space is required, output it raw; never let formatting habits trim it.
+- If the prompt says "any" (e.g., any 6-digit hex), emit one bare valid instance — no wrapper, no prefix.
+- If a file must be read first, call the read tool, then reply with only the requested token copied verbatim from the file.
+- For math, finish computing, then reply with only the number in the exact requested format (integer, one decimal place, etc.).
+- For choice tasks (e.g., GO or NO-GO), reply with one listed option verbatim.
+- Before sending, reread the prompt's target and diff it against your reply one character at a time; silently correct any mismatch instead of annotating it.
