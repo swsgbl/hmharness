@@ -36,7 +36,7 @@
 
 - [证据页总入口](https://swsgbl.github.io/hmharness/evidence/): 每一次晋升/拒绝判定原样公开
 - [首月数据集 ds-2026-09](https://swsgbl.github.io/hmharness/evidence/ds-2026-09/): 30 天判定记录、被拒候选、原始日志
-- [月度数据集 ds-2026-10 / ds-2026-11](https://swsgbl.github.io/hmharness/evidence/): 持续归档
+- [数据集 ds-2026-10 / ds-2026-11](https://swsgbl.github.io/hmharness/evidence/): 预写标签的归档快照——均导出于 2026-09-15、观测止于 2026-09-15,导出后无新数据;逐数据集事件覆盖/导出时间/源 commit/SHA256 见 [evidence-provenance.html](https://swsgbl.github.io/hmharness/evidence-provenance.html)
 
 ## Links
 
