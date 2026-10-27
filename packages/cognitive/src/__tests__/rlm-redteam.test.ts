@@ -16,6 +16,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runSandboxedEval, SANDBOX_BYPASS_VECTORS } from '../rlm-sandbox.ts';
 
 const T = { timeoutMs: 10_000 };
@@ -106,4 +109,78 @@ test('redteam: crash containment still holds under hostile payloads', async () =
     const ok = await runSandboxedEval('return 1;', {}, {}, T);
     assert.equal(ok.value, 1);
   }
+});
+
+/* ---- Issue #21 / anti-theater round 2: the DECLARED bypass must be
+ * demonstrated REAL with its actual consequences (network egress, host
+ * filesystem read, host subprocess spawn). If any of these ever stops
+ * escaping, the declaration is stale and must be updated — and if one
+ * escapes while undeclared, CI fails above. Either way no silent drift. */
+
+test('redteam R9: declared bypass is REAL — dynamic import(node:net) reaches the network from the worker', async () => {
+  const net = await import('node:net');
+  let received = false;
+  const server = net.createServer((sock) => {
+    sock.on('data', () => { received = true; sock.end(); });
+  });
+  await new Promise<void>((res) => server.listen(0, '127.0.0.1', res));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const payload = `
+      try {
+        const net = await import('node:net');
+        const ok = await new Promise((resolve) => {
+          const s = net.connect(ctx.vars.port, '127.0.0.1');
+          s.on('connect', () => { s.write('probe'); s.end(); resolve(true); });
+          s.on('error', () => resolve(false));
+          setTimeout(() => { s.destroy(); resolve(false); }, 3000);
+        });
+        return ok ? 'ESCAPED dynamic import() node:net connected to a host listener' : 'blocked';
+      } catch (e) { return 'blocked: ' + String(e).slice(0, 60); }
+    `;
+    const r = await runSandboxedEval(payload, { port }, {}, T);
+    const result = r.ok ? String(r.value) : `${r.error?.code}: ${r.error?.message?.slice(0, 50)}`;
+    assert.match(result, /^ESCAPED/, 'the declared bypass must stay REAL — if this blocks, update SANDBOX_BYPASS_VECTORS');
+    assert.equal(received, true, 'the host listener must actually have seen the probe');
+    assert.ok(SANDBOX_BYPASS_VECTORS.some((b) => b.replace(/[\s_-]/g, '').includes('dynamicimport')), 'the escape stays declared');
+  } finally {
+    await new Promise<void>((res) => server.close(() => res()));
+  }
+});
+
+test('redteam R10: declared bypass is REAL — dynamic import(node:fs) reads a host file outside any workspace', async () => {
+  const marker = `hmh-redteam-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const file = join(tmpdir(), `${marker}.txt`);
+  await writeFile(file, `content-${marker}`, 'utf8');
+  try {
+    const payload = `
+      try {
+        const fs = await import('node:fs');
+        const c = fs.readFileSync(ctx.vars.path, 'utf8');
+        return c === ctx.vars.expect ? 'ESCAPED dynamic import() node:fs read a host file outside the sandbox' : 'mismatch';
+      } catch (e) { return 'blocked: ' + String(e).slice(0, 60); }
+    `;
+    const r = await runSandboxedEval(payload, { path: file, expect: `content-${marker}` }, {}, T);
+    const result = r.ok ? String(r.value) : `${r.error?.code}: ${r.error?.message?.slice(0, 50)}`;
+    assert.match(result, /^ESCAPED/, 'host file read via dynamic import is the declared reality — pin it');
+    assert.ok(SANDBOX_BYPASS_VECTORS.some((b) => b.replace(/[\s_-]/g, '').includes('dynamicimport')), 'the escape stays declared');
+  } finally {
+    await rm(file, { force: true });
+  }
+});
+
+test('redteam R11: declared bypass is REAL — dynamic import(node:child_process) spawns a HOST subprocess', async () => {
+  const marker = `hmh-spawn-${Math.random().toString(36).slice(2)}`;
+  const payload = `
+    try {
+      const cp = await import('node:child_process');
+      const r = cp.spawnSync(ctx.vars.nodeBin, ['-e', 'process.stdout.write("' + ctx.vars.marker + '")']);
+      if (r.status === 0 && String(r.stdout).includes(ctx.vars.marker)) return 'ESCAPED dynamic import() node:child_process spawned a host subprocess';
+      return 'blocked status=' + r.status + ' err=' + String(r.error).slice(0, 60);
+    } catch (e) { return 'blocked: ' + String(e).slice(0, 60); }
+  `;
+  const r = await runSandboxedEval(payload, { nodeBin: process.execPath, marker }, {}, T);
+  const result = r.ok ? String(r.value) : `${r.error?.code}: ${r.error?.message?.slice(0, 50)}`;
+  assert.match(result, /^ESCAPED/, 'host subprocess spawn via dynamic import is the declared reality — pin it');
+  assert.ok(SANDBOX_BYPASS_VECTORS.some((b) => b.replace(/[\s_-]/g, '').includes('dynamicimport')), 'the escape stays declared');
 });

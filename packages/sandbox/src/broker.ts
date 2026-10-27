@@ -21,7 +21,8 @@
  * Layering: this module has zero cognitive imports; ledger mirroring is
  * an injectable onDeny hook the composition layer wires.
  */
-import { recommendedIsolation, type IsolationLevel } from './microvm.ts';
+import { recommendedIsolation, isolationToTrust, type IsolationLevel } from './microvm.ts';
+import { assertIsolationGate, type TrustLevel } from './trust.ts';
 
 export type CapabilityClass = 'filesystem' | 'network' | 'process' | 'secret' | 'device';
 
@@ -200,6 +201,7 @@ export class CapabilityBroker {
     return this.audits.slice();
   }
 
+
   private decide(req: CapabilityRequest, allowed: boolean, reason: string, tier: ExecutionTier, token?: CapabilityToken): BrokerDecision {
     const entry: AuditEntry = { at: this.now(), subject: req.subject, class: req.class, allowed, reason };
     this.audits.push(entry);
@@ -256,4 +258,19 @@ export class SecretBroker {
   list(): string[] {
     return [...this.secrets.keys()];
   }
+}
+
+/* ---------------- Execution gate (Issue #21: tier claims must meet reality) ----------------
+ *
+ * A broker decision names the tier a workload SHOULD run at; the machine
+ * only offers what detectHighestIsolation() actually found. This composer
+ * makes the pairing fail closed: executing a decision whose tier outranks
+ * the machine throws a structured IsolationGateError naming BOTH tiers —
+ * the old world let critical decisions silently execute in Docker.
+ * Worker tier never gates: its walls come from the running Node runtime
+ * itself, so the machine requirement is just 'process'.
+ */
+export function assertExecutionGate(decision: BrokerDecision, available: IsolationLevel): void {
+  const required: TrustLevel = decision.tier === 'worker' ? 'worker' : isolationToTrust(decision.tier);
+  assertIsolationGate(required, isolationToTrust(available), `broker decision tier '${decision.tier}'`);
 }
