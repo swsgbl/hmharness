@@ -1,0 +1,13 @@
+我来查一下 CLI 的子命令列表确认。运行 `hmh --help`:关键词 snapshot / checkpoint / evolution:运行 `hmh evolution --help` 确认 snapshot 子命令:确认成功。答案是:
+
+## `hmh evolution snapshot`
+
+在 hmharness 中,对演化状态(skills / memory / insights)做快照用于恢复的子命令是:
+
+```
+hmh evolution snapshot
+```
+
+它会把 `HMH_HOME` 下的 skills、memory、insights 打成一个带时间戳的快照,配合恢复选项(如 `hmh evolution restore --latest`)即可回滚到之前的演化状态。
+
+调用一次即可看到当前快照列表:`hmh evolution snapshot --list`。

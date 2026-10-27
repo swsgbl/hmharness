@@ -1,0 +1,6 @@
+2条匹配信息。以下是每条匹配的文件与行号证据：
+
+- G:\hmharness-wtC\website\docs\agent\tools.md:106 — `sdk_api_lookup`
+- G:\hmharness-wtC\website\docs\agent\tools.md:49 — 在概览表中列出，描述为 "Look up an SDK API symbol with file:line evidence"
+
+**答案：`sdk_api_lookup`**

@@ -1,0 +1,3 @@
+**Want**
+
+(In HarmonyOS/OpenHarmony, the `Want` object is the standard carrier for passing navigation and launch parameters between abilities — e.g., `context.startAbility(want)` or `router` navigation params wrapped in a Want.)
