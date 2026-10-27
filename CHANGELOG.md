@@ -1,3 +1,7 @@
+## [0.23.43] - 2026-10-27
+
+安全诚实化三连（审计文档包 P0-B + 发版列车候载件齐发）：①**沙箱隔离声明诚实化+fail-closed 执行门禁(Issue #21,PR#24,四轮 CI 攻坚)**——MicroVMSandboxProvider 的 Docker 兜底谎言根除:isAvailable() 仅真实 hypervisor 启动并通过 boot 自测才 true(自测未实现→恒 false),exec/copyIn/copyOut/snapshot/restore 全部 fail closed 抛结构化 IsolationGateError;新增 trust.ts 四档 TrustLevel CapabilityContract(escapeVectors 全部 pin 为 source-level fact);broker critical 决策遇 container-only 机器必炸;红队 R9-R11 反剧场(declared bypass 必须实证真实后果);**CI 三连败定位出的真缺陷:runner 的 Docker 守护进程测试中途预热,probe/detect 两次独立探测各说真话合起来矛盾——修复=单一共享证据快照+派生不再探+假探针注入测试缝**。②**演化守护周期超时 600s→30min**——真实 evolve 周期(40+ 真实调用,20min 实测)超旧上限被恰 600s 击杀;401 时代秒完从未暴露。③**板级安装器 FALLBACK_PINS 补全 15 名(PR#25)**——离线路径 5 包 undefined.tgz 404 根除+发版钉名覆盖断言(cli 声明集⊆pins 名集)。全套 993 测试。
+
 ## [0.23.42] - 2026-10-27
 
 发版管线钉版事故修复（0.23.40/0.23.41 两轮的隐藏雷）：①**事故**——bump 脚本只升各包 `version` 忘了升 44 根跨包依赖钉,cli@0.23.40/0.23.41 全部以 kernel@0.23.39 等旧件出厂,用户全局安装得到混合版本树——0.23.40 的挂死根修(kernel ChatOptions.signal)与 0.23.41 的 /evolve 401 根修(loadConfig 派生)从未真正到达任何用户;本机npm缓存掩盖了真相,--prefer-online 重装+registry dependencies 复核才抓到。②**修复**——全部 44 钉同步 0.23.42;版本一致性门禁升级:跨包钉必须等于根版本(硬失败),该类事故从此在 preflight 即被拦下。③**验证**——npm pack 逐包复核钉值 + 全新目录安装 16/16 同版本实测。0.23.41 已不可变,latest 即刻指向本版。
