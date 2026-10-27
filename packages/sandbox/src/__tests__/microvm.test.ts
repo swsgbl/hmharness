@@ -54,13 +54,17 @@ test('MicroVMSandboxProvider: declares the firecracker design backend, not docke
   assert.notEqual(p.backend, 'docker', 'a container backend must never wear the microVM name');
 });
 
-test('MicroVMSandboxProvider: Docker-only machine NEVER reports microVM available (Issue #21 regression)', async () => {
+test('MicroVMSandboxProvider: Docker-only machine NEVER reports microVM available (Issue #21 regression)', async (t) => {
   // Before the honesty rework this machine (Docker 29.x reachable) answered
   // isAvailable()=true and exec() ran plain `docker run` as "the strongest
   // tier" — the exact lie Issue #21 pins. Now: no boot self-test exists on
   // ANY machine, so available must be false even with Docker fully up.
   const p = new MicroVMSandboxProvider();
   const probe = await p.probe();
+  // The assertions below assume a Docker-present machine (dev box); CI
+  // runners have no Docker daemon, so guard on the probe instead of failing
+  // (same pattern as real-browser tests skipping on missing browsers).
+  if (!probe.dockerAvailable) return t.skip('Docker not available on this machine - the regression guard needs a Docker-present machine');
   assert.notEqual(probe.selfTest, 'passed', 'the VM boot self-test is not implemented anywhere yet');
   assert.equal(probe.microvmReady, false);
   assert.equal(await p.isAvailable(), false, 'Docker presence must not make a container pass as a microVM');
