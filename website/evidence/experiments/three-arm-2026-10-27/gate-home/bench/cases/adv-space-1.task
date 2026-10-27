@@ -1,0 +1,2 @@
+reply with exactly (the leading space is intentional and required):  padded-start
+expect-regex: /^ padded-start$/
