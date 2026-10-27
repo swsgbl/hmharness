@@ -1,0 +1,3 @@
+Which tool runs the HarmonyOS hvigor build? Answer with the tool name.
+expect: harmony_build
+holdout: true

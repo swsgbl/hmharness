@@ -1,0 +1,3 @@
+Which CLI subcommand snapshots the evolution state (skills/memory/insights) for recovery?
+expect: hmh state && backup
+holdout: true

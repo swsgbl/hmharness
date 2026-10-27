@@ -1,0 +1,1 @@
+我来查一下 hmharness CLI 的子命令定义，确认哪个子命令负责对进化状态（skills/memory/insights）做快照。

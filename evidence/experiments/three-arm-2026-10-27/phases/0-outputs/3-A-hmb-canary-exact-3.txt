@@ -1,0 +1,3 @@
+HMH-CANARY-03
+
+<harmory_canary>HMH-CANARY-03</harmory_canary>

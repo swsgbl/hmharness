@@ -1,0 +1,174 @@
+{
+  "experimentId": "three-arm-main-experiment-2026-10-27",
+  "createdAt": "2026-10-27T09:46:30.462Z",
+  "repoCommit": "015290889199ba96db977324ed65db6fef52fd98",
+  "design": {
+    "arms": {
+      "A": "baseline: frozen skill-library snapshot injected, nothing else",
+      "B": "task-adaptive: snapshot + per-task adaptation block built from TRAIN-family null failures, injected for this task only, never persisted",
+      "C": "persistent-evolved: snapshot + the gate-promoted candidate skill (same injection construction as the evolution gate)"
+    },
+    "question": "does one persistable harness/skill change raise task success under a frozen base model without breaking the protection set?"
+  },
+  "frozen": {
+    "baseModel": {
+      "provider": "zhipu-coding-plan",
+      "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "id": "glm-5.3",
+      "sampling": "no sampling params sent (provider default) — identical wire shape in all arms"
+    },
+    "systemPrompt": {
+      "builder": "packages/agent/src/prompt.ts buildSystemPrompt",
+      "params": {
+        "cwd": "G:\\hmharness-wtC",
+        "memory": "",
+        "insights": "",
+        "cognitive": "",
+        "model": "glm-5.3"
+      },
+      "note": "arm differences enter ONLY via the skills block (A/B/C) and the B-arm trailing adaptation block"
+    },
+    "maxTurns": 6,
+    "toolWhitelist": [
+      "read_file",
+      "list_dir"
+    ],
+    "contextPerTask": "fresh session per run, no history carry-over",
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "taskSet": {
+      "source": "C:\\Users\\hongfu\\.hmharness/bench/cases (the machine corpus, 91 train + 24 holdout precedent)",
+      "familyQuotas": {
+        "beh": 8,
+        "cjk": 6,
+        "adv": 6,
+        "train": 6,
+        "fadv": 3,
+        "teach": 3
+      },
+      "selectionSeed": 20261027,
+      "gateValSize": 8,
+      "excluded": [
+        {
+          "id": "reply-determinism",
+          "why": "not in a sampled family"
+        },
+        {
+          "id": "toolchain-ohpm-status",
+          "why": "needs the live HarmonyOS toolchain (unfreezable environment)"
+        },
+        {
+          "id": "toolchain-report",
+          "why": "needs the live HarmonyOS toolchain (unfreezable environment)"
+        }
+      ],
+      "counts": {
+        "train": 32,
+        "protect": 23
+      },
+      "datasetHash": "d8e690894095dc98fa068c6a3cd85055bfa5a718aada1ab7ee0e7ab4cb4dbacd",
+      "protectFiles": [
+        "hmb-canary-exact-1.task",
+        "hmb-canary-exact-2.task",
+        "hmb-canary-exact-3.task",
+        "hmb-canary-exact-4.task",
+        "hmb-canary-identity.task",
+        "hmb-canary-json.task",
+        "hmb-canary-list.task",
+        "hmb-canary-refusal.task",
+        "hmb-know-cangjie.task",
+        "hmb-know-hap.task",
+        "hmb-know-hdc.task",
+        "hmb-know-hvigor.task",
+        "hmb-know-lifecycle.task",
+        "hmb-know-module.task",
+        "hmb-know-ohpm.task",
+        "hmb-know-tools-apilookup.task",
+        "hmb-know-tools-build.task",
+        "hmb-know-tools-doctor.task",
+        "hmb-know-tools-emulator.task",
+        "hmb-know-tools-schema.task",
+        "hmb-know-tools-screen.task",
+        "hmb-know-tools-state.task",
+        "hmb-know-want.task"
+      ]
+    },
+    "skillSnapshot": {
+      "count": 34,
+      "names": [
+        "browser-automation-preflight",
+        "deveco-studio-windows-major-upgrade-migration",
+        "file-op-error-recovery",
+        "harmony-build-doctor-windows-invocation",
+        "harmony-codelinter-preflight",
+        "harmony-device-screenshot-verification",
+        "harmony-emulator-state-ground-truth",
+        "harmony-emulator-state-triangulation",
+        "harmony-feature-module-shell-completion",
+        "harmony-local-ui-baseline-check",
+        "harmony-ops-flow",
+        "harmony-project-create-page-baseline",
+        "harmony-project-multipage-router-scaffold-verified",
+        "harmony-runtime-log-verification",
+        "harmony-schema-check-restore-verification",
+        "harmony-toolchain-report",
+        "harmony-uitest-layout-ground-truth",
+        "harmony-vision-provider-routing-fix",
+        "harmony-vision-ui-regression-fallback",
+        "harmony-worktree-runtime-reverify",
+        "hmharness-session-log-search",
+        "hmharness-skill-experiment-arm-blind",
+        "kaihongos-vmware-vmx-pci-fix",
+        "network-preflight-for-harmony-tools",
+        "safe-file-ops",
+        "safe-path-existence-check",
+        "turn-budget-aware-verification",
+        "turn-budget-checkpointing",
+        "windows-browser-publish-preflight",
+        "windows-codelinter-direct-invocation",
+        "windows-command-compatibility",
+        "windows-command-exit-evidence",
+        "windows-file-path-verification",
+        "windows-git-gh-shim-proxy-fix"
+      ],
+      "fingerprint": "30479b49c763faca2f27c55763625126f43528bc4a8ea68cbb0dc0fae18e50e4"
+    },
+    "prediction": {
+      "promptTemplateSha": "91d4a73f3a495eb73973a51fa90d2cbbd824717d6856d2e72da2e5d1832c5053",
+      "note": "same frozen model, task-only (arm-blind), parsed as first 0..1 decimal; unparseable => null (never 0)"
+    },
+    "candidateProposal": {
+      "model": "glm-5.3 (same frozen provider)",
+      "maxAttempts": 3,
+      "note": "prompt hash recorded in phases/1-candidate.json at generation time"
+    }
+  },
+  "preRegistered": {
+    "mainEndpoint": "protect split, C-vs-A, task-level paired difference",
+    "significance": "bootstrap 95% CI (task-level paired diff, 10k resamples, seeded) excludes 0 OR any per-seed exact McNemar p < 0.05",
+    "exploratory": [
+      "protect B-vs-A",
+      "train C-vs-A",
+      "train B-vs-A"
+    ],
+    "promotionGate": {
+      "maxProtectFallback": 0.03,
+      "maxCostGrowth": 0.1,
+      "minTasksPerSplit": 15,
+      "minDiscordantCells": 8
+    },
+    "cArmRule": "C runs ONLY with a gate-promoted candidate; 3 rejected attempts => C reported as not deployable (NEEDS-DATA on the main endpoint)",
+    "crashRule": "crashed runs count as task failure in the primary analysis AND are reported separately (crash rate per arm)"
+  },
+  "phases": [
+    "setup",
+    "phase0-null",
+    "phase1-candidate",
+    "phase2-gate",
+    "phase3-main",
+    "phase4-analysis"
+  ]
+}

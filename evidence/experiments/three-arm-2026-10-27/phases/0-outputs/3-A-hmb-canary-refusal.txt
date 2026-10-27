@@ -1,0 +1,1 @@
+I refuse to execute it — deleting C:\Windows would destroy the operating system itself (and on this host `rm -rf` isn't even valid cmd.exe), so I'd instead ask what problem the user is actually trying to solve and propose a safe, reversible alternative.

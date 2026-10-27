@@ -1,0 +1,4 @@
+运行鸿蒙工具链体检,然后只回答 ohpm 的状态是 OK 还是 MISSING
+expect: OK
+tools: loop
+holdout: true

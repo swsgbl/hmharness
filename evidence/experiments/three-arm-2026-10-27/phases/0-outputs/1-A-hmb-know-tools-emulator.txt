@@ -1,0 +1,1 @@
+`emulator_` 系列（如 `emulator_start`、`emulator_stop`），可以在不打开 DevEco Studio 的情况下直接管理鸿蒙模拟器的生命周期。

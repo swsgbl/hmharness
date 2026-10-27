@@ -1,0 +1,5 @@
+**NO-GO** — on answering blindly, that is.
+
+I have no context in this conversation about what's being gated: no plan, no build result, no change under review. A GO/NO-GO call requires a subject.
+
+Tell me what the decision concerns (e.g., a build to promote, a merge, a skill experiment, a deploy), and I'll verify the current state and give you a definitive **GO** or **NO-GO** with the evidence behind it.

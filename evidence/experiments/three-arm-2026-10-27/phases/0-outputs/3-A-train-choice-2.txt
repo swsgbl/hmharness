@@ -1,0 +1,1 @@
+快速确认环境状态后给出结论。Environment check (working dir + agent state):

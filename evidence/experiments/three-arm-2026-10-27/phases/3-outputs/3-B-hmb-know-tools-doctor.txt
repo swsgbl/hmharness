@@ -1,0 +1,3 @@
+`harmony_build_doctor`
+
+(注意:在 Windows 上不要直接裸调该命令——它可能返回无法解析的输出,应参考 `harmony-build-doctor-windows-invocation` 技能中的调用方式。)

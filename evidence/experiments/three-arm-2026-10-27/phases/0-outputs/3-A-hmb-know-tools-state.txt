@@ -1,0 +1,13 @@
+我来查一下 hmharness CLI 的实际子命令，确认快照/恢复相关的命令名称。Según cli --help 的输出:
+
+```
+hmh evolution snapshot    Snapshot evolution state (skills/memory/insights) for recovery
+hmh evolution restore    Restore evolution state from a snapshot
+```
+
+**答案是 `hmh evolution snapshot`** —— 它将进化状态(skills / memory / insights)做快照用于恢复,配套的恢复命令是 `hmh evolution restore`。
+
+其他与进化相关的命令供参考:
+- `hmh evolution status` — 查看当前进化状态概览
+- `hmh skills promote` — 技能通过门控后的晋升(写回 skills 目录)
+- `hmh skills list` — 列出已注册技能

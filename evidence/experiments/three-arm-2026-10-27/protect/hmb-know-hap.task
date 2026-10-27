@@ -1,0 +1,3 @@
+What file suffix does a signed HarmonyOS installable carry? One word.
+expect: .hap
+holdout: true

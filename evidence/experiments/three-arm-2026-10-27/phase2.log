@@ -1,0 +1,8 @@
+npm notice run hmharness@0.23.42 npx
+npm notice run tsx scripts/three-arm-experiment.mts phase2
+  [gate] baseline bench: 26 train + 9 holdout cases
+  [gate] baseline: train 54%, holdout 56%
+  [gate] candidate "exact-output-only": drafting + candidate bench
+  [gate]   rejected (regression)
+phase2: protect integrity OK (a264d64e70ef)
+gate outcome: rejected — bench regression on a previously passing case

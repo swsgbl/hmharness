@@ -1,0 +1,4 @@
+say READY then nothing else
+expect: READY
+expect-none: error | failed
+holdout: true

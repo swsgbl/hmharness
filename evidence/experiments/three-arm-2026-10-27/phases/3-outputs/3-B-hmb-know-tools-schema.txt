@@ -1,0 +1,3 @@
+`harmony_schema_check`
+
+该工具用于在构建前对 module.json5 等配置做 schema 校验（低成本预检门禁），并可验证非 git 文件的恢复是否与原文件逐字节一致。

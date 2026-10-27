@@ -1,0 +1,1 @@
+`harmony_device_screenshot_verification` — it captures the device screen and asserts expected text (e.g., the page title) is visible in the shot.
