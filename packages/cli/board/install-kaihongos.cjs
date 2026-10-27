@@ -62,10 +62,16 @@ let PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
 // Known-good pin set (offline fallback when the registry is unreachable).
 // The release bot keeps versions synced; the NAMES must cover the full
 // first-party set so the offline path cannot produce an incomplete tree.
+// 2026-10-27 fix: this list had only 10 names while PACKAGES had grown to 15 —
+// pins[n] was undefined for cognitive/environments/lsp/browser/extension, so
+// the offline path tried <name>-undefined.tgz → 404 → INSTALL FAILED (directly
+// contradicting the promise above; evidence: cli 0.23.42 declares 14 deps).
 const FALLBACK_PINS = {
   cli: '0.23.42', web: '0.23.42', agent: '0.23.42', kernel: '0.23.42',
   sandbox: '0.23.42', evolution: '0.23.42', 'domain-ops': '0.23.42',
   evaluation: '0.23.42', observability: '0.23.42', 'domain-harmony': '0.23.42',
+  cognitive: '0.23.42', environments: '0.23.42', lsp: '0.23.42',
+  browser: '0.23.42', extension: '0.23.42',
 };
 
 // ---------- helpers ---------------------------------------------------------

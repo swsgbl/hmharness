@@ -96,6 +96,8 @@ const REG = 'https://registry.npmjs.org';
     + `  cli: '${v}', web: '${v}', agent: '${v}', kernel: '${v}',\n`
     + `  sandbox: '${v}', evolution: '${v}', 'domain-ops': '${v}',\n`
     + `  evaluation: '${v}', observability: '${v}', 'domain-harmony': '${v}',\n`
+    + `  cognitive: '${v}', environments: '${v}', lsp: '${v}',\n`
+    + `  browser: '${v}', extension: '${v}',\n`
     + '};';
   let touched = 0;
   for (const inst of [path.join(ROOT, 'scripts', 'install-kaihongos.cjs'), path.join(ROOT, 'packages', 'cli', 'board', 'install-kaihongos.cjs')]) {
@@ -106,6 +108,26 @@ const REG = 'https://registry.npmjs.org';
     } catch { /* twin missing is not release-blocking */ }
   }
   console.log(touched > 0 ? 'board installer FALLBACK_PINS synced to ' + v : 'board installer pins already at ' + v);
+  // belt-and-braces: after syncing, the offline pin NAMES must cover every
+  // first-party package the cli declares (plus cli itself) — a missing name
+  // means pins[n] === undefined on the offline path → <name>-undefined.tgz
+  // 404 → INSTALL FAILED (2026-10-27 lesson: 10 names vs 15-package set).
+  const declared = new Set(Object.keys(cliPkg.dependencies ?? {})
+    .filter((d) => d.startsWith('@hmharness/')).map((d) => d.slice('@hmharness/'.length)));
+  declared.add('cli');
+  const installers = [path.join(ROOT, 'scripts', 'install-kaihongos.cjs'), path.join(ROOT, 'packages', 'cli', 'board', 'install-kaihongos.cjs')];
+  for (const inst of installers) {
+    let src;
+    try { src = fs.readFileSync(inst, 'utf8'); } catch { continue; }
+    const pinsBlock = src.match(/const FALLBACK_PINS = \{[\s\S]*?\};/)?.[0] ?? '';
+    const pinned = new Set([...pinsBlock.matchAll(/'?([\w-]+)'?\s*:/g)].map((m) => m[1]));
+    const missing = [...declared].filter((d) => !pinned.has(d));
+    if (missing.length) {
+      console.error('FALLBACK_PINS coverage FAILED: ' + inst + ' is missing ' + missing.join(', ') + ' — offline boards would fail to install');
+      process.exit(1);
+    }
+  }
+  console.log('FALLBACK_PINS coverage ok: names cover the full first-party set (' + [...declared].sort().join(', ') + ')');
 }
 
 // 0. preflight first - never publish a broken set
