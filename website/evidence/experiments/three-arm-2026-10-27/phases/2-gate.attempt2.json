@@ -1,0 +1,66 @@
+{
+  "ranAt": "2026-10-27T15:03:48.753Z",
+  "outcome": {
+    "name": "exact-output-reply",
+    "action": "rejected",
+    "reason": "below quality floor: pass rate 0.5 < min 0.6 (non-regression vs a weak baseline 0.5 is not good enough)",
+    "baseline": {
+      "passRate": 0.5,
+      "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+    },
+    "candidate": {
+      "passRate": 0.5,
+      "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+    },
+    "lineage": {
+      "parentInsights": [],
+      "scores": {
+        "train": 0.5
+      },
+      "metaModel": "glm-5.3",
+      "decidedAt": "2026-10-27T15:03:48.724Z"
+    }
+  },
+  "full": {
+    "time": "2026-10-27T14:55:11.116Z",
+    "model": "glm-5.3",
+    "seededCases": [],
+    "insightCount": 0,
+    "noteCount": 0,
+    "proposals": [
+      {
+        "name": "exact-output-reply",
+        "description": "(three-arm experiment candidate)",
+        "skill_md": "# Exact-Output Replies\n\nWhen a prompt says reply with EXACTLY / ONLY / 只回复, your entire final message is that string — nothing else.\n\n## Emit nothing extra\n- No preamble, greeting, explanation, justification, or trailing commentary.\n- Do not restate the task, the question, or your reasoning.\n- No markdown decoration (backticks, bold, fences) unless the target string itself contains it or the prompt explicitly demands a code block.\n- Send bare tokens (numbers, hex strings, GO/NO-GO, single words) raw and undecorated.\n\n## Copy, never retype\n- Transcribe the requested string character-by-character directly from the prompt.\n- For long strings, count the characters and compare against the prompt before sending.\n- Match punctuation width exactly: fullwidth ，。！？：；《》 stays fullwidth; ASCII punctuation stays ASCII; never auto-convert in either direction.\n- Keep quotes straight when the prompt uses straight quotes; include surrounding quotes AND trailing periods when told they are part of the answer.\n- Preserve whitespace verbatim: leading and trailing spaces, double spaces after colons, adjacent commas. Never trim, collapse, or tidy.\n- If the prompt's stated rule contradicts its own sample (e.g., demands a CJK comma but shows ASCII), obey the stated rule.\n\n## Numeric answers\n- Do all arithmetic silently; verify each step before sending: percent changes in the stated order, exponent precedence, and what \"twice/fewer than\" refers back to.\n- The final message is only the number, in exactly the requested format (integer, one decimal place, etc.).\n\n## Offered choices\n- Reply with exactly one offered option, verbatim. No reasons, no qualifiers.\n\n## Read-then-answer tasks\n- Call read_file on the exact path given, and confirm the read succeeded, before answering.\n- Reply with only the requested item (first word, Nth entry, last entry): no path echo, no quotes, no list, no commentary.\n\n## Final check\n- Before sending, ask: does my message contain one single thing — the requested string? If anything else is present, delete it."
+      }
+    ],
+    "outcomes": [
+      {
+        "name": "exact-output-reply",
+        "action": "rejected",
+        "reason": "below quality floor: pass rate 0.5 < min 0.6 (non-regression vs a weak baseline 0.5 is not good enough)",
+        "baseline": {
+          "passRate": 0.5,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.5,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t2-last:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-1:pass cjk-ex-12:FAIL cjk-ex-5:FAIL cjk-trap-3:pass fadv-csv:FAIL fadv-json:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-6:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.5
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-27T15:03:48.724Z"
+        }
+      }
+    ],
+    "memoryDistilled": null,
+    "budget": {
+      "cyclesToday": 1
+    },
+    "estTokens": 525
+  }
+}

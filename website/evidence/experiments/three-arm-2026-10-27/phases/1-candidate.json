@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-10-27T14:27:33.848Z",
+  "generatedAt": "2026-10-27T14:54:57.378Z",
   "promptSha": "7fa7a8e55f3dc1a0ea0516906364c75067d12947c144c25b9848f414d09ab174",
   "attempts": [
     {
       "attempt": 1,
       "ok": true,
-      "name": "exact-output-only"
+      "name": "exact-output-reply"
     }
   ],
   "candidate": {
-    "name": "exact-output-only",
-    "description": "Make the final reply contain only the requested string, copied character-for-character — no preamble, no fences, no normalization, no extras.",
-    "skill_md": "# Exact-output replies\n\nWhen a task asks for an exact string, a single word/number, or one of a fixed option set, the final reply is that token and nothing else.\n\n- Send the answer as your entire final message: no greeting, no explanation, no restatement, no labels, no units unless requested.\n- Do all reasoning silently (thinking or tool calls), never in the visible reply.\n- Copy the target character-for-character from the prompt. Never \"fix\" or improve it:\n  - Keep punctuation exactly as given: ASCII vs full-width (`,` vs `，`; `!` vs `！`), straight vs curly quotes.\n  - Keep spacing exactly: leading and trailing spaces, double spaces, double commas, no space after a colon.\n  - Keep surrounding quotes and trailing periods when the prompt says they are part of the answer.\n- Do not wrap answers in backticks or code fences; characters you add make it wrong. Fence only if the target itself is a fenced block.\n- If a leading/trailing space is required, output it raw; never let formatting habits trim it.\n- If the prompt says \"any\" (e.g., any 6-digit hex), emit one bare valid instance — no wrapper, no prefix.\n- If a file must be read first, call the read tool, then reply with only the requested token copied verbatim from the file.\n- For math, finish computing, then reply with only the number in the exact requested format (integer, one decimal place, etc.).\n- For choice tasks (e.g., GO or NO-GO), reply with one listed option verbatim.\n- Before sending, reread the prompt's target and diff it against your reply one character at a time; silently correct any mismatch instead of annotating it."
+    "name": "exact-output-reply",
+    "description": "How to pass character-exact reply tasks: emit only the requested string verbatim, copy punctuation and whitespace precisely, compute silently, never decorate or explain.",
+    "skill_md": "# Exact-Output Replies\n\nWhen a prompt says reply with EXACTLY / ONLY / 只回复, your entire final message is that string — nothing else.\n\n## Emit nothing extra\n- No preamble, greeting, explanation, justification, or trailing commentary.\n- Do not restate the task, the question, or your reasoning.\n- No markdown decoration (backticks, bold, fences) unless the target string itself contains it or the prompt explicitly demands a code block.\n- Send bare tokens (numbers, hex strings, GO/NO-GO, single words) raw and undecorated.\n\n## Copy, never retype\n- Transcribe the requested string character-by-character directly from the prompt.\n- For long strings, count the characters and compare against the prompt before sending.\n- Match punctuation width exactly: fullwidth ，。！？：；《》 stays fullwidth; ASCII punctuation stays ASCII; never auto-convert in either direction.\n- Keep quotes straight when the prompt uses straight quotes; include surrounding quotes AND trailing periods when told they are part of the answer.\n- Preserve whitespace verbatim: leading and trailing spaces, double spaces after colons, adjacent commas. Never trim, collapse, or tidy.\n- If the prompt's stated rule contradicts its own sample (e.g., demands a CJK comma but shows ASCII), obey the stated rule.\n\n## Numeric answers\n- Do all arithmetic silently; verify each step before sending: percent changes in the stated order, exponent precedence, and what \"twice/fewer than\" refers back to.\n- The final message is only the number, in exactly the requested format (integer, one decimal place, etc.).\n\n## Offered choices\n- Reply with exactly one offered option, verbatim. No reasons, no qualifiers.\n\n## Read-then-answer tasks\n- Call read_file on the exact path given, and confirm the read succeeded, before answering.\n- Reply with only the requested item (first word, Nth entry, last entry): no path echo, no quotes, no list, no commentary.\n\n## Final check\n- Before sending, ask: does my message contain one single thing — the requested string? If anything else is present, delete it."
   },
-  "candidateSha": "8c514b788bacd2dacc7ef5dc98bd6be26edc21462a7a42a39e74a80ea66d6d7f",
+  "candidateSha": "aaa177320be20b04e2bddd343e227a4be403e71971ea1f1d2fe86708f103d8b7",
   "gateOutcome": "rejected",
-  "gateRejectedReason": "bench regression on a previously passing case"
+  "gateRejectedReason": "below quality floor: pass rate 0.5 < min 0.6 (non-regression vs a weak baseline 0.5 is not good enough)"
 }
