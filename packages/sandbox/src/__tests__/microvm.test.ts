@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { access, mkdtemp } from 'node:fs/promises';
-import { recommendedIsolation, isolationCost, MicroVMSandboxProvider, detectHighestIsolation, isolationToTrust } from '../microvm.ts';
-import { IsolationGateError } from '../trust.ts';
+import { recommendedIsolation, isolationCost, MicroVMSandboxProvider, detectHighestIsolation, isolationToTrust, type IsolationLevel } from '../microvm.ts';
+import { IsolationGateError, TRUST_RANK } from '../trust.ts';
 import { CapabilityBroker, assertExecutionGate } from '../broker.ts';
 
 test('recommendedIsolation: critical risk -> microvm', () => {
@@ -76,15 +76,37 @@ test('MicroVMSandboxProvider: probe evidence agrees with detectHighestIsolation 
   const p = new MicroVMSandboxProvider();
   const probe = await p.probe();
   const highest = await detectHighestIsolation();
-  // API face consistency: both reporters must tell the same story
-  const expectedLevel = probe.dockerAvailable ? 'container' : 'process';
+  // Relational expectation, never a machine constant: derive what detection
+  // SHOULD answer from the probe evidence via the production mapping
+  // (trust.ts / microvm.ts) — booted hypervisor -> microvm, Docker
+  // capability -> container, nothing -> process. PR#24 CI: the dev box
+  // answers 'container', a daemon-less runner answers 'process', and BOTH
+  // are correct — the invariant under test is that the two API faces tell
+  // the same story, not which story the machine happens to tell.
+  const expectedLevel: IsolationLevel = probe.microvmReady ? 'microvm' : probe.dockerAvailable ? 'container' : 'process';
   assert.equal(highest.level, expectedLevel);
   assert.equal(highest.trust, isolationToTrust(expectedLevel));
-  assert.notEqual(highest.level, 'microvm', 'no boot self-test exists -> detection never claims microvm');
+  // the detection result must obey the level->trust mapping itself
+  assert.equal(highest.trust, isolationToTrust(highest.level));
+  // the reported trust must be a legal TrustLevel (set defined once in trust.ts)
+  assert.ok(highest.trust in TRUST_RANK, `illegal TrustLevel from detection: ${String(highest.trust)}`);
+  // hypervisor verdicts must agree between the two probes
+  assert.equal(highest.hypervisor, probe.hypervisor);
+  // no boot self-test exists today, so detection must not claim microvm —
+  // stated relationally so it stays true when the self-test lands: the
+  // microvm claim flips exactly with probe.microvmReady
+  assert.equal(probe.microvmReady, highest.level === 'microvm');
 });
 
-test('MicroVMSandboxProvider: exec fails closed with the structured gate error (no silent docker run)', async () => {
+test('MicroVMSandboxProvider: exec fails closed with the structured gate error (no silent docker run)', async (t) => {
   const p = new MicroVMSandboxProvider();
+  // Guard + relational expectation: "available" is whatever detection
+  // actually answers on THIS machine. PR#24 CI: a runner whose docker
+  // daemon never answers reports 'process', the dev box 'container' — both
+  // honest, the old 'container' literal was a dev-box fact masquerading as
+  // an invariant.
+  const highest = await detectHighestIsolation();
+  if (highest.trust === 'real-microvm') return t.skip('real microVM host: exec takes the lifecycle-unimplemented path instead of the gate (NEEDS-DATA)');
   await assert.rejects(
     () => p.exec('ls', ['-la'], { workdir: '/workspace', limits: {} }),
     (err: unknown) => {
@@ -92,7 +114,7 @@ test('MicroVMSandboxProvider: exec fails closed with the structured gate error (
       const e = err as IsolationGateError;
       assert.equal(e.code, 'E_ISOLATION_INSUFFICIENT');
       assert.equal(e.required, 'real-microvm');
-      assert.equal(e.available, 'container', 'this machine truly tops out at Docker');
+      assert.equal(e.available, highest.trust, 'the error names the level detection actually answered here — derived, never a dev-box constant');
       assert.match(e.message, /exec/);
       return true;
     },
