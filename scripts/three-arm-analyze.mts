@@ -61,7 +61,6 @@ const primary = asPrimary(mainRecords);
 interface ArmStats { runs: number; pass: number; rate: number; tokens: number | null; wallMsAvg: number; toolCalls: number; recoveries: number; crashes: number; falseCompletion: number; brier: number | null; crashRate: number }
 function armStats(rs: RunRecord[], arm: string, split?: 'train' | 'protect'): ArmStats {
   const sel = rs.filter((r) => r.arm === arm && (split === undefined || r.holdoutClass === split));
-  const measured = sel.filter((r) => r.metrics.cost.totalTokens !== null || r.decision !== 'crash');
   const tok = sel.reduce((s, r) => s + (r.metrics.cost.totalTokens ?? 0), 0);
   const briers = sel.filter((r) => r.metrics.brier !== null);
   return {
@@ -69,7 +68,7 @@ function armStats(rs: RunRecord[], arm: string, split?: 'train' | 'protect'): Ar
     pass: sel.filter((r) => r.outcome.success === true).length,
     rate: sel.length ? Number((sel.filter((r) => r.outcome.success === true).length / sel.length).toFixed(4)) : 0,
     tokens: tok > 0 ? tok : null,
-    wallMsAvg: measured.length ? Math.round(sel.reduce((s, r) => s + r.metrics.wallMs, 0) / sel.length) : 0,
+    wallMsAvg: sel.length ? Math.round(sel.reduce((s, r) => s + r.metrics.wallMs, 0) / sel.length) : 0,
     toolCalls: sel.reduce((s, r) => s + r.metrics.toolCalls, 0),
     recoveries: sel.reduce((s, r) => s + r.metrics.recoveries, 0),
     crashes: sel.filter((r) => r.metrics.crashes === 1).length,
@@ -247,7 +246,7 @@ ${gateResult.gates.length ? gateResult.gates.map((g) => `- [${g.pass ? 'PASS' : 
 
 ## 六、NEEDS-DATA 清单
 
-${[...(cDeployable ? mainCmp.needsData : ['C 臂不可部署(门控拒绝全部候选版本)——主终点无 C 臂数据']), ...(!cDeployable ? [] : []), ...(Number.isNaN(costGrowth) ? ['成本门数据不足(token 计数缺失)'] : []), ...(stats['C:all']!.brier === null && stats['A:all']!.brier === null ? ['Brier 无数据(预测解析失败或缺失)'] : []), ...(['真实用户轨迹分层:本实验无真实用户会话层(不适用,如实标注)'])].map((s) => `- ${s}`).join('\n')}
+${[...(cDeployable ? mainCmp.needsData : ['C 臂不可部署(门控拒绝全部候选版本)——主终点无 C 臂数据']), ...(Number.isNaN(costGrowth) ? ['成本门数据不足(token 计数缺失)'] : []), ...(stats['C:all']!.brier === null && stats['A:all']!.brier === null ? ['Brier 无数据(预测解析失败或缺失)'] : []), '真实用户轨迹分层:本实验无真实用户会话层(不适用,如实标注)'].map((s) => `- ${s}`).join('\n')}
 
 ## 七、证据位置 / SHA / datasetHash
 
