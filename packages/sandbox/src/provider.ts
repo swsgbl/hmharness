@@ -21,7 +21,10 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 
 const run = promisify(execFile);
 
-export type SandboxBackend = 'docker' | 'local';
+/** 'firecracker' / 'cloud-hypervisor' are DECLARED design backends of
+ *  MicroVMSandboxProvider — they only appear in a SandboxResult once a real
+ *  VM path exists (Issue #21: a Docker stand-in must never wear them). */
+export type SandboxBackend = 'docker' | 'local' | 'firecracker' | 'cloud-hypervisor';
 
 export interface ProviderSandboxSpec {
   /** working directory inside the sandbox */
