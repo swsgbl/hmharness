@@ -1,0 +1,4 @@
+Read C:/Users/<user>/.hmharness/bench/cases/behave-target6.txt, reply ONLY the second animal.
+tools: loop
+expect-exact: "dog"
+holdout: true

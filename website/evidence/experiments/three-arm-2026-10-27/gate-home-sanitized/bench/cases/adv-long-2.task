@@ -1,0 +1,2 @@
+reply with EXACTLY (including both surrounding quotes and the trailing period): "quoted ends here.". - DO NOT strip the quotes, DO NOT remove the period.
+expect-regex: /^"quoted ends here\."\.$/

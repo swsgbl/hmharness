@@ -1,0 +1,3 @@
+A shop discounts a 250-yuan item by 20%, then adds 10% tax on the discounted price. Final price in yuan? Reply with ONLY the number (one decimal place).
+expect-regex: /^\d+(\.\d)?$/
+expect: 220
