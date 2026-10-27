@@ -100,14 +100,47 @@ export interface MicroVMProbe {
    *  found but VM lifecycle (boot/rootfs/api-socket) is NOT implemented;
    *  'no-hypervisor' = neither binary exists */
   selfTest: 'passed' | 'not-implemented' | 'no-hypervisor';
-  /** Docker status is reported for EVIDENCE only — it never makes microvm available */
+  /** Docker status is reported for EVIDENCE only — it never makes microvm
+   *  available. TRUE means the daemon actually answered `docker info`; a CLI
+   *  without a daemon is false (the CLI proves nothing — `docker run` would
+   *  fail). Derived from the SAME snapshot as detectHighestIsolation(). */
   dockerAvailable: boolean;
   /** true only when hypervisor !== null && selfTest === 'passed' */
   microvmReady: boolean;
   note: string;
 }
 
-async function runProbe(bin: string, args: string[], timeoutMs: number): Promise<string | null> {
+/* ---------------- Single evidence source (PR#24 3rd CI failure, B-fix3) ----------------
+ *
+ * probe() and detectHighestIsolation() used to run IDENTICAL probe commands
+ * (firecracker --version / cloud-hypervisor --version / docker info, 3000/
+ * 3000/5000ms, all failures flattened to null) as two INDEPENDENT passes.
+ * On the CI runner the docker daemon warms up mid-test: the first pass
+ * timed out or was refused (probe().dockerAvailable=false -> expected
+ * 'process') while the second, seconds later, reached the freshly-started
+ * daemon (detect -> 'container'). Two individually honest probes, one mixed
+ * message. The fix is structural, not another timeout tweak: collect the
+ * evidence ONCE per process, share that snapshot with every consumer, and
+ * derive ALL isolation verdicts from it. A snapshot cannot disagree with
+ * itself. Availability still means "the daemon truly answered" — a CLI
+ * alone never raises the level.
+ */
+
+/** One machine-wide evidence snapshot. Plain data — derivations are pure. */
+export interface MachineIsolationEvidence {
+  /** `firecracker --version` output; null = absent/failed */
+  firecrackerVersion: string | null;
+  /** `cloud-hypervisor --version` output; null = absent/failed */
+  cloudHypervisorVersion: string | null;
+  /** `docker info` SUCCEEDED (daemon reachable & responsive). The ONLY
+   *  docker signal allowed to raise the isolation level. */
+  dockerDaemonVersion: string | null;
+  /** `docker --version` output (CLI exists). Evidence for logs only — a
+   *  CLI without a daemon runs nothing, so it can never mean 'container'. */
+  dockerCliVersion: string | null;
+}
+
+async function shellOutProbe(bin: string, args: string[], timeoutMs: number): Promise<string | null> {
   try {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
@@ -119,25 +152,69 @@ async function runProbe(bin: string, args: string[], timeoutMs: number): Promise
   }
 }
 
-/**
- * Probe the machine for the strongest isolation it ACTUALLY provides.
- * Reports microvm ONLY when a hypervisor binary exists AND its boot
- * self-test passed; Docker presence alone reports container. Never a lie.
- */
-export async function detectHighestIsolation(): Promise<{ level: IsolationLevel; trust: TrustLevel; hypervisor: string | null; evidence: string }> {
-  const fc = await runProbe('firecracker', ['--version'], 3000);
-  const ch = await runProbe('cloud-hypervisor', ['--version'], 3000);
-  const docker = await runProbe('docker', ['info', '--format', '{{.ServerVersion}}'], 5000);
-  const hypervisor: string | null = fc ? 'firecracker' : ch ? 'cloud-hypervisor' : null;
+/** pluggable raw prober (production = shell out; tests inject fakes) */
+export type RawProbe = (bin: string, args: string[], timeoutMs: number) => Promise<string | null>;
+let rawProbe: RawProbe = shellOutProbe;
+
+/** Test seam: inject a fake prober and RESET the shared evidence snapshot,
+ *  or pass null to restore production probing. Nothing outside tests
+ *  should ever call this. */
+export function setRawProbeForTests(fn: RawProbe | null): void {
+  rawProbe = fn ?? shellOutProbe;
+  sharedEvidence = null;
+}
+
+/** Collect the machine's isolation evidence. Runs ONCE per process. */
+async function collectIsolationEvidence(): Promise<MachineIsolationEvidence> {
+  const fc = await rawProbe('firecracker', ['--version'], 3000);
+  const ch = await rawProbe('cloud-hypervisor', ['--version'], 3000);
+  const daemon = await rawProbe('docker', ['info', '--format', '{{.ServerVersion}}'], 5000);
+  const cli = await rawProbe('docker', ['--version'], 3000);
+  return { firecrackerVersion: fc, cloudHypervisorVersion: ch, dockerDaemonVersion: daemon, dockerCliVersion: cli };
+}
+
+let sharedEvidence: Promise<MachineIsolationEvidence> | null = null;
+
+/** THE single evidence source: first caller collects, everyone reuses the
+ *  same in-flight snapshot. Derive — never re-probe. */
+function machineEvidence(): Promise<MachineIsolationEvidence> {
+  sharedEvidence ??= collectIsolationEvidence();
+  return sharedEvidence;
+}
+
+/** Derive the machine's honest highest isolation from one evidence
+ *  snapshot. Pure — testable without touching the machine. */
+export function isolationFromEvidence(ev: MachineIsolationEvidence): {
+  level: IsolationLevel;
+  trust: TrustLevel;
+  hypervisor: 'firecracker' | 'cloud-hypervisor' | null;
+  evidence: string;
+} {
+  const hypervisor = ev.firecrackerVersion ? 'firecracker' : ev.cloudHypervisorVersion ? 'cloud-hypervisor' : null;
   const hypEvidence = hypervisor ? 'hypervisor binary present but boot self-test not implemented' : 'no hypervisor binary';
   // NEVER level='microvm' today: the boot self-test does not exist (see
   // MicroVMSandboxProvider.probe()), and a --version string is not a booted
   // VM. When the self-test lands, promote the hypervisor branch to a real
   // check and return microvm ONLY on selfTest === 'passed'.
-  if (docker) {
-    return { level: 'container', trust: 'container', hypervisor, evidence: `docker server ${docker} reachable; ${hypEvidence}` };
+  if (ev.dockerDaemonVersion) {
+    return { level: 'container', trust: 'container', hypervisor, evidence: `docker server ${ev.dockerDaemonVersion} reachable; ${hypEvidence}` };
   }
-  return { level: 'process', trust: 'process', hypervisor, evidence: `no docker; ${hypEvidence}` };
+  const dockerEvidence = ev.dockerCliVersion
+    ? `docker CLI present (${ev.dockerCliVersion}) but daemon unreachable — a CLI without a daemon runs nothing; ${hypEvidence}`
+    : `no docker; ${hypEvidence}`;
+  return { level: 'process', trust: 'process', hypervisor, evidence: dockerEvidence };
+}
+
+/**
+ * Determine the machine's strongest ACTUALLY available isolation. Derived
+ * from the same shared evidence snapshot as MicroVMSandboxProvider.probe()
+ * — the two API faces cannot disagree. Reports microvm ONLY when a
+ * hypervisor binary exists AND its boot self-test passed; a reachable
+ * Docker daemon reports container; anything less reports process. Never a
+ * lie.
+ */
+export async function detectHighestIsolation(): Promise<{ level: IsolationLevel; trust: TrustLevel; hypervisor: string | null; evidence: string }> {
+  return isolationFromEvidence(await machineEvidence());
 }
 
 /**
@@ -161,13 +238,13 @@ export class MicroVMSandboxProvider implements SandboxProvider {
     this.config = { ...DEFAULT_MICROVM_CONFIG, ...config };
   }
 
-  /** Evidence-grade probe for logs/UI/API — same fields everywhere. */
+  /** Evidence-grade probe for logs/UI/API — same fields everywhere. Reads
+   *  the SAME shared evidence snapshot detectHighestIsolation() uses, so the
+   *  two faces cannot tell different stories about one machine. */
   async probe(): Promise<MicroVMProbe> {
-    const fc = await runProbe('firecracker', ['--version'], 3000);
-    const ch = await runProbe('cloud-hypervisor', ['--version'], 3000);
-    const docker = await runProbe('docker', ['info', '--format', '{{.ServerVersion}}'], 5000);
-    const hypervisor: MicroVMProbe['hypervisor'] = fc ? 'firecracker' : ch ? 'cloud-hypervisor' : null;
-    const version = fc ?? ch;
+    const ev = await machineEvidence();
+    const hypervisor: MicroVMProbe['hypervisor'] = ev.firecrackerVersion ? 'firecracker' : ev.cloudHypervisorVersion ? 'cloud-hypervisor' : null;
+    const version = ev.firecrackerVersion ?? ev.cloudHypervisorVersion;
     // Boot self-test: NOT IMPLEMENTED. A --version string is not a booted VM.
     // When someone implements it, return 'passed' here and isAvailable()/
     // detectHighestIsolation() become true to microvm on that machine.
@@ -176,13 +253,15 @@ export class MicroVMSandboxProvider implements SandboxProvider {
       hypervisor,
       hypervisorVersion: version,
       selfTest,
-      dockerAvailable: Boolean(docker),
+      dockerAvailable: ev.dockerDaemonVersion !== null,
       microvmReady: hypervisor !== null && selfTest === 'passed',
       note: hypervisor
         ? `${hypervisor} binary present, but the VM boot self-test is not implemented — microVM is NOT reported available (would-be config: ${this.config.vcpus} vcpu/${this.config.memoryMb}MB)`
-        : docker
-          ? 'no Firecracker/Cloud Hypervisor found; Docker is present but a container is NOT a microVM — reporting unavailable (Issue #21: no silent downgrade)'
-          : 'no hypervisor and no Docker — microVM unavailable',
+        : ev.dockerDaemonVersion
+          ? 'no Firecracker/Cloud Hypervisor found; Docker daemon is reachable but a container is NOT a microVM — reporting unavailable (Issue #21: no silent downgrade)'
+          : ev.dockerCliVersion
+            ? 'no hypervisor; docker CLI present but daemon unreachable — neither microVM nor container is available'
+            : 'no hypervisor and no Docker — microVM unavailable',
     };
   }
 
