@@ -1,0 +1,1 @@
+`harmony_ui_regression` — it captures the device screen and compares it against a UI baseline (including title-text matching) to return a PASS/FAIL assertion in one step.

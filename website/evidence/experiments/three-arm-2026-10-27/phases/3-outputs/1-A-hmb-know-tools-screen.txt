@@ -1,0 +1,1 @@
+`harmony_ui_regression` — it captures the current device screen and verifies expected text (e.g., the page title) is present in the rendered page.

@@ -1,0 +1,3 @@
+`harmony_schema_check`
+
+它用于在构建前对 module.json5 等配置做 SDK schema 校验（作为低成本的预构建配置门禁）。

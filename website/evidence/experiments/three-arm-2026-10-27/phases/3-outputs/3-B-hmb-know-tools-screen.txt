@@ -1,0 +1,1 @@
+`harmony_device_screenshot_verification` — it captures the device screen and visually confirms the launched app's page content (e.g., the title text) as shown.

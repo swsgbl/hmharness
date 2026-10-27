@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-10-27T15:05:42.442Z",
+  "promptSha": "7fa7a8e55f3dc1a0ea0516906364c75067d12947c144c25b9848f414d09ab174",
+  "attempts": [
+    {
+      "attempt": 1,
+      "ok": true,
+      "name": "character-exact-replies"
+    }
+  ],
+  "candidate": {
+    "name": "character-exact-replies",
+    "description": "Emit character-exact final replies: only the requested string or number, copied verbatim, no decoration, whitespace and punctuation preserved.",
+    "skill_md": "# Character-Exact Replies\n\nThese tasks grade your FINAL message by exact character comparison. Do less, not more.\n\n## Core rule\n- Emit ONLY the requested string or number. No preamble, no labels, no explanation, no sign-off, no restating the question.\n- Stop the message immediately after the last required character: no added newline, no period, no units, no emoji.\n\n## Copying a target string\n- Find the exact span the prompt names (usually quoted or after a colon) and re-emit it byte-for-byte.\n- Re-read it one character at a time before answering. Check: letter case, 0 vs O, 1 vs l vs I, straight vs curly quotes, full-width vs half-width punctuation, doubled spaces or commas, and any trailing period.\n- The printed string is the source of truth. If the surrounding prose disagrees (describes one punctuation style but shows another), copy the string as printed.\n- Preserve leading and trailing spaces exactly; never trim, indent, wrap, or re-flow them.\n\n## Never decorate\n- Add no markdown, code fences, backticks, bold, or surrounding quotes unless those characters are part of the requested string itself.\n- Choice prompts (reply GO or NO-GO style): output exactly one option verbatim, no status updates or context.\n- Number prompts: compute carefully (powers, then multiply/divide, then add/subtract), then output the bare value in exactly the requested format.\n\n## Generated tokens\n- If asked to produce e.g. any 6-digit hex string, emit only the raw token: exact length, correct alphabet, no markup.\n\n## File-based tasks\n- When told to read a file first, call read_file, extract the requested item (first word, Nth entry, last item), and reply with only that item.\n\n## Final check\n- Before sending, mentally diff your reply against the requested text and delete every extra character. Ending right after the answer is correct."
+  },
+  "candidateSha": "1a2d8188eb1a8fccad11ec8c2ad29e9f753e03dce0fa3d62877b94fb46a32810",
+  "gateOutcome": "rejected",
+  "gateRejectedReason": "bench regression on a previously passing case"
+}

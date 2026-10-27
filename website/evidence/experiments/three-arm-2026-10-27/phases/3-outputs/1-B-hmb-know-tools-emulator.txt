@@ -1,0 +1,1 @@
+**`harmony_`** — 该前缀下的工具家族（如 emulator 启停、设备管理、hdc 交互等）可以直接管理模拟器生命周期，无需打开 DevEco Studio。

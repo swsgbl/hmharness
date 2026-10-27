@@ -1,0 +1,1 @@
+**`harmony_`** — the harmony_* tool family (via skills like `harmony-emulator-state-ground-truth` and `harmony-emulator-state-triangulation`) handles emulator lifecycle checks and state verification on the command line, without needing DevEco Studio open.

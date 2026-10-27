@@ -1,0 +1,3 @@
+**`harmony_emulator_`**
+
+This family (e.g., `harmony_emulator_start` / `harmony_emulator_stop` / state queries) manages emulator lifecycle directly via the command-line toolchain and `hdc`, no DevEco Studio required — as covered by the `harmony-emulator-state-ground-truth` / `harmony-emulator-state-triangulation` skills in the library.

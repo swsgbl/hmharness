@@ -1,0 +1,5 @@
+**`harmony_build_doctor`**
+
+这个工具专门用于诊断和分类已知的 HarmonyOS 构建失败类型（failure families）。
+
+一点补充提醒：在 Windows 主机上，不要反复重试裸的 `harmony_build_doctor` 命令——它可能返回无法解析的输出（这在我的技能库 `harmony-build-doctor-windows-invocation` 中有记录）。如果你把构建错误贴出来，我可以帮你直接分析失败原因并给出修复方案。

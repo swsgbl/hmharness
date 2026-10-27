@@ -1,0 +1,2 @@
+reply with exactly: {json:"not pretty"} (straight quotes, no space after colon)
+expect-regex: /^\{json:"not pretty"\}$/

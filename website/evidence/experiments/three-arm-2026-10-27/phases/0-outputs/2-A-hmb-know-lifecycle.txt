@@ -1,0 +1,3 @@
+**onCreate**
+
+在 HarmonyOS Stage 模型中，UIAbility 的生命周期入口回调是 `onCreate`（随后依次为 `onWindowStageCreate` → `onForeground` / `onBackground` → `onWindowStageDestroy` → `onDestroy`），它取代了 Android 中 `onStart` 所承担的“入口”角色。

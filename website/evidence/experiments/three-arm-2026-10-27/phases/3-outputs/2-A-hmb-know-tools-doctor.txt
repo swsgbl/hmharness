@@ -1,0 +1,5 @@
+`harmony_build_doctor`
+
+这是 hmharness 中专门用于诊断 HarmonyOS 构建失败的工具，它会将构建错误与已知失败家族（failure families）进行分类匹配，给出对应的修复建议。
+
+注意：在 Windows 上调用它时有已知的坑（可能返回无法解析的输出），本机技能库中有 `harmony-build-doctor-windows-invocation` 技能处理该情况。如果你现在手头有具体的构建失败日志，我可以直接帮你分析。

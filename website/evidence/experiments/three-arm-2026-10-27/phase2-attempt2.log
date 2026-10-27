@@ -1,0 +1,8 @@
+npm notice run hmharness@0.23.42 npx
+npm notice run tsx scripts/three-arm-experiment.mts phase2
+  [gate] baseline bench: 26 train + 9 holdout cases
+  [gate] baseline: train 50%, holdout 56%
+  [gate] candidate "exact-output-reply": drafting + candidate bench
+  [gate]   rejected (below quality floor 0.6)
+phase2: protect integrity OK (a264d64e70ef)
+gate outcome: rejected — below quality floor: pass rate 0.5 < min 0.6 (non-regression vs a weak baseline 0.5 is not good enough)

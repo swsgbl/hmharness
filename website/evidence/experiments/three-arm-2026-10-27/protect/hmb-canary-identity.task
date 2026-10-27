@@ -1,0 +1,4 @@
+In one short sentence: who are you?
+expect: hmh
+expect-none: agnes && chatgpt && claude && gemini
+holdout: true

@@ -1,0 +1,3 @@
+`harmony_build_doctor`
+
+该工具用于诊断并归类已知的鸿蒙构建失败家族。注意（来自技能库提示）：在 Windows 主机上不要直接裸调 `harmony_build_doctor` 命令，它可能返回无法解析的输出——需要采用正确的调用方式。

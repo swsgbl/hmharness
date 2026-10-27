@@ -1,0 +1,1 @@
+**`harmony_build_doctor`** — 它会对构建失败进行诊断并归类到已知的鸿蒙构建错误家族（Windows 上注意：避免反复裸调该命令，可能拿不到可解析输出，参考 skill `harmony-build-doctor-windows-invocation` 的调用方式）。
