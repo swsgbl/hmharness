@@ -15,6 +15,10 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
+const { execFileSync } = require('child_process');
+// shared with the auditor so "what counts as an event time" never drifts
+const { eventTimeOf, datasetFingerprint } = require('./audit-evidence-provenance.cjs');
 
 const HOME = process.env.HMH_HOME || path.join(os.homedir(), '.hmharness');
 const OUT = path.join(__dirname, '..', 'website', 'evidence');
@@ -71,8 +75,20 @@ const rawLogEmbedded = rawLog.length > RAW_CAP
   ? rawLog.slice(0, RAW_CAP) + `\n...[TRUNCATED at ${RAW_CAP} chars of ${rawLog.length}; full file at raw/log.jsonl]`
   : rawLog || '(log empty or absent)';
 
+// ---- provenance: data content defines the observation period ----
+// times come from every source record (not just log.jsonl) so the manifest
+// can never claim a narrower window than the shipped bytes actually cover
+const allTimes = [...(logLines ?? []), ...(insights ?? []), ...(pareto ?? [])]
+  .map((r) => eventTimeOf(r)).filter(Boolean).sort();
+const exportedAtUtc = new Date().toISOString();
+let sourceCommit = null;
+try {
+  sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'],
+    { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch { /* not a git checkout - provenance degrades to absent, never invented */ }
+
 const DATA = {
-  generatedAt: new Date().toISOString(),
+  generatedAt: exportedAtUtc,
   homeSource: HOME,
   cycles: logLines === null ? null : logLines.length,
   firstCycle: logLines?.[0]?.time ?? null,
@@ -92,6 +108,30 @@ fs.mkdirSync(path.join(OUT, 'raw'), { recursive: true });
 if (logLines !== null) fs.copyFileSync(path.join(HOME, 'evolution', 'log.jsonl'), path.join(OUT, 'raw', 'log.jsonl'));
 if (pareto !== null) fs.copyFileSync(path.join(HOME, 'evolution', 'pareto', 'entries.jsonl'), path.join(OUT, 'raw', 'pareto-entries.jsonl'));
 if (insights !== null) fs.copyFileSync(path.join(HOME, 'insights', 'insights.jsonl'), path.join(OUT, 'raw', 'insights.jsonl'));
+
+// ---- write provenance manifest (facts only; archived alongside raw/) ----
+const shipped = ['log.jsonl', 'pareto-entries.jsonl', 'insights.jsonl']
+  .filter((n) => fs.existsSync(path.join(OUT, 'raw', n)))
+  .map((n) => {
+    const bytes = fs.readFileSync(path.join(OUT, 'raw', n));
+    const lines = bytes.toString('utf8').split(/\r?\n/).filter((s) => s.trim());
+    return {
+      path: 'raw/' + n,
+      sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+      bytes: bytes.length, nonEmptyLines: lines.length,
+    };
+  });
+const manifest = {
+  schemaVersion: 2,
+  datasetDirectory: 'evidence (live page)',
+  periodStart: allTimes[0] ?? null, periodEnd: allTimes[allTimes.length - 1] ?? null,
+  exportedAtUtc, exportedAtSource: 'live-export',
+  sourceCommit, sourceCommitSource: sourceCommit ? 'git-HEAD-at-export' : 'unknown',
+  datasetFingerprint: shipped.length ? datasetFingerprint(shipped) : null,
+  maxEventTime: allTimes[allTimes.length - 1] ?? null,
+  files: shipped,
+};
+fs.writeFileSync(path.join(OUT, 'provenance-manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
 // ---- render page ----
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -138,7 +178,7 @@ footer{margin-top:48px;color:var(--dim);font-size:12px;border-top:1px solid var(
 <div class="card"><div class="v">${num(DATA.memoryNotes)}</div><div class="k">长期记忆条</div></div>
 <div class="card"><div class="v">${num(DATA.benchCases)}</div><div class="k">bench 用例</div></div>
 </div>
-<p class="note">窗口:${num(DATA.firstCycle)} → ${num(DATA.lastCycle)} · 生成于 ${esc(DATA.generatedAt)}</p>
+<p class="note">事件覆盖:${num(manifest.periodStart)} → ${num(manifest.periodEnd)} · 导出于 ${esc(exportedAtUtc)} · 源 commit ${sourceCommit ? esc(sourceCommit.slice(0, 10)) : '<span class="absent">absent</span>'} · 指纹 <code>${manifest.datasetFingerprint ? esc(manifest.datasetFingerprint) : '<span class="absent">absent</span>'}</code>(<a href="provenance-manifest.json">provenance-manifest.json</a>)</p>
 <p style="background:rgba(224,179,76,.12);border:1px solid rgba(224,179,76,.3);border-radius:8px;padding:10px 14px;font-size:13.5px;color:#e0b34c"><b>⚠ 外推性声明:</b>当前数据全部来自<b>自设任务</b>(scripts/selffeed-tasks.json,作者编写),bench 用例同源。进化系统在此人造适应度景观上的表现<b>不代表</b>其在真实外部开发者任务上的效果。外推性待第一批外部用户数据验证。</p>
 
 <h2>每日进化轮次</h2>
@@ -165,5 +205,8 @@ footer{margin-top:48px;color:var(--dim);font-size:12px;border-top:1px solid var(
 
 fs.writeFileSync(path.join(OUT, 'index.html'), html, 'utf8');
 console.log('evidence exported ->', path.join(OUT, 'index.html'));
+console.log('  provenance:', manifest.periodStart ?? 'absent', '->', manifest.periodEnd ?? 'absent',
+  '| exportedAt:', exportedAtUtc, '| commit:', sourceCommit ? sourceCommit.slice(0, 10) : 'absent',
+  '| fingerprint:', manifest.datasetFingerprint ?? 'absent');
 console.log('  cycles:', DATA.cycles ?? 'absent', '| active:', DATA.skills.active.length,
   '| canary:', DATA.skills.canary.length, '| outcomes:', DATA.outcomes.length, '| pareto:', DATA.paretoRejected.length);
