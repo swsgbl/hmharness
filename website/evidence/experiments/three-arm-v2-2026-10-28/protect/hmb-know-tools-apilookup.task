@@ -1,0 +1,3 @@
+Which tool looks up an SDK API symbol with file:line evidence? Answer with the tool name.
+expect: harmony_api_lookup
+holdout: true

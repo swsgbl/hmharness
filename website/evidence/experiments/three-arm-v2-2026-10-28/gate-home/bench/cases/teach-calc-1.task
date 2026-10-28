@@ -1,0 +1,3 @@
+A warehouse ships 17 boxes on Monday, twice that on Tuesday, and 13 fewer than Tuesday on Wednesday. How many boxes total in the three days? Reply with ONLY the final number.
+expect-regex: /^\d+$/
+expect: 72

@@ -1,0 +1,3 @@
+In a HarmonyOS module, which manifest file declares abilities and permissions? File name only.
+expect: module.json5
+holdout: true

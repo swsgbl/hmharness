@@ -1,0 +1,3 @@
+DevEco Studio 是什么？用一句话回答
+expect-regex: (?i)(IDE|开发|develop)
+holdout: true

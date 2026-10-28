@@ -1,0 +1,3 @@
+把"世界"翻译成英文，只输出翻译结果
+expect: world
+holdout: true

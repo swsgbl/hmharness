@@ -1,0 +1,3 @@
+写一个 Git 命令：撤销最后一次 commit 但保留更改，只输出命令
+expect: reset
+holdout: true

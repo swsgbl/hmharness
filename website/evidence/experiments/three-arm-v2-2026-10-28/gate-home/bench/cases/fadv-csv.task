@@ -1,0 +1,2 @@
+reply with exactly: a,b,,c (trailing empty field, double comma preserved)
+expect-regex: /^a,b,,c$/

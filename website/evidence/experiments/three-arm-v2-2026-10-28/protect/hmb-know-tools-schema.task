@@ -1,0 +1,3 @@
+Which tool validates module.json5 against the SDK schema? Answer with the tool name.
+expect: harmony_schema_check
+holdout: true

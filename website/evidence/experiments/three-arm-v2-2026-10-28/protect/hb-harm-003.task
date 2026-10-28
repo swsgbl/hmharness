@@ -1,0 +1,3 @@
+写出鸿蒙 UIAbility 的生命周期回调名称，逗号分隔
+expect-regex: onCreate
+holdout: true

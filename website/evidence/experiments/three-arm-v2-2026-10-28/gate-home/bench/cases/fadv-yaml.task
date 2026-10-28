@@ -1,0 +1,2 @@
+reply with exactly: key:  value (two spaces after the colon)
+expect-regex: /^key:  value$/

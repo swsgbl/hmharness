@@ -1,0 +1,3 @@
+只回复这四个字: 验收通过
+expect-exact: "验收通过"
+holdout: true

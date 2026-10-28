@@ -1,0 +1,3 @@
+把"开源改变世界"翻译成英文，只输出翻译
+expect-regex: (?i)open.?source
+holdout: true

@@ -1,0 +1,2 @@
+reply with exactly: end-space. (the trailing period is part of the answer, then nothing)
+expect-regex: /^end-space\.$/

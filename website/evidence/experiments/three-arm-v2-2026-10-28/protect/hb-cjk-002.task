@@ -1,0 +1,3 @@
+把"hello"翻译成中文，只输出翻译结果
+expect: 你好
+holdout: true

@@ -1,0 +1,3 @@
+把 JSON {"a":1} 压缩成一行，只输出结果
+expect-exact: {"a":1}
+holdout: true

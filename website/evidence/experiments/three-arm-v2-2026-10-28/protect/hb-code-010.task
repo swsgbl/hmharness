@@ -1,0 +1,3 @@
+写一个 CSS 规则：将文字颜色设为红色，只输出CSS
+expect-regex: color:\s*red
+holdout: true
