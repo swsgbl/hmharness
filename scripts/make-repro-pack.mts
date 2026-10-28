@@ -38,7 +38,7 @@
 import { loadTrajectories } from '../packages/cognitive/src/index.ts';
 import type { CognitiveTrajectory } from '../packages/cognitive/src/index.ts';
 import { createHash } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -165,6 +165,36 @@ function pointerGet(obj: unknown, dotted: string): unknown {
 
 const tokenize = (text: string): string[] => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
 
+/** PII token drop-set (security-review hardening): machine/git usernames must
+ *  not survive tokenization into the PUBLISHED corpus. */
+function usernameTokens(): string[] {
+  const names = new Set<string>();
+  try { const u = userInfo().username?.toLowerCase(); if (u && u.length >= 3) names.add(u); } catch { /* OS-dependent */ }
+  try {
+    const gitName = execFileSync('git', ['config', 'user.name'], { cwd: REPO, encoding: 'utf8' }).trim().toLowerCase();
+    if (gitName.length >= 3) for (const part of gitName.split(/\s+/)) if (part.length >= 3) names.add(part);
+  } catch { /* no git identity configured */ }
+  return [...names];
+}
+
+/** Credential markers scanned in the RAW goal text for transparency (counted
+ *  into the manifest — raw text is never published; literal key=value shapes
+ *  are destroyed by tokenization since =/@/: are separators). */
+const CREDENTIAL_MARKERS = ['sk-', 'ghp_', 'gho_', 'ghu_', 'akia', 'begin open', 'private key', 'password=', 'passwd', 'token=', 'api_key', 'apikey', 'secret=', 'bearer '];
+function countCredentialMarkers(text: string): number {
+  const lower = text.toLowerCase();
+  return CREDENTIAL_MARKERS.reduce((n, m) => n + (lower.includes(m) ? 1 : 0), 0);
+}
+
+/** Credential-PREFIX + digit token (password1, secret123, sk1234…): dropped
+ *  like secret-shaped tokens — a plain English word ('password' with no
+ *  digits) is not a credential and stays. */
+const CREDENTIAL_PREFIX_RE = /^(sk|ghp|gho|ghu|akia|passwd|password|secret|token|apikey|bearer)[a-z]*\d+[a-z0-9]*$/;
+function assertNoCredentialShapedSurvive(projectedText: string): void {
+  const hits = projectedText.toLowerCase().split(/[^a-z0-9]+/).filter((w) => CREDENTIAL_PREFIX_RE.test(w));
+  if (hits.length > 0) throw new Error(`credential-shaped tokens survived projection: ${hits.slice(0, 5).join(', ')} — refusing to build pack`);
+}
+
 /** Secret-shaped token minimization for the PUBLISHED corpus: long tokens
  *  with several digits are commit hashes / ICP numbers / key-ish strings.
  *  Dropping them is verdict-neutral only if the self-test still says
@@ -178,6 +208,8 @@ interface CorpusPack {
   droppedIds: string[];
   redactedTokenCount: number;
   redactedDistinctTokens: number;
+  piiTokens: string[];
+  rawMarkerHits: number;
 }
 
 async function freezeCorpus(recipe: Recipe, expManifest: unknown): Promise<CorpusPack> {
@@ -219,11 +251,15 @@ async function freezeCorpus(recipe: Recipe, expManifest: unknown): Promise<Corpu
   // goal.description is reduced to its tokenize() output (space-joined): that
   // is the only form the experiment ever reads it in.
   const redacted = new Map<string, number>();
+  const piiTokens = usernameTokens();
+  const isDropped = (w: string): boolean => isSecretShaped(w) || CREDENTIAL_PREFIX_RE.test(w) || piiTokens.includes(w);
+  let rawMarkerHits = 0;
   const lines = pool.map((t) => {
+    rawMarkerHits += countCredentialMarkers(t.goal?.description ?? '');
     const tokens = tokenize(t.goal?.description ?? '');
     const kept: string[] = [];
     for (const w of new Set(tokens)) {
-      if (isSecretShaped(w)) redacted.set(w, (redacted.get(w) ?? 0) + 1);
+      if (isDropped(w)) redacted.set(w, (redacted.get(w) ?? 0) + 1);
       else kept.push(w);
     }
     return JSON.stringify({
@@ -234,6 +270,8 @@ async function freezeCorpus(recipe: Recipe, expManifest: unknown): Promise<Corpu
       metrics: { success: t.metrics.success },
     });
   });
+  const joined = lines.join('\n');
+  assertNoCredentialShapedSurvive(joined);
   return {
     lines,
     datasetHash: targetHash,
@@ -241,6 +279,8 @@ async function freezeCorpus(recipe: Recipe, expManifest: unknown): Promise<Corpu
     droppedIds,
     redactedTokenCount: [...redacted.values()].reduce((s, n) => s + n, 0),
     redactedDistinctTokens: redacted.size,
+    piiTokens,
+    rawMarkerHits,
   };
 }
 
@@ -401,7 +441,7 @@ interface PackManifest {
     reconstruction: { method: string; droppedIds: string[]; verified: boolean };
     projection: {
       fields: string;
-      goalRedaction: { rule: string; tokenCount: number; distinctTokens: number };
+      goalRedaction: { rule: string; tokenCount: number; distinctTokens: number; piiTokens: string[]; rawCredentialMarkerHits: number };
     };
   };
   evidenceExcluded: Array<{ path: string; reason: string }>;
@@ -559,9 +599,11 @@ const manifest: PackManifest = {
           projection: {
             fields: '{id, environment.id, goal.description (tokenized), steps[].action.type, steps[].outcome, metrics.success} — exactly the fields the frozen driver and packages/cognitive/src/skill-compiler.ts consume',
             goalRedaction: {
-              rule: 'drop tokens with length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings)',
+              rule: 'drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).',
               tokenCount: corpusInfo.redactedTokenCount,
               distinctTokens: corpusInfo.redactedDistinctTokens,
+              piiTokens: corpusInfo.piiTokens,
+              rawCredentialMarkerHits: corpusInfo.rawMarkerHits,
             },
           },
         },

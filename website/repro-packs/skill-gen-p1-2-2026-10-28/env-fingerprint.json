@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T16:15:57.373Z",
+  "generatedAt": "2026-10-28T16:40:08.006Z",
   "nodeVersionRequired": ">=22.7 (native --experimental-transform-types; tsx fallback)",
   "packTime": {
     "node": "v22.23.3",

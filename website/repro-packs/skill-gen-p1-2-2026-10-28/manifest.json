@@ -2,10 +2,10 @@
   "kind": "hmharness-repro-pack",
   "version": 1,
   "experimentId": "skill-gen-p1-2-2026-10-28",
-  "generatedAt": "2026-10-28T16:15:57.375Z",
+  "generatedAt": "2026-10-28T16:40:08.008Z",
   "generator": {
     "script": "scripts/make-repro-pack.mts",
-    "repoCommit": "c66c1b3",
+    "repoCommit": "bcbaae5",
     "nodeVersion": "v22.23.3",
     "platform": "win32/x64"
   },
@@ -62,6 +62,7 @@
     "reconstruction": {
       "method": "live corpus is append-only; dropped newest-started trajectories until sha256(family:<sorted ids>) equaled the manifest-frozen datasetHash; verified per-family usable counts",
       "droppedIds": [
+        "trj-2026-10-28T15-48-32-c81vjd-mvsbmjir-terminal",
         "trj-2026-10-28T15-48-32-c81vjd-mvsahivc-terminal",
         "trj-2026-10-28T14-52-10-dklgvl-mvs8w75y-harmonyos",
         "trj-2026-10-28T14-52-10-dklgvl-mvs8gued-terminal",
@@ -75,9 +76,13 @@
     "projection": {
       "fields": "{id, environment.id, goal.description (tokenized), steps[].action.type, steps[].outcome, metrics.success} — exactly the fields the frozen driver and packages/cognitive/src/skill-compiler.ts consume",
       "goalRedaction": {
-        "rule": "drop tokens with length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings)",
-        "tokenCount": 71,
-        "distinctTokens": 40
+        "rule": "drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).",
+        "tokenCount": 89,
+        "distinctTokens": 41,
+        "piiTokens": [
+          "hongfu"
+        ],
+        "rawCredentialMarkerHits": 36
       }
     }
   },
@@ -133,7 +138,7 @@
   "fileIndex": [
     {
       "path": "README.md",
-      "sha256": "2f97c4a2dcbddacaaeec3728d0fb5e5211f61082a66c25a25da6f7113df49379",
+      "sha256": "18b5567ad1e0f89685d47db7cccbb4412c7ee6aec066e78ff3173617d3dd27c8",
       "bytes": 5124
     },
     {
@@ -148,13 +153,13 @@
     },
     {
       "path": "env-fingerprint.json",
-      "sha256": "fc4e57f1b1844fcc0e264aba28677ce013cfce6917fa9ec50f1572e5cf9df21e",
+      "sha256": "d93735bb03f536b09fd7ab233a7dddfbba9c690ebd94ad7a006b8ab73d3fa9ab",
       "bytes": 459
     },
     {
       "path": "hmh-home/cognitive/trajectories/corpus.jsonl",
-      "sha256": "0cb4776bdfb38ea07138b240daf0c4fcbd9c862432ef3f4dedefcae0c870eb60",
-      "bytes": 1150077
+      "sha256": "c91c5b28d8f40143088a4d54d740c20e43e76430b44f5e36b843a3060c54ec33",
+      "bytes": 1149951
     },
     {
       "path": "packages/cognitive/package.json",
