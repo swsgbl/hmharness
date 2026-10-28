@@ -1,0 +1,3 @@
+Which tool family manages emulator lifecycle without DevEco Studio? Answer with the tool family prefix.
+expect: harmony_emulator
+holdout: true

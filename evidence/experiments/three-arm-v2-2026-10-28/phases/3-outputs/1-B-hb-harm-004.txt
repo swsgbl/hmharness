@@ -1,0 +1,1 @@
+Stage 模型是 HarmonyOS API 9 起推荐的应用开发架构，将应用划分为应用级的 "Stage"（管理生命周期、上下文和资源）与组件级的 UIAbility（承载界面）和 ExtensionAbility（承载后台/服务扩展），相比旧的 FA 模型更适合多设备与分布式场景。

@@ -1,0 +1,3 @@
+写一个SQL查询：从users表选取age>18的name，只输出SQL
+expect-regex: (?i)SELECT.*FROM.*users.*WHERE.*age
+holdout: true

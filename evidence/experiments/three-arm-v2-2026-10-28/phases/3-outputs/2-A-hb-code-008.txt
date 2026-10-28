@@ -1,0 +1,5 @@
+```bash
+git reset --soft HEAD~1
+```
+
+（若希望更改同时退出暂存区，用 `git reset --mixed HEAD~1`）

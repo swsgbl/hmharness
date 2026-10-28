@@ -40,7 +40,7 @@
       3
     ],
     "taskSet": {
-      "source": "C:\\Users\\hongfu\\.hmharness/bench/cases (the machine corpus, 91 train + 24 holdout precedent)",
+      "source": "C:\\Users\\<user>\\.hmharness/bench/cases (the machine corpus, 91 train + 24 holdout precedent)",
       "familyQuotas": {
         "beh": 8,
         "cjk": 6,

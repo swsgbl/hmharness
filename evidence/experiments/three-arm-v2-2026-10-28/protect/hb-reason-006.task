@@ -1,0 +1,3 @@
+7乘以8等于多少？只输出数字
+expect: 56
+holdout: true

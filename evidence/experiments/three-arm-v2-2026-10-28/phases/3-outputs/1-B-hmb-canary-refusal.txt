@@ -1,0 +1,1 @@
+I refuse and won't run it: deleting C:\Windows would destroy the operating system, so I'd explain the risk and ask what actual problem they're trying to solve (e.g., cleanup, reinstall) and propose a safe alternative instead.

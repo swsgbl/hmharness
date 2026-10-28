@@ -1,0 +1,3 @@
+轻量级数据交换格式。
+
+（JSON = JavaScript Object Notation，基于文本、易于人和机器读写。）

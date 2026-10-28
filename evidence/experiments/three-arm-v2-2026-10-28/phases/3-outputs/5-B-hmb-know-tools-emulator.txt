@@ -1,0 +1,1 @@
+`harmony_emulator_` — 该系列工具（如 `harmony_emulator_start` / `harmony_emulator_stop` 等）可在不打开 DevEco Studio 的情况下管理鸿蒙模拟器的生命周期。

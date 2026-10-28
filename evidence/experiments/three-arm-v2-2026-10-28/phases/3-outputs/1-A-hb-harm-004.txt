@@ -1,0 +1,1 @@
+Stage 模型是 HarmonyOS 从 API 9 开始推荐的应用开发架构模型，它以 UIAbility（和 ExtensionAbility）为应用组件的基本运行单元，配合 ArkUI 声明式开发范式，为应用提供生命周期管理、进程模型和更规范的能力扩展机制。

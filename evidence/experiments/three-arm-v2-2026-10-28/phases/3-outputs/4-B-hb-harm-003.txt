@@ -1,0 +1,3 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+说明：完整生命周期为 7 个回调，其中 onForeground/onBackground 可以多次交替触发（应用前后台切换），其余按顺序各执行一次。

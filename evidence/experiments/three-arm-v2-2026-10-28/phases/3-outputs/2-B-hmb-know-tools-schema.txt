@@ -1,0 +1,1 @@
+**`harmony_schema_check`** — it serves as a cheap pre-build config gate that validates `module.json5` against the SDK schema.

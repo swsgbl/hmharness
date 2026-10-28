@@ -1,0 +1,5 @@
+**`emulator_`**
+
+该工具族（如 `emulator_start`、`emulator_stop`、`emulator_snapshot` 等）可以在不打开 DevEco Studio 的情况下独立管理鸿蒙模拟器的完整生命周期（启动、停止、快照等），与 `harmony_*` 工具族（项目创建、构建、签名、UI 回归等）是分开的。
+
+如果你想确认当前环境里具体注册了哪些 `emulator_*` 工具，我可以帮你查一下 `hmh` 的工具列表。

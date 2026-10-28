@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是 HarmonyOS 应用程序包格式，本质上是一个类似 zip 的压缩包，包含模块的代码、资源、库和配置文件，用于安装到鸿蒙设备上运行。

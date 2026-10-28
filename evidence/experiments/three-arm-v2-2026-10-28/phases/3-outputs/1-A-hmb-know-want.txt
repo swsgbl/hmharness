@@ -1,0 +1,3 @@
+**Want**
+
+(In ArkTS it's the `Want` object — you set `bundleName`, `abilityName`, `uri`, and `parameters` on it, then pass it to `startAbility()` / router navigation to carry launch parameters between abilities.)

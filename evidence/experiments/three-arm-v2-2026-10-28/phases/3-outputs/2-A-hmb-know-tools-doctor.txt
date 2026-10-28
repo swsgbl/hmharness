@@ -1,0 +1,3 @@
+**`harmony_build_doctor`**
+
+This is the tool that diagnoses failed HarmonyOS builds and classifies errors into known failure families. One Windows-specific caveat from my skill notes: don't retry the bare `harmony_build_doctor` invocation repeatedly on Windows — it may return no parseable output; use the documented Windows invocation workaround instead.

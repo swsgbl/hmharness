@@ -1,0 +1,3 @@
+`harmony_build`
+
+(它的诊断变体是 `harmony_build_doctor`，但在 Windows 上不要直接重复调用裸的 doctor 命令——它可能返回无法解析的输出，这是技能库中已知的注意事项。)

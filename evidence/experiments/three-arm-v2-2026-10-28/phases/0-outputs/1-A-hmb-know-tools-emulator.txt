@@ -1,0 +1,5 @@
+**`harmony-`**（具体为 harmony-emulator 子族）
+
+在没有 DevEco Studio 的情况下，emulator 生命周期由 `harmony-emulator` 工具族管理，底层依赖：
+- `hdc list targets` —— 探测模拟器/设备状态（如 harmony-emulator-state-ground-truth、harmony-emulator-state-triangulation 技能所用的三角验证法）
+- DevEco Studio 附带的模拟器命令行工具（直接调用，无需启动 IDE）

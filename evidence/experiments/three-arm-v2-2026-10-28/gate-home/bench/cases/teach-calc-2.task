@@ -1,0 +1,3 @@
+Compute 7*8 + 12/4 - 3^2. Reply with ONLY the result (a single integer).
+expect-regex: /^\d+$/
+expect: 50

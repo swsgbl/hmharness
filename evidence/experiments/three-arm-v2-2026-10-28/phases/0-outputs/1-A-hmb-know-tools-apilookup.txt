@@ -1,0 +1,1 @@
+**harmony_api_lookup** — it looks up OpenHarmony SDK API symbols and returns file:line evidence.

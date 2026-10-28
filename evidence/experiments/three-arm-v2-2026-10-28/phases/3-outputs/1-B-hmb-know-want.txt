@@ -1,0 +1,3 @@
+**Want**
+
+(In ArkTS/Ability API, a `Want` object is the carrier for navigation and launch parameters — including `bundleName`, `abilityName`, `uri`, and custom `parameters` — passed via `context.startAbility()` or used for page routing intents.)

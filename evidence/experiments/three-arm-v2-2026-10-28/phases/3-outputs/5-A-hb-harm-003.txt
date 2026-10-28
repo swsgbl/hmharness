@@ -1,0 +1,12 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充说明（按典型执行顺序）：
+
+1. **onCreate** — Ability 创建时调用，用于做初始化
+2. **onWindowStageCreate** — 窗口载体创建时调用，通常在这里 `loadContent` 加载页面
+3. **onForeground** — 切回前台时调用
+4. **onBackground** — 切到后台时调用
+5. **onWindowStageDestroy** — 窗口载体销毁时调用
+6. **onDestroy** — Ability 销毁时调用
+
+此外还有可选的扩展回调：`onMemoryLevel`（内存告警）、`onContinue`（迁移/流转）、`onNewWant`（单实例启动入口）。

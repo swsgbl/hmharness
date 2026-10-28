@@ -1,0 +1,1 @@
+DevEco Studio 是华为官方推出的 HarmonyOS 应用与元服务一体化开发工具（基于 IntelliJ IDEA），提供代码编写、编译构建、调试、预览器、模拟器等全流程开发能力。

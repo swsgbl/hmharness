@@ -1,0 +1,3 @@
+把 "hello world foo bar" 按空格分割，输出数组，只输出结果
+expect-regex: hello.*world.*foo.*bar
+holdout: true

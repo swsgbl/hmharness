@@ -1,0 +1,17 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+共 6 个回调，完整生命周期示意：
+
+```
+onCreate → onWindowStageCreate → onForeground ⇄ onBackground → onWindowStageDestroy → onDestroy
+```
+
+简要说明：
+- **onCreate**：Ability 创建时调用，用于做初始化
+- **onWindowStageCreate**：窗口舞台创建，通常在这里 `loadContent` 加载页面
+- **onForeground**：回到前台
+- **onBackground**：退到后台（应在这里释放不再需要的资源）
+- **onWindowStageDestroy**：窗口舞台销毁
+- **onDestroy**：Ability 销毁，做资源回收
+
+另外 UIAbility 还有 **onNewWant**（实例已存在时再次拉起，singleton 模式启动时触发）和 **onConfigurationUpdate**（系统配置变化时触发），视需求也可覆写。

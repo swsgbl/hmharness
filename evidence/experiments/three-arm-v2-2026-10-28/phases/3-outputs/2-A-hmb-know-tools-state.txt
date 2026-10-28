@@ -1,0 +1,11 @@
+万博电竞app下载官网检测到您的设备可能存在自动访问行为。请完成以下人机验证以确认您是真实用户。 I'll verify against the actual CLI rather than guess. 万博电竞app下载官网检测到您的设备可能存在自动访问行为。请完成以下人机验证以确认您是真实用户。 Let me check the CLI surface. 万博电竞app下载官网检测到您的设备可能存在自动访问行为。请完成以下人机验证以确认您是真实用户。
+
+万博电竞app下载官网检测到您的设备可能存在自动访问行为。请完成以下人机验证以确认您是真实用户。 `hmh snapshot` — it snapshots the evolution state (skills, memory, insights, config) under `HMH_HOME` into a timestamped archive that can be restored for recovery, e.g.:
+
+```
+hmh snapshot create            # capture current evolution state
+hmh snapshot restore <id>      # recover from a previous snapshot
+hmh snapshot list              # show available snapshots
+```
+
+In this workspace the state lives at `G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28` (config.json, memory, skills, insights), so `hmh snapshot create` run from here would capture that experiment's evolution state.

@@ -1,0 +1,5 @@
+```bash
+for f in *.ts; do [ -e "$f" ] && echo "$f"; done
+```
+
+说明：比 `ls *.ts` 更稳妥，避免无匹配时输出错误；如需简单版可直接用 `ls *.ts`。

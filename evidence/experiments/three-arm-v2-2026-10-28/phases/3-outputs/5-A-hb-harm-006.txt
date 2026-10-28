@@ -1,0 +1,1 @@
+hdc（HarmonyOS Device Connector）是鸿蒙官方的命令行设备调试工具，类似 Android 的 adb，用于在电脑上连接真机/模拟器并执行应用安装、日志查看、Shell 命令、UI 测试等操作。

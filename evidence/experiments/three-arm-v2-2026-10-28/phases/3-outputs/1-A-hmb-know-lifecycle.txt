@@ -1,0 +1,3 @@
+`onCreate`
+
+在 HarmonyOS/UIAbility 生命周期中，UIAbility 实例创建时首先回调 `onCreate`（对应 Android 中 Activity 启动入口的角色），随后才是 `onWindowStageCreate`、`onForeground` 等。

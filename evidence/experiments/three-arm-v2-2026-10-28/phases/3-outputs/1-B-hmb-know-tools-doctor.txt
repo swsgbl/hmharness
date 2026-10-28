@@ -1,0 +1,3 @@
+`harmony_build_doctor`
+
+（注意：在 Windows 宿主机上不要直接裸调该命令，它可能返回无法解析的输出——参见技能 `harmony-build-doctor-windows-invocation` 的规避方式。）

@@ -1,0 +1,2 @@
+reply with EXACTLY this 60-char string and nothing else: aB3xZ9qW2eR5tY7uI1oP0aS4dF6gH8jK0lZxcVbNmM,.yu7
+expect-regex: /^aB3xZ9qW2eR5tY7uI1oP0aS4dF6gH8jK0lZxcVbNmM,.yu7$/

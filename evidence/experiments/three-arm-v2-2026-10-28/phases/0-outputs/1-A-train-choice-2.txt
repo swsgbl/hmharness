@@ -1,0 +1,8 @@
+NO-GO — I can't issue a GO/NO-GO call without knowing what the decision is about. There's no prior context in this session (no build result, test output, release candidate, or verification evidence) to base it on.
+
+Give me the target of the decision, for example:
+
+1. **What's being gated** — a build/release, a code change, a skill promotion, a DevEco migration, a device deployment?
+2. **The evidence** — point me at it, or I can gather it myself: run builds, lint, UI regression, runtime logs, test pass rates, etc.
+
+Once I know the subject, I'll run the relevant checks and give you a decisive GO or NO-GO with reasons.

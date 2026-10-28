@@ -1,0 +1,1 @@
+ArkTS 是华为在 TypeScript 基础上扩展而来的 HarmonyOS 应用开发语言——它继承 TS 的语法和类型系统，并通过声明式 UI（如 `@Component`、`@Builder`）等扩展与更严格的静态约束（如禁用 `any`、限制运行时改变对象结构）来获得更好的性能和可预测性。

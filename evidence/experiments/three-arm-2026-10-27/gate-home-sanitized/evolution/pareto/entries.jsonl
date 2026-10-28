@@ -1,0 +1,3 @@
+{"name":"exact-output-only","parentInsights":[],"rejectedReason":"bench regression","scores":{"train":0.5},"metaModel":"glm-5.3","at":"2026-10-27T14:44:27.305Z"}
+{"name":"exact-output-reply","parentInsights":[],"rejectedReason":"below quality floor (0.50 < 0.6)","scores":{"train":0.5},"metaModel":"glm-5.3","at":"2026-10-27T15:03:48.723Z"}
+{"name":"character-exact-replies","parentInsights":[],"rejectedReason":"bench regression","scores":{"train":0.5},"metaModel":"glm-5.3","at":"2026-10-27T15:19:13.300Z"}

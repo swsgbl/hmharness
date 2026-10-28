@@ -1,0 +1,21 @@
+```python
+def is_palindrome(s):
+    """
+    判断字符串是否为回文（忽略大小写和非字母数字字符）
+    """
+    # 只保留字母和数字，并转为小写
+    cleaned = ''.join(c.lower() for c in s if c.isalnum())
+    
+    # 空字符串视为回文
+    if not cleaned:
+        return True
+    
+    # 双指针比较
+    left, right = 0, len(cleaned) - 1
+    while left < right:
+        if cleaned[left] != cleaned[right]:
+            return False
+        left += 1
+        right -= 1
+    return True
+```

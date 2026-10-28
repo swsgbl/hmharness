@@ -1,0 +1,13 @@
+我来看一下 hmharness 的 CLI 定义，确认具体子命令名称。先并行查看仓库结构和 CLI 帮助：run_command
+
+```cmd
+where hmh 2>nul & dir /b package.json bin src 2>nul
+```
+
+file_search
+```text
+pattern: (snapshot|checkpoint|backup).*(skill|memory|insight)|evolution.*(snapshot|backup)
+path: G:\hmharness-wtC2
+max: 20
+```
+sucessツLet me look at the CLI source directly. 

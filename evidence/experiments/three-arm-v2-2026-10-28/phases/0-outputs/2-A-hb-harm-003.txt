@@ -1,0 +1,9 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+简要说明（按典型执行顺序）：
+- **onCreate**：Ability 创建时调用，用于初始化
+- **onWindowStageCreate**：窗口阶段创建，通常在这里 `loadContent` 加载页面
+- **onForeground**：回到前台
+- **onBackground**：退到后台
+- **onWindowStageDestroy**：窗口阶段销毁
+- **onDestroy**：Ability 销毁，做资源回收

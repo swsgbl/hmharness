@@ -1,0 +1,3 @@
+A build just failed with an unfamiliar error. Which tool classifies known HarmonyOS build failure families? Answer with the tool name.
+expect: harmony_build_doctor
+holdout: true
