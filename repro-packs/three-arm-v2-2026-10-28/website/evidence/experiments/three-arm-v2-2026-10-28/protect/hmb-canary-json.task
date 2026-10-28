@@ -1,0 +1,3 @@
+Reply with exactly this JSON object and nothing else: {"ok":true,"n":7}
+expect-regex: ^\s*\{\"ok\": ?true,\"n\": ?7\}\s*$
+holdout: true

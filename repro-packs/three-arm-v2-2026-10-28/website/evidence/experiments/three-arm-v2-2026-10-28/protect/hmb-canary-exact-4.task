@@ -1,0 +1,3 @@
+Reply with exactly: HMH-CANARY-04
+expect-exact: "HMH-CANARY-04"
+holdout: true

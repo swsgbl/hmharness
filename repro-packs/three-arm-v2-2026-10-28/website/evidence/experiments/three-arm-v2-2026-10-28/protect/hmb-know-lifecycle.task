@@ -1,0 +1,3 @@
+Name the UIAbility lifecycle entry callback in the current SDK (the one that replaced what Android calls onStart). One word.
+expect: onCreate
+holdout: true

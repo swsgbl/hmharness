@@ -1,0 +1,370 @@
+{
+  "kind": "hmharness-repro-pack",
+  "version": 1,
+  "experimentId": "skill-gen-p1-2-2026-10-28",
+  "generatedAt": "2026-10-28T16:15:57.375Z",
+  "generator": {
+    "script": "scripts/make-repro-pack.mts",
+    "repoCommit": "c66c1b3",
+    "nodeVersion": "v22.23.3",
+    "platform": "win32/x64"
+  },
+  "publishedVerdict": {
+    "verdict": "WEAK-POSITIVE",
+    "secondaryEndpoint": "effective",
+    "selectionChanged": 0,
+    "llmTokens": 0,
+    "perFamily": {
+      "terminal": {
+        "n": 107,
+        "contA": 0.48598130841121495,
+        "contB": 0.48598130841121495,
+        "m1": 0.3644859813084112,
+        "pAtTau": 0.8717948717948718
+      },
+      "harmonyos": {
+        "n": 21,
+        "contA": 0.09523809523809523,
+        "contB": 0.09523809523809523,
+        "m1": 0.19047619047619047,
+        "pAtTau": 0.5
+      },
+      "browser": {
+        "n": 10,
+        "contA": 0.1,
+        "contB": 0.1,
+        "m1": 0.4,
+        "pAtTau": 0.25
+      }
+    }
+  },
+  "reproduce": {
+    "entry": "node reproduce.cjs",
+    "analyzer": "scripts/skillgen-p1-2-experiment.mts",
+    "analyzerIsByteIdenticalTo": "scripts/skillgen-p1-2-experiment.mts",
+    "env": {
+      "HMH_HOME": "hmh-home"
+    }
+  },
+  "corpus": {
+    "families": [
+      "terminal",
+      "harmonyos",
+      "browser"
+    ],
+    "datasetHash": "a2ac0a292557497fd8ed65911bb12c98cce630d15871c56be46cee816acc666d",
+    "trajectoryCount": 467,
+    "familyCounts": {
+      "terminal": 355,
+      "harmonyos": 79,
+      "browser": 33
+    },
+    "reconstruction": {
+      "method": "live corpus is append-only; dropped newest-started trajectories until sha256(family:<sorted ids>) equaled the manifest-frozen datasetHash; verified per-family usable counts",
+      "droppedIds": [
+        "trj-2026-10-28T15-48-32-c81vjd-mvsahivc-terminal",
+        "trj-2026-10-28T14-52-10-dklgvl-mvs8w75y-harmonyos",
+        "trj-2026-10-28T14-52-10-dklgvl-mvs8gued-terminal",
+        "trj-2026-10-28T10-39-27-mmub8x-mvrzuxt3-harmonyos",
+        "trj-2026-10-28T10-39-27-mmub8x-mvrzg0hx-terminal",
+        "trj-2026-10-28T10-36-53-asm2q2-mvrzcsut-harmonyos",
+        "trj-2026-10-28T10-36-53-asm2q2-mvrzcj4w-terminal"
+      ],
+      "verified": true
+    },
+    "projection": {
+      "fields": "{id, environment.id, goal.description (tokenized), steps[].action.type, steps[].outcome, metrics.success} — exactly the fields the frozen driver and packages/cognitive/src/skill-compiler.ts consume",
+      "goalRedaction": {
+        "rule": "drop tokens with length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings)",
+        "tokenCount": 71,
+        "distinctTokens": 40
+      }
+    }
+  },
+  "evidenceExcluded": [
+    {
+      "path": "REPORT.md",
+      "reason": "human execution report — analyzer output, not input (see deviation 6 in it)"
+    },
+    {
+      "path": "machine-verdict.md",
+      "reason": "analyzer OUTPUT being reproduced; frozen copy ships as published/"
+    },
+    {
+      "path": "phases/run.json",
+      "reason": "analyzer OUTPUT being reproduced; frozen copy ships as published/"
+    },
+    {
+      "path": "phases/analysis.json",
+      "reason": "analyzer OUTPUT being reproduced; frozen copy ships as published/"
+    },
+    {
+      "path": "phases/sensitivity-exploratory.txt",
+      "reason": "post-hoc exploratory artifact (manifest deviation 2); the preregistered analyzer never reads it"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "website/evidence/experiments/skill-gen-p1-2-2026-10-28/phases/run.json",
+      "published": "published/phases/run.json",
+      "kind": "json",
+      "volatile": [
+        "generatedAt"
+      ],
+      "whyVolatile": "ISO timestamp of the run"
+    },
+    {
+      "path": "website/evidence/experiments/skill-gen-p1-2-2026-10-28/phases/analysis.json",
+      "published": "published/phases/analysis.json",
+      "kind": "json",
+      "volatile": [
+        "generatedAt",
+        "wallclockMs"
+      ],
+      "whyVolatile": "timestamp + wall-clock ms (machine speed)"
+    },
+    {
+      "path": "website/evidence/experiments/skill-gen-p1-2-2026-10-28/machine-verdict.md",
+      "published": "published/machine-verdict.md",
+      "kind": "text",
+      "volatile": []
+    }
+  ],
+  "fileIndex": [
+    {
+      "path": "README.md",
+      "sha256": "2f97c4a2dcbddacaaeec3728d0fb5e5211f61082a66c25a25da6f7113df49379",
+      "bytes": 5124
+    },
+    {
+      "path": "compare-lib.cjs",
+      "sha256": "76491c18f9641ec6f7b9bedea4af6a74c351db42ecf54c73a848fd18e95e9141",
+      "bytes": 6531
+    },
+    {
+      "path": "compare.cjs",
+      "sha256": "df79cacdc998003b6b9f211698f76bb8d8b4d4b78756f46b817316da140c61bc",
+      "bytes": 2102
+    },
+    {
+      "path": "env-fingerprint.json",
+      "sha256": "fc4e57f1b1844fcc0e264aba28677ce013cfce6917fa9ec50f1572e5cf9df21e",
+      "bytes": 459
+    },
+    {
+      "path": "hmh-home/cognitive/trajectories/corpus.jsonl",
+      "sha256": "0cb4776bdfb38ea07138b240daf0c4fcbd9c862432ef3f4dedefcae0c870eb60",
+      "bytes": 1150077
+    },
+    {
+      "path": "packages/cognitive/package.json",
+      "sha256": "138801821a97787b5446fb751332326bd6ae84e3616c57c6792d23e9b84b7a06",
+      "bytes": 935
+    },
+    {
+      "path": "packages/cognitive/src/abstract-actions.ts",
+      "sha256": "e671bb6befdd7995423fa1f684af72e922a4bc6d4aee1391971883fd882c7700",
+      "bytes": 10700
+    },
+    {
+      "path": "packages/cognitive/src/analysis.ts",
+      "sha256": "83f30b17046c269b92df8c8a1168d1b415bbc8784c49e34607f431652424296e",
+      "bytes": 20940
+    },
+    {
+      "path": "packages/cognitive/src/benchmark.ts",
+      "sha256": "a9e8190e8aa875ec820deb215628d1cebed8da9b292f281f01638c9a89e385ad",
+      "bytes": 6161
+    },
+    {
+      "path": "packages/cognitive/src/code-world-model.ts",
+      "sha256": "c0da9cb745f265ae241287c094dda975d3b0047d749eaf36162fe528e3aeb613",
+      "bytes": 9945
+    },
+    {
+      "path": "packages/cognitive/src/code-world-store.ts",
+      "sha256": "29df2c857a4ece44a92f46b2b6126ac49dcd366f146938041cd1d2377090b5d0",
+      "bytes": 2386
+    },
+    {
+      "path": "packages/cognitive/src/continual.ts",
+      "sha256": "3ebfe003a0d4c6ae9ebb2637a1c7ad5ed4b4d61aeef218fc88794aa4ef87fc25",
+      "bytes": 9030
+    },
+    {
+      "path": "packages/cognitive/src/credit-assignment.ts",
+      "sha256": "ba0aa693c882bea49b6f104579361d32a697ba9c3a525bcf9515d9fc69bf3175",
+      "bytes": 4915
+    },
+    {
+      "path": "packages/cognitive/src/crowd.ts",
+      "sha256": "a7412c21855a4fede88031a897f6ecf1a604e6a54278cabc6c99d492bf813082",
+      "bytes": 14002
+    },
+    {
+      "path": "packages/cognitive/src/evalset.ts",
+      "sha256": "25af23578b3ea0a13f0ae4af24376b432ae651151e4552cc19d35cd3ab665af5",
+      "bytes": 9048
+    },
+    {
+      "path": "packages/cognitive/src/evidence-ledger.ts",
+      "sha256": "8a5421a4114f0da2d867405ae2bac85cd7fe7b16ffcbb0830843a56301146c67",
+      "bytes": 4085
+    },
+    {
+      "path": "packages/cognitive/src/evolution2.ts",
+      "sha256": "02fa5e32c5edf6a1bf3dc552adf320b65a244de3f8c22db19b10523114c4a36c",
+      "bytes": 10507
+    },
+    {
+      "path": "packages/cognitive/src/exploration.ts",
+      "sha256": "8389677cc6da2ad7b04b67317b5da92ae5ba8f273fcb7d13f5aded4b5a88a1e1",
+      "bytes": 11897
+    },
+    {
+      "path": "packages/cognitive/src/explore-runner.ts",
+      "sha256": "360395541843653a6d3f413c4a10b244bbdbce52d93c1609a822b16cea83f1ab",
+      "bytes": 6020
+    },
+    {
+      "path": "packages/cognitive/src/goal.ts",
+      "sha256": "0823b4b45e83a4c0a3097d113cb9e9857f03f8aedc146a360deba177bf0e4cb4",
+      "bytes": 8543
+    },
+    {
+      "path": "packages/cognitive/src/governance.ts",
+      "sha256": "70b3a03c964df0672b2c2d3268b92afa4641b43bba946322bc3ab508ac0702fd",
+      "bytes": 5199
+    },
+    {
+      "path": "packages/cognitive/src/index.ts",
+      "sha256": "82e047fcdd0fe55537d53905e99d706400d2e072acdf27664d11e5ae3ab2a4bb",
+      "bytes": 1698
+    },
+    {
+      "path": "packages/cognitive/src/learning-loop.ts",
+      "sha256": "e605d4b1e019d3dc110c70d155246a61eb98431f216d16069726b927119dbfd7",
+      "bytes": 2942
+    },
+    {
+      "path": "packages/cognitive/src/learning-targets.ts",
+      "sha256": "88b418d419f3275601c1e889e3d8c235671e57fe31a7037b67932afb66d2c2e5",
+      "bytes": 17650
+    },
+    {
+      "path": "packages/cognitive/src/ledger.ts",
+      "sha256": "542c601e7c7b5803b5ca653577fa8336506f1e350aad1fffba7c3757cca02bc6",
+      "bytes": 7664
+    },
+    {
+      "path": "packages/cognitive/src/mea.ts",
+      "sha256": "83c5740612d1d52d859585771a08c24a2de1b59676c3e212409d3afb076ddecd",
+      "bytes": 8815
+    },
+    {
+      "path": "packages/cognitive/src/memory.ts",
+      "sha256": "d0cb28be62dcd32b989613534b806a5a83acb63628a2213b4a392b7dc1dd5429",
+      "bytes": 9783
+    },
+    {
+      "path": "packages/cognitive/src/multi-agent.ts",
+      "sha256": "7e0a14425fc1f257b9d01ff86a3a44680a17044f8e78427cf12541cef86cf377",
+      "bytes": 8428
+    },
+    {
+      "path": "packages/cognitive/src/prediction-os.ts",
+      "sha256": "67cded711478c7a25c8458a362e333840c345a3fe56d44d30d47df510453e9c3",
+      "bytes": 9562
+    },
+    {
+      "path": "packages/cognitive/src/protocol.ts",
+      "sha256": "da79eb1380e5569aa0bf163e7c0f062cdeaa33bcf38c0020e965367daee90d28",
+      "bytes": 9344
+    },
+    {
+      "path": "packages/cognitive/src/registry.ts",
+      "sha256": "e50106c5352d155308f91ecfe5ffbc53e86be4e7a09bef8b59b5716b8685d31e",
+      "bytes": 9931
+    },
+    {
+      "path": "packages/cognitive/src/rlm-sandbox.ts",
+      "sha256": "131547fc0d1b5880937e377a3a8f96a2b8b476461ea54105470cf1624a80bd7f",
+      "bytes": 6269
+    },
+    {
+      "path": "packages/cognitive/src/rlm.ts",
+      "sha256": "e8ffbb8e34d51c3b7e6c6ae53f7eca01678fe8255554e5e9db963820c70e556e",
+      "bytes": 7248
+    },
+    {
+      "path": "packages/cognitive/src/skill-compiler.ts",
+      "sha256": "124f4b1e8bf16837ddc7bc4dd03c87633410b69c60d5a784ea97379367e6899c",
+      "bytes": 27748
+    },
+    {
+      "path": "packages/cognitive/src/slice.ts",
+      "sha256": "ecad41c78a6db5540176b5fa623dad6b88eafba10739c01d17c996aeb535e31d",
+      "bytes": 10663
+    },
+    {
+      "path": "packages/cognitive/src/status.ts",
+      "sha256": "7157ce7794cdfa5481d7deb899ec082efa5e8f56417f9db536aea32299694378",
+      "bytes": 4788
+    },
+    {
+      "path": "packages/cognitive/src/trajectory.ts",
+      "sha256": "ab8477789527301c25e1ffc8da690664829d525ce9158c56fedd3b0ddfede797",
+      "bytes": 4361
+    },
+    {
+      "path": "packages/cognitive/src/transfer-lab.ts",
+      "sha256": "5faa60f1a5cbaa6b53ba094280729d1793fe1416fee8100ed0060e63129f2b44",
+      "bytes": 10274
+    },
+    {
+      "path": "packages/cognitive/src/wm-causal.ts",
+      "sha256": "9307f1e841a113fcfcc93f47cd4afba3382361957020dc4fcf4e9bdd552eb67a",
+      "bytes": 8449
+    },
+    {
+      "path": "packages/cognitive/src/world-model.ts",
+      "sha256": "516fb40380647e0b92fbebe073d607b1d9cc4097a092f5e9b50047b8572b84cc",
+      "bytes": 20100
+    },
+    {
+      "path": "published/machine-verdict.md",
+      "sha256": "0d1eff0e2be9d7542094014f29589729334deb08663075130f74d8780b91e8d8",
+      "bytes": 687
+    },
+    {
+      "path": "published/manifest.json",
+      "sha256": "d2f816cf10b70afcaa2f9189ad42a83ca0dc1f5c8b737b923622190cfd01a64c",
+      "bytes": 9380
+    },
+    {
+      "path": "published/phases/analysis.json",
+      "sha256": "1772f6a58b6adb870af65ebff9f44dea6e2c61f70fa9eaa2020174f29571aee3",
+      "bytes": 452
+    },
+    {
+      "path": "published/phases/run.json",
+      "sha256": "dbfba84e86aca37096913398b9356d6f85fb9c10c100cc2db7817b6bc10a1cde",
+      "bytes": 46412
+    },
+    {
+      "path": "reproduce.cjs",
+      "sha256": "718a25925fffa249920aebe2e609249cf3067acd638d21ffcf7bb9788a9b0032",
+      "bytes": 1494
+    },
+    {
+      "path": "scripts/skillgen-p1-2-experiment.mts",
+      "sha256": "4b32c1df98e90e0d3917971c83820242250d99399e2df3d8123dcb8a6a1fb46f",
+      "bytes": 11440
+    },
+    {
+      "path": "verdict-rules.md",
+      "sha256": "bea0ca1aeddb69e4687abc5e69ee939bd92e75651239c2a7d542747d20647221",
+      "bytes": 3131
+    }
+  ]
+}

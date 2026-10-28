@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-10-28T16:15:57.373Z",
+  "nodeVersionRequired": ">=22.7 (native --experimental-transform-types; tsx fallback)",
+  "packTime": {
+    "node": "v22.23.3",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "determinism": {
+    "seed": "real-cycle-2026-10-07 (split), skillgen-p1-2-<family> (bootstrap)",
+    "datasetHash": "a2ac0a292557497fd8ed65911bb12c98cce630d15871c56be46cee816acc666d",
+    "llmTokens": 0,
+    "network": "none"
+  }
+}

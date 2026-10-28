@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-10-28T11:07:57.809Z",
+  "verdict": "WEAK-POSITIVE",
+  "secondaryEndpoint": "effective",
+  "counts": {
+    "familiesImproving": 3,
+    "familiesWorsening": 0,
+    "worsenedBeyond5pp": 0,
+    "significantNonLowPower": 0,
+    "lowPowerOrEmpty": 0
+  },
+  "llmTokens": 0,
+  "wallclockMs": 320,
+  "note": "corpus-replay experiment: zero LLM tokens; no API calls (429 rule structurally inapplicable — preregistered)"
+}

@@ -1,0 +1,4 @@
+List exactly three tool names, one per line, no other text. Use: read_file, edit_file, run_command.
+expect: read_file && edit_file && run_command
+expect-none: bullet
+holdout: true

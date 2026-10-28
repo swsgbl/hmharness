@@ -1,0 +1,3 @@
+二分查找的时间复杂度是什么？只输出大O表示
+expect-regex: O\(.*log
+holdout: true

@@ -1,0 +1,127 @@
+{
+  "ranAt": "2026-10-28T04:30:58.218Z",
+  "report": {
+    "time": "2026-10-28T04:11:43.542Z",
+    "model": "glm-5.3",
+    "seededCases": [
+      "toolchain-report.task",
+      "reply-determinism.task",
+      "toolchain-ohpm-status.task"
+    ],
+    "insightCount": 0,
+    "noteCount": 0,
+    "proposals": [
+      {
+        "name": "verbatim-character-copy",
+        "description": "(three-arm-v2 population candidate, class format)",
+        "skill_md": "Treat the requested string as immutable literal data, not prose to improve.\nCopy it directly from the prompt, character by character.\nPreserve any leading or trailing spaces exactly; never trim.\nInclude surrounding quotes, brackets, and terminal punctuation when they are part of the target.\nKeep full-width/CJK punctuation byte-identical; never substitute ASCII lookalikes.\nKeep case exactly; do not auto-capitalize or lowercase.\nPreserve repeated delimiters and empty fields; do not collapse them.\nKeep every character the prompt flags as intentional or required.\nNever insert characters the target does not contain.\nBefore sending, silently diff your reply against the prompt: same length, same first and last character.\nIf anything differs, correct it without commenting."
+      },
+      {
+        "name": "payload-only-reply",
+        "description": "(three-arm-v2 population candidate, class format)",
+        "skill_md": "The reply channel carries the payload only.\nOutput the target string, then stop.\nNo greeting, acknowledgment, preamble, or sign-off.\nNo explanation of what you did or why.\nNo markdown: no code fences, bullets, bold, or headers.\nThe first character of the reply is the first character of the target.\nThe last character of the reply is the last character of the target.\nEmit nothing after the final character — no trailing note or addendum.\nDo not restate, translate, or confirm the instruction.\nDo not wrap the answer in quotes or backticks unless they are part of the target.\nIf tempted to add anything, delete it instead."
+      },
+      {
+        "name": "verbatim-codepoint-copy",
+        "description": "(three-arm-v2 population candidate, class exact-output)",
+        "skill_md": "# verbatim-codepoint-copy\n\n- Copy the target exactly, character by character, not by meaning.\n- Treat every character as frozen: punctuation width, case, spacing, script.\n- Never normalize half-width punctuation to full-width or back.\n- Never swap a mark for its localized equivalent.\n- Match each punctuation character to the exact form shown in the prompt.\n- Never translate, transliterate, or \"fix\" the text.\n- Keep every space exactly where it sits, including around Latin words inside CJK text.\n- Your instinct to standardize or improve the text is the failure mode.\n- Verify punctuation width and spacing before sending.\n- Change nothing; the target is already correct as shown."
+      },
+      {
+        "name": "bare-string-reply",
+        "description": "(three-arm-v2 population candidate, class exact-output)",
+        "skill_md": "# bare-string-reply\n\n- The entire reply is the string alone. Nothing before, nothing after.\n- No preamble, no explanation, no politeness, no sign-off.\n- No markdown: no backticks, asterisks, or fences unless the target itself is fenced.\n- Do not decorate commands, code, or filenames; emit them as plain text.\n- No trailing punctuation the target does not contain.\n- End at the string's last character: no newline, no trailing space.\n- If the target was shown quoted, output the inner text unless quotes are part of the string.\n- Formatting is addition; addition is failure.\n- When unsure, output less."
+      }
+    ],
+    "outcomes": [
+      {
+        "name": "verbatim-character-copy",
+        "action": "rejected",
+        "reason": "below quality floor: pass rate 0.46153846153846156 < min 0.6 (non-regression vs a weak baseline 0.46153846153846156 is not good enough)",
+        "baseline": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.46153846153846156
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-28T04:18:57.931Z"
+        }
+      },
+      {
+        "name": "payload-only-reply",
+        "action": "rejected",
+        "reason": "below quality floor: pass rate 0.46153846153846156 < min 0.6 (non-regression vs a weak baseline 0.46153846153846156 is not good enough)",
+        "baseline": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.46153846153846156
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-28T04:23:18.790Z"
+        }
+      },
+      {
+        "name": "verbatim-codepoint-copy",
+        "action": "rejected",
+        "reason": "below quality floor: pass rate 0.46153846153846156 < min 0.6 (non-regression vs a weak baseline 0.46153846153846156 is not good enough)",
+        "baseline": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.46153846153846156
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-28T04:26:16.621Z"
+        }
+      },
+      {
+        "name": "bare-string-reply",
+        "action": "rejected",
+        "reason": "below quality floor: pass rate 0.46153846153846156 < min 0.6 (non-regression vs a weak baseline 0.46153846153846156 is not good enough)",
+        "baseline": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "candidate": {
+          "passRate": 0.46153846153846156,
+          "cases": "adv-cn-punct:FAIL adv-long-1:FAIL adv-long-2:FAIL adv-mixed-1:FAIL adv-space-1:FAIL adv-space-2:FAIL beh-echo-t5-first:pass beh-t10-l4:pass beh-t6-l2:pass beh-t6-l5:pass beh-t8-n:pass behave-echo-count3:pass behave-echo-last:pass cjk-ex-5:FAIL cjk-trap-3:pass cjk-trap-5:pass fadv-csv:FAIL fadv-json:FAIL fadv-yaml:FAIL reply-determinism:pass teach-calc-1:FAIL teach-calc-2:FAIL teach-calc-5:FAIL toolchain-report:FAIL train-choice-2:pass train-x-8:pass"
+        },
+        "lineage": {
+          "parentInsights": [],
+          "scores": {
+            "train": 0.46153846153846156
+          },
+          "metaModel": "glm-5.3",
+          "decidedAt": "2026-10-28T04:30:58.205Z"
+        }
+      }
+    ],
+    "memoryDistilled": null,
+    "budget": {
+      "cyclesToday": 0
+    },
+    "estTokens": 726
+  }
+}

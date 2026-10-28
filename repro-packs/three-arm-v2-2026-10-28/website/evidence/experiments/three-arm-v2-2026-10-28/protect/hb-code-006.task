@@ -1,0 +1,3 @@
+写一个 TypeScript interface User，包含 name:string 和 age:number，只输出代码
+expect: interface User
+holdout: true
