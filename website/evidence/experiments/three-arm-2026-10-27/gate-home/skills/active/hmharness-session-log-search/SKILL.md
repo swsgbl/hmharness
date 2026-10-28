@@ -17,7 +17,7 @@ Goal: Reliably find and search past session JSONL logs under `~/.hmharness/sessi
 ## Extract user/assistant text
 Use PowerShell JSON parsing:
 powershell
-Get-Content 'C:\Users\hongfu\.hmharness\sessions\2026\09\13\*.jsonl' | ForEach-Object {
+Get-Content 'C:\Users\<user>\.hmharness\sessions\2026\09\13\*.jsonl' | ForEach-Object {
   $o = $_ | ConvertFrom-Json
   if ($o.type -eq 'user' -or $o.type -eq 'assistant') { $o.text }
 }

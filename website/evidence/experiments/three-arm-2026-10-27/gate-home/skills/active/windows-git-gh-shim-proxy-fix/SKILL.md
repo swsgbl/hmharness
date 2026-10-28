@@ -1,12 +1,12 @@
 ## Symptom
 - On Windows, `gh` (Go exec) fails with: failed to run git: 'merge' 不是内部或外部命令.
-- Root cause: `where git` first returns a `.cmd` shim such as `C:\Users\hongfu\.local\bin\git.cmd`, which Go exec cannot invoke.
+- Root cause: `where git` first returns a `.cmd` shim such as `C:\Users\<user>\.local\bin\git.cmd`, which Go exec cannot invoke.
 
 ## Fix
 1. Check PATH: `where git`.
 2. Prepend real Git cmd dir for the current shell before running gh:
    `set "PATH=C:\Program Files\Git\cmd;%PATH%"`
-   Or remove `C:\Users\hongfu\.local\bin` from PATH.
+   Or remove `C:\Users\<user>\.local\bin` from PATH.
 3. Avoid cmd trailing-space bug: do NOT use `set VAR=value && cmd2`; the space before `&&` becomes part of the value. Use:
    `set "VAR=value"`
    or pass config directly to git.

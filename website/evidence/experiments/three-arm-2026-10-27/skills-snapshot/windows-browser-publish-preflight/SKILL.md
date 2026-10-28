@@ -12,7 +12,7 @@ Get-ChildItem G:\hmharness-yingxiao\posts | Select-Object Name
 
 ## 2. Verify browser-harness skill path
 powershell
-Test-Path C:\Users\hongfu\.claude\skills\browser-harness\SKILL.md
+Test-Path C:\Users\<user>\.claude\skills\browser-harness\SKILL.md
 
 If false, locate the real path with `dir /s /b SKILL.md` and update.
 

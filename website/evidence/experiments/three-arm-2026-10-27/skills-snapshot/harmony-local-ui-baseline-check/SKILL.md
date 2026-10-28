@@ -6,7 +6,7 @@ When you have a HarmonyOS app like SelfFeedR with existing UI baselines and need
 ## Prerequisites
 - Emulator or device reachable via hdc, typically target `127.0.0.1:5555`.
 - Project root containing `hmh-baseline.cjs` and optionally `hmh-ui.cjs`.
-- Baseline directory e.g. `C:\Users\hongfu\.hmharness\ops\ui-baselines\SelfFeedR\` with PNGs and `baseline.json`.
+- Baseline directory e.g. `C:\Users\<user>\.hmharness\ops\ui-baselines\SelfFeedR\` with PNGs and `baseline.json`.
 
 ## Baseline check
 1. `cd /d G:\hmharness-selffeed\SelfFeedR`

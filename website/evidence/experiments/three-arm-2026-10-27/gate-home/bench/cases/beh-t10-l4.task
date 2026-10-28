@@ -1,3 +1,3 @@
-Read C:/Users/hongfu/.hmharness/bench/cases/behave-target10.txt, reply ONLY the fourth flavor.
+Read C:/Users/<user>/.hmharness/bench/cases/behave-target10.txt, reply ONLY the fourth flavor.
 tools: loop
 expect-exact: "mint"

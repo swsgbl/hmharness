@@ -19,5 +19,5 @@ Use before continuing WeChat/Weibo/browser tasks that rely on browser-harness or
 Example:
 powershell
 Get-NetTCPConnection -LocalPort 9222 -State Listen
-dir /s /b C:\Users\hongfu\.claude\skills\browser-harness\SKILL.md
+dir /s /b C:\Users\<user>\.claude\skills\browser-harness\SKILL.md
 dir /s /b G:\hmharness-yingxiao\posts\*.md
