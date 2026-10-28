@@ -37,6 +37,13 @@ test('prompt contains DeepSeek-origin instructions: phased execution, challenge 
   assert.ok(p.includes('ground truth'), 'missing user-feedback');
 });
 
+test('prompt contains Codex final-answer structure rules (section + path:line + findings first)', () => {
+  const p = buildSystemPrompt({ cwd: '/w', home: '/h', memory: '', skills: '', insights: '', model: 'm' });
+  assert.ok(p.includes('## Final answer structure'), 'missing final-answer section header');
+  assert.ok(p.includes('path:line'), 'missing path:line file-reference rule');
+  assert.ok(p.includes('findings first'), 'missing findings-first review rule');
+});
+
 test('AGENTS.md injected when provided; omitted when absent', () => {
   const withMd = buildSystemPrompt({ cwd: '/w', home: '/h', memory: '', skills: '', insights: '', model: 'm', agentsMd: 'Use the fm engine, never hvigor.' });
   assert.ok(withMd.includes('Use the fm engine, never hvigor.'));
