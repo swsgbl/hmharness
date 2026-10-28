@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-10-29(六十二) · 测试诚实化双收官:CI 假绿根修 + clean-room 验真自动化(P0-2 关门)
+
+**动机**:Windows 本机 routes-* 四测试连崩数周(`UV_HANDLE_CLOSING` 断言)挡了三轮验收;审计文档 03 P0-2"发布工件验真"的验收门(clean-room 安装+关键路径实跑)一直靠人工抽查。
+
+**关键决策**:①8-B 根因比预想深——旧 `server.close()` 藏**无条件 `process.exit(0)`**,库上下文里直接击杀测试宿主:Windows 触发 libuv 断言,**Linux CI 同样被杀=此前 CI 全绿是假绿**,掩盖 2026-10-18 拆分起 5 个潜伏缺陷(port-0 回显/pair-rotate 报旧状态/守卫断言合同不符/extension-status 环境依赖/diff cwd 依赖);修复=统一句柄登记表+closeOnce() LIFO 排干+SSE 写入门+库层绝不 exit+幂等(PR#33)。②8-A `scripts/cleanroom-verify.cjs`:官方源 tarball 双指纹→隔离目录+隔离缓存安装→15 包钉版核验→关键路径实跑(check/state/任务+interrupt/rollout/resume/bench/evolve,无 key 边界如实记录)→工件归档 `website/evidence/cleanroom/`,写入单点脱敏(OS 用户名→`<user>`,SANITIZATION.md 记 sha256 前像;预推钩子连"描述脱敏的字面量"都拦,措辞须绕开)(PR#34)。③PR#35:browser 测试硬编码 19223=BrowserOS 真实默认口,用户机开着就环境翻车→借临时空闲口。
+
+**实测证据**:修复后**本机全套首次全绿**(1037 零 fail,数周来第一次);四 routes 文件连跑两遍 5/5×2;v0.23.45 发版后 cleanroom 脚本自验新版本 **11/11 PASS**(吃狗粮闭环);证据三目录入库 gh-pages 同步。
+
+**教训**:①`process.exit` 出现在库里=宿主生死被绑架,测试"全绿"可能只是"没跑到断言就被杀"——假绿的鉴别特征是文件级失败无逐条结果;②测试环境敏感三连修通用模式=环境依赖必须钉死或借临时资源,断言必须与产品合同对齐;③验真工件本身也要过脱敏门,写"我们脱敏了 X"这句话都不能包含 X 的字面量。
+
+---
+
+## 2026-10-29(六十一) · 结构化结论输出双修:TUI markdown 渲染器 + Codex 式答复结构规范(v0.23.44)
+
+**动机**:用户三家 CLI 对比实测(Codex/Claude Code 干净 vs hmh 混乱:`#`/`**`/`|---|` 原样透传、表格散架),质问"之前让你参考 Codex 开源仓库提示词工程,没做到吗?"——核查属实:prompt.ts 只移植了 Codex 执行纪律类模式,**漏掉其 "Final answer structure and style guidelines" 核心章节**(`gpt_5_2_prompt.md` 尾部),TUI 的 mdColor() 只是 6 行行首着色器,渲染层从未建设(Codex TUI 有 markdown 渲染模块族+styles.md)。
+
+**关键决策**:双修两层——①`packages/cli/src/markdown.ts` 424 行零依赖终端渲染器:单遍块扫描+行内状态机;表格 box 边框+CJK 双宽等宽对齐+冒号对齐+超宽截断;流式接入 say 流(未闭合块随 chunk 重排,已闭合块纯函数不变);resume/transcript 同渲染器;mdColor 删除(PR#31,28 例测试)。②prompt.ts 增补 `## Final answer structure` 10 行:冗长度阶梯(小=2-5 句无标题/中=≤6 要点/大=按区域 1-2 条)/要点 4-6 不嵌套/反引号约定/path:line/findings-first/简单事零格式+中文条款(短标题≤6字、先结论)(PR#32)。同车发布:复现包 P2-1(PR#29)+web page.ts 3833 行拆 12 域(PR#30)。
+
+**实测证据**:指挥者独立冒烟(中文表格+标题+粗体+代码块+嵌套列表):标题青粗带下划线、表格四列 box 对齐、☑ 绿色、代码块内 `**` 保留、转义正确——与 Claude Code 终端同级;npm 16/16;设备 15 包升级三端同核探针 OK。
+
+**教训**:①"参考了开源仓库"要落到具体章节级别自查——移植清单里漏掉的正是用户肉眼可见的那层;②输出干净=提示词约束×渲染器两层合力,缺一不可;③网页端渲染早修过,缺口诊断必须按端分别核(本例缺口只在 TUI+提示词)。
+
+---
+
 ## 2026-10-28(六十) · 破案轮:语法错误一击致命 / Tabbit 隐身浏览器 / Chrome 单实例陷阱
 
 **动机**:继续逐浏览器当场验证(五十九轮后 Chrome/Brave 仍不连)。
