@@ -78,7 +78,7 @@ See `verdict-rules.md`: the decision enum and every gate were frozen in the expe
 - `hmh-home/cognitive/trajectories/corpus.jsonl` — 467 usable trajectories of the 3 frozen families, in the exact loader order the published run saw (single file ⇒ readdir order is deterministic on every OS).
 - dataset hash (frozen in the experiment manifest): `a2ac0a292557497fd8ed65911bb12c98cce630d15871c56be46cee816acc666d` — recomputed at pack time and equal.
 - The corpus grew after the experiment ran; the packer dropped the 8 newest trajectories (ids in manifest.json → corpus.reconstruction) until the hash matched the freeze-time value, and verified per-family counts (terminal=355, harmonyos=79, browser=33).
-- Projection: each trajectory is reduced to the fields the frozen analyzer consumes — `{id, environment.id, goal.description→tokenized, steps[].action.type/outcome, metrics.success}`. `goal.description` is replaced by its tokenize() output (the only form the experiment reads); 89 secret-shaped tokens (41 distinct: ≥12 chars with ≥4 digits) were dropped. The self-test proves the projection + redaction are verdict-neutral by requiring IDENTICAL.
+- Projection: each trajectory is reduced to the fields the frozen analyzer consumes — `{id, environment.id, goal.description→tokenized, steps[].action.type/outcome, metrics.success}`. `goal.description` is replaced by its tokenize() output (the only form the experiment reads); 100 secret-shaped tokens (49 distinct: ≥12 chars with ≥4 digits) were dropped. The self-test proves the projection + redaction are verdict-neutral by requiring IDENTICAL.
 
 ## Honesty clauses
 

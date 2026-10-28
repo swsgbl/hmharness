@@ -174,6 +174,12 @@ function usernameTokens(): string[] {
     const gitName = execFileSync('git', ['config', 'user.name'], { cwd: REPO, encoding: 'utf8' }).trim().toLowerCase();
     if (gitName.length >= 3) for (const part of gitName.split(/\s+/)) if (part.length >= 3) names.add(part);
   } catch { /* no git identity configured */ }
+  try {
+    const email = execFileSync('git', ['config', 'user.email'], { cwd: REPO, encoding: 'utf8' }).trim().toLowerCase();
+    const local = email.split('@')[0];
+    if (local && local.length >= 3) names.add(local);
+  } catch { /* no git email configured */ }
+  if (names.size === 0) throw new Error('PII drop-set derivation failed (no machine/git identity available) — refusing to build: fail closed');
   return [...names];
 }
 
@@ -183,23 +189,49 @@ function usernameTokens(): string[] {
 const CREDENTIAL_MARKERS = ['sk-', 'ghp_', 'gho_', 'ghu_', 'akia', 'begin open', 'private key', 'password=', 'passwd', 'token=', 'api_key', 'apikey', 'secret=', 'bearer '];
 function countCredentialMarkers(text: string): number {
   const lower = text.toLowerCase();
-  return CREDENTIAL_MARKERS.reduce((n, m) => n + (lower.includes(m) ? 1 : 0), 0);
+  return CREDENTIAL_MARKERS.reduce((n, m) => n + (lower.split(m).length - 1), 0);
+}
+/** Marker-adjacent material is cut from the RAW text BEFORE tokenization:
+ *  'password: hunter2' / 'token=abc' lose the value next to the marker word
+ *  (the following whitespace-delimited chunk), because the value itself may
+ *  be an arbitrary string no shape rule can catch. */
+function stripCredentialAdjacents(raw: string): string {
+  let text = raw.replace(/(sk|ghp|gho|ghu|akia)[-_][a-z0-9_]{4,}/gi, ' ');
+  text = text.replace(/(password|passwd|secret|token|api[_-]?key|apikey|bearer)\s*[=:]\s*\S+/gi, ' ');
+  text = text.replace(/(password|passwd|secret|token|api[_-]?key|apikey|bearer)\s+(?!is|was|to|the|and|for|of|in|on|field|name|error|invalid|wrong|correct|reset|change|prompt|input|mask)\S+/gi, ' ');
+  return text;
 }
 
 /** Credential-PREFIX + digit token (password1, secret123, sk1234…): dropped
  *  like secret-shaped tokens — a plain English word ('password' with no
  *  digits) is not a credential and stays. */
 const CREDENTIAL_PREFIX_RE = /^(sk|ghp|gho|ghu|akia|passwd|password|secret|token|apikey|bearer)[a-z]*\d+[a-z0-9]*$/;
+/** INDEPENDENT post-projection validator (must NOT reuse the drop predicate):
+ *  stricter thresholds than the drop rule + standalone credential-prefix
+ *  fragments (a raw ghp_xxx tokenizes to a lone 'ghp' that carries no digits). */
 function assertNoCredentialShapedSurvive(projectedText: string): void {
-  const hits = projectedText.toLowerCase().split(/[^a-z0-9]+/).filter((w) => CREDENTIAL_PREFIX_RE.test(w));
+  const toks = projectedText.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const hits = toks.filter((w) =>
+    ['ghp', 'gho', 'ghu', 'akia'].includes(w)
+    || CREDENTIAL_PREFIX_RE.test(w)
+    || (w.length >= 16 && /[a-z]/.test(w) && /\d/.test(w)));
   if (hits.length > 0) throw new Error(`credential-shaped tokens survived projection: ${hits.slice(0, 5).join(', ')} — refusing to build pack`);
+}
+/** PII absence proof: none of the derived identity tokens may appear in the
+ *  published corpus (the self-test complements this by requiring IDENTICAL). */
+function assertNoPiiSurvive(projectedText: string, pii: string[]): void {
+  const toks = new Set(projectedText.toLowerCase().split(/[^\p{L}\p{N}]+/u));
+  const leaked = pii.filter((p) => toks.has(p));
+  if (leaked.length > 0) throw new Error(`PII tokens survived projection (${leaked.length} kinds) — refusing to build pack`);
 }
 
 /** Secret-shaped token minimization for the PUBLISHED corpus: long tokens
  *  with several digits are commit hashes / ICP numbers / key-ish strings.
  *  Dropping them is verdict-neutral only if the self-test still says
  *  IDENTICAL — which the packager enforces before shipping. */
-const isSecretShaped = (w: string): boolean => w.length >= 12 && (w.match(/\d/g)?.length ?? 0) >= 4 && /\p{L}/u.test(w);
+const isSecretShaped = (w: string): boolean =>
+  (w.length >= 12 && (w.match(/\d/g)?.length ?? 0) >= 4 && /\p{L}/u.test(w))
+  || (w.length >= 16 && /\p{L}/u.test(w) && /\d/.test(w)); // base64/encoded blobs with sparse digits
 
 interface CorpusPack {
   lines: string[];
@@ -255,8 +287,9 @@ async function freezeCorpus(recipe: Recipe, expManifest: unknown): Promise<Corpu
   const isDropped = (w: string): boolean => isSecretShaped(w) || CREDENTIAL_PREFIX_RE.test(w) || piiTokens.includes(w);
   let rawMarkerHits = 0;
   const lines = pool.map((t) => {
-    rawMarkerHits += countCredentialMarkers(t.goal?.description ?? '');
-    const tokens = tokenize(t.goal?.description ?? '');
+    const raw = t.goal?.description ?? '';
+    rawMarkerHits += countCredentialMarkers(raw);
+    const tokens = tokenize(stripCredentialAdjacents(raw));
     const kept: string[] = [];
     for (const w of new Set(tokens)) {
       if (isDropped(w)) redacted.set(w, (redacted.get(w) ?? 0) + 1);
@@ -441,7 +474,7 @@ interface PackManifest {
     reconstruction: { method: string; droppedIds: string[]; verified: boolean };
     projection: {
       fields: string;
-      goalRedaction: { rule: string; tokenCount: number; distinctTokens: number; piiTokens: string[]; rawCredentialMarkerHits: number };
+      goalRedaction: { rule: string; tokenCount: number; distinctTokens: number; piiTokenCount: number; rawCredentialMarkerHits: number };
     };
   };
   evidenceExcluded: Array<{ path: string; reason: string }>;
@@ -599,10 +632,10 @@ const manifest: PackManifest = {
           projection: {
             fields: '{id, environment.id, goal.description (tokenized), steps[].action.type, steps[].outcome, metrics.success} — exactly the fields the frozen driver and packages/cognitive/src/skill-compiler.ts consume',
             goalRedaction: {
-              rule: 'drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers / key-shaped strings); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).',
+              rule: 'drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers); (a2) length>=16 with letters AND digits (base64/encoded blobs with sparse digits); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens (count only — values never published). Pre-tokenization, credential-marker-adjacent material (password: VALUE / token=VALUE / bare-marker next word) is cut from the RAW text. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).',
               tokenCount: corpusInfo.redactedTokenCount,
               distinctTokens: corpusInfo.redactedDistinctTokens,
-              piiTokens: corpusInfo.piiTokens,
+              piiTokenCount: corpusInfo.piiTokens.length,
               rawCredentialMarkerHits: corpusInfo.rawMarkerHits,
             },
           },
