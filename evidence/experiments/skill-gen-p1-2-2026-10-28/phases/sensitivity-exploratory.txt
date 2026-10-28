@@ -1,0 +1,44 @@
+npm notice run hmharness@0.23.43 npx
+npm notice run tsx scripts/skillgen-p1-2-sensitivity.mts
+
+=== terminal (n=107) top-12 in arm-A order ===
+  [SIGNAL] sup=124 cont=0.486 run_command|run_command|run_command|run_command
+  [SIGNAL] sup=91 cont=0.374 read_file|run_command|run_command|run_command
+  [SIGNAL] sup=87 cont=0.327 run_command|run_command|run_command|write_file
+  [SIGNAL] sup=81 cont=0.327 run_command|run_command|write_file|run_command
+  [SIGNAL] sup=78 cont=0.383 run_command|run_command|run_command|read_file
+  [SIGNAL] sup=77 cont=0.327 run_command|write_file|run_command|run_command
+  [SIGNAL] sup=74 cont=0.318 write_file|run_command|run_command|run_command
+  [SIGNAL] sup=67 cont=0.318 run_command|read_file|run_command|run_command
+  [SIGNAL] sup=62 cont=0.318 run_command|run_command|read_file|run_command
+  [SIGNAL] sup=59 cont=0.262 read_file|read_file|run_command|run_command
+  [SIGNAL] sup=50 cont=0.252 run_command|run_command|read_file|read_file
+  [SIGNAL] sup=50 cont=0.234 read_file|read_file|read_file|run_command
+
+=== harmonyos (n=21) top-12 in arm-A order ===
+  [SIGNAL] sup=8 cont=0.095 harmony_logs|harmony_logs|harmony_logs|harmony_logs
+  [  no ] sup=6 cont=0.095 hdc-shell|hdc-shell|hdc-shell|hdc-shell
+  [SIGNAL] sup=3 cont=0.048 harmony_devices|harmony_logs|harmony_logs|harmony_logs
+  [SIGNAL] sup=3 cont=0.048 harmony_logs|harmony_logs|harmony_logs|harmony_build
+  [SIGNAL] sup=3 cont=0.143 harmony_build|harmony_logs|harmony_logs|harmony_logs
+  [SIGNAL] sup=2 cont=0 harmony_build|harmony_sign|harmony_devices|harmony_install
+  [SIGNAL] sup=2 cont=0 harmony_build_doctor|harmony_devices|harmony_logs|harmony_logs
+  [SIGNAL] sup=2 cont=0 harmony_api_lookup|harmony_api_lookup|harmony_api_lookup|harmony_api_l
+  [SIGNAL] sup=2 cont=0 harmony_build|harmony_build|harmony_logs|harmony_logs
+  [SIGNAL] sup=10 cont=0.19 harmony_logs|harmony_logs|harmony_logs
+  [SIGNAL] sup=3 cont=0 harmony_sign|harmony_devices|harmony_install
+  [SIGNAL] sup=2 cont=0 harmony_api_lookup|harmony_api_lookup|harmony_build_doctor
+
+=== browser (n=10) top-12 in arm-A order ===
+  [SIGNAL] sup=3 cont=0.1 type-text|type-text|type-text|type-text
+  [SIGNAL] sup=2 cont=0 browser_read|browser_tabs|browser_tabs|browser_read
+  [SIGNAL] sup=3 cont=0.1 browser_tabs|browser_tabs|browser_read
+  [  no ] sup=2 cont=0 click|navigate|type-text
+  [  no ] sup=2 cont=0 navigate|type-text|navigate
+  [  no ] sup=2 cont=0 click|type-text|click
+  [  no ] sup=4 cont=0 navigate|type-text
+  [  no ] sup=4 cont=0.2 click|type-text
+  [SIGNAL] sup=3 cont=0.1 browser_read|browser_tabs
+  [  no ] sup=3 cont=0.1 click|navigate
+  [SIGNAL] sup=3 cont=0.1 type-text|navigate
+  [SIGNAL] sup=3 cont=0 type-text|click
