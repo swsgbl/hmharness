@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,12 +10,20 @@ import { fileURLToPath } from 'node:url';
  * as undefined text at runtime for half the users - this test catches it at
  * build time. Extracted from the PAGE template by evaluating the LABELS
  * object literal the same way the browser does.
+ * P1-3 拆分:LABELS 随 core 域迁往 page/core.ts,两处候选依次探测。
  */
-const pageSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../page.ts'), 'utf8');
-const m = /var LABELS = (\{[\s\S]*?\n  \});/.exec(pageSrc);
-assert.ok(m, 'LABELS object literal found in page.ts');
-// eslint-disable-next-line no-eval
-const LABELS = eval(`(${m[1]})`) as Record<string, Record<string, unknown>>;
+const here = dirname(fileURLToPath(import.meta.url));
+let LABELS: Record<string, Record<string, unknown>> | null = null;
+for (const p of [join(here, '../page.ts'), join(here, '../page/core.ts')]) {
+  if (!existsSync(p)) continue;
+  const m = /var LABELS = (\{[\s\S]*?\n  \});/.exec(readFileSync(p, 'utf8'));
+  if (m) {
+    // eslint-disable-next-line no-eval
+    LABELS = eval(`(${m[1]})`) as Record<string, Record<string, unknown>>;
+    break;
+  }
+}
+assert.ok(LABELS, 'LABELS object literal found in page.ts / page/core.ts');
 
 function flatKeys(obj: Record<string, unknown>, prefix = ''): string[] {
   const out: string[] = [];
