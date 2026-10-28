@@ -236,6 +236,15 @@ function loadPredictions(file: string): Map<string, number | null> {
 
 function recordKey(r: Pick<RunRecord, 'arm' | 'seed' | 'taskId'>): string { return `${r.arm}:${r.seed}:${r.taskId}`; }
 
+/** Provider quota states (429 / rate limit / insufficient balance): these are
+ *  window boundaries, not task failures — the driver stops at the phase
+ *  boundary instead of recording pollution. Everything else (network blips,
+ *  5xx) stays a normal crash-record path. */
+function isQuotaDeath(err: unknown): boolean {
+  const s = String(err).toLowerCase();
+  return s.includes('429') || s.includes('rate limit') || s.includes('quota') || s.includes('insufficient');
+}
+
 /* ---------------- prediction (secondary metric) ---------------- */
 
 const PREDICT_PROMPT = (taskPrompt: string) =>
@@ -410,9 +419,15 @@ async function execPhase(o: ExecOpts): Promise<void> {
         try {
           const pr = await chat(provider, [{ role: 'user', content: PREDICT_PROMPT(task.prompt) }]);
           predictedP = parseProb(pr.message.content ?? '');
-        } catch { predictedP = null; }
-        predictions.set(pKey, predictedP);
-        appendPrediction(o.predictFile, seed, task.id, predictedP);
+          predictions.set(pKey, predictedP);
+          appendPrediction(o.predictFile, seed, task.id, predictedP);
+        } catch (err) {
+          // quota death must stop the phase at the boundary — recording a
+          // permanent null prediction (or a run) out of a 429 would be data
+          // pollution, not an honest measurement; resume is idempotent
+          if (isQuotaDeath(err)) throw new Error(`phase ${o.phase}: quota window exhausted at prediction for ${seed}:${task.id}: ${String(err).slice(0, 120)}`);
+          predictedP = null; // transient non-quota failure: no prediction this run (brier null)
+        }
       } else predictedP = predictions.get(pKey) ?? null;
 
       let system: string;
@@ -447,6 +462,12 @@ async function execPhase(o: ExecOpts): Promise<void> {
         appendRecord(o.outFile, rec);
         console.log(`[${n}/${total}] seed${seed} ${arm} ${task.id} -> ${verdict.pass ? 'PASS' : 'FAIL'} (${wallMs}ms, ${totalTokens ?? '?'}tok)`);
       } catch (err) {
+        if (isQuotaDeath(err)) {
+          // 429/quota: stop at the phase boundary. Completed cells are on
+          // disk; the interrupted cell is NOT recorded (crash records are for
+          // task-level failures, not provider quota states); resume re-runs it.
+          throw new Error(`phase ${o.phase}: quota window exhausted at ${arm}:${seed}:${task.id}: ${String(err).slice(0, 120)}`);
+        }
         const wallMs = Date.now() - t0;
         appendRecord(o.outFile, crashRecord(arm, o.datasetHash, seed, task, String(err).slice(0, 300), wallMs));
         console.log(`[${n}/${total}] seed${seed} ${arm} ${task.id} -> CRASH ${String(err).slice(0, 80)}`);
@@ -616,9 +637,20 @@ async function cmdPhase2(): Promise<void> {
   const cands = readCandidates();
   if (cands.population.length === 0) throw new Error('run phase1 first');
   const protectBefore = protectFingerprint();
+  // 429 sentinel: runEvolution (frozen repo code) swallows per-case errors as
+  // FAIL, which would turn a quota window boundary into fake bench failures.
+  // The runner marks quota death; after the run, a set sentinel vetoes the
+  // gate conclusions so a polluted cycle can never be recorded as valid.
+  const quotaFlag = join(PHASES, '2-gate.QUOTA-DEAD');
+  rmSync(quotaFlag, { force: true });
   const runner: CaseRunner = async (c, skillsPrompt) => {
-    const r = await makeRunner(provider)(c, systemPromptFor(skillsPrompt));
-    return r.output;
+    try {
+      const r = await makeRunner(provider)(c, systemPromptFor(skillsPrompt));
+      return r.output;
+    } catch (err) {
+      if (isQuotaDeath(err)) { writeFileSync(quotaFlag, `${new Date().toISOString()} ${c.name}: ${String(err).slice(0, 160)}\n`, 'utf8'); }
+      throw err;
+    }
   };
   const report = await runEvolution({
     home: GATE_HOME,
@@ -628,6 +660,10 @@ async function cmdPhase2(): Promise<void> {
     maxProposals: cands.population.length,
     log: (l) => console.log('  [gate]', l),
   });
+  if (existsSync(quotaFlag)) {
+    writeFileSync(join(PHASES, '2-gate.json'), JSON.stringify({ ranAt: new Date().toISOString(), report, INVALID: 'quota death during gate — outcomes below are POLLUTED (fail-by-429); rerun phase2 in a fresh window, do not use this report' }, null, 2) + '\n', 'utf8');
+    throw new Error('quota window exhausted DURING the gate: report written with INVALID marker — rerun phase2 in a fresh window (gate-home is rebuilt deterministically from the same candidates)');
+  }
   writeFileSync(join(PHASES, '2-gate.json'), JSON.stringify({ ranAt: new Date().toISOString(), report }, null, 2) + '\n', 'utf8');
 
   // pre-registered pick: highest gate train pass rate among promoted; tie -> lexicographically smallest name
