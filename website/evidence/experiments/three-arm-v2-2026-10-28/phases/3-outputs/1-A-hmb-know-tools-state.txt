@@ -1,0 +1,1 @@
+接下来我会检查 hmh CLI 的帮助信息,以确认快照 evolution 状态的子命令。正在运行 `hmh --help`:

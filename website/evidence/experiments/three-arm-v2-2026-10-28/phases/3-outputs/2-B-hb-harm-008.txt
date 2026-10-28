@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是鸿蒙应用的功能模块包文件，由代码、资源、第三方库和 module.json 配置组成，是 App Pack（应用包）的基本组成单元，可独立部署运行在设备上。

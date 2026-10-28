@@ -1,0 +1,1 @@
+我来查看 hmharness CLI 的子命令，确认快照进化状态的具体命令。Let me check the CLI help and source. I'll run these in parallel.

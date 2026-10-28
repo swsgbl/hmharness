@@ -1,0 +1,3 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充：此外还有两个非核心但常用的回调——onConfigurationUpdate（系统配置变化时）、onMemoryLevel（内存告警时）。

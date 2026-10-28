@@ -1,0 +1,3 @@
+`hdc`
+
+(具体用法:`hdc install <path-to-hap>`)

@@ -1,0 +1,11 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充说明：
+- **onCreate**：Ability 创建时回调，用于初始化
+- **onWindowStageCreate**：窗口创建时回调，通常在这里 `loadContent` 加载页面
+- **onForeground**：切换到前台
+- **onBackground**：切换到后台
+- **onWindowStageDestroy**：窗口销毁
+- **onDestroy**：Ability 销毁
+
+此外还有一些非核心生命周期回调：`onConfigurationUpdate`（系统配置变化）、`onMemoryLevel`（内存告警）、`onSaveAbilityState` / `onRestoreAbilityState`（状态保存恢复）、`onNewWant`（单例模式下再次拉起）。

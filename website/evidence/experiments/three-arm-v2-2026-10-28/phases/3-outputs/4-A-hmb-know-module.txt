@@ -1,0 +1,3 @@
+**module.json5**
+
+(位于模块的 `src/main/module.json5`，其中声明 `abilities`、`requestPermissions` 等。)

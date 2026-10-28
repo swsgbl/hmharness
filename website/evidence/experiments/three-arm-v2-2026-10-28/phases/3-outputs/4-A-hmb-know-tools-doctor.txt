@@ -1,0 +1,3 @@
+**harmony_build_doctor**
+
+This tool classifies known HarmonyOS build failure families. One caveat from the skill library: on Windows hosts, don't invoke the bare `harmony_build_doctor` command directly — it may return no parseable output (see the `harmony-build-doctor-windows-invocation` skill for the correct invocation pattern). If you share the actual error output, I can run the diagnosis properly.

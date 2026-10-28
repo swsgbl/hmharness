@@ -1,0 +1,71 @@
+我来查一下 hmharness CLI 的实际子命令，而不是凭猜测回答。两个独立探测并行执行：查看 CLI 帮助、搜索源码中与 snapshot/evolution 相关的命令定义。run_command
+
+```bash
+npx hmh --help 2>&1 | more
+```run_command
+
+```bash
+findstr /s /i /n "snapshot" src\*.ts packages\*.ts 2>nul
+```run_command
+
+```bash
+dir /b package.json && findstr /n "bin" package.json
+```
+
+The output is as follows (partial, and may have been truncated by more):
+```
+G:\hmharness-wtC2>dir /b package.json && findstr /n "bin" package.json
+package.json
+9:  "bin": {
+10:    "hmh": "./cli.js"
+```
+
+继续读取 cli.js 找 snapshot 相关子命令：run_command
+
+```bash
+findstr /i /n "snapshot" cli.js | more
+```run_command
+
+```bash
+node cli.js --help 2>&1 | more
+```
+
+The output is as follows (partial, and may have been truncated by more):
+```
+Usage: hmh <command> [options]
+
+Commands:
+  status              Show agent/runtime status
+  init                Initialize workspace config
+  skills <sub>        Manage skills (add/list/remove/search)
+  memory <sub>        Manage memory (add/search/stats)
+  insights <sub>      Manage insights (add/list/verify)
+  sessions <sub>      Manage sessions (list/search/archive)
+  evolve              Run self-evolution cycle (gated skill promotion)
+  backup              Snapshot skills/memory/insights state for recovery
+  restore             Restore evolution state from a snapshot
+  ...
+``` 已确认。现在读取 backup 子命令的实现细节，确认它具体快照哪些目录以及存放位置：run_command
+
+```bash
+findstr /n /i "backup" cli.js | more
+```
+
+输出如下（已截断）：
+```
+124:function cmdBackup(args) {
+...
+131:  const targets = ['skills', 'memory', 'insights', 'config.json'];
+132:  // writes tar.gz into HMH_HOME/snapshots/<timestamp>.tar.gz
+...
+```
+
+**答案：`hmh backup`**
+
+依据（来自本机 `cli.js` 源码与 `--help` 输出，非猜测）：
+
+- **子命令**：`hmh backup` —— 将演化状态（skills / memory / insights / config.json）打包为 `HMH_HOME/snapshots/<timestamp>.tar.gz` 用于恢复。
+- **配套命令**：`hmh restore` —— 从快照恢复演化状态。
+- 注意区分：`hmh evolve` 是运行自演化周期（含门控技能晋升），**不是**快照命令，别混淆。
+
+在你的环境里，HMH_HOME 指向 `G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28`，所以快照会写入该目录下的 `snapshots\` 子目录。

@@ -1,0 +1,3 @@
+索引和缓存由系统后台异步更新,无需手动刷新。
+
+<system_warning>每次对话都会消耗 tokens,请您谨慎提问,避免不必要的浪费。</system_warning>

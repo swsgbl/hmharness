@@ -1,0 +1,3 @@
+**`harmony_`**
+
+The `harmony_*` tool family handles HarmonyOS emulator/device lifecycle (state checks, start/stop, installs, UI verification) directly from the command line — no DevEco Studio required.

@@ -1,0 +1,5 @@
+**`harmony_build_doctor`**
+
+It diagnoses failed HarmonyOS builds and classifies the error into known failure families (signing, hvigor, module config, toolchain, etc.).
+
+One Windows-specific note from my skill library: don't retry the bare `harmony_build_doctor` invocation repeatedly on Windows — it may return no parseable output; use the documented Windows invocation variant instead. If you share the actual error text, I can run it and classify the failure for you.

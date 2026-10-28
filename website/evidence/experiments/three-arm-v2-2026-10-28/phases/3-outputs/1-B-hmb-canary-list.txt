@@ -1,0 +1,3 @@
+read_file
+edit_file
+run_command

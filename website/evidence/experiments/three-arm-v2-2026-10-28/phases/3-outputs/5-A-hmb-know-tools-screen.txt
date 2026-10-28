@@ -1,0 +1,1 @@
+`harmony_device_screenshot` — because it captures the current device screen and verifies expected text appears on it in one step.

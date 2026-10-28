@@ -1,0 +1,5 @@
+`harmony_build_doctor`
+
+这是框架中用于对已知鸿蒙构建失败家族（如签名缺失、hvigor 配置错误、ohpm 依赖解析失败等）进行分类归类的工具。
+
+一个相关注意事项（来自技能库 `harmony-build-doctor-windows-invocation`）：在 Windows 上不要裸调 `harmony_build_doctor`，它可能返回无法解析的输出；应按该技能指定的调用方式使用。如果你现在正要诊断这次构建失败，我可以先读取该技能文件，按正确方式执行诊断。

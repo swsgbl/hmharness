@@ -1,0 +1,5 @@
+```css
+selector {
+  color: red;
+}
+```

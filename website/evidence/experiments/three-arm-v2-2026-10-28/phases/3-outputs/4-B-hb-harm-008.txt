@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是 HarmonyOS 应用/鸿蒙生态的安装包格式（本质是一个符合 App Packing 规范的压缩包），由 DevEco Studio/hvigor 将 ArkTS 代码、资源、第三方库和 module.json5 配置等打包而成，可安装运行在鸿蒙设备上。

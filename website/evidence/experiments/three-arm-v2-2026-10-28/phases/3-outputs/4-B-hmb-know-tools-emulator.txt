@@ -1,0 +1,1 @@
+`emulator` 工具族（如 `emulator_list`、`emulator_start`、`emulator_stop` 等）可以在不依赖 DevEco Studio 的情况下直接管理模拟器生命周期。

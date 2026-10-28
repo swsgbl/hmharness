@@ -1,0 +1,1 @@
+Stage 模型是 HarmonyOS 从 API 8 起引入的应用开发标准模型（替代早期的 FA 模型），以 UIAbility 和 ExtensionAbility 为核心组件，配合 ArkUI 声明式开发范式，提供统一的生命周期管理与分布式多端协同能力，是当前鸿蒙应用开发推荐使用的模型。
