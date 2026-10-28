@@ -89,5 +89,15 @@
       "failureClass": "exact-output",
       "candidateSha": "07becf81dc740bf65eed6deee24a3de5e8b6dbe9da3f3fb5c89c8d45321e92aa"
     }
-  ]
+  ],
+  "gateOutcome": {
+    "ranAt": "2026-10-28T04:30:58.218Z",
+    "promoted": [],
+    "rejected": [
+      "verbatim-character-copy",
+      "payload-only-reply",
+      "verbatim-codepoint-copy",
+      "bare-string-reply"
+    ]
+  }
 }
