@@ -7,7 +7,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from '../server.ts';
@@ -15,6 +15,14 @@ import { startServer } from '../server.ts';
 test('session run-control routes served through the extracted module', async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-sess-routes-'));
   await mkdir(join(home, 'sessions'), { recursive: true });
+  // pre-seed the workspace store with a NON-git directory so /api/diff is
+  // deterministic: the server adopts workspaces.json from HMH_HOME and
+  // chdirs into the current workspace - without this, diff targets the
+  // repo checkout and flips git:true (assertion had never actually
+  // executed before the 2026-10-29 close() rewrite let this file finish)
+  const ws = await mkdtemp(join(tmpdir(), 'hmh-sess-ws-'));
+  await writeFile(join(home, 'workspaces.json'), JSON.stringify({ current: 'ws0', items: [{ id: 'ws0', name: 'ws', path: ws }] }), 'utf8');
+  const prevCwd = process.cwd();
   const prevHome = process.env.HMH_HOME;
   process.env.HMH_HOME = home;
   let close: (() => Promise<void>) | undefined;
@@ -71,6 +79,8 @@ test('session run-control routes served through the extracted module', async () 
     if (close) await close();
     if (prevHome === undefined) delete process.env.HMH_HOME;
     else process.env.HMH_HOME = prevHome;
+    process.chdir(prevCwd); // before the rm: Windows cannot delete a live cwd
     await rm(home, { recursive: true, force: true });
+    await rm(ws, { recursive: true, force: true });
   }
 });
