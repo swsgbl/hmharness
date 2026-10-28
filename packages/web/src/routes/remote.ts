@@ -6,9 +6,10 @@
  * feed, pairing rotation, tunnel toggle/switch-line, mobile disconnect, and
  * the read-only extension-bridge probe. Bodies moved VERBATIM; the pairing
  * state group (pairToken/pairExpiresAt/pairPin are module-level `let`s in
- * server.ts that rotatePairing() rewrites) is injected as PER-REQUEST
- * snapshot values — the delegation re-reads them on every call, so a
- * rotation mid-flight is picked up by the next request.
+ * server.ts that rotatePairing() rewrites) is injected as getters — read at
+ * USE sites (deps.pairToken, not a destructured const), so /api/pair/rotate
+ * and pair-info's auto-rotate report the state they JUST wrote, and a
+ * rotation mid-flight is picked up by any later read.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { patchConfig } from '@hmharness/kernel';
@@ -47,7 +48,6 @@ export async function handleRemoteRoute(
     cfg, port, exposure, json, mobileSessions, trustedLanIps,
     rotatePairing, pairingValid, persistMobileSessions, preferredLanAddress,
     requestIsFromLoopbackTransport, requestConnectionMode, sameOriginOk,
-    pairToken, pairExpiresAt, pairPin,
   } = deps;
 
   if (req.method === 'GET' && url.pathname === '/api/qr') {
@@ -89,25 +89,25 @@ export async function handleRemoteRoute(
     if (!pairingValid()) rotatePairing();
     const t = tunnel.state;
     const lanIp = preferredLanAddress();
-    const lanUrl = lanIp ? `http://${lanIp}:${port}/pair?token=${pairToken}` : '';
-    const tunnelUrl = t.url ? `${t.url}/pair?token=${pairToken}` : '';
+    const lanUrl = lanIp ? `http://${lanIp}:${port}/pair?token=${deps.pairToken}` : '';
+    const tunnelUrl = t.url ? `${t.url}/pair?token=${deps.pairToken}` : '';
     json(res, 200, {
       lanIp,
       port,
       pairingUrl: t.url ? tunnelUrl : lanUrl,
       lanPairingUrl: lanUrl,
       tunnelPairingUrl: tunnelUrl,
-      expiresAt: pairExpiresAt,
+      expiresAt: deps.pairExpiresAt,
       now: Date.now(),
       connected: mobileSessions.size > 0,
-      pin: requestIsFromLoopbackTransport(req) && requestConnectionMode(req) === 'lan' ? pairPin : '',
+      pin: requestIsFromLoopbackTransport(req) && requestConnectionMode(req) === 'lan' ? deps.pairPin : '',
       tunnel: t,
     });
     return true;
   }
   if (req.method === 'POST' && url.pathname === '/api/pair/rotate') {
     rotatePairing();
-    json(res, 200, { ok: true, expiresAt: pairExpiresAt });
+    json(res, 200, { ok: true, expiresAt: deps.pairExpiresAt });
     return true;
   }
   if (req.method === 'POST' && url.pathname === '/api/tunnel/toggle') {

@@ -7,6 +7,7 @@
  * this is a local companion, never exposed.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { Socket } from 'node:net';
 import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -310,6 +311,21 @@ export async function startServer(opts: {
   const allQueued = () => [...executors.values()].flatMap((e) => e.queue.map((q) => ({ ...q, owner: e })));
   let activeSessionId = '';
   const sseClients = new Set<ServerResponse>();
+  // ---- unified lifecycle registry (2026-10-29 Windows libuv teardown fix) ----
+  // Everything below that can hold the event loop open registers here and
+  // close() drains it LIFO (timers, sockets, helper children, our process
+  // listeners). The old close path funneled into process.exit() from LIBRARY
+  // context: it killed in-process hosts mid-run (the node:test routes-*
+  // file-level crashes ~4s after start) and raced libuv teardown on Windows
+  // ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c"
+  // - uv_async_send hitting a handle already in CLOSING state). A library
+  // close() NEVER exits the process; only the entries that OWN the process
+  // (the signal handlers, the desktop shutdown route) exit, after the drain.
+  let closed = false; // write gate: writing an ending socket mid-teardown is uv activity
+  let closePromise: Promise<void> | null = null; // close() idempotence: one promise for every call
+  const timers = new Set<NodeJS.Timeout>(); // heartbeat interval, approval timeouts
+  const sockets = new Set<Socket>(); // live connections incl. SSE + keep-alive
+  const regTimer = (t: NodeJS.Timeout): NodeJS.Timeout => { timers.add(t); return t; };
   // queue persistence (survives daemon death): per-session pending items
   const queueFile = join(home, 'web-queues.json');
   const saveQueues = () =>
@@ -387,6 +403,7 @@ export async function startServer(opts: {
   // older than it (frontend also dedups by id as belt-and-braces)
   let sseSeq = 0;
   const sseSend = (res: ServerResponse, event: string, data: unknown) => {
+    if (closed) return; // gate: no SSE writes into a closing/destroyed socket
     const id = ++sseSeq;
     res.write(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     // keep a short replay ring so a reconnect can catch up missed events
@@ -572,11 +589,11 @@ export async function startServer(opts: {
         const send = (granted: boolean) => {
           try { exec.stdin?.write(JSON.stringify({ type: 'approval', id, granted }) + '\n'); } catch { /* gone */ }
         };
-        const timer = setTimeout(() => {
+        const timer = regTimer(setTimeout(() => {
           if (exec.pending?.id === id) exec.pending = null;
           broadcast('approvalDone', { name: ev.name, granted: false, timeout: true, sessionId: sid });
           send(false);
-        }, APPROVAL_TIMEOUT_MS);
+        }, APPROVAL_TIMEOUT_MS));
         exec.pending = { name: String(ev.name ?? ''), args: ev.args as Record<string, unknown>, resolve: send, timer, id };
         broadcast('approvalReq', { name: ev.name, args: ev.args, sessionId: sid });
         sendEnvelope(sid, runId, 'approval.required', {
@@ -915,10 +932,16 @@ export async function startServer(opts: {
       }
       // remote/extension routes live in routes/remote.ts (web split slice 4);
       if (await handleRemoteRoute(req, url, res, {
-        cfg, port: opts.port, exposure, json, mobileSessions, trustedLanIps,
+        cfg, port: actualPort, exposure, json, mobileSessions, trustedLanIps,
         rotatePairing, pairingValid, persistMobileSessions, preferredLanAddress,
         requestIsFromLoopbackTransport, requestConnectionMode, sameOriginOk,
-        pairToken, pairExpiresAt, pairPin,
+        // getters, not snapshots: /api/pair/rotate (and pair-info's
+        // auto-rotate) mutate these module vars and then report them - a
+        // value captured at deps-build time reports the PRE-rotate state
+        // (stale token URL / expiresAt 0)
+        get pairToken() { return pairToken; },
+        get pairExpiresAt() { return pairExpiresAt; },
+        get pairPin() { return pairPin; },
       })) return;
             // cognitive panel routes live in routes/cognitive.ts (web split slice 1);
       // read-only projections of HMH_HOME stores — same paths/shapes as always
@@ -926,8 +949,11 @@ export async function startServer(opts: {
       if (desktop && req.method === 'POST' && url.pathname === '/api/desktop/shutdown') {
         // desktop bridge graceful stop: the desktop supervisor calls this
         // (token-gated above) BEFORE falling back to killing its own child.
+        // desktop-host.ts IS the process owner here: drain every handle,
+        // THEN exit 0 (an exit over live handles is the teardown race the
+        // 2026-10-29 close() rewrite exists to prevent).
         json(res, 200, { ok: true });
-        shutdown();
+        void closeOnce().catch(() => undefined).finally(() => process.exit(0));
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/state') {
@@ -935,6 +961,7 @@ export async function startServer(opts: {
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/events') {
+        if (closed) { json(res, 503, { error: 'closing' }); return; } // raced a close: no new streams
         res.writeHead(200, {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
@@ -1247,7 +1274,7 @@ export async function startServer(opts: {
           return;
         }
         if (line === '/web' || line.startsWith('/web ')) {
-          okText(`当前即 web UI: http://127.0.0.1:${opts.port} / you are already here`);
+          okText(`当前即 web UI: http://127.0.0.1:${actualPort} / you are already here`);
           return;
         }
         if (line === '/exit' || line === '/quit') {
@@ -1275,24 +1302,102 @@ export async function startServer(opts: {
     }
   });
 
-  const heartbeat = setInterval(() => {
+  // live-connection tracking: server.close() alone never finishes while a
+  // keep-alive socket (fetch/undici pools, SSE) stays parked on the server,
+  // so close() drains through this set
+  server.on('connection', (s) => {
+    if (closed) { s.destroy(); return; } // raced a close in flight: nothing is served past the gate
+    sockets.add(s);
+    s.on('close', () => sockets.delete(s));
+  });
+
+  const heartbeat = regTimer(setInterval(() => {
+    if (closed) return; // cleared by close(); this guards an already-queued tick
     for (const r of sseClients) r.write(': ping\n\n');
-  }, 15_000);
+  }, 15_000));
 
   // keep the resident local companion alive: log and continue instead of
   // dying bare (a dead detached process is invisible until the user notices
-  // the browser can't connect)
-  process.on('uncaughtException', (err) => {
+  // the browser can't connect). Removed again on close(): a library host
+  // keeps its own exception policy.
+  const onUncaught = (err: Error): void => {
     console.error(`[hmh web] uncaught: ${String(err).slice(0, 400)}`);
-  });
+  };
+  process.on('uncaughtException', onUncaught);
 
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    // lan/wan must bind the wildcard; loopback (and desktop mode) stays on 127.0.0.1
-    const bind = exposure === 'loopback' ? host : '0.0.0.0';
-    server.listen(opts.port, bind, resolve);
-  }).catch((err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
+  /** The ONE drain path, LIFO over the lifecycle registry: timers -> parked
+   *  approvals -> detached task children (pipes released, child untouched)
+   *  -> SSE -> server (stop accepting, bounded natural drain, force-destroy
+   *  survivors, await 'close') -> helper children (tunnel: kill + wait; MCP
+   *  clients: close) -> our process listeners. Idempotent: every caller gets
+   *  the same promise, which resolves with every handle drained. */
+  const closeOnce = (): Promise<void> => {
+    if (closePromise) return closePromise;
+    closePromise = (async () => {
+      closed = true; // write gate FIRST: late SSE/broadcast writes into ended
+      // sockets are exactly the uv activity the Windows teardown crash fed on
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+      for (const e of executors.values()) {
+        if (e.pending) { clearTimeout(e.pending.timer); e.pending = null; }
+        // task children are detached by design: a daemon death must not kill
+        // the run (the rollout on disk is the durable record). unref() only
+        // releases OUR ends of their stdio pipes - open for the child, no
+        // longer holding this (host) event loop open.
+        for (const pipe of [e.proc?.stdout, e.proc?.stderr, e.proc?.stdin]) {
+          (pipe as Socket | null | undefined)?.unref?.();
+        }
+      }
+      for (const r of sseClients) { try { r.end(); } catch { /* already gone */ } }
+      sseClients.clear();
+      // stop accepting, then drain what is connected. Idle keep-alive sockets
+      // never close on their own inside any useful window, so: short natural
+      // grace, then force-destroy the survivors.
+      const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
+      const graceEnd = Date.now() + 250;
+      while (sockets.size > 0 && Date.now() < graceEnd) await new Promise((r) => setTimeout(r, 25));
+      for (const s of sockets) { try { s.destroy(); } catch { /* gone */ } }
+      sockets.clear();
+      server.closeAllConnections?.(); // belt: anything that slipped the tracker
+      // 'close' fires once the listener is down AND every connection ended;
+      // the destroys above make it prompt - the race just never hangs a caller
+      await Promise.race([
+        serverClosed,
+        new Promise<void>((r) => setTimeout(r, 4_000).unref?.()),
+      ]);
+      // helper children: the tunnel child is NON-detached (a dead daemon must
+      // not leak a public tunnel URL) -> kill and wait. Task children were
+      // left running above, per their detached semantics.
+      await tunnel.stop().catch(() => undefined);
+      for (const c of clients) { try { c.close(); } catch { /* best effort */ } }
+      process.off('SIGINT', onSignal);
+      process.off('SIGTERM', onSignal);
+      process.off('uncaughtException', onUncaught);
+    })();
+    return closePromise;
+  };
+  // signal shutdown belongs to the process OWNER (foreground `hmh web`, the
+  // spawned daemon, desktop-host): drain first, THEN exit. In library hosts
+  // (tests, embedders) close() just releases handles - the process lives on.
+  const onSignal = (): void => {
+    void closeOnce().catch(() => undefined).finally(() => process.exit(0));
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      // lan/wan must bind the wildcard; loopback (and desktop mode) stays on 127.0.0.1
+      const bind = exposure === 'loopback' ? host : '0.0.0.0';
+      server.listen(opts.port, bind, resolve);
+    });
+  } catch (err) {
+    // start failed: drain what the registry already armed (heartbeat,
+    // listeners) so a caller that CATCHES this error (tests, the desktop
+    // supervisor) is not left with a half-server leaking handles.
+    void closeOnce().catch(() => undefined);
+    if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
       // 2026-10-09 (HMH Desktop): the library no longer process.exit()s the
       // HOST process - the caller decides how to report and exit. The CLI's
       // foreground path prints the same two friendly lines it always did
@@ -1302,7 +1407,7 @@ export async function startServer(opts: {
       throw e;
     }
     throw err;
-  });
+  }
   // port 0 (desktop mode / callers wanting an OS-assigned port): report the
   // actually-bound port back. Non-zero ports: identical to opts.port.
   const bound = server.address();
@@ -1338,30 +1443,14 @@ export async function startServer(opts: {
   }
   } // end !desktop banner branch
 
-  // graceful shutdown, idempotent: SIGINT/SIGTERM (foreground) and the
-  // desktop /api/desktop/shutdown route all funnel through this one path.
-  let shutdownDone = false;
-  const shutdown = (): void => {
-    if (shutdownDone) return;
-    shutdownDone = true;
-    clearInterval(heartbeat);
-    for (const c of clients) c.close();
-    for (const r of sseClients) r.end();
-    void tunnel.stop();
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 1500).unref();
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  // graceful shutdown is ONE path now: closeOnce() above. SIGINT/SIGTERM and
+  // the desktop shutdown route drain first and (as process owners) exit
+  // after; library close() drains and returns.
   return {
     port: actualPort,
     host,
-    // library close(): triggers the same graceful path; resolves once the
-    // process is on its way out (or after the same 1.5s backstop).
-    close: () =>
-      new Promise<void>((resolve) => {
-        shutdown();
-        setTimeout(resolve, 1_600);
-      }),
+    // library close(): the drain itself - idempotent (repeat calls return
+    // the same promise) and it NEVER exits the host process.
+    close: closeOnce,
   };
 }

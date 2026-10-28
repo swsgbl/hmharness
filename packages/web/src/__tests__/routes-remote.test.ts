@@ -51,17 +51,35 @@ test('remote/extension routes served through the extracted module', async () => 
     assert.equal(rotBody.ok, true);
     assert.ok(rotBody.expiresAt > 0);
 
-    // tunnel/mobile mutations: desktop-only guard (loopback transport on a
-    // loopback-bound test server reads as NOT lan -> 403 desktop only)
-    const tun = await fetch(`${base}/api/tunnel/toggle`, { method: 'POST' });
-    assert.equal(tun.status, 403);
-    assert.equal((await tun.json() as { error: string }).error, 'desktop only');
+    // tunnel/mobile mutations: the LOCAL loopback UI is the owner (the
+    // pairing modal in shell.ts calls these from the browser at the
+    // machine) -> allowed. These assertions used to expect a desktop-only
+    // 403 for loopback callers - an expectation that had NEVER actually
+    // executed: the old close() process.exit killed this file before its
+    // results were reported (every platform; CI's green was false, exposed
+    // by the 2026-10-29 close() rewrite). enable:false keeps the toggle
+    // side-effect-free (stopping a never-started tunnel is a no-op).
+    const tun = await fetch(`${base}/api/tunnel/toggle`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enable: false }),
+    });
+    assert.equal(tun.status, 200);
+    assert.equal(((await tun.json()) as { ok: boolean }).ok, true);
 
     const mob = await fetch(`${base}/api/mobile/disconnect`, { method: 'POST' });
-    assert.equal(mob.status, 403);
+    assert.equal(mob.status, 200);
 
-    // extension bridge probe: no bridge on this machine -> honest available:false
+    // extension bridge probe: pin the bridge port to a dead one - a dev
+    // machine running the real bridge (7789) must not flip this into
+    // available:true (environment-dependent assertion; it had never
+    // actually executed before the 2026-10-29 close() rewrite let this
+    // file finish and report)
+    const prevExtPort = process.env.HMH_EXTENSION_PORT;
+    process.env.HMH_EXTENSION_PORT = '1';
     const ext = await fetch(`${base}/api/extension/status`);
+    if (prevExtPort === undefined) delete process.env.HMH_EXTENSION_PORT;
+    else process.env.HMH_EXTENSION_PORT = prevExtPort;
     assert.equal(ext.status, 200);
     const extBody = (await ext.json()) as { available: boolean; port: number };
     assert.equal(extBody.available, false);
