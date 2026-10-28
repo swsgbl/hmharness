@@ -7,12 +7,21 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(here, '..', 'page.ts'), 'utf8');
+// P1-3 拆分后页面源码 = page.ts(装配层)+ page/ 域片段;扫描范围必须
+// 覆盖全部承载页面 JS 的文件,锚点/行级规则一行都不能漏(P1-3 台账)。
+const pageDir = join(here, '..', 'page');
+const parts = [readFileSync(join(here, '..', 'page.ts'), 'utf8')];
+if (existsSync(pageDir)) {
+  for (const f of readdirSync(pageDir).sort()) {
+    if (f.endsWith('.ts')) parts.push(readFileSync(join(pageDir, f), 'utf8'));
+  }
+}
+const src = parts.join('\n');
 const lines = src.split('\n');
 
 test('九个已修 sink 的锚点(回退即红)', () => {
