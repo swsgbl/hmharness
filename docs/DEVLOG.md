@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-10-28(五十七) · 外部复现包 P2-1:另一个审查者在独立目录复现同一判定
+
+**动机**:审计文档 03 P2-1——验收手册要求"基于已过门的单项实验做可复现包,包括环境、原始逐题数据、脚本、manifest、判定规则;**另一个审查者在独立目录复现同一判定**"。
+
+**关键决策**:①打包器 `scripts/make-repro-pack.mts`(配方驱动,仅认两份已过门实验,未知 id 拒绝)产出自包含目录:冻结分析器逐字节镜像(靠镜像仓库布局切片,分析器按 `import.meta.dirname` 自解析路径,零改写)+冻结输入+`published/` 判定冻结副本+`verdict-rules.md`(从实验 manifest 预注册段逐字提取)+环境指纹+README+`reproduce.cjs`/`compare.cjs`(逐字段 diff,易变字段 generatedAt/wallclockMs 剪除,文本 EOL 归一);②skill-gen 语料在实验后已 append-only 增长(+4)——按"最新优先剔除直到 datasetHash 等于冻结值"重建冻结时语料(hash+三族计数双验证 355/79/33),语料投影只保留实验消费的字段(goal.description 仅保留 tokenize() 形式,是实验读它的唯一形态;另剔除 71 个敏感形 token——≥12 字符且含 ≥4 数字,判定中性由打包器自检强制证明);③包内镜像仓库自身 `packages/*/package.json` 的 `"type":"module"` 标记——否则 Node 原生 transform-types 把镜像 .ts 当 CJS 解析直接崩(外部目录实测暴露);④打包器**自检门**:打包即在自己身上跑 reproduce,非 IDENTICAL 拒绝出包。
+
+**实测证据**:两个包(skill-gen 47 文件/1.7M、three-arm-v2 87 文件/2.0M)打包自检 IDENTICAL;**仓库外全新临时目录**(无 node_modules、无 tsx、纯 `node reproduce.cjs`)双包 RESULT: IDENTICAL——skill-gen:run.json/analysis.json/machine-verdict.md 三件逐字段同(WEAK-POSITIVE/effective),three-arm-v2:analysis.json 逐字段同(gate NEEDS-DATA);单测 12/12(对比器语义+manifest 完整性+已提交包 sha256 门,挂入 npm test 链)。skill-gen 包随 gh-pages 公开在 `website/repro-packs/`,两实验 REPORT.md 头部已加外部复现指引行。
+
+**教训**:①"复现同一判定"的正确口径是**冻结输入在包内**而非重跑活数据——活语料必漂移,靠 datasetHash 反推冻结时点(append-only 存储上贪心剔除是精确算法)是通用解;②Node 原生 type-transforms 的隐藏雷:无最近 package.json 的 .ts 文件按 CJS 解析,自包含包必须镜像模块类型标记;③对比器把"逐字节相同"放宽为"剪除易变字段后逐字段相同"必须显式声明易变字段清单(时间戳/墙钟),否则判定复现是伪命题;④EOL 归一化(sha256 与文本对比双重归一)是跨平台包完整性的前提——autocrlf 仓库里不归一的哈希在 Linux 校验必炸。
+
 ## 2026-10-27(五十六) · 钉版事故:两轮发版的根修从未到达用户
 
 **动机**:0.23.41 CI 发版"成功"、npm latest 已指新——但装后复核发现嵌套 kernel 仍是 0.23.39,fossil 守护测试照旧 401。发布成功≠发布正确。

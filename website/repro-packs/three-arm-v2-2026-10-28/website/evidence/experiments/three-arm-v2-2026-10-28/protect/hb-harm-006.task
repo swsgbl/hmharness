@@ -1,0 +1,3 @@
+hdc 是什么工具？用一句话回答
+expect-regex: (?i)(设备|device|调试|debug|连接)
+holdout: true

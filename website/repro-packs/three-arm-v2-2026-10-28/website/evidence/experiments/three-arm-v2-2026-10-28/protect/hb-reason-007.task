@@ -1,0 +1,3 @@
+50减去23等于多少？只输出数字
+expect: 27
+holdout: true

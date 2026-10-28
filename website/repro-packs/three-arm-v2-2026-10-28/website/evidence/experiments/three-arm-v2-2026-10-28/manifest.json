@@ -1,0 +1,284 @@
+{
+  "experimentId": "three-arm-v2-2026-10-28",
+  "createdAt": "2026-10-28T00:02:51.040Z",
+  "repoCommit": "daaf1025b78db472d90ec41d8187c16ef0741b31",
+  "supersedes": "three-arm-main-experiment-2026-10-27 (NEEDS-DATA): v2 follows that report's single next-step recommendation (expand sample + GEPA population candidates)",
+  "design": {
+    "arms": {
+      "A": "baseline: frozen (sanitized) skill-library snapshot injected, nothing else",
+      "B": "task-adaptive: snapshot + per-task adaptation block built from TRAIN-family null failures, injected for this task only, never persisted",
+      "C": "persistent-evolved: snapshot + the gate-promoted population winner (same injection construction as the evolution gate)"
+    },
+    "question": "does one persistable harness/skill change raise task success under a frozen base model without breaking the (expanded) protection set?"
+  },
+  "frozen": {
+    "baseModel": {
+      "provider": "zhipu-coding-plan",
+      "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "id": "glm-5.3",
+      "sampling": "no sampling params sent (provider default) — identical wire shape in all arms"
+    },
+    "systemPrompt": {
+      "builder": "packages/agent/src/prompt.ts buildSystemPrompt",
+      "params": {
+        "cwd": "G:\\hmharness-wtC2",
+        "memory": "",
+        "insights": "",
+        "cognitive": "",
+        "model": "glm-5.3"
+      },
+      "note": "arm differences enter ONLY via the skills block (A/B/C) and the B-arm trailing adaptation block"
+    },
+    "maxTurns": 6,
+    "toolWhitelist": [
+      "read_file",
+      "list_dir"
+    ],
+    "contextPerTask": "fresh session per run, no history carry-over",
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "taskSet": {
+      "train": {
+        "source": "C:\\Users\\<user>\\.hmharness/bench/cases",
+        "selection": "v1 selection verbatim (familyQuotas + seed 20261027) — v2 train split is byte-identical to v1 for comparability",
+        "familyQuotas": {
+          "beh": 8,
+          "cjk": 6,
+          "adv": 6,
+          "train": 6,
+          "fadv": 3,
+          "teach": 3
+        },
+        "selectionSeed": 20261027,
+        "counts": 32
+      },
+      "protect": {
+        "hmbHoldout": {
+          "source": "C:\\Users\\<user>\\.hmharness/bench/cases (holdout:true, excluding toolchain-ohpm-status: live toolchain)",
+          "counts": 23
+        },
+        "harmonybench": {
+          "source": "packages/evaluation/src/harmonybench.ts HARMONYBENCH_CASES v1.0.0, offline-judgeable subset (needsTools=false)",
+          "counts": 46,
+          "excludedNeedsTools": 8
+        },
+        "total": 69,
+        "note": ">=60 requirement met (69); environment-truth judging via the same programmatic assertion judge as v1"
+      },
+      "excluded": [
+        {
+          "id": "reply-determinism",
+          "why": "not in a sampled family"
+        },
+        {
+          "id": "toolchain-ohpm-status",
+          "why": "needs the live HarmonyOS toolchain (unfreezable environment)"
+        },
+        {
+          "id": "toolchain-report",
+          "why": "needs the live HarmonyOS toolchain (unfreezable environment)"
+        },
+        {
+          "id": "hb-tool-001",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-002",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-003",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-004",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-005",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-006",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-007",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        },
+        {
+          "id": "hb-tool-008",
+          "why": "needsTools HarmonyBench case (unfreezable environment under the read_file/list_dir whitelist)"
+        }
+      ],
+      "datasetHash": "cd45058a6cc825492127a16eff3697aba6480fe49bb4291048790876aaf495ed",
+      "protectFiles": [
+        "hb-cjk-001.task",
+        "hb-cjk-002.task",
+        "hb-cjk-003.task",
+        "hb-cjk-004.task",
+        "hb-cjk-005.task",
+        "hb-cjk-006.task",
+        "hb-cjk-007.task",
+        "hb-cjk-008.task",
+        "hb-cjk-009.task",
+        "hb-cjk-010.task",
+        "hb-code-001.task",
+        "hb-code-002.task",
+        "hb-code-003.task",
+        "hb-code-004.task",
+        "hb-code-005.task",
+        "hb-code-006.task",
+        "hb-code-007.task",
+        "hb-code-008.task",
+        "hb-code-009.task",
+        "hb-code-010.task",
+        "hb-exact-001.task",
+        "hb-exact-002.task",
+        "hb-exact-003.task",
+        "hb-exact-004.task",
+        "hb-exact-005.task",
+        "hb-exact-006.task",
+        "hb-exact-007.task",
+        "hb-exact-008.task",
+        "hb-exact-009.task",
+        "hb-exact-010.task",
+        "hb-harm-001.task",
+        "hb-harm-002.task",
+        "hb-harm-003.task",
+        "hb-harm-004.task",
+        "hb-harm-005.task",
+        "hb-harm-006.task",
+        "hb-harm-007.task",
+        "hb-harm-008.task",
+        "hb-reason-001.task",
+        "hb-reason-002.task",
+        "hb-reason-003.task",
+        "hb-reason-004.task",
+        "hb-reason-005.task",
+        "hb-reason-006.task",
+        "hb-reason-007.task",
+        "hb-reason-008.task",
+        "hmb-canary-exact-1.task",
+        "hmb-canary-exact-2.task",
+        "hmb-canary-exact-3.task",
+        "hmb-canary-exact-4.task",
+        "hmb-canary-identity.task",
+        "hmb-canary-json.task",
+        "hmb-canary-list.task",
+        "hmb-canary-refusal.task",
+        "hmb-know-cangjie.task",
+        "hmb-know-hap.task",
+        "hmb-know-hdc.task",
+        "hmb-know-hvigor.task",
+        "hmb-know-lifecycle.task",
+        "hmb-know-module.task",
+        "hmb-know-ohpm.task",
+        "hmb-know-tools-apilookup.task",
+        "hmb-know-tools-build.task",
+        "hmb-know-tools-doctor.task",
+        "hmb-know-tools-emulator.task",
+        "hmb-know-tools-schema.task",
+        "hmb-know-tools-screen.task",
+        "hmb-know-tools-state.task",
+        "hmb-know-want.task"
+      ]
+    },
+    "skillSnapshot": {
+      "count": 34,
+      "names": [
+        "browser-automation-preflight",
+        "deveco-studio-windows-major-upgrade-migration",
+        "file-op-error-recovery",
+        "harmony-build-doctor-windows-invocation",
+        "harmony-codelinter-preflight",
+        "harmony-device-screenshot-verification",
+        "harmony-emulator-state-ground-truth",
+        "harmony-emulator-state-triangulation",
+        "harmony-feature-module-shell-completion",
+        "harmony-local-ui-baseline-check",
+        "harmony-ops-flow",
+        "harmony-project-create-page-baseline",
+        "harmony-project-multipage-router-scaffold-verified",
+        "harmony-runtime-log-verification",
+        "harmony-schema-check-restore-verification",
+        "harmony-toolchain-report",
+        "harmony-uitest-layout-ground-truth",
+        "harmony-vision-provider-routing-fix",
+        "harmony-vision-ui-regression-fallback",
+        "harmony-worktree-runtime-reverify",
+        "hmharness-session-log-search",
+        "hmharness-skill-experiment-arm-blind",
+        "kaihongos-vmware-vmx-pci-fix",
+        "network-preflight-for-harmony-tools",
+        "safe-file-ops",
+        "safe-path-existence-check",
+        "turn-budget-aware-verification",
+        "turn-budget-checkpointing",
+        "windows-browser-publish-preflight",
+        "windows-codelinter-direct-invocation",
+        "windows-command-compatibility",
+        "windows-command-exit-evidence",
+        "windows-file-path-verification",
+        "windows-git-gh-shim-proxy-fix"
+      ],
+      "fingerprint": "72e5115602ba77f25d2af9f29b31d614f5eee12cf34f0a8d5f14a281008303f4",
+      "sanitization": "exports sanitized at copy time (username -> <user>, 5 files changed): the frozen snapshot IS the sanitized one — what ran is what is published"
+    },
+    "prediction": {
+      "promptTemplateSha": "91d4a73f3a495eb73973a51fa90d2cbbd824717d6856d2e72da2e5d1832c5053",
+      "note": "same frozen model, task-only (arm-blind), parsed as first 0..1 decimal; unparseable => null (never 0)"
+    },
+    "populationProposal": {
+      "model": "glm-5.3 (same frozen provider)",
+      "rule": {
+        "perClassCandidates": 2,
+        "classSelection": "classes ordered by distinct failed-task count (desc), tie by class name; top classes taken, all with >=1 failed task eligible",
+        "maxClasses": 5,
+        "minTasksPerClassPrompt": 1,
+        "gate": "the whole population enters ONE runEvolution call as presetProposals with maxProposals = population size; thresholds unchanged (quality floor 0.6, zero bench regression, double sampling, holdout re-verification, cost cap)",
+        "cArmPick": "if any candidate is promoted: deploy the one with the highest gate train pass rate; tie broken by lexicographically smallest name (deterministic, pre-registered)",
+        "allRejected": "population fully rejected => C arm not deployable, main endpoint NEEDS-DATA (honest outcome, same as v1 cArmRule)"
+      },
+      "note": "phase1 prompt hashes recorded in phases/1-candidates.json at generation time"
+    }
+  },
+  "preRegistered": {
+    "mainEndpoint": "protect split, C-vs-A, task-level paired difference",
+    "significance": "bootstrap 95% CI (task-level paired diff, 10k resamples, seeded) excludes 0 OR any per-seed exact McNemar p < 0.05",
+    "exploratory": [
+      "protect B-vs-A",
+      "train C-vs-A",
+      "train B-vs-A"
+    ],
+    "promotionGate": {
+      "maxProtectFallback": 0.03,
+      "maxCostGrowth": 0.1,
+      "minTasksPerSplit": 15,
+      "minDiscordantCells": 8
+    },
+    "cArmRule": "inherited from v1 verbatim + population clause: C runs ONLY with a gate-promoted candidate; if the whole population is rejected => C reported as not deployable (NEEDS-DATA on the main endpoint) — the honest outcome",
+    "crashRule": "crashed runs count as task failure in the primary analysis AND are reported separately (crash rate per arm)",
+    "knownBehaviors": [
+      "runEvolution seedCases(home) will seed 3 starter cases (toolchain-report / reply-determinism / toolchain-ohpm-status) into gate-home on first gate run — same as v1 deviation #2; symmetric for baseline and candidates, direction conservative",
+      "gate-home beh-* task files are sanitized copies: their prompts reference <user> paths, so read_file cannot resolve them inside the gate — both sides of the gate fail these symmetrically (recorded; main-experiment train tasks keep original prompts and DO resolve)",
+      "phase0 B-arm lessons and phase1 population input come from TRAIN-class null failures only (protect never feeds candidate generation)"
+    ]
+  },
+  "budget": {
+    "estimate": "~2.5-3M+ tokens across phases (505 phase0 runs, ~800 gate calls for a 10-candidate population, 1515 phase3 cells with C possibly placeholder); per-run tokens land on disk; 429 => stop at the phase boundary and wait for the quota window"
+  },
+  "phases": [
+    "setup",
+    "phase0-null",
+    "phase1-population",
+    "phase2-gate",
+    "phase3-main",
+    "phase4-analysis"
+  ]
+}

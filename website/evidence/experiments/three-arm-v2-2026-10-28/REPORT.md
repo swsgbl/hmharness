@@ -1,5 +1,6 @@
 # REPORT:三臂 v2 扩样本实验 three-arm-v2-2026-10-28(执行交付报告)
 
+> **外部复现(统计判定器部分):见 [repro-packs/three-arm-v2-2026-10-28/](../../../repro-packs/three-arm-v2-2026-10-28/)**——离线 analyzer 复现包(phases 原始数据+逐字分析器+判定规则+对比器),仓库外任意目录 `node reproduce.cjs` 一键重跑,analysis.json 逐字段对比须输出 IDENTICAL(审计 P2-1 实测已过,记录见 DEVLOG 2026-10-28 外部复现包轮)。
 > 本文件是任务书要求的执行交付层(执行史/偏差/配额断点/commit 清单/复现)。
 > 统计判定的机器生成全文见同目录 `report.md`(由 `scripts/three-arm-v2-analyze.mts` 产出,判定语言按预注册枚举,无手工修饰);结构化数字见 `analysis.json`。
 > v2 接续 three-arm-main-experiment-2026-10-27 的 NEEDS-DATA 结论,执行其唯一下一步建议(protect ≥60 + 5 seeds + GEPA 分型种群),门限零改动。

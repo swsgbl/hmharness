@@ -1,0 +1,3 @@
+写一个Python函数 is_palindrome(s)，判断回文，只输出代码
+expect: def is_palindrome
+holdout: true

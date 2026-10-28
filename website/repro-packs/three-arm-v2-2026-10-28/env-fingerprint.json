@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-10-28T16:15:57.936Z",
+  "nodeVersionRequired": ">=22.7 (native --experimental-transform-types; tsx fallback)",
+  "packTime": {
+    "node": "v22.23.3",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "determinism": {
+    "bootstrapSeed": 42,
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "datasetHash": "cd45058a6cc825492127a16eff3697aba6480fe49bb4291048790876aaf495ed",
+    "llmTokens": "n/a (offline re-analysis of published run records)"
+  }
+}

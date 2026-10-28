@@ -42,3 +42,6 @@ audit-doc.txt
 projects/
 # scratch session-log analysis workspace (user-side research, never source)
 .audit/
+
+# repro-pack build output (published copies live in website/repro-packs/)
+/repro-packs/

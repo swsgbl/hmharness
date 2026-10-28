@@ -1,0 +1,3 @@
+Which single tool would you use to capture the device screen and assert the page shows its title text? Answer with the tool name and one clause.
+expect: harmony_ui_regression
+holdout: true
