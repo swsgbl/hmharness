@@ -1,0 +1,1 @@
+`harmony_ui_regression` — it captures the device screenshot and verifies the page contains the expected title text.

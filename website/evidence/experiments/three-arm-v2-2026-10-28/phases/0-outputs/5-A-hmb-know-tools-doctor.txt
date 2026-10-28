@@ -1,0 +1,3 @@
+**harmony_build_doctor**
+
+它专门对已知的鸿蒙构建失败家族（签名、hvigor、SDK 版本等）做归类诊断。注意：在 Windows 上不要裸调该命令（可能无可解析输出），应参考 `harmony-build-doctor-windows-invocation` 技能中的调用方式。

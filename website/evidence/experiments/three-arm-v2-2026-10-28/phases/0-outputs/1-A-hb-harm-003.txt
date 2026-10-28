@@ -1,0 +1,1 @@
+onCreate, onWindowStageCreate, onWindowStageDestroy, onForeground, onBackground, onDestroy

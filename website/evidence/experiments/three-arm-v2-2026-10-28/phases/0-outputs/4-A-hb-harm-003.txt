@@ -1,0 +1,10 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+共 6 个回调，完整生命周期流转：
+
+- **onCreate** → Ability 创建时调用，可接收 want 参数做初始化
+- **onWindowStageCreate** → 窗口创建时调用，通常在此 `loadContent()` 加载页面
+- **onForeground** → 切回前台
+- **onBackground** → 切到后台
+- **onWindowStageDestroy** → 窗口销毁
+- **onDestroy** → Ability 销毁，释放资源

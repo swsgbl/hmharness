@@ -1,0 +1,10 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充说明：
+- **onCreate**：Ability 创建时调用，用于做初始化
+- **onWindowStageCreate**：窗口舞台创建，通常在此 `loadContent` 加载页面
+- **onForeground / onBackground**：切前台 / 切后台
+- **onWindowStageDestroy**：窗口舞台销毁
+- **onDestroy**：Ability 销毁，做资源清理
+
+另有条件触发的回调：`onNewWant`（singleton 实例复用收到新 Want 时）、`onConfigurationUpdate`（系统配置变化）、`onMemoryLevel`（内存告警）。
