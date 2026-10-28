@@ -1,0 +1,73 @@
+{
+  "version": "0.23.45",
+  "registry": "https://registry.npmjs.org",
+  "keep": false,
+  "startedAt": "2026-10-28T23:21:45.344Z",
+  "node": "v24.19.0",
+  "npm": "12.2.0",
+  "os": "Windows_NT 10.0.26340 x64",
+  "platform": "win32",
+  "tmpDir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-pFQ2oT",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.45.tgz",
+    "sha256": "59354dde2dc265b688cb21fb2fa2b436e5456560e20a3ea1bbaad2a11f95ac66",
+    "registryIntegrity": "sha512-nEmYHmWEIDTtvTPtLCDgD2VqGtJXcdMbpjoVkNrRVOf7w2rVEc+99FfuqiwqTfJtekf/2LJKhQS1EKuTH6Ch+g==",
+    "bytes": 169983
+  },
+  "packageGraph": {
+    "installed": {
+      "agent": "0.23.45",
+      "browser": "0.23.45",
+      "cli": "0.23.45",
+      "cognitive": "0.23.45",
+      "domain-harmony": "0.23.45",
+      "domain-ops": "0.23.45",
+      "environments": "0.23.45",
+      "evaluation": "0.23.45",
+      "evolution": "0.23.45",
+      "extension": "0.23.45",
+      "kernel": "0.23.45",
+      "lsp": "0.23.45",
+      "observability": "0.23.45",
+      "sandbox": "0.23.45",
+      "web": "0.23.45"
+    },
+    "pins": {
+      "agent": "0.23.45",
+      "browser": "0.23.45",
+      "cognitive": "0.23.45",
+      "domain-harmony": "0.23.45",
+      "domain-ops": "0.23.45",
+      "environments": "0.23.45",
+      "evaluation": "0.23.45",
+      "evolution": "0.23.45",
+      "extension": "0.23.45",
+      "kernel": "0.23.45",
+      "observability": "0.23.45",
+      "sandbox": "0.23.45",
+      "web": "0.23.45",
+      "lsp": "0.23.45"
+    },
+    "unexpected": [],
+    "expected": [
+      "kernel",
+      "observability",
+      "evaluation",
+      "sandbox",
+      "cognitive",
+      "environments",
+      "browser",
+      "extension",
+      "evolution",
+      "domain-harmony",
+      "domain-ops",
+      "lsp",
+      "agent",
+      "web",
+      "cli",
+      "codexhost-bridge"
+    ]
+  },
+  "finishedAt": "2026-10-28T23:24:06.516Z",
+  "evidenceDir": "v0.23.45/20261028T232406Z"
+}

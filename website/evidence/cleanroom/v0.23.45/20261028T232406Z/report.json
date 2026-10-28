@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "version": "0.23.45",
+    "registry": "https://registry.npmjs.org",
+    "keep": false,
+    "startedAt": "2026-10-28T23:21:45.344Z",
+    "node": "v24.19.0",
+    "npm": "12.2.0",
+    "os": "Windows_NT 10.0.26340 x64",
+    "platform": "win32",
+    "tmpDir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-pFQ2oT",
+    "tarball": {
+      "url": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.45.tgz",
+      "sha256": "59354dde2dc265b688cb21fb2fa2b436e5456560e20a3ea1bbaad2a11f95ac66",
+      "registryIntegrity": "sha512-nEmYHmWEIDTtvTPtLCDgD2VqGtJXcdMbpjoVkNrRVOf7w2rVEc+99FfuqiwqTfJtekf/2LJKhQS1EKuTH6Ch+g==",
+      "bytes": 169983
+    },
+    "packageGraph": {
+      "installed": {
+        "agent": "0.23.45",
+        "browser": "0.23.45",
+        "cli": "0.23.45",
+        "cognitive": "0.23.45",
+        "domain-harmony": "0.23.45",
+        "domain-ops": "0.23.45",
+        "environments": "0.23.45",
+        "evaluation": "0.23.45",
+        "evolution": "0.23.45",
+        "extension": "0.23.45",
+        "kernel": "0.23.45",
+        "lsp": "0.23.45",
+        "observability": "0.23.45",
+        "sandbox": "0.23.45",
+        "web": "0.23.45"
+      },
+      "pins": {
+        "agent": "0.23.45",
+        "browser": "0.23.45",
+        "cognitive": "0.23.45",
+        "domain-harmony": "0.23.45",
+        "domain-ops": "0.23.45",
+        "environments": "0.23.45",
+        "evaluation": "0.23.45",
+        "evolution": "0.23.45",
+        "extension": "0.23.45",
+        "kernel": "0.23.45",
+        "observability": "0.23.45",
+        "sandbox": "0.23.45",
+        "web": "0.23.45",
+        "lsp": "0.23.45"
+      },
+      "unexpected": [],
+      "expected": [
+        "kernel",
+        "observability",
+        "evaluation",
+        "sandbox",
+        "cognitive",
+        "environments",
+        "browser",
+        "extension",
+        "evolution",
+        "domain-harmony",
+        "domain-ops",
+        "lsp",
+        "agent",
+        "web",
+        "cli",
+        "codexhost-bridge"
+      ]
+    },
+    "finishedAt": "2026-10-28T23:24:06.516Z",
+    "evidenceDir": "v0.23.45/20261028T232406Z"
+  },
+  "steps": [
+    {
+      "step": "download + fingerprint",
+      "status": "PASS",
+      "detail": "169983 bytes, sha256 59354dde2dc265b6…, integrity matches"
+    },
+    {
+      "step": "clean-room npm install",
+      "status": "PASS",
+      "detail": "npm exit=0; dist/main.js present=true"
+    },
+    {
+      "step": "pin + version verification",
+      "status": "PASS",
+      "detail": "15 installed packages all @0.23.45; 14 CLI pins exact; codexhost-bridge outside dep graph → registry confirms"
+    },
+    {
+      "step": "hmh check (toolchain probe)",
+      "status": "PASS",
+      "detail": "exit=0; toolchain probe lines: 4"
+    },
+    {
+      "step": "web /api/state smoke",
+      "status": "PASS",
+      "detail": "HTTP 200, daemonVersion=0.23.45, busy=false, workspace=hmh-cleanroom-pFQ2oT"
+    },
+    {
+      "step": "task accept (POST /api/task)",
+      "status": "PASS",
+      "detail": "HTTP 200 {\"ok\":true} — boundary: fake baseUrl http://127.0.0.1:9/v1, no real key"
+    },
+    {
+      "step": "interrupt (POST /api/interrupt)",
+      "status": "PASS",
+      "detail": "HTTP 200 {\"ok\":true} — structural answer is the channel proof (task may have already failed honestly without a key)"
+    },
+    {
+      "step": "session rollout landed",
+      "status": "PASS",
+      "detail": "activeSessionId=web-mvsqoax2, busy=false"
+    },
+    {
+      "step": "resume --last (CLI)",
+      "status": "PASS",
+      "detail": "resuming 2026-10-28T23-22-01-fd6bgm · 1 messages · model probe-model · repl exits cleanly on stdin EOF (exit=0)"
+    },
+    {
+      "step": "hmh bench",
+      "status": "PASS",
+      "detail": "exit=0; pass rate: 100% (no key: case list may be empty — output recorded as-is)"
+    },
+    {
+      "step": "hmh evolve --max=1",
+      "status": "PASS",
+      "detail": "terminated by verifier timeout at 120s after the structured failure below; honest failure without a key: model errors reported in-structure"
+    }
+  ]
+}
