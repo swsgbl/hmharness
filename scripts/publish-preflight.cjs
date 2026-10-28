@@ -62,7 +62,11 @@ if (!process.argv.includes('--skip-tests')) {
   console.log('== build + unit tests + typecheck');
   for (const cmd of ['npm run build', 'npm run typecheck', 'npm test']) {
     try {
-      execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 900000 });
+      // 30min: the full suite took 8min on a fast runner and >15min on a slow
+      // one — the old 900s cap killed npm test mid-run (exit!=0 with ZERO
+      // "not ok" lines = the timeout signature), reading like a test failure
+      // (2026-10-28 main CI false-red). Same lesson as publish.cjs's 600s.
+      execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 1800000 });
       console.log('  ' + cmd + ': ok');
     } catch (e) {
       // surface the FAILING TESTS, not just the output tail: node:test emits
