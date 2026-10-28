@@ -1,0 +1,3 @@
+用不超过10个汉字解释什么是JSON
+expect-regex: [\u4e00-\u9fff]{2,10}
+holdout: true

@@ -1,5 +1,6 @@
 # REPORT:技能泛化 P1-2 单因素实验 skill-gen-p1-2-2026-10-28(前置条件感知触发匹配)
 
+> **外部复现:见 [repro-packs/skill-gen-p1-2-2026-10-28/](../../../repro-packs/skill-gen-p1-2-2026-10-28/)**——自包含复现包(冻结语料快照+逐字分析器+判定规则+对比器),仓库外任意目录 `node reproduce.cjs` 一键复现,判定对比器须输出 IDENTICAL(审计 P2-1 实测已过,记录见 DEVLOG 2026-10-28 外部复现包轮)。
 > 本文件是任务书要求的执行交付层(执行史/偏差/成本/commit 清单/复现)。
 > 统计判定的机器生成全文见同目录 `machine-verdict.md`(由 `scripts/skillgen-p1-2-experiment.mts` 产出,判定语言按预注册枚举,无手工修饰);结构化数字见 `phases/analysis.json`,逐案例原始结果见 `phases/run.json`(138 条 holdout 成功轨迹 × A/B 两臂全量字段)。
 > 预注册 `manifest.json` 冻结于实现之前(commit `1f606f9`,先于任何 Skill Compiler 代码改动)——这是三臂纪律的照搬:先冻结,后实现,再跑数。

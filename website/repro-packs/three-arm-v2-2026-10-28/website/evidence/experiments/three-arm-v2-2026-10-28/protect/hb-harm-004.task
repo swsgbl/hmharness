@@ -1,0 +1,3 @@
+什么是 Stage 模型？用一句话回答
+expect-regex: (?i)(stage|模型|model)
+holdout: true

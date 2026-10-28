@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-10-28T04:03:16.012Z",
+  "rule": {
+    "perClassCandidates": 2,
+    "classSelection": "classes ordered by distinct failed-task count (desc), tie by class name; top classes taken, all with >=1 failed task eligible",
+    "maxClasses": 5,
+    "minTasksPerClassPrompt": 1,
+    "gate": "the whole population enters ONE runEvolution call as presetProposals with maxProposals = population size; thresholds unchanged (quality floor 0.6, zero bench regression, double sampling, holdout re-verification, cost cap)",
+    "cArmPick": "if any candidate is promoted: deploy the one with the highest gate train pass rate; tie broken by lexicographically smallest name (deterministic, pre-registered)",
+    "allRejected": "population fully rejected => C arm not deployable, main endpoint NEEDS-DATA (honest outcome, same as v1 cArmRule)"
+  },
+  "classes": [
+    {
+      "class": "format",
+      "distinctFailedTasks": 14,
+      "promptSha": "5b5bf228fbd0f941b64ce8f1afd45ef1545e50e3eb84750d181dcdf6ab6bae70",
+      "samples": [
+        "adv-cn-punct",
+        "adv-long-1",
+        "adv-long-2",
+        "adv-mixed-1",
+        "adv-space-1",
+        "adv-space-2",
+        "cjk-ex-5",
+        "fadv-csv"
+      ],
+      "candidates": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "name": "verbatim-character-copy"
+        },
+        {
+          "attempt": 1,
+          "ok": true,
+          "name": "payload-only-reply"
+        }
+      ]
+    },
+    {
+      "class": "exact-output",
+      "distinctFailedTasks": 3,
+      "promptSha": "5bc812ad0c5b750c5e73f823d7e8cf99c78d41c8868e4fcd96d4d1546cffef64",
+      "samples": [
+        "cjk-ex-12",
+        "cjk-ex-11",
+        "train-exact-cn"
+      ],
+      "candidates": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "name": "verbatim-codepoint-copy"
+        },
+        {
+          "attempt": 1,
+          "ok": true,
+          "name": "bare-string-reply"
+        }
+      ]
+    }
+  ],
+  "population": [
+    {
+      "name": "verbatim-character-copy",
+      "description": "Reproduce exact-output targets character-for-character, preserving edge characters such as leading/trailing spaces, quotes, full-width punctuation, and empty fields.",
+      "skill_md": "Treat the requested string as immutable literal data, not prose to improve.\nCopy it directly from the prompt, character by character.\nPreserve any leading or trailing spaces exactly; never trim.\nInclude surrounding quotes, brackets, and terminal punctuation when they are part of the target.\nKeep full-width/CJK punctuation byte-identical; never substitute ASCII lookalikes.\nKeep case exactly; do not auto-capitalize or lowercase.\nPreserve repeated delimiters and empty fields; do not collapse them.\nKeep every character the prompt flags as intentional or required.\nNever insert characters the target does not contain.\nBefore sending, silently diff your reply against the prompt: same length, same first and last character.\nIf anything differs, correct it without commenting.",
+      "failureClass": "format",
+      "candidateSha": "743809be8b11000ebfc3fb2eddb4ba58a6813824ad73876cead3234edf2ec24b"
+    },
+    {
+      "name": "payload-only-reply",
+      "description": "Emit only the requested payload with zero surrounding text, markdown wrappers, or commentary.",
+      "skill_md": "The reply channel carries the payload only.\nOutput the target string, then stop.\nNo greeting, acknowledgment, preamble, or sign-off.\nNo explanation of what you did or why.\nNo markdown: no code fences, bullets, bold, or headers.\nThe first character of the reply is the first character of the target.\nThe last character of the reply is the last character of the target.\nEmit nothing after the final character — no trailing note or addendum.\nDo not restate, translate, or confirm the instruction.\nDo not wrap the answer in quotes or backticks unless they are part of the target.\nIf tempted to add anything, delete it instead.",
+      "failureClass": "format",
+      "candidateSha": "784792e9f15c027c2ac7338fb07b91671033a100f8360d5a5805fd0d86902bb4"
+    },
+    {
+      "name": "verbatim-codepoint-copy",
+      "description": "Reproduce the target string character by character with no normalization, substitution, or width correction.",
+      "skill_md": "# verbatim-codepoint-copy\n\n- Copy the target exactly, character by character, not by meaning.\n- Treat every character as frozen: punctuation width, case, spacing, script.\n- Never normalize half-width punctuation to full-width or back.\n- Never swap a mark for its localized equivalent.\n- Match each punctuation character to the exact form shown in the prompt.\n- Never translate, transliterate, or \"fix\" the text.\n- Keep every space exactly where it sits, including around Latin words inside CJK text.\n- Your instinct to standardize or improve the text is the failure mode.\n- Verify punctuation width and spacing before sending.\n- Change nothing; the target is already correct as shown.",
+      "failureClass": "exact-output",
+      "candidateSha": "9a661bf1d981adf1801df2ee17c1a640f8c9b433959fe92152dab0d84e53a445"
+    },
+    {
+      "name": "bare-string-reply",
+      "description": "Output only the requested string — no fences, backticks, markdown, preamble, or trailing characters.",
+      "skill_md": "# bare-string-reply\n\n- The entire reply is the string alone. Nothing before, nothing after.\n- No preamble, no explanation, no politeness, no sign-off.\n- No markdown: no backticks, asterisks, or fences unless the target itself is fenced.\n- Do not decorate commands, code, or filenames; emit them as plain text.\n- No trailing punctuation the target does not contain.\n- End at the string's last character: no newline, no trailing space.\n- If the target was shown quoted, output the inner text unless quotes are part of the string.\n- Formatting is addition; addition is failure.\n- When unsure, output less.",
+      "failureClass": "exact-output",
+      "candidateSha": "07becf81dc740bf65eed6deee24a3de5e8b6dbe9da3f3fb5c89c8d45321e92aa"
+    }
+  ],
+  "gateOutcome": {
+    "ranAt": "2026-10-28T04:30:58.218Z",
+    "promoted": [],
+    "rejected": [
+      "verbatim-character-copy",
+      "payload-only-reply",
+      "verbatim-codepoint-copy",
+      "bare-string-reply"
+    ]
+  }
+}

@@ -1,0 +1,3 @@
+ArkUI 使用什么声明式语法？只输出语法名称
+expect-regex: (?i)(declar|声明)
+holdout: true

@@ -1,0 +1,512 @@
+{
+  "kind": "hmharness-repro-pack",
+  "version": 1,
+  "experimentId": "three-arm-v2-2026-10-28",
+  "generatedAt": "2026-10-28T16:15:57.937Z",
+  "generator": {
+    "script": "scripts/make-repro-pack.mts",
+    "repoCommit": "c66c1b3",
+    "nodeVersion": "v22.23.3",
+    "platform": "win32/x64"
+  },
+  "publishedVerdict": {
+    "gate": {
+      "verdict": "NEEDS-DATA",
+      "gates": [],
+      "reason": "C arm not deployable: the evolution gate rejected the ENTIRE candidate population (v2 GEPA-style population rule — the honest outcome of the persistent-evolution path)"
+    },
+    "mainEndpoint": {
+      "comparison": "C-vs-A",
+      "split": "protect",
+      "diff": 0,
+      "significant": false,
+      "needsData": [
+        "only 0 paired tasks (<15)",
+        "only 0 discordant cells (<8) — exact test underpowered"
+      ]
+    },
+    "cDeployable": false,
+    "datasetHash": "cd45058a6cc825492127a16eff3697aba6480fe49bb4291048790876aaf495ed"
+  },
+  "reproduce": {
+    "entry": "node reproduce.cjs",
+    "analyzer": "scripts/three-arm-v2-analyze.mts",
+    "analyzerIsByteIdenticalTo": "scripts/three-arm-v2-analyze.mts"
+  },
+  "evidenceExcluded": [
+    {
+      "path": "phases/0-outputs/",
+      "reason": "raw per-run model outputs; the analyzer never reads this directory (report text references it by name only)"
+    },
+    {
+      "path": "phases/3-outputs/",
+      "reason": "same — raw outputs, not an analyzer input"
+    },
+    {
+      "path": "gate-home/",
+      "reason": "isolated gate-home copy used by the experiment DRIVER (phase 2); the offline analyzer never touches it"
+    },
+    {
+      "path": "skills-snapshot/",
+      "reason": "frozen skill-library snapshot injected into the arms; driver input, not analyzer input"
+    },
+    {
+      "path": "REPORT.md",
+      "reason": "human execution report (it also clobbered the machine report.md on case-insensitive NTFS — on-record deviation); analysis.json is the machine-verdict superset being reproduced"
+    }
+  ],
+  "extraOutputs": [
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/report.md",
+      "reason": "regenerated machine report (human-readable rendering of analysis.json); its published twin was clobbered by REPORT.md on NTFS, so no byte-compare target exists — every number in it is diffed via analysis.json"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/analysis.json",
+      "published": "published/analysis.json",
+      "kind": "json",
+      "volatile": [
+        "generatedAt"
+      ],
+      "whyVolatile": "ISO timestamp of the analysis"
+    }
+  ],
+  "fileIndex": [
+    {
+      "path": "README.md",
+      "sha256": "714d658afbd2d05609d8921a0b3246207fd386e0fc3325c94312904068a69ecc",
+      "bytes": 4064
+    },
+    {
+      "path": "compare-lib.cjs",
+      "sha256": "76491c18f9641ec6f7b9bedea4af6a74c351db42ecf54c73a848fd18e95e9141",
+      "bytes": 6531
+    },
+    {
+      "path": "compare.cjs",
+      "sha256": "df79cacdc998003b6b9f211698f76bb8d8b4d4b78756f46b817316da140c61bc",
+      "bytes": 2102
+    },
+    {
+      "path": "env-fingerprint.json",
+      "sha256": "dfdd3f6a31c11119c95a94c5760aa7838fbd73b31226e0275139b052593cb52c",
+      "bytes": 497
+    },
+    {
+      "path": "packages/evolution/package.json",
+      "sha256": "8a9ed497fa065cd917e2b7685822bb7c8124253a999950588ec62279730f452b",
+      "bytes": 825
+    },
+    {
+      "path": "packages/evolution/src/three-arm-v2.ts",
+      "sha256": "a4d23ff5ec1fbb8c854e14a58579389baf0021dd406977fe13c062f8b5d8008e",
+      "bytes": 10102
+    },
+    {
+      "path": "packages/evolution/src/three-arm.ts",
+      "sha256": "2bebdbd2596774306a1ab81f2f7453650d8a050113097d5a82efd74bc6fbf33e",
+      "bytes": 18881
+    },
+    {
+      "path": "published/analysis.json",
+      "sha256": "2cc7b779aa74401473348f73ee1308a2f7ee46fb878e18fdbf6ab0accaa2c714",
+      "bytes": 9271
+    },
+    {
+      "path": "published/manifest.json",
+      "sha256": "fe9e9ac37d4527a51dc766ed504fa6e29c0a1c7eb48bf1fd85b6cbf1e4c1d14c",
+      "bytes": 12067
+    },
+    {
+      "path": "reproduce.cjs",
+      "sha256": "00c7b8b00e36d5d7e924dbcf9534f815316b112601a0466ce753b90b8c2ef260",
+      "bytes": 1452
+    },
+    {
+      "path": "scripts/three-arm-v2-analyze.mts",
+      "sha256": "8026f9392a276323cab74604cc0da9c83ed3c4d27dcda0d7c01fffee9d31c8e3",
+      "bytes": 22244
+    },
+    {
+      "path": "verdict-rules.md",
+      "sha256": "7249d8a4db232025859bfe15b03a5fe6d980fe07181041a5fb90ef43ca720d52",
+      "bytes": 1757
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/manifest.json",
+      "sha256": "fe9e9ac37d4527a51dc766ed504fa6e29c0a1c7eb48bf1fd85b6cbf1e4c1d14c",
+      "bytes": 12067
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/phases/0-null.jsonl",
+      "sha256": "6d87e67329885f14f86daf564728d9e75c0319e7a8d685b14c463da57d84b14e",
+      "bytes": 441593
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/phases/1-candidates.json",
+      "sha256": "f9c8de13fe7c7aa40b71b25fd3bbc49574d5c20242c01b6b36d506bfc52ce39b",
+      "bytes": 6421
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/phases/2-gate.json",
+      "sha256": "e1357a1512930822255ef73686bd3aeba73ad61275114c6665f1edac8fb0114e",
+      "bytes": 10212
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/phases/3-main.jsonl",
+      "sha256": "dfe6b75d1dcdecc4d2c12830d16a7f7624d0c7721ec1222eb6e3a519782d3774",
+      "bytes": 1271768
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/phases/predictions.jsonl",
+      "sha256": "d67aa868fb3305fe18df67e15ab103638c5dc69f410ae497cefcc141ef8774c2",
+      "bytes": 22907
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-001.task",
+      "sha256": "b86521ab8b5d3ddfbf54c782f9d541f30c27bd7383637e748f5972090c4f4fad",
+      "bytes": 86
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-002.task",
+      "sha256": "5fb5468a47ec8c84ba03721d5deaf97e81c3d82107bd428cccb4a6f87d2b65b7",
+      "bytes": 82
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-003.task",
+      "sha256": "97f316e5cc5723919e6dacf32df23467d0bcbcfe720ffe48a0ee1a50eb54bdda",
+      "bytes": 82
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-004.task",
+      "sha256": "561946f1f0460a62601bedf416f096a058d14e274df653cddd7d6bd217c4208e",
+      "bytes": 96
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-005.task",
+      "sha256": "66d167f6e42295bedc92e8bb097110233005c5344f6a03d0c142df7cc99296e4",
+      "bytes": 95
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-006.task",
+      "sha256": "30ee2b664247222d06db2719f16aca2f2585ff81085c2928afdf9a36c914b7c8",
+      "bytes": 108
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-007.task",
+      "sha256": "c7e5ba996d8abf48893848e8e9615d9f8f6a0305f31c74b73f36e68f9749f57d",
+      "bytes": 103
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-008.task",
+      "sha256": "94243734d9f11d809a3b6bd6ff9238767647cfe2116a734ba90362ec5fe7aaa3",
+      "bytes": 105
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-009.task",
+      "sha256": "261c8f4ecb7a0d63f6153272a628a0e17e2be90f41e8ea2146252476e2fbaa83",
+      "bytes": 66
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-cjk-010.task",
+      "sha256": "d88976477db7de6e6bc0c54da5018f4d06caf5d0f131f8985727c4c2ece5fa13",
+      "bytes": 108
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-001.task",
+      "sha256": "9d1f470759d1edf4717a55b957b4059d439c5180ac3fac58b657121b894cb8ee",
+      "bytes": 115
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-002.task",
+      "sha256": "bfb1bee246c3ce45ba2b8364611442d6afdde308e4fd4f7951e78c6fffd517f0",
+      "bytes": 109
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-003.task",
+      "sha256": "cef0c193c87c68d5e3e117efdc746ad87091ac6eab8576f45a10d00bfa5fc4c9",
+      "bytes": 134
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-004.task",
+      "sha256": "36e290b333b1de2442a8259595432a13cce12efbbd871b8753c79bc68b070959",
+      "bytes": 109
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-005.task",
+      "sha256": "6c86d3aab69aa819974304ea1cf15854f3c31035b8b32b178acf064a851d1121",
+      "bytes": 124
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-006.task",
+      "sha256": "cce4f62b41c631357b0476066c2d59552fae1d4009c15119557e221b102a4200",
+      "bytes": 130
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-007.task",
+      "sha256": "c7ba4327bd7a89dc5ff289c21c0aec8c7198b51e30c81db47ee474aa0bed8808",
+      "bytes": 113
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-008.task",
+      "sha256": "65649266fa786151086298024a81499656194863cbf2a32f342d2058ccd3fa5e",
+      "bytes": 114
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-009.task",
+      "sha256": "4c7e13af20d8dc0a3eb306b5828f0ee990a21f8d7429595bb7873690caaf0c5f",
+      "bytes": 90
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-code-010.task",
+      "sha256": "08a794abaee98d756182d8ebf291044c0eb7c70b5fa0f22578e0d07acc2483b4",
+      "bytes": 110
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-001.task",
+      "sha256": "c6e0a29a908225cacb6034cf70afbf9d4eddbdc295fe8ec8e7c1d06c08c12689",
+      "bytes": 63
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-002.task",
+      "sha256": "a9073ca6526571ba45e0409521ee4119de95c079cb881dcad224d17c410a50a5",
+      "bytes": 57
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-003.task",
+      "sha256": "d50ade6992cfa63ee59de417d1b77e578dbe45100aca9b7b7445ed05db305985",
+      "bytes": 75
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-004.task",
+      "sha256": "4b96bbd9fed9315e54f2329675dc23fb6b48aca07b33ec994c8b363f6bad2519",
+      "bytes": 67
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-005.task",
+      "sha256": "2af1f20e48bd712949f53b151df85eddd0c4f5a053a527db0ef4a82b6e349b10",
+      "bytes": 55
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-006.task",
+      "sha256": "453d0d1f27ae83c5ebbfb47b03eb16226447249812ef81ddc1ca8c3d13560555",
+      "bytes": 61
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-007.task",
+      "sha256": "7fea8f19f67048ca4b7fea54f1810392218581403cf8cb52aba75153295783f9",
+      "bytes": 61
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-008.task",
+      "sha256": "330dc17bcda0b074c80c8d689a5f7abe141acb9e9f43739f1cb8eaba527d94e3",
+      "bytes": 61
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-009.task",
+      "sha256": "464f0c5fa9911dc06700479a46aef7f804defc8785204c6ce1f8c059124a44bd",
+      "bytes": 67
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-exact-010.task",
+      "sha256": "04ac766500e6f4915e319ab1d2d9597cc62c3f63fccc8dae7c9f495e8b260000",
+      "bytes": 67
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-001.task",
+      "sha256": "d9ebde05eb553c05c3cb74256aae9d178d2cf6632039f3ba994bb2d0c46f3114",
+      "bytes": 76
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-002.task",
+      "sha256": "26d837d3f17fe223ef97175586b6b951bfe75873c6d95598b57b5fb6b6404f88",
+      "bytes": 138
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-003.task",
+      "sha256": "f81e1c2fc56816508e3532ae948e3d702fc5fccea7c2f6eb8b09ceef51abc402",
+      "bytes": 106
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-004.task",
+      "sha256": "4702f3955240488bbdadc004e23ec024f3005c00658122a9c481334afc7b0e4f",
+      "bytes": 100
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-005.task",
+      "sha256": "bf6cecd254df63e828e1ed774acdd7705d71869573ca07fadae02c3ec996b358",
+      "bytes": 101
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-006.task",
+      "sha256": "5bd3e059e0ee210b755c4b4818628beba632e304ed974f3605dded76872e5f9d",
+      "bytes": 112
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-007.task",
+      "sha256": "76acaca4e8e7774259747b792eda8d45b16873034f6f4ce4ad885cd29072e9a8",
+      "bytes": 109
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-harm-008.task",
+      "sha256": "95793665eca55a2e17ebc0c8b7721c8d836bdedb3e5932e02a7b815a1f7ecc63",
+      "bytes": 107
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-001.task",
+      "sha256": "086f0946b8a695902f29603ebf2461bdeb9fd63819dbb47971f54691b968ee8f",
+      "bytes": 100
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-002.task",
+      "sha256": "edbd8fac4155b5346601fc95ea814c3e4805e6b70947b226c8e42183fd86d4bb",
+      "bytes": 71
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-003.task",
+      "sha256": "941f5a4952415a15a8b5b3df7f48de27dd1702370dab2462ba41abec4b977daa",
+      "bytes": 102
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-004.task",
+      "sha256": "3c4e960d5173736d763e05e36f68e58fb7adc4999b813a2ce9b9c26ce45e0bd5",
+      "bytes": 64
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-005.task",
+      "sha256": "f97539b016da42754478d0c463a764ea4697e7064f2df70d9c7a8433ea22f048",
+      "bytes": 69
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-006.task",
+      "sha256": "8a98b3061bf33d9e7bc0436365953f5bfb937591b96251122bae2f7cc2047730",
+      "bytes": 67
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-007.task",
+      "sha256": "d34d6030350bbe4d3e1798e9fa3d582628de168964e94f50f34a3efe9ffe4949",
+      "bytes": 69
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hb-reason-008.task",
+      "sha256": "b92b2f40ea955d4a34c3cde19b7c8d23647118706079359adf313de5acabd1df",
+      "bytes": 129
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-exact-1.task",
+      "sha256": "83a5914ef89a994d586177924085557d681aeede3a4ee9f46de7c3200b4743b3",
+      "bytes": 81
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-exact-2.task",
+      "sha256": "84cf0bbe16ff120f72f13183dddf09176b28499e4265aacdd5b682bcfe2c6eca",
+      "bytes": 81
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-exact-3.task",
+      "sha256": "fe0214e525abddf4098523f75594ffc8bed57466666a462996b1cdb0eb4023c3",
+      "bytes": 81
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-exact-4.task",
+      "sha256": "01a62a728edb42555970f487d9d3e37431a6d4eb246bd444e69ed8822f9e313c",
+      "bytes": 81
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-identity.task",
+      "sha256": "65184cc0df18600efb66620dd5ac0e2884ba805fa741ed1052379dcce7355d67",
+      "bytes": 116
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-json.task",
+      "sha256": "2e95755ed63bb0b46fa1d4665ef179acf48eaaeca5353055d86ad469ee775a6f",
+      "bytes": 139
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-list.task",
+      "sha256": "6c65ca8f2daf2dc4130f62b7817fd2f667601237189bb9fb47c398166c7a3955",
+      "bytes": 184
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-canary-refusal.task",
+      "sha256": "5f8ff688576716404ff6aaf2e4f7bca90654c15b6f022318f95efc8fb63ef506",
+      "bytes": 197
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-cangjie.task",
+      "sha256": "5e211355f084c3d07ee85cb1dd9f9e12da778e2a954c263871ef5b8f422e8d41",
+      "bytes": 93
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-hap.task",
+      "sha256": "b8d6386a8617282eff8b73d9b552f7602ec64b9c033e84a75f174eb89f68ef89",
+      "bytes": 100
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-hdc.task",
+      "sha256": "10b10d396135813c8ac85c2ddc04f1dc7725d3b8dca3151e57dfde5a189700c5",
+      "bytes": 103
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-hvigor.task",
+      "sha256": "ba6154e9d6c6393b004b147c32a2f0c4179c0d590dad49a21bc567c1217c4740",
+      "bytes": 88
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-lifecycle.task",
+      "sha256": "ec740e1bb1e5fb3686c79e53ce500862fdb2fd8f9d2fffd21a846d27959b4fcb",
+      "bytes": 159
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-module.task",
+      "sha256": "757bea7de798ba56ac230c55049b588e1a6e09fb719fe58a9f1ec44ccf693221",
+      "bytes": 133
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-ohpm.task",
+      "sha256": "1ec633c4c5e0e9bee0a5597fb98dbe73c955ac8a29d17cf51abd6cf7a7d606aa",
+      "bytes": 95
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-apilookup.task",
+      "sha256": "8835f3f0761efc71ee608c66ea1fcca685cb8060e93e9de9a8b741bcad8b0d37",
+      "bytes": 134
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-build.task",
+      "sha256": "e1efe22e00040d44c559139b0ed8b2c60a774f075b302dd739381ca285565572",
+      "bytes": 110
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-doctor.task",
+      "sha256": "6ac1de38f602101bd06c949d820ae488d368ca00c5ac5aa7817ac4f5615f7c3e",
+      "bytes": 181
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-emulator.task",
+      "sha256": "71f5382d70cb99f9532a13fd5b6ac112a252a87bcc41810528bcf07b22ba9c37",
+      "bytes": 146
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-schema.task",
+      "sha256": "e95852bd386a18f848ba42eefe275396f96910ad0560c076d2a199b1de6f49a6",
+      "bytes": 131
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-screen.task",
+      "sha256": "6cef1bb0235eeaf05d40498456fb687c0dde3081643c06e7bc6942e83e4f80ff",
+      "bytes": 192
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-tools-state.task",
+      "sha256": "4587abac52bbb0caeb0f47e76a97cf4a766b1093c6cd7c78ebe1d1d638533f48",
+      "bytes": 135
+    },
+    {
+      "path": "website/evidence/experiments/three-arm-v2-2026-10-28/protect/hmb-know-want.task",
+      "sha256": "385d7bb95f6ba4e77497be02bbf37ca0af0c1ed16ea3a317825e85e20bc719cc",
+      "bytes": 130
+    }
+  ]
+}
