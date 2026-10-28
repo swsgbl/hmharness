@@ -59,8 +59,17 @@ test('lifecycle: startBrowser fails honestly when no BrowserOS exists (install U
   process.env.PATH = home;
   try {
     discoverBrowsers(true, { roots: [join(home, 'nope', 'BrowserOS.exe')] });
+    // hermetic port: 19223 is BrowserOS's real default — a user machine with a
+    // live BrowserOS answers it and the honest error differs (env flake hit
+    // during the v0.23.45 release run, 2026-10-29). Borrow a just-freed
+    // ephemeral port instead: nothing is listening on it.
+    const { createServer } = await import('node:net');
+    const hold = createServer();
+    await new Promise<void>((res) => hold.listen(0, '127.0.0.1', () => res()));
+    const freePort = (hold.address() as { port: number }).port;
+    await new Promise<void>((res) => hold.close(() => res()));
     await assert.rejects(
-      () => startBrowser(home, { port: 19223 }),
+      () => startBrowser(home, { port: freePort }),
       /BrowserOS not found[\s\S]*browseros\.com/,
     );
   } finally {
