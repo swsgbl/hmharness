@@ -332,12 +332,15 @@ test('resume picker modal: loads rollouts from HMH_HOME, arrows + Enter pick, Es
     const h = await makeTui();
     try {
       const pickP = h.rt.openResumePicker();
-      // the first page lands asynchronously - poll the rendered modal frame
+      // the first page lands asynchronously - poll the rendered modal frame.
+      // Wait for BOTH rows: the ↓+Enter below assumes the full preload
+      // (beta=newer at row 0, ↓ lands on alpha). Waiting for alpha alone
+      // raced a half-loaded list on loaded CI runners (picked beta).
       const deadline = Date.now() + 5000;
       let frame = '';
       while (Date.now() < deadline) {
         frame = h.rt.paletteProbe().frameText;
-        if (frame.includes('alpha')) break;
+        if (frame.includes('alpha') && frame.includes('beta')) break;
         await new Promise((r) => setTimeout(r, 25));
       }
       assert.match(frame, /alpha/);
