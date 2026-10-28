@@ -2,10 +2,10 @@
   "kind": "hmharness-repro-pack",
   "version": 1,
   "experimentId": "skill-gen-p1-2-2026-10-28",
-  "generatedAt": "2026-10-28T16:48:14.533Z",
+  "generatedAt": "2026-10-28T17:07:01.772Z",
   "generator": {
     "script": "scripts/make-repro-pack.mts",
-    "repoCommit": "6b86fa3",
+    "repoCommit": "aab2504",
     "nodeVersion": "v22.23.3",
     "platform": "win32/x64"
   },
@@ -76,11 +76,12 @@
     "projection": {
       "fields": "{id, environment.id, goal.description (tokenized), steps[].action.type, steps[].outcome, metrics.success} — exactly the fields the frozen driver and packages/cognitive/src/skill-compiler.ts consume",
       "goalRedaction": {
-        "rule": "drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers); (a2) length>=16 with letters AND digits (base64/encoded blobs with sparse digits); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens (count only — values never published). Pre-tokenization, credential-marker-adjacent material (password: VALUE / token=VALUE / bare-marker next word) is cut from the RAW text. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).",
+        "rule": "drop tokens matching ANY of: (a) length>=12 AND >=4 digits AND >=1 letter (commit hashes / registration numbers); (a2) length>=16 with letters AND digits (base64/encoded blobs with sparse digits); (b) credential-prefix+digit shapes (password123, sk1234…); (c) machine/git username tokens (count only — values never published). On the TOKENIZED stream, the token immediately following a credential-marker token (password/token/secret/sk/ghp/api key…) is dropped (markerAdjacentTokenDrops) — separator-agnostic by construction. Literal key=value pairs cannot survive tokenization (=, @, : are separators); a post-projection assert enforces that no credential-shaped token remains. Verdict-neutrality of every drop is proven by the pack self-test (RESULT: IDENTICAL required).",
         "tokenCount": 100,
         "distinctTokens": 49,
         "piiTokenCount": 2,
-        "rawCredentialMarkerHits": 52
+        "rawCredentialMarkerHits": 52,
+        "markerAdjacentTokenDrops": 76
       }
     }
   },
@@ -151,13 +152,13 @@
     },
     {
       "path": "env-fingerprint.json",
-      "sha256": "3839fd8748d8cb32be4aca63dcd1af9c03846cd506289d828503ad4ecd9e380a",
+      "sha256": "8a865030ca77649e5905a5baddcd5f847f166e688b07e1f73821680306faa758",
       "bytes": 459
     },
     {
       "path": "hmh-home/cognitive/trajectories/corpus.jsonl",
-      "sha256": "b7f27bb4724122e78fa1442b03d5c6dbf24ddeff9ed71184053e91571d7d64f1",
-      "bytes": 1149609
+      "sha256": "906dc9337e70c46b0d56f452b4a29fa03e7a9dec4685df6e2e4bb54687920d97",
+      "bytes": 1148946
     },
     {
       "path": "packages/cognitive/package.json",
