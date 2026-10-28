@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-10-28(五十九) · 破案轮:语法错误一击致命 / Tabbit 隐身浏览器 / Chrome 单实例陷阱
+
+**动机**:继续逐浏览器当场验证(五十八轮后 Chrome/Brave 仍不连)。
+
+**三案连破**:
+1. **round-59 的 saveBinding race 改写把 background.js 写出语法错误**(`try{write=...}` 与 `.then` 链断开)——Chrome 的 SW **从装载起就无法启动**:announce/attach/beacon 全无。而守护日志里的 announce 来自 **Brave 幽灵 SW**,完美掩盖了"Chrome 是死的"这一事实。node --check 应成为任何 SW 改动后的固定门禁。
+2. **杀不死的 ext=no chrome.exe = Tabbit Browser**(另一个 Chromium 系浏览器,进程名就叫 chrome.exe,注册了 GoogleChromeAutoLaunch 开机自启)——每次"杀光 Chrome"都被它复活,新窗口全挂在它身上。它成了第 8 个适配对象:autolaunch Run 值已补 --load-extension,**当场验证 CONNECTED ✓ v0.23.31**(SW 取证流完整呈现 boot→announce→save→readback→attach)。
+3. **Chrome 单实例陷阱**:已有默认档案进程时,新启动只是旧进程开新窗口,--load-extension 参数被无声吞掉。杀光(含 Tabbit)→快捷方式启动→**Chrome 也 CONNECTED ✓ v0.23.31**。
+
+**顺手加固**:saveBinding race 化(storage 挂起不再冻结 SW,内存 token 先 attach);boot/readback/save beacon 常驻进活动环(/v1/dbg 信标现在也落 ring——取证不再依赖 env 开关)。
+
+**终态**:桥 UP · Chrome CONNECTED v0.23.31 · Tabbit 已适配(自启带参) · Edge(live-2 启动器)已验 · Brave=手动通道定案 · Firefox=HKCU 策略待实测 · BrowserOS=ACP(用户豁免)。
+
+**教训**:①SW 文件的每次手改必须过 node --check——语法错误=整个扩展静默死亡且被别的 SW 的 announce 掩盖;②"杀光某浏览器进程"在多 Chromium 浏览器机器上必须先看清进程身份(Tabbit 用 chrome.exe!);③单实例语义让"带参启动"在旧进程存活时完全无效——适配验证必须从干净进程态开始;④SW 取证流([sw] 前缀进活动环)让 40 秒内看到完整启动链,这次是它救的场。
+
+
+---
+
+## 2026-10-28(五十八) · 当场验证轮:Brave 幽灵注册的终局诊断与手动通道定案
+
+**动机**:用户三次质问"你都验证过了吗?为什么没见你打开浏览器,我找不到扩展"——自动化测试的验证≠用户真人验证。本轮全部改为当场开真实浏览器验证。
+
+**快改快验**:
+- 快捷方式全量勘查:246 个 .lnk 里 10 个 Chromium 系全部统一补上 --load-extension(统一指向 extension-live-2 v0.23.31);用户档 Chrome/BrowserOS/Helium/Brave/Opera/夸克全覆盖(系统级 ProgramData 夸克需管理员,用户级已替代);
+- Firefox:Program Files 写策略需管理员 → HKCU 策略通道(ExtensionSettings force_installed)写入成功(未签名拒载风险仍在,待实测);
+- attach 取证常驻化(不再依赖调试 env):events attach try/authorized 永久落活动环;
+- Chrome/BrowserOS 同目录同代码 announce+attach 链路在 node 冒充下全通(200 SSE+hello);Brave announce 每 30s 到达但 attach 永不到——location-8 幽灵注册(16 天前)钉死旧目录 + 该注册下 storage 拒写 → announce 拿 token 存不进 → attach 无 token 跳过 = 死循环(readback beacon 证实方向);junction 换内容方案尝试后回滚(SW 起不来,引入新变量);
+- Brave 定案:转手动开发者模式装载(chrome 同款,一次即永久)——扩展页已代开到 brave://extensions。
+
+**教训**:①location-8 注册+SW storage 拒写=修复无从下手的死地——自动通道在该浏览器终结,手动一次是正解不是妥协(Chrome 同款先例);②"验证"一词必须区分:临时实例自动化验证 vs 用户日常档案真人验证,向用户汇报时必须明说用的是哪种;③诊断 beacon 要在设计时就常驻,临时开关意味着每次排障都要重启浏览器+守护。
+
+---
+
+## 2026-10-28(五十七) · 适配收口:系统级自愈(计划任务)与逐浏览器通道终态
+
+**动机**:用户"继续推进,适配每个浏览器"。真机七台 8/8 已过(五十五轮),适配的最后短板是可用性:桥守护+进程看门狗双双被系统性清理(两个 detached pid 同时消失)——进程级保活挡不住整树清除。
+
+**修复:三层保活**
+1. 桥守护(detached+pid 文件);
+2. 进程看门狗(60s 探测/版本检查/复活,幂等);
+3. Windows 计划任务(每分钟系统级点火,重启电脑也常驻)。
+计划任务三坑(全部现场踩中):schtasks /TR 吃掉内联 -e 引号→任务入口必须是纯脚本文件;硬编码 C:\Program Files\nodejs 在 mise 机器上静默 ENOENT→node 路径取 process.execPath;SYSTEM 触发缺 HOME(mise shim 模板炸)→cmd /c start /b 包装继承用户环境链。
+
+**实测**:强杀守护→80s 后计划任务复活(VERIFIED);任务 XML 实查命令/参数正确;CLI 硬化路径构建 0 错(自动生成入口文件+cmdlet 注册),布防输出"双保险就位"。
+
+**逐浏览器适配终态**:chrome/edge/brave/opera/quark/browseros=快捷方式 --load-extension 通道(稳定目录 v0.23.31,Edge 桌面启动器已校);firefox=策略 force_installed+XPI;所有浏览器共用同一载荷与固定扩展 ID。BrowserOS 另有 ACP 通道(用户豁免验证)。
+
+**教训**:①Windows 计划任务的引号/路径/环境三坑每个都会静默失败——任务入口用文件、node 用 execPath、执行走 cmd 包装;②"已在运行"分支会跳过布防——stop→start 才是布防的完整路径。
+
+---
+
+---
+
 ## 2026-10-28(五十七) · 外部复现包 P2-1:另一个审查者在独立目录复现同一判定
 
 **动机**:审计文档 03 P2-1——验收手册要求"基于已过门的单项实验做可复现包,包括环境、原始逐题数据、脚本、manifest、判定规则;**另一个审查者在独立目录复现同一判定**"。
