@@ -18,6 +18,7 @@ import { loadConfig, homeDir, resolveProvider, listProviders, saveProvider, setC
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
+import { renderMarkdown } from './markdown.ts';
 import { formatRow, initialPickerState, pickerKey, reducePicker, toolbarLine, visibleRows, type PickerState } from './resume-picker.ts';
 import { savePending, loadPending, clearPending } from './tui-state.ts';
 
@@ -921,6 +922,15 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
+  /** Markdown-aware transcript text (resume/replay): the same renderer the
+   *  live say stream uses, so replayed answers look like what was streamed. */
+  addMarkdown(text: string): void {
+    const width = Math.max(20, (stdout.columns || 100) - 2);
+    this.entries.push({ lines: renderMarkdown(text, width) });
+    this.scrollFromBottom = 0;
+    this.dirty = true;
+  }
+
   /** The user's own input, chat-style: separated by a blank line above and
    *  below, right-aligned to the terminal width so it reads as "the human
    *  side" against left-aligned model output. */
@@ -961,16 +971,18 @@ export class TuiRuntime {
     const entry: Entry = { lines };
     const repaint = () => {
       if (kind === 'say') {
-        const wrapped = wrapTo(buf, width);
         lines.length = 0;
-        // B10: completed lines get markdown color ONCE; the in-progress tail
-        // stays raw until it wraps — stable rows never reflow
-        const lastIdx = wrapped.length - 1;
-        for (let i = 0; i < lastIdx; i++) lines.push(TuiRuntime.mdColor(wrapped[i]));
-        if (wrapped.length) {
-          const last = wrapped[lastIdx];
-          lines.push(buf.endsWith('\n') ? TuiRuntime.mdColor(last) : last);
-        }
+        // wave7-A: completed lines (up to the last \n) go through the real
+        // markdown renderer — headings lose their #, pipe tables become
+        // aligned box tables, ** becomes bold (Codex/Claude Code parity).
+        // The in-progress tail stays raw until its line completes. An
+        // unclosed fence/table may reflow as chunks arrive; closed blocks
+        // are pure functions of their text and never change.
+        const lastNl = buf.lastIndexOf('\n');
+        const done = lastNl >= 0 ? buf.slice(0, lastNl) : '';
+        const tail = lastNl >= 0 ? buf.slice(lastNl + 1) : buf;
+        if (done) lines.push(...renderMarkdown(done, width));
+        if (tail) lines.push(tail);
       } else {
         // thinking stays FOLDED while streaming: one live line (what Claude
         // Code shows), never the raw chain-of-thought - it is model-internal
@@ -1178,18 +1190,9 @@ export class TuiRuntime {
     this.dirty = true;
   }
 
-  /* ---------------- M4: streaming markdown colorizer (B10) ---------------- */
-  /** Light zero-dep markdown line color for STREAMED text: headings cyan,
-   *  list markers dim, fences dim, blockquotes dim; everything else plain.
-   *  Applied per completed line so already-stable rows never reflow. */
-  static mdColor(line: string): string {
-    const t = line.trim();
-    if (/^#{1,6}\s/.test(t)) return CYAN(BOLD(line));
-    if (/^```/.test(t)) return DIM(line);
-    if (/^>\s?/.test(t)) return DIM(line);
-    if (/^[-*+]\s/.test(t) || /^\d+[.)]\s/.test(t)) return DIM(line.replace(/^(\s*[-*+]\s|\s*\d+[.)]\s)/, '$1'));
-    return line;
-  }
+  /* streaming markdown coloring (old M4/B10 line colorizer) was replaced by
+   *  the block renderer in markdown.ts (wave7-A, 2026-10-29): the say stream
+   *  renders completed lines via renderMarkdown instead of tinting prefixes */
   private overlayKey(data: string): void {
     const ov = this.overlay;
     if (!ov) return;
@@ -2290,7 +2293,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
         rt.addUser(text.replace(/\n+/g, ' ').slice(0, 400));
       } else if (m.role === 'assistant') {
         const calls = (m as { tool_calls?: Array<{ function?: { name?: string } }> }).tool_calls ?? [];
-        if (text.trim()) rt.addText(text.slice(0, 2000));
+        // rendered like the live say stream (wave7-A): headings/tables/lists
+        // come back as terminal output, not raw markdown with pipes and hashes
+        if (text.trim()) rt.addMarkdown(text.slice(0, 2000));
         for (const c of calls) rt.addText('● ' + CYAN(String(c.function?.name ?? 'tool')) + DIM(' …'), 'dim');
       } else if (m.role === 'tool') {
         const first = text.split('\n').find((l) => l.trim()) ?? '';

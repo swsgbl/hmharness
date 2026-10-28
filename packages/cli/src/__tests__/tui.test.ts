@@ -484,15 +484,6 @@ test('COMMANDS covers the M4 P1 family and every key exists in both locales', as
   }
 });
 
-test('mdColor: headings cyan-bold, fences/lists/blockquotes dim, prose plain', async () => {
-  const { TuiRuntime } = await import('../tui.ts');
-  assert.match(TuiRuntime.mdColor('# Title'), /\x1b\[36m\x1b\[1m# Title/);
-  assert.match(TuiRuntime.mdColor('```ts'), /\x1b\[2m/);
-  assert.match(TuiRuntime.mdColor('- item'), /\x1b\[2m/);
-  assert.match(TuiRuntime.mdColor('> quote'), /\x1b\[2m/);
-  assert.equal(TuiRuntime.mdColor('plain prose line'), 'plain prose line');
-});
-
 test('M4 cell: addToolCell folds to one line; toggleLastCell expands to the full output; z key drives it', async () => {
   const h = await makeTui();
   try {
