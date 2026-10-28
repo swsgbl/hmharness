@@ -294,24 +294,27 @@ export class ExtensionBridgeServer {
       return this.json(res, 200, { ok: true, ...(token ? { token } : {}) });
     }
     if (req.method === 'POST' && url === '/v1/dbg') {
-      // TEMPORARY round-45 forensics sink: SW-side step beacons. Loopback
-      // only (guardHost), prints when HMH_BRIDGE_DEBUG=1, always 200.
-      if (process.env.HMH_BRIDGE_DEBUG === '1') {
-        const chunks: Buffer[] = [];
-        for await (const ch of req) chunks.push(ch as Buffer);
-        console.error(`[sw-dbg] ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`);
-      }
+      // SW-side step beacons (round 45): now they ALSO land in the activity
+      // ring (round 58 lesson — a forensics sink that needs an env flag is
+      // a forensics sink you don't have when you need it). Loopback only.
+      const chunks: Buffer[] = [];
+      for await (const ch of req) chunks.push(ch as Buffer);
+      try {
+        const j = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { step?: string; extra?: string };
+        this.noteChatActivity(req.headers.origin ?? 'anon', `[sw] ${j.step ?? '?'}${j.extra ? ' ' + j.extra : ''}`);
+      } catch { /* keep raw */ }
+      if (process.env.HMH_BRIDGE_DEBUG === '1') console.error(`[sw-dbg] ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`);
       return this.json(res, 200, { ok: true });
     }
     if (req.method === 'GET' && url === '/v1/events') {
       if (!this.guardOrigin(req, res)) return;
-      // ATTACH FORENSICS (temporary, round 45 debugging): the SW was
-      // announcing but never attaching on a real profile — see exactly what
-      // arrives. stderr-only, no secrets (token prefix).
-      const dbg = process.env.HMH_BRIDGE_DEBUG === '1';
-      if (dbg) console.error(`[bridge] events attach: origin=${req.headers.origin ?? '-'} ua=${(req.headers['user-agent'] ?? '').slice(0, 40)} token=${(req.headers.authorization ?? '').slice(7, 19)}…`);
+      // ATTACH FORENSICS (round 58, permanent): announce-without-attach was
+      // invisible in the field (Brave: announce ok, no attach, no clue).
+      // Every attempt lands in the activity trail — no secrets (token prefix).
+      const tok8 = (req.headers.authorization ?? '').slice(7, 15);
+      this.noteChatActivity(req.headers.origin ?? 'anon', `events attach try (token ${tok8}…)`);
       const ok = await this.authorized(req, res);
-      if (dbg && !ok) console.error('[bridge] events attach REJECTED (401)');
+      this.noteChatActivity(req.headers.origin ?? 'anon', ok ? 'events attach AUTHORIZED' : 'events attach REJECTED (401)');
       if (!ok) return;
       return this.attachSse(req, res);
     }

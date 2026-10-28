@@ -1149,18 +1149,22 @@ flags:
       if (sub === 'stop') {
         const w = ed.stopWatchdog();
         const killed = ed.stopExtensionDaemon(port);
-        stdout.write(w || killed ? '已停止扩展桥守护(含看门狗)\n' : '守护本就未运行\n');
+        const task = ed.uninstallScheduledWatchdog();
+        stdout.write(w || killed || task ? '已停止扩展桥守护(含看门狗/计划任务)\n' : '守护本就未运行\n');
         return;
       }
-      const { probeExtensionDaemon, ensureExtensionDaemon, startWatchdog, DEFAULT_EXTENSION_PORT } = ed;
+      const { probeExtensionDaemon, ensureExtensionDaemon, startWatchdog, installScheduledWatchdog, DEFAULT_EXTENSION_PORT } = ed;
       const p = port ?? DEFAULT_EXTENSION_PORT;
       const already = await probeExtensionDaemon(p);
       if (already.up) { stdout.write(`✓ 扩展桥已在运行: 127.0.0.1:${p} — 无需重复启动\n`); return; }
       const r = await ensureExtensionDaemon(p);
       if (!r.up) { stdout.write(`✗ 守护启动失败(详见 ${homeDir()}/extension.log)\n`); return; }
-      const wpid = startWatchdog(p);
+      startWatchdog(p);
+      const task = installScheduledWatchdog(p);
       stdout.write(`✓ 扩展桥守护已启动(后台,PID 文件 ${homeDir()}/extension.pid)\n`);
-      if (wpid) stdout.write(`✓ 看门狗已就位(每 60s 自检,桥意外死亡自动复活)\n`);
+      stdout.write(task
+        ? `✓ 双保险就位:进程看门狗 + Windows 计划任务(每分钟系统级自愈,重启电脑也常驻)\n`
+        : `✓ 看门狗已就位(每 60s 自检,桥意外死亡自动复活)\n`);
       stdout.write(r.connected ? '  浏览器扩展已连接 — 智能体 extension_* 工具可用\n' : '  装有扩展的浏览器 30 秒内自动连接(浏览器先开也行)\n');
       stdout.write(DIM('  停止: hmh extension stop;前台调试: hmh extension serve;状态: hmh extension status\n'));
       return;
@@ -1205,11 +1209,12 @@ flags:
       stdout.write(DIM('  生效时机: 浏览器重启后常驻;撤销: hmh extension uninstall\n'));
       // 装完即用:终端侧零操作 —— 直接把桥守护拉起(幂等,已在跑则跳过)
       try {
-        const { ensureExtensionDaemon, startWatchdog } = await import('./extension-daemon.ts');
-        const p = await ensureExtensionDaemon(pArg ? Number(pArg.slice(7)) : undefined);
-        if (p.up) startWatchdog(pArg ? Number(pArg.slice(7)) : undefined);
+        const { ensureExtensionDaemon, startWatchdog, installScheduledWatchdog } = await import('./extension-daemon.ts');
+        const portN = pArg ? Number(pArg.slice(7)) : undefined;
+        const p = await ensureExtensionDaemon(portN);
+        if (p.up) { startWatchdog(portN); installScheduledWatchdog(portN); }
         stdout.write(p.up
-          ? `✓ 扩展桥守护已启动(后台+看门狗) — 浏览器打开后 30 秒内自动连接\n`
+          ? `✓ 扩展桥守护已启动(后台+双保险看门狗) — 浏览器打开后 30 秒内自动连接\n`
           : DIM('  · 桥守护未能启动 — 手动: hmh extension start\n'));
       } catch { /* 守护是锦上添花,不阻塞安装报告 */ }
       return;

@@ -16,6 +16,7 @@
  */
 (() => {
   'use strict';
+  try {
   const api = globalThis.browser ?? globalThis.chrome;
 
   const DEFAULT_PORT = 7789;
@@ -35,13 +36,24 @@
 
   async function loadBinding() {
     try {
+      if (!api.storage?.local?.get) { dbg('storage API UNAVAILABLE'); binding = { tokenMemOnly: true }; return binding; }
       const got = await api.storage.local.get(['port', 'token']);
       binding = { port: got.port, token: got.token };
-    } catch (e) { binding = {}; }
+    } catch (e) { dbg('load ERR ' + e); binding = {}; }
     return binding;
   }
   async function saveBinding() {
-    try { await api.storage.local.set({ port: binding.port, token: binding.token }); dbg('save ok token=' + (binding.token ? binding.token.slice(0, 8) : 'none')); } catch (e) { dbg('save ERR ' + e); }
+    // RACE, not await (round 59): a hung storage.set froze the SW between
+    // announce and attach (field: announce every 30s, attach never) — the
+    // in-memory token is enough to attach; persistence catches up or not.
+    let write;
+    try {
+      write = api.storage.local.set({ port: binding.port, token: binding.token })
+        .then(() => dbg('save ok token=' + (binding.token ? binding.token.slice(0, 8) : 'none')))
+        .catch((e) => dbg('save ERR ' + e));
+    } catch (e) { dbg('set SYNC-THROW ' + e); return; }
+    const timer = new Promise((r) => setTimeout(() => { dbg('save HUNG — proceeding with in-memory token'); r(); }, 3000));
+    await Promise.race([write, timer]);
   }
 
   // ------------------------------------------------------------------ badge
@@ -110,6 +122,10 @@
       if (j.token) {
         binding.token = j.token;
         await saveBinding();
+        try {
+          const rb = await api.storage.local.get(['token', 'port']);
+          dbg('save readback: token=' + (rb.token ? rb.token.slice(0, 8) : 'MISSING') + ' port=' + (rb.port ?? 'MISSING'));
+        } catch (e2) { dbg('save readback ERR ' + e2); }
         badge('on');
         dbg('granted token=' + j.token.slice(0, 8) + ' attaching');
         void attach();
@@ -134,7 +150,8 @@
 
   /** Attach the SSE downlink as a fetch stream; dispatch commands. */
   async function attach() {
-    if (!binding.token) { badge('unpaired'); return; }
+    if (!binding.token) { dbg('attach skip: no token'); badge('unpaired'); return; }
+    dbg('attach start token=' + binding.token.slice(0, 8));
     if (stream) stream.abort();
     const ac = new AbortController();
     stream = ac;
@@ -196,6 +213,7 @@
       }
       if (watchdog) clearInterval(watchdog);
     } catch (e) {
+      dbg('attach ERR ' + ((e && e.name) || '?') + ' ' + String((e && e.message) || '').slice(0, 100));
       if (watchdog) clearInterval(watchdog);
       if (stream !== ac) return;
     }
@@ -532,5 +550,19 @@
   } catch (e) { /* panel behavior is a convenience, never fatal */ }
 
   // first load of this context (worker start or event page load)
+  dbg('worker boot v' + api.runtime.getManifest().version);
   void loadBinding().then(() => { dbg('boot token=' + (binding.token ? binding.token.slice(0, 8) : 'none') + ' port=' + (binding.port ?? 'def')); if (binding.token) void attach(); else void announceAndAutoPair(); });
+
+  } catch (bootErr) {
+    // a sync throw mid-IIFE killed every listener after it — announce the
+    // error via the one channel that works (the alarm handler registered
+    // before the throw still fires; this catch keeps SW alive regardless)
+    try {
+      void fetch((globalThis.__hmhBaseUrl || 'http://127.0.0.1:7789') + '/v1/dbg', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ step: 'IIFE BOOT THROW', extra: String(bootErr && bootErr.stack || bootErr).slice(0, 400), at: Date.now() }),
+      }).catch(() => undefined);
+    } catch { /* even the beacon failed */ }
+  }
 })();

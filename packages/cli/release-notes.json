@@ -1,6 +1,11 @@
 {
   "notes": [
     {
+      "v": "0.23.44",
+      "date": "2026-10-29",
+      "note": "结构化结论输出双修(TUI markdown 渲染器+Codex 式答复结构规范)+外部复现包 P2-1+web page.ts 拆分;1036 测试"
+    },
+    {
       "v": "0.23.43",
       "date": "2026-10-27",
       "note": "沙箱隔离诚实化+fail-closed(Docker 兜底谎言根除/TrustLevel 四档/单一证据源)+演化守护 30min+FALLBACK_PINS 15 名;993 测试"
