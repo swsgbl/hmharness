@@ -1,0 +1,26 @@
+clean-room verify @hmharness/cli@0.23.44 — registry https://registry.npmjs.org — node v24.19.0 — npm 12.2.0 — Windows_NT 10.0.26340 x64
+tarball: https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.44.tgz
+sha256: 5debc574688329967c6653b169e927b80abdfe0d76449e140659a957f4b49b34
+registry integrity digest matches: YES
+$ npm install "C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-6d8pYx\hmharness-cli-0.23.44.tgz" --registry https://registry.npmjs.org --cache "C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-6d8pYx\npm-cache" --no-audit --no-fund
+  [install/stdout] added 44 packages in 7s
+  [install/stderr] npm notice
+  [install/stderr] npm notice New patch version of npm available! 12.2.0 -> 12.2.1
+  [install/stderr] npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+  [install/stderr] npm notice To update run: npm install -g npm@12.2.1
+  [install/stderr] npm notice
+installed @hmharness/* packages: 15 → agent@0.23.44, browser@0.23.44, cli@0.23.44, cognitive@0.23.44, domain-harmony@0.23.44, domain-ops@0.23.44, environments@0.23.44, evaluation@0.23.44, evolution@0.23.44, extension@0.23.44, kernel@0.23.44, lsp@0.23.44, observability@0.23.44, sandbox@0.23.44, web@0.23.44
+CLI pins 14 @hmharness/* deps
+registry fallback codexhost-bridge@0.23.44: registry confirms 0.23.44
+  [check/stdout] hdc: OK (hdc) Ver: 3.2.0f
+  [check/stdout] hvigorw: OK (C:\Program Files\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.bat)
+  [check/stdout] ohpm: OK (C:\Program Files\Huawei\DevEco Studio\tools\ohpm\bin\ohpm.bat)
+  [check/stdout] cjpm: OK (C:\鸿蒙开发工具\cangjie\cangjie-1.1.0\tools\bin\cjpm.exe) Command failed: C:\鸿蒙开发工具\cangjie\cangjie-1.1.0\tools\bin\cjpm.exe --version
+  [resume/stdout] [2mresuming 2026-10-28T21-15-32-dmvy3v · 1 messages · model probe-model
+  [resume/stdout] [0m[36mhmh[0m[2m · probe-model · C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-6d8pYx\home
+  [resume/stdout] [0m[2m输入任务,/exit 退出 · /help 命令帮助
+  [resume/stdout] [0m[36mhmh> [0m[36mhmh> [0m
+  [bench/stdout] pass rate: 100%
+  [evolve/stdout] [36mevolve[0m[2m · evolve · 模型 probe-model · 第 1 轮 (one-shot)
+  [evolve/stdout] [0m[2m  baseline bench: 2 train + 1 holdout cases
+  [evolve/stdout] [0m
