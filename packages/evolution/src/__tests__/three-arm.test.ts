@@ -129,7 +129,11 @@ test('bootstrapPairedCI: deterministic, all-positive diffs exclude 0', () => {
   const ci2 = bootstrapPairedCI([1, 1, 1, 0.5, 0.5], { seed: 1 });
   assert.deepEqual(ci1, ci2);
   assert.ok(ci1.ciLo > 0);
-  const mixed = bootstrapPairedCI(Array.from({ length: 20 }, () => (Math.random() > 0.5 ? 1 : -1)), { seed: 1 });
+  // FIXED balanced fixture: the old Math.random() draws were unseeded, so a
+  // lopsided sample occasionally pushed the bootstrap CI off 0 — the test
+  // titled "deterministic" was flaky by construction (CI false-red 2026-10-28)
+  const mixedDiffs = Array.from({ length: 20 }, (_, i) => (i % 2 === 0 ? 1 : -1));
+  const mixed = bootstrapPairedCI(mixedDiffs, { seed: 1 });
   assert.ok(mixed.ciLo < 0 && mixed.ciHi > 0);
 });
 

@@ -1,0 +1,103 @@
+{
+  "experimentId": "skill-gen-p1-2-2026-10-28",
+  "createdAt": "2026-10-28T00:00:00.000Z",
+  "repoCommit": "5607d4b",
+  "roadmap": "P1-2 (audit 01/03): one-factor-at-a-time Skill Compiler research",
+  "priorArt": {
+    "measured": "skill workflow holdout generalization 0.39 < 0.6 promotion gate (0.23.29 real cycle, honest rejection on record)",
+    "attribution": "skill-generalization-lab.mts (0.26): TRIGGER/PRECONDITION axis dominates (68% of holdout misses diverge at step 0) + 15/47 all-steps-present-but-reordered (secondary axis, NOT addressed here)",
+    "preconditionMiner": "scripts/precondition-miner.mts (39df0b8) produced SkillSpecV2.preconditions[] SUGGESTIONS as an analysis instrument; the compiler itself never consumed them (toSkillSpecV2 emits preconditions: [] unconditionally) — this experiment closes that loop as the FIRST factor"
+  },
+  "factor": {
+    "selected": "precondition-aware trigger matching (把 preconditions[] 从'建议字段'接入挖掘与匹配打分)",
+    "explicitlyNot": "variable-binding abstraction (the 15/47 reordering axis) — reserved as the NEXT factor; one factor per experiment",
+    "mechanism": "A treats applicability as env-id + strict contiguous containment of the mined n-gram (the gram's first step IS the trigger, so a train-specific opening kills step 0). B separates WHEN-to-fire from WHAT-to-run: structured preconditions mined from TRAIN support trajectories only (preceding action types / position band / goal keywords, each with coverage), used (a) to gate skill-candidate selection toward candidates with a learnable firing context and (b) to score trigger match on unseen trajectories. The procedure body stays a pure contiguous n-gram in BOTH arms — no ordering relaxation leaks in."
+  },
+  "frozen": {
+    "corpus": {
+      "home": "~/.hmharness (HMH_HOME if set)",
+      "loader": "loadTrajectories(home, 2000); usable = steps.length > 0 (same filter as the 0.26 lab)",
+      "datasetHash": "a2ac0a292557497fd8ed65911bb12c98cce630d15871c56be46cee816acc666d",
+      "hashBasis": "sha256 over 'family:<sorted trajectory ids>' lines for the 3 families, computed at freeze time",
+      "probedAt": "2026-10-28",
+      "allTrajectories": 814
+    },
+    "families": {
+      "selection": "top-3 environments by usable-successful trajectory count (frozen at probe time)",
+      "chosen": {
+        "terminal": { "usable": 355, "successful": 344 },
+        "harmonyos": { "usable": 79, "successful": 73 },
+        "browser": { "usable": 33, "successful": 33 }
+      },
+      "excluded": {
+        "arc3": "24 successful only, and an abstract-reasoning population (different work shape than agent workflows)",
+        "desktop": "23 usable — below the top-3 cut; kept as documented backup, NOT run"
+      }
+    },
+    "split": {
+      "perFamily": "70/30 train/holdout inside each family over USABLE trajectories (successful or not)",
+      "shuffle": "mulberry32(hashSeed('real-cycle-2026-10-07')) keyed map-then-sort — byte-identical implementation to the 0.26 lab so the terminal-family arm-A number is same-口径 comparable to the measured 0.39",
+      "seed": "real-cycle-2026-10-07"
+    },
+    "mining": {
+      "call": "mineWorkflows(train, { minSupport: 2, nMin: 2, nMax: 4 }) — existing defaults, unchanged",
+      "armASelection": "现状排序 verbatim: candidates.sort is mineWorkflows' own (steps.length desc, support desc); top-1 = first. Skill = toSkillSpecV2(candidate) (preconditions [] — current behavior). Trigger = env-only: every holdout success 'fires'.",
+      "armBSelection": "same pool, same order; for EVERY candidate mine preconditions from its TRAIN support trajectories ONLY (holdout never touched by mining/selection/scorer construction): (1) locate the gram's first contiguous-containment start i in each support trajectory; (2) preceding = action types in steps[0..i), keep types with coverage>=0.6 (fraction of support trajectories containing the type in that prefix), sorted by coverage desc, cap 3; (3) positionBand = [p10,p90] nearest-rank quantiles of i/steps.length, produced only when supportUsed>=4; (4) goalKeywords = lowercase tokens (len>=3) of goal.description with coverage>=0.6, cap 3. hasContextSignal := >=1 preceding(cov>=0.6) OR >=1 goalKeyword(cov>=0.6). B top-1 = first candidate (in arm-A order) passing hasContextSignal; if NONE passes => B≡A for that family, recorded as degenerate.",
+      "noLookRule": "arm B's selection and scorer are built from TRAIN only; holdout is read exactly once, in the run phase, by the frozen scorer"
+    },
+    "preconditionCheckGrammar": {
+      "ctx:preceding:<type>": "type appears among the trajectory's action types BEFORE the anchor position",
+      "ctx:position:<lo>-<hi>": "anchor/steps.length falls in [lo,hi] (2-decimal inclusive band)",
+      "ctx:goal:<word>": "word (len>=3, lowercase) appears in goal.description tokens",
+      "anchorSemantics": "anchor = first contiguous-containment start of the FULL gram in the trajectory; if the gram is not contained, anchor = first occurrence of gram[0]'s action type; if gram[0] never occurs, preceding and position conditions are NOT satisfied (goal still evaluable)",
+      "unknownChecks": "check strings outside this grammar are reported as ignored — never guessed"
+    },
+    "scoring": {
+      "triggerMatchScore": "score = satisfied/total over the skill's structured precondition checks (env mismatch => score 0 outright); empty preconditions => score 1 flagged vacuous",
+      "tau": 0.5,
+      "matched": "env matches AND score >= tau"
+    },
+    "promotionGate": {
+      "threshold": 0.6,
+      "rule": "unchanged and NOT lowered: a skill is promotable in a family only if its full-holdout-success contiguous-containment rate >= 0.6; reported per arm per family whatever the number is"
+    }
+  },
+  "preRegistered": {
+    "mainEndpoint": "per family: contB vs contA — contiguous-containment rate of the arm's selected skill over ALL holdout successes (same 口径 as the measured 0.39; arm A's trigger is env-only so its matched set IS the full holdout set)",
+    "significance": "per family: exact McNemar two-sided over per-trajectory paired containment flags (A vs B), p<0.05; plus seeded task-level bootstrap 95% CI (10k resamples) on the paired rate difference as a check",
+    "verdictEnum": ["POSITIVE", "WEAK-POSITIVE", "MIXED", "NEGATIVE", "NEEDS-DATA"],
+    "verdictRule": {
+      "POSITIVE": ">=2/3 families contB>=contA AND no family contB < contA-0.05 AND >=1 family with contB>contA and McNemar p<0.05",
+      "WEAK-POSITIVE": ">=2/3 families contB>=contA AND no family contB < contA-0.05 AND no significant family",
+      "MIXED": "some family improves and some degrades by >0.05 without dominating pattern",
+      "NEGATIVE": ">=2/3 families contB<contA (honest negative is a legal deliverable)",
+      "NEEDS-DATA": ">=2 families are low-power (holdout successes <10), or a family pool degenerates (no mined candidates) — stated as NEEDS-DATA with what is missing"
+    },
+    "lowPower": "family with <10 holdout successes is flagged low-power; it still reports numbers but cannot alone drive POSITIVE/NEGATIVE",
+    "secondaryEndpoint": {
+      "name": "trigger precision (mechanism check: do mined preconditions carry real information?)",
+      "definition": "P@tau = |contains AND matched| / |matched| for the B skill per family; baseline is arm A's env-only trigger whose precision IS contA; effective iff >=2/3 families P_B > contA with that family's matchRate M1>=0.2 (a matcher that fires on <20% of cases proves nothing even at precision 1)",
+      "alsoReported": ["matchRate M1 = matched/holdoutSuccesses", "recall R@tau = |contains AND matched| / |contains|", "vacuous-skill flag if B skill has zero structured preconditions"]
+    },
+    "perCase": "every holdout success carries {family, id, containsA, containsB, matchedB, scoreB, satisfiedChecks, totalChecks}",
+    "honestyClauses": [
+      "negative results reported as negatives (三臂 discipline)",
+      "promotion gate 0.6 never lowered, never re-defined",
+      "holdout never feeds mining, selection, thresholds, or grammar",
+      "degenerate families (empty pool / no-signal pool) recorded, not papered over",
+      "all rules frozen HERE before implementation; any deviation logged in REPORT.md as an execution deviation"
+    ],
+    "cost": {
+      "llmTokens": "zero — this is a corpus-replay experiment (mining/scoring are pure local computation), no API calls; wallclock ms per phase recorded on disk",
+      "noApiNote": "the 429 phase-boundary rule is structurally inapplicable (no network); recorded here so its absence is a stated fact, not an omission"
+    }
+  },
+  "phases": ["setup-freeze", "implement", "run", "analyze"],
+  "artifacts": {
+    "manifest": "website/evidence/experiments/skill-gen-p1-2-2026-10-28/manifest.json (this file, frozen first)",
+    "implementation": "packages/cognitive/src/skill-compiler.ts + packages/cognitive/src/__tests__/skill-preconditions.test.ts",
+    "driver": "scripts/skillgen-p1-2-experiment.mts",
+    "data": "phases/run.json (per-family per-case results), phases/analysis.json",
+    "reports": "REPORT.md (execution deliverable) + report.md (machine verdict, enum-locked language)"
+  }
+}

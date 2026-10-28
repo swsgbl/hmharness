@@ -175,6 +175,214 @@ export function deriveCounterexamples(
   return out;
 }
 
+/* -------- precondition-aware triggering (P1-2 single-factor experiment) --------
+ *
+ * The 0.26 Generalization Lab attributed the 0.39 holdout rejection to the
+ * TRIGGER/PRECONDITION axis (68% of misses diverge at step 0): arm A's
+ * applicability test is env-id + strict contiguous containment, so the
+ * gram's FIRST STEP is itself the trigger — and a train-specific opening
+ * kills matching before any procedure knowledge is consulted. This block
+ * separates WHEN-to-fire from WHAT-to-run: preconditions mined from TRAIN
+ * support trajectories only (preceding action types / position band /
+ * goal keywords, each with its coverage — honest miners leave empty what
+ * the data does not support), a mechanical check grammar the matcher
+ * parses back, and a scorer over that grammar. The procedure body stays a
+ * pure contiguous n-gram in both arms — no ordering relaxation (that is
+ * the NEXT factor, variable binding), one factor per experiment.
+ */
+export interface MinedPreconditions {
+  /** action types appearing in the support trajectories' prefixes before the
+   *  gram starts; coverage = fraction of support trajectories whose prefix
+   *  contains the type */
+  preceding: Array<{ type: string; coverage: number }>;
+  /** [p10, p90] nearest-rank band of first-containment position / length */
+  positionBand?: { p10: number; p90: number };
+  /** goal-description tokens shared across support trajectories */
+  goalKeywords: Array<{ word: string; coverage: number }>;
+  /** support trajectories actually located (gram found in each) */
+  supportUsed: number;
+}
+
+/** First index where gram occurs CONTIGUOUSLY in seq, or -1. */
+function firstContainment(seq: string[], gram: string[]): number {
+  if (gram.length === 0) return -1;
+  outer: for (let i = 0; i + gram.length <= seq.length; i++) {
+    for (let j = 0; j < gram.length; j++) if (seq[i + j] !== gram[j]) continue outer;
+    return i;
+  }
+  return -1;
+}
+
+function tokenizeGoal(text: string): string[] {
+  return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
+}
+
+const successTypes = (t: CognitiveTrajectory): string[] =>
+  t.steps.filter((s) => s.outcome === 'success').map((s) => s.action.type);
+
+/** Mine structured preconditions for a workflow candidate from its TRAIN
+ *  support trajectories (holdout must NEVER reach this function — the P1-2
+ *  no-look rule). Everything carries coverage; below-threshold signals stay
+ *  absent rather than diluted. Deterministic: ties break lexicographically. */
+export function minePreconditions(
+  candidate: WorkflowCandidate,
+  train: CognitiveTrajectory[],
+  opts: { minCoverage?: number; cap?: number; minBandSupport?: number } = {},
+): MinedPreconditions {
+  const minCoverage = opts.minCoverage ?? 0.6;
+  const cap = opts.cap ?? 3;
+  const minBandSupport = opts.minBandSupport ?? 4;
+  const byId = new Map(train.map((t) => [t.id, t]));
+  const support = candidate.trajectoryIds.map((id) => byId.get(id)).filter((t): t is CognitiveTrajectory => !!t);
+  const gram = candidate.steps;
+  const preCount = new Map<string, number>();
+  const goalCount = new Map<string, number>();
+  const ratios: number[] = [];
+  let used = 0;
+  for (const t of support) {
+    const seq = successTypes(t);
+    const i = firstContainment(seq, gram);
+    if (i < 0) continue; // support recorded on this train set but gram not re-locatable: skip honestly
+    used++;
+    for (const ty of new Set(seq.slice(0, i))) preCount.set(ty, (preCount.get(ty) ?? 0) + 1);
+    if (seq.length > 0) ratios.push(i / seq.length);
+    for (const w of new Set(tokenizeGoal(t.goal?.description ?? ''))) goalCount.set(w, (goalCount.get(w) ?? 0) + 1);
+  }
+  const keep = (m: Map<string, number>): Array<[string, number]> =>
+    [...m.entries()]
+      .filter(([, c]) => used > 0 && c / used >= minCoverage)
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+      .slice(0, cap);
+  return {
+    preceding: keep(preCount).map(([type, c]) => ({ type, coverage: Number((c / used).toFixed(2)) })),
+    ...(used >= minBandSupport && ratios.length > 0
+      ? {
+          positionBand: (() => {
+            const s = [...ratios].sort((a, b) => a - b);
+            const q = (p: number) => Number(s[Math.min(s.length - 1, Math.max(0, Math.ceil(p * s.length) - 1))].toFixed(2));
+            return { p10: q(0.1), p90: q(0.9) };
+          })(),
+        }
+      : {}),
+    goalKeywords: keep(goalCount).map(([word, c]) => ({ word, coverage: Number((c / used).toFixed(2)) })),
+    supportUsed: used,
+  };
+}
+
+/** Turn mined signals into Conditions with the mechanical check grammar the
+ *  matcher parses back (see parseStructuredCheck). */
+export function preconditionsFromMined(mined: MinedPreconditions): Condition[] {
+  const out: Condition[] = [];
+  for (const p of mined.preceding) {
+    out.push({ description: `${p.type} seen before the workflow starts (coverage ${p.coverage})`, check: `ctx:preceding:${p.type}` });
+  }
+  if (mined.positionBand) {
+    const { p10, p90 } = mined.positionBand;
+    out.push({ description: `workflow starts within relative position [${p10}, ${p90}]`, check: `ctx:position:${p10.toFixed(2)}-${p90.toFixed(2)}` });
+  }
+  for (const g of mined.goalKeywords) {
+    out.push({ description: `goal mentions "${g.word}" (coverage ${g.coverage})`, check: `ctx:goal:${g.word}` });
+  }
+  return out;
+}
+
+/** A candidate has a learnable firing context iff at least one preceding
+ *  type or goal keyword clears the coverage bar — the P1-2 signal gate. */
+export function hasContextSignal(mined: MinedPreconditions): boolean {
+  return mined.preceding.length > 0 || mined.goalKeywords.length > 0;
+}
+
+/** Arm-B selection: the first candidate (in arm-A's existing order) whose
+ *  mined preconditions show a stable firing context; if none does, the
+ *  family is degenerate and B falls back to arm-A's pick, recorded as such. */
+export function selectByPreconditionStability(
+  candidates: WorkflowCandidate[],
+  train: CognitiveTrajectory[],
+  opts: { minCoverage?: number } = {},
+): { selected: WorkflowCandidate | undefined; signalPool: WorkflowCandidate[]; degenerate: boolean } {
+  const pool = candidates.filter((c) => hasContextSignal(minePreconditions(c, train, opts)));
+  return {
+    selected: pool[0] ?? candidates[0],
+    signalPool: pool,
+    degenerate: pool.length === 0 && candidates.length > 0,
+  };
+}
+
+/** Compile a candidate into a V2 skill WITH its preconditions filled from
+ *  train (toSkillSpecV2 leaves them [] — the现状 this factor repairs). */
+export function compileSkillWithPreconditions(
+  candidate: WorkflowCandidate,
+  train: CognitiveTrajectory[],
+  opts: { provenance?: string; environmentScope?: string[]; minCoverage?: number } = {},
+): SkillSpecV2 {
+  const skill = toSkillSpecV2(candidate, opts);
+  return { ...skill, preconditions: preconditionsFromMined(minePreconditions(candidate, train, { minCoverage: opts.minCoverage })) };
+}
+
+type StructuredCheck =
+  | { kind: 'preceding'; type: string; check: string }
+  | { kind: 'position'; lo: number; hi: number; check: string }
+  | { kind: 'goal'; word: string; check: string };
+
+/** Parse the frozen check grammar; anything else is reported, not guessed. */
+export function parseStructuredCheck(check: string): StructuredCheck | undefined {
+  if (check.startsWith('ctx:preceding:')) return { kind: 'preceding', type: check.slice('ctx:preceding:'.length), check };
+  const pos = /^ctx:position:(\d+\.\d+)-(\d+\.\d+)$/.exec(check);
+  if (pos) return { kind: 'position', lo: Number(pos[1]), hi: Number(pos[2]), check };
+  if (check.startsWith('ctx:goal:')) return { kind: 'goal', word: check.slice('ctx:goal:'.length), check };
+  return undefined;
+}
+
+export interface TriggerMatchResult {
+  score: number;
+  matched: boolean;
+  satisfied: number;
+  total: number;
+  /** structured checks this skill carries; 0 => score is vacuous */
+  vacuous: boolean;
+  /** check strings outside the frozen grammar, reported never guessed */
+  ignored: string[];
+  anchor: number;
+  components: Array<{ check: string; satisfied: boolean }>;
+}
+
+/** Precondition-aware trigger scoring on an UNSEEN trajectory. anchor =
+ *  first contiguous-containment start of the gram; else first occurrence of
+ *  gram[0]; else -1 (preceding/position unsatisfiable, goal still live). */
+export function triggerMatchScore(
+  skill: SkillSpecV2,
+  traj: CognitiveTrajectory,
+  opts: { threshold?: number } = {},
+): TriggerMatchResult {
+  const threshold = opts.threshold ?? 0.5;
+  const gram = skill.trigger.actionTypes?.length ? skill.trigger.actionTypes : skill.procedure.map((s) => s.ref);
+  const seq = successTypes(traj);
+  const contained = firstContainment(seq, gram);
+  const firstStep = gram[0] !== undefined ? seq.indexOf(gram[0]) : -1;
+  const anchor = contained >= 0 ? contained : firstStep;
+  const structured: StructuredCheck[] = [];
+  const ignored: string[] = [];
+  for (const c of skill.preconditions) {
+    const p = parseStructuredCheck(c.check);
+    if (p) structured.push(p);
+    else ignored.push(c.check);
+  }
+  const prefixTypes = new Set(anchor > 0 ? seq.slice(0, anchor) : []);
+  const goalTokens = new Set(tokenizeGoal(traj.goal?.description ?? ''));
+  const components = structured.map((p) => ({
+    check: p.check,
+    satisfied:
+      p.kind === 'preceding' ? prefixTypes.has(p.type)
+      : p.kind === 'position' ? anchor >= 0 && seq.length > 0 && anchor / seq.length >= p.lo - 0.0055 && anchor / seq.length <= p.hi + 0.0055
+      : goalTokens.has(p.word),
+  }));
+  const envOK = skill.trigger.environmentId === traj.environment.id;
+  const satisfied = components.filter((c) => c.satisfied).length;
+  const vacuous = structured.length === 0;
+  const score = !envOK ? 0 : vacuous ? 1 : satisfied / structured.length;
+  return { score, matched: envOK && score >= threshold, satisfied, total: structured.length, vacuous, ignored, anchor, components };
+}
+
 /* -------- environment-independent skill IR (0.27 Transfer OS 2.0 start) --------
  *
  * A skill's IR is its procedure expressed in ABSTRACT verbs (the
