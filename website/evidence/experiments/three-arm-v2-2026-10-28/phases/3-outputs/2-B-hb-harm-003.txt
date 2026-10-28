@@ -1,0 +1,11 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充说明：
+
+- **核心生命周期**即上述 6 个回调，流程为：`onCreate → onWindowStageCreate → onForeground → onBackground → onWindowStageDestroy → onDestroy`
+- **其他相关回调**（非严格意义的六状态，但常被用到）：
+  - `onNewWant` — 单例模式（singleton）下 Ability 已存在、再次拉起时触发
+  - `onConfigurationUpdate` — 系统配置变化（语言、深色模式等）时触发
+  - `onMemoryLevel` — 系统内存告警时触发
+  - `onWindowStageRestore`（API 18+）— 跨端迁移恢复窗口时触发
+  - `onPrepareToTerminate`（API 12+）— 可拦截销毁，返回 true 阻止默认销毁行为

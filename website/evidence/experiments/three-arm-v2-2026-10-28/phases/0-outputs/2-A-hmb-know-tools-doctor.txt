@@ -1,0 +1,3 @@
+**`harmony_build_doctor`** — 该工具用于分类已知的鸿蒙构建失败类型（failure families）。
+
+注意：在 Windows 上有一个已知问题（见技能 `harmony-build-doctor-windows-invocation`）——直接裸调用该命令可能返回无法解析的输出，建议按技能中的方式调用。

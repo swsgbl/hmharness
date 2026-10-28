@@ -1,0 +1,1 @@
+Let me check the actual CLI surface rather than guess.派生自对框架的事实核查需求。I'll inspect the `hmh` CLI help and search for snapshot-related subcommands in the repo.

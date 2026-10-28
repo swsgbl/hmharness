@@ -1,0 +1,3 @@
+HAP 是什么文件格式？用一句话回答
+expect-regex: (?i)(包|package|应用|app)
+holdout: true

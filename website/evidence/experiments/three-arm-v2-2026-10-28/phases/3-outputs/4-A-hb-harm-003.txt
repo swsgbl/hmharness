@@ -1,0 +1,9 @@
+onCreate, onWindowStageCreate, onForeground, onBackground, onWindowStageDestroy, onDestroy
+
+补充说明（属于 UIAbility 但非主生命周期链的回调）：onConfigurationUpdate, onMemoryLevel, onNewWant（单实例模式下再次拉起时触发）、onDump、 onSaveAbilityState（配合 AbilityConstants）
+
+核心流转顺序：**onCreate → onWindowStageCreate → onForeground → onBackground → onWindowStageDestroy → onDestroy**
+
+关键注意点：
+- `onWindowStageCreate` 中通常调用 `windowStage.loadContent('pages/Index')` 加载页面
+- Ability 生命周期与页面（Page/Component）生命周期是两套体系，UIAbility 销毁不代表进程结束（可能仅缓存），进程级状态监听需用 `ApplicationContext.on('applicationStateChange')`

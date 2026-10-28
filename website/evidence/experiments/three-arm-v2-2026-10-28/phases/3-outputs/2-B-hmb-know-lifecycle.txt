@@ -1,0 +1,3 @@
+**onCreate**
+
+在 Stage 模型的 UIAbility 生命周期中，旧 FA 模型（以及 Android）里的 `onStart` 已被 `onCreate` 取代 —— Ability 实例创建时回调，用于接收 Want 并做初始化。

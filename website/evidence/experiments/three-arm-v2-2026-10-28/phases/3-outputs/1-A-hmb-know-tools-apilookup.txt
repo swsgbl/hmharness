@@ -1,0 +1,3 @@
+快速核实一下框架里的工具定义,再给出准确名称。powershell -NoProfile -Command "Get-ChildItem -Recurse G:\hmharness-wtC2 -Include *.cjs,*.js,*.json,*.md -File -Depth 3 | Where-Object { $_.FullName -notmatch 'node_modules' } | Select-String -Pattern 'file:line|API symbol|api_search|apiSearch' -List | Select-Object -First 20 Path"
+
+powershell -NoProfile -Command "Get-ChildItem -Recurse G:\hmharness-wtC2 -Include *.cjs,*.js,*.json,*.md -File -Depth 3 | Where-Object { $_.FullName -notmatch 'node_modules' } | Select-String -Pattern 'harmony_api|sdk_search|symbol' -List | Select-Object -First 20 Path"

@@ -1,0 +1,5 @@
+**`harmony_build_doctor`**
+
+它专门对已知的 HarmonyOS 构建失败家族（failure families）做分类诊断。
+
+注意：在 Windows 宿主机上不要直接裸调该命令（可能返回无法解析的输出），应遵循 `harmony-build-doctor-windows-invocation` 技能中的调用方式。

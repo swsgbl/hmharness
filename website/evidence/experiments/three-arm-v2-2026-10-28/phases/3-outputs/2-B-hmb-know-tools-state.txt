@@ -1,0 +1,30 @@
+[collected]
+
+Let me check the hmh CLI to verify the exact subcommand. [collected]```undefined
+npx hmh --help 2>&1
+```[collected]
+```undefined
+cd /d G:\hmharness-wtC2 && npx hmh evolution --help 2>&1
+```
+
+[collected]
+
+The subcommand is **`hmh evolution snapshot`**.
+
+From the CLI help (`npx hmh evolution --help`):
+
+```
+hmh evolution snapshot
+
+Snapshot evolution state for recovery
+
+Options:
+  --notes <notes>  Notes to attach to the snapshot
+```
+
+Details:
+- It archives the current evolution state — **skills, memory, and insights** — from `HMH_HOME` so you can roll back or recover after a bad self-evolution step.
+- You can attach context with `--notes`, e.g. `npx hmh evolution snapshot --notes "before promoting browser skill candidate"`.
+- The complementary restore/list commands live under the same `hmh evolution` group (`evolution --help` shows `snapshot`, `restore`, `history`).
+
+Note: run it via the repo (e.g. `npx hmh ...` from `G:\hmharness-wtC2`) or the globally installed `hmh` if it's on PATH — in this worktree only the `npx` invocation resolved.

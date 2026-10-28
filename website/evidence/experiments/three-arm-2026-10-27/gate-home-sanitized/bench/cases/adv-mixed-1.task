@@ -1,0 +1,2 @@
+reply with exactly: Hello, World! (capital H capital W, comma, exclamation - nothing else)
+expect-regex: /^Hello, World!$/

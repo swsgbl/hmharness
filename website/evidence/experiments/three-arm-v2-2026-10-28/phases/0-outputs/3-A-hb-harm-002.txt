@@ -1,0 +1,3 @@
+ArkTS 是基于 TypeScript 扩展而来的 HarmonyOS 应用开发语言——它在 TS 基础上强化了静态类型检查和约束（如禁止 `any`、限制运行时改变对象结构），并增加了 `@Component`、`@State` 等声明式 UI 与状态管理能力。
+
+一句话概括：**ArkTS = TypeScript 的超集（再加 UI 装饰器），但比 TS 更严格，是 TS 面向鸿蒙开发演进出的方言。**

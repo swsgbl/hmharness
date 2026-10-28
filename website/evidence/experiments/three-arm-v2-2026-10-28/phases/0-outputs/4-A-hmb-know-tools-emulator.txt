@@ -1,0 +1,3 @@
+**`harmony_`**
+
+The `harmony_*` tool family manages emulator lifecycle (start/stop/state checks) headlessly via command line, without needing DevEco Studio open. Supporting skills in my library include `harmony-emulator-state-ground-truth` and `harmony-emulator-state-triangulation`, which govern how to verify emulator state reliably (e.g., triangulating with `hdc list targets` rather than trusting a single signal).

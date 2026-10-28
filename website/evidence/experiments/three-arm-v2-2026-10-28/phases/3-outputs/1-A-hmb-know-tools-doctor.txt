@@ -1,0 +1,3 @@
+**`harmony_build_doctor`** — 它会对 HarmonyOS 构建失败日志进行诊断，并将其归类到已知的失败家族（failure families），同时给出对应的修复建议。
+
+一点提示（来自技能库）：在 Windows 上不要反复裸跑该命令——它可能返回无法解析的输出，建议参考 `harmony-build-doctor-windows-invocation` 技能中的调用方式。如果你把构建失败日志贴出来，我可以直接帮你跑诊断并给出修复方案。

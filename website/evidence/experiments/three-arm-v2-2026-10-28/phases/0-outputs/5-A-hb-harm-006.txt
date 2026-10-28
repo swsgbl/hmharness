@@ -1,0 +1,1 @@
+hdc（HarmonyOS Device Connector）是华为提供的鸿蒙设备调试命令行工具，类似 Android 的 adb，用于连接设备、安装应用、推送文件和执行 shell 命令。

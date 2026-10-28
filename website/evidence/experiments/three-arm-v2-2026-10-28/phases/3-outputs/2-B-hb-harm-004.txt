@@ -1,0 +1,1 @@
+Stage 模型是 HarmonyOS 从 API 9 开始推荐的应用开发模型，它以 UIAbility（承载 UI 与生命周期）、ExtensionAbility（后台/服务扩展）和 AbilityStage 为核心组件来组织应用，替代早期的 FA 模型，更利于分布式、多设备和大规模应用开发。

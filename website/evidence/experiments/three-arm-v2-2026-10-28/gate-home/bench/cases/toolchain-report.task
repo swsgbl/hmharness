@@ -1,0 +1,3 @@
+运行鸿蒙工具链体检,然后逐项说出一共检查了哪三个工具的名称
+expect: hdc && hvigorw && ohpm
+tools: loop

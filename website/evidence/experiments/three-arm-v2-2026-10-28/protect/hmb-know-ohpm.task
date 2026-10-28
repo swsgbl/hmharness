@@ -1,0 +1,3 @@
+Which package manager resolves HarmonyOS dependencies? One word.
+expect: ohpm
+holdout: true

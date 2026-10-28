@@ -1,0 +1,3 @@
+Let me quickly verify the exact tool name in the local framework config/docs before answering.运行一下框架内的检索：SECTCL
+
+harmony_api_lookup

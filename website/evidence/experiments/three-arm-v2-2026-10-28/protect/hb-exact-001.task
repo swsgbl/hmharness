@@ -1,0 +1,3 @@
+reply with exactly: HELLO
+expect-exact: HELLO
+holdout: true

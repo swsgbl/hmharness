@@ -1,0 +1,3 @@
+写一个JavaScript函数 sum(arr)，返回数组和，只输出代码
+expect: function sum
+holdout: true

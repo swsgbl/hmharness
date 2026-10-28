@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是鸿蒙应用/服务的基本部署单元——一个以 `.hap` 为扩展名的压缩包，包含编译后的代码、资源以及 `module.json` 配置，由一个或多个 HAP 组合构建出可在设备上运行的 HarmonyOS 应用。

@@ -1,0 +1,3 @@
+**Want**
+
+In HarmonyOS, `Want` is the object that carries navigation/launch parameters between abilities (e.g., `abilityName`, `bundleName`, URI, and custom `parameters`) when starting another ability via `context.startAbility()`.

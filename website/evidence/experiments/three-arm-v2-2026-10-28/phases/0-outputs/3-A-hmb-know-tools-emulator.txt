@@ -1,0 +1,3 @@
+**`harmony_`**
+
+The `harmony_*` tool family covers emulator lifecycle operations (start/stop/state checks, install, UI verification) independently of DevEco Studio — complemented by skills like `harmony-emulator-state-triangulation` and `harmony-emulator-state-ground-truth` for reliable state verification.

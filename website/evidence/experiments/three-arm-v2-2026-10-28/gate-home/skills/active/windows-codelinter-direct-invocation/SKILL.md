@@ -1,0 +1,11 @@
+- Problem: harmony_lint probes a stale path (C:\DevEco-Studio\...) and reports 'codelinter not found' even when DevEco Studio is installed.
+- Real CLI entry: `C:\Program Files\Huawei\DevEco Studio\plugins\codelinter\run\index.js`.
+- Use DevEco's bundled Node: `C:\Program Files\Huawei\DevEco Studio\tools\node\node.exe`.
+- Set `HM_CODELINTER` to the index.js path, or call node directly:
+  `node "C:\Program Files\Huawei\DevEco Studio\plugins\codelinter\run\index.js" -c <config> <entry/src>`
+- Scan scope: only module source trees declared in build-profile.json5 are enumerated; arbitrary dirs are silently skipped.
+- Dot-prefixed directories are NOT enumerated.
+- Exit code is 0 even with defects unless `-e`/`--exit-on` is passed; do not rely on exit code alone.
+- Defect counters live in `~/.codelinter/codelinter.log`; look for `lint code finished! errorFileCount...`.
+- Default config (no `-c`) scans `**/*.ets`, `**/*.h`, `**/*.cpp` with @typescript-eslint/recommended, @performance/recommended, and 12 @security rules.
+- Verify by tailing the counter log; rerun with `-e` if you need non-zero exit on defects.

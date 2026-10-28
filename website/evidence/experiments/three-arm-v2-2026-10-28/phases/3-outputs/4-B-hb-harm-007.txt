@@ -1,0 +1,1 @@
+ArkTS 声明式语法（基于 TypeScript 扩展，通过装饰器、链式调用等描述 UI）

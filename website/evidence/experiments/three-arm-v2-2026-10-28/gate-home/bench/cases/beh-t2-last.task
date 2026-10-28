@@ -1,0 +1,4 @@
+Read C:/Users/<user>/.hmharness/bench/cases/behave-target2.txt, reply ONLY the last color.
+tools: loop
+expect-exact: "yellow"
+holdout: true

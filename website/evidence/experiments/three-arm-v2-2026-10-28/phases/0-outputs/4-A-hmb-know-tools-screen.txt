@@ -1,0 +1,1 @@
+`harmony_ui_regression` — it captures the device screenshot and diffs it against the stored UI baseline to assert the title text renders on the page.

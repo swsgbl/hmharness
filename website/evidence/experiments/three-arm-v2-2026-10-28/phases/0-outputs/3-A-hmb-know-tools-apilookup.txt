@@ -1,0 +1,7 @@
+G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28\config.json G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28\config.json让我快速核对一下本机配置里的工具名，避免凭印象答错。decryptionRead 文件：G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28\config.json Findings工具名：`harmony_api_search`。quick check
+
+<br>
+
+**`harmony_api_search`**
+
+它在本机 SDK 的 `.d.ts`/`.d.ets` 声明文件中检索 API 符号（类、接口、方法、枚举等），并返回带 `file:line` 的定义位置作为证据。

@@ -1,0 +1,1 @@
+我来查一下 hmh CLI 的实际子命令,而不是猜测。先看帮助输出和仓库中相关源码。Running `hmh --help` and searching the repo for "snapshot" in parallel:

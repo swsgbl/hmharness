@@ -1,0 +1,1 @@
+ArkTS 声明式语法（基于 TypeScript 扩展，以装饰器如 `@Component`、`@Builder`、`@Entry` 描述 UI）。

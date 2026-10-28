@@ -1,0 +1,3 @@
+`harmony_build_doctor`
+
+它专门用于诊断 HarmonyOS 构建失败并将其归类到已知的失败家族（failure families）。注意：在 Windows 上不要反复裸跑该命令（可能返回无法解析的输出），可参考技能 `harmony-build-doctor-windows-invocation` 的替代调用方式。

@@ -1,0 +1,3 @@
+列出3个欧洲国家，逗号分隔，不要其他内容
+expect-regex: \w+,\s*\w+,\s*\w+
+holdout: true

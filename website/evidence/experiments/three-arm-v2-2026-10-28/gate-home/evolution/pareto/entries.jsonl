@@ -1,0 +1,4 @@
+{"name":"verbatim-character-copy","parentInsights":[],"rejectedReason":"below quality floor (0.46 < 0.6)","scores":{"train":0.46153846153846156},"metaModel":"glm-5.3","at":"2026-10-28T04:18:57.928Z"}
+{"name":"payload-only-reply","parentInsights":[],"rejectedReason":"below quality floor (0.46 < 0.6)","scores":{"train":0.46153846153846156},"metaModel":"glm-5.3","at":"2026-10-28T04:23:18.790Z"}
+{"name":"verbatim-codepoint-copy","parentInsights":[],"rejectedReason":"below quality floor (0.46 < 0.6)","scores":{"train":0.46153846153846156},"metaModel":"glm-5.3","at":"2026-10-28T04:26:16.621Z"}
+{"name":"bare-string-reply","parentInsights":[],"rejectedReason":"below quality floor (0.46 < 0.6)","scores":{"train":0.46153846153846156},"metaModel":"glm-5.3","at":"2026-10-28T04:30:58.196Z"}

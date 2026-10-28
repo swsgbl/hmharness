@@ -1,0 +1,2 @@
+reply GO or NO-GO
+expect-any: GO || NO-GO

@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是 HarmonyOS 应用/模块的安装包格式，本质是一个包含代码、资源、配置文件（module.json 等）并经过签名的 zip 压缩包。

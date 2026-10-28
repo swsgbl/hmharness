@@ -1,0 +1,1 @@
+HAP（Harmony Ability Package）是鸿蒙应用/服务的部署包格式，由代码、资源、配置文件等打包而成，一个应用可由一个或多个 HAP（Entry 或 Feature 类型）组成。

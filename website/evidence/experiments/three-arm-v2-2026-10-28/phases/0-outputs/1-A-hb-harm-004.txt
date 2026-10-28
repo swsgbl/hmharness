@@ -1,0 +1,1 @@
+Stage 模型是 HarmonyOS 从 API 9 开始推荐的应用开发模型，它将 UI 与业务逻辑分离（由 UIAbility 承载界面生命周期、AbilityStage 管理组件容器），以 Stage-Manager 调度为核心，取代了早期的 FA 模型。

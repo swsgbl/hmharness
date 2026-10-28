@@ -1,0 +1,3 @@
+用中文写一句关于春天的诗，不要解释
+expect-regex: [\u4e00-\u9fff]{4,}
+holdout: true

@@ -1,0 +1,1 @@
+`harmony_ui_regression` — 它会截取设备屏幕并断言页面呈现了预期的标题文本。

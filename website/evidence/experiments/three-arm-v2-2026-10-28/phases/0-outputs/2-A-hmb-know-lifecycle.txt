@@ -1,0 +1,3 @@
+**onCreate**
+
+(UIAbility 生命周期首个回调，替代了 Android Activity 的 onStart 作为 Ability 启动入口；随后依次为 onWindowStageCreate → onForeground → onBackground → onWindowStageDestroy → onDestroy)
