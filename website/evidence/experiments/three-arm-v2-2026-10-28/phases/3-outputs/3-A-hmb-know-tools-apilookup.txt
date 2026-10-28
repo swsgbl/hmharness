@@ -24,7 +24,7 @@ I need to figure out the package structure first — that last findstr may have 
 
 ```json
 {
-  "command": "dir /b G:\\hmharness-wtC2\\website 2>nul & dir /b G:\\hmharness-wtC2\\.claude 2>nul & dir /b C:\\Users\\hongfu\\.claude\\skills 2>nul"
+  "command": "dir /b G:\\hmharness-wtC2\\website 2>nul & dir /b G:\\hmharness-wtC2\\.claude 2>nul & dir /b C:\\Users\\<user>\\.claude\\skills 2>nul"
 }
 ```
 

@@ -75,3 +75,9 @@ npx tsx scripts/sanitize-evidence.mts <v1 实验目录>   # (工具)v1 冻结证
 ```
 
 驱动器幂等可续跑(逐格 done 集合);证据目录 append-only,重跑只追加不覆盖历史。候选为生成式(无采样参数非确定),复现的是协议与判定门,不是逐字节输出。
+
+
+## 出版注记（脱敏补录）
+
+- 1-B-hmb-know-tools-apilookup.txt: pre-scrub sha256[:16]=ac537ac6560d90a7 (only the hallucinated username string was replaced with <user> at publication; deviation 7 in REPORT.md)
+- 3-A-hmb-know-tools-apilookup.txt: pre-scrub sha256[:16]=025b4a9ebfe96f41 (only the hallucinated username string was replaced with <user> at publication; deviation 7 in REPORT.md)

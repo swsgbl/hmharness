@@ -4,7 +4,7 @@ config.json G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-
 
 让我再检查一下工具定义： G:\hmharness-wtC2\tools\api-search\SKILL.md 不存在 G:\hmharness-wtC2\skills 不存在 dir /b G:\hmharness-wtC2\tools
 
-让我检查实际的工具位置： dir /b G:\hmharness-wtC2 where /r G:\hmharness-wtC2 harmony_api*.cjs 2>nul dir /b C:\Users\hongfu\.hmharness\tools 2>nul
+让我检查实际的工具位置： dir /b G:\hmharness-wtC2 where /r G:\hmharness-wtC2 harmony_api*.cjs 2>nul dir /b C:\Users\<user>\.hmharness\tools 2>nul
 
 让我搜索框架中与 API 相关的工具： findstr /s /m /i "api.*symbol\|file:line" G:\hmharness-wtC2\tools\*.md 2>nul dir /b /s G:\hmharness-wtC2\tools\*.json 2>nul | findstr /i "api" 
 
@@ -63,7 +63,7 @@ hmh tools list
 
 鉴于在当前工作树 `G:\hmharness-wtC2` 中除了一个空的 `website` 文件夹外，我无法找到任何工具、代码或框架注册表，我没有经验依据来命名一个特定的工具。
 
-让我检查一下 `HMH` 主目录中的技能： dir /b C:\Users\hongfu\.hmharness 2>nul dir /b C:\Users\hongfu\.zcode\skills 2>nul dir /b C:\Users\hongfu\.claude\skills 2>nul
+让我检查一下 `HMH` 主目录中的技能： dir /b C:\Users\<user>\.hmharness 2>nul dir /b C:\Users\<user>\.zcode\skills 2>nul dir /b C:\Users\<user>\.claude\skills 2>nul
 
 在我得出结论之前，让我先检查一下智能体状态目录： dir /b "G:\hmharness-wtC2\website\evidence\experiments\three-arm-v2-2026-10-28" 2>nul
 
