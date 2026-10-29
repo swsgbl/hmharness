@@ -1,3 +1,7 @@
+## [0.23.47] - 2026-10-29
+
+chat 传输层 node:http 回退——jitless 板任务全挂根修(PR#38,设备实测取证):深开鸿板禁 RWX 必须 \`--jitless\`,该 node 构建(v24.19.0 musl)jitless 下 \`typeof WebAssembly === 'undefined'\`,而 undici fetch 依赖 wasm → 板上一切 fetch 调用 80ms 内抛 "fetch failed WebAssembly is not defined"(本地无 TLS 同样死),kernel chat 原只走 fetch → 任务全部挂死(runner 0% CPU 挂在重试)。修复:新增 \`packages/kernel/src/http-transport.ts\`——模块级 memo 探测(fetch 为函数且 WebAssembly 存在→原生 fetch 零行为变化;否则 node:http/https 回退,keep-alive Agent 单例,AbortSignal 贯穿 body 消费,错误归一保持 TRANSIENT_RE 重试语义,首次回退一条取证 warn);chat/chatVision/mcp/models 探测全部走统一传输,SSE 泵经 getReader() 零感知差异;测试隔离到子进程+\`__forceTransportForTests\` 钉选(毒化全局在 Node 22 会炸 undici 惰性 wasm 实例化,CI 三轮实证)。全套 1046 测试。
+
 ## [0.23.46] - 2026-10-29
 
 隧道重试风暴根治(设备"应用用不了"事故复盘,PR#37):①**指数退避+放弃语义**——受限网络下 cloudflared 下载失败→pinggy 兜底→3s 固定间隔无限重试的整夜循环(资源压力致任务子进程间歇静默死亡)根除:冷启动退避 3s→6s→12s→24s→48s…上限 5min;在线断线前 3 次快速后并入阶梯;连续失败 5 次(含存活<60s 短命)彻底放弃并一次性提示,仅手动重试或重启恢复;稳定在线≥60s 退线只计新回合不误杀。②**板级安装器默认 `web.tunnel=false`**——孪生安装器共享 `board-defaults.cjs`(缺失补 false/显式值绝不覆盖/corrupt 不碰/幂等);板级内网环境不再默认承受互联网隧道风暴。③tui resume picker 闪断根修(轮询条件 alpha→alpha+beta 双行齐,PR#34 内)。④browser startBrowser 测试硬编码 19223=BrowserOS 真实默认口的环境敏感根修→临时空闲口(PR#35,用户机开着 BrowserOS 时翻车)。全套 1042 测试。

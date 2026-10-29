@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "version": "0.23.46",
+    "registry": "https://registry.npmjs.org",
+    "keep": false,
+    "startedAt": "2026-10-29T06:23:21.364Z",
+    "node": "v24.19.0",
+    "npm": "12.2.0",
+    "os": "Windows_NT 10.0.26340 x64",
+    "platform": "win32",
+    "tmpDir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-Nz37Fd",
+    "tarball": {
+      "url": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.46.tgz",
+      "sha256": "bfaa73f4eb99dcd6e19be2e6cc180ffe118f19ac604035edf9a2af8566c74d3a",
+      "registryIntegrity": "sha512-sVQiIWDWhKLjQo5c+sSeSnWrEkk6EoAI960ZeA/Vy3O5u1cQyAxnZulIrK1XceANLH/KylW446kI7X69VU0UsA==",
+      "bytes": 171643
+    },
+    "finishedAt": "2026-10-29T06:23:30.363Z",
+    "evidenceDir": "v0.23.46/20261029T062330Z"
+  },
+  "steps": [
+    {
+      "step": "download + fingerprint",
+      "status": "PASS",
+      "detail": "171643 bytes, sha256 bfaa73f4eb99dcd6…, integrity matches"
+    },
+    {
+      "step": "clean-room npm install",
+      "status": "FAIL",
+      "detail": "npm exit=1; dist/main.js present=false"
+    }
+  ]
+}

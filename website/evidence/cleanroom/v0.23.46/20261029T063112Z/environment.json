@@ -1,0 +1,73 @@
+{
+  "version": "0.23.46",
+  "registry": "https://registry.npmjs.org",
+  "keep": false,
+  "startedAt": "2026-10-29T06:28:50.536Z",
+  "node": "v24.19.0",
+  "npm": "12.2.0",
+  "os": "Windows_NT 10.0.26340 x64",
+  "platform": "win32",
+  "tmpDir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-tGStJS",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.46.tgz",
+    "sha256": "bfaa73f4eb99dcd6e19be2e6cc180ffe118f19ac604035edf9a2af8566c74d3a",
+    "registryIntegrity": "sha512-sVQiIWDWhKLjQo5c+sSeSnWrEkk6EoAI960ZeA/Vy3O5u1cQyAxnZulIrK1XceANLH/KylW446kI7X69VU0UsA==",
+    "bytes": 171643
+  },
+  "packageGraph": {
+    "installed": {
+      "agent": "0.23.46",
+      "browser": "0.23.46",
+      "cli": "0.23.46",
+      "cognitive": "0.23.46",
+      "domain-harmony": "0.23.46",
+      "domain-ops": "0.23.46",
+      "environments": "0.23.46",
+      "evaluation": "0.23.46",
+      "evolution": "0.23.46",
+      "extension": "0.23.46",
+      "kernel": "0.23.46",
+      "lsp": "0.23.46",
+      "observability": "0.23.46",
+      "sandbox": "0.23.46",
+      "web": "0.23.46"
+    },
+    "pins": {
+      "agent": "0.23.46",
+      "browser": "0.23.46",
+      "cognitive": "0.23.46",
+      "domain-harmony": "0.23.46",
+      "domain-ops": "0.23.46",
+      "environments": "0.23.46",
+      "evaluation": "0.23.46",
+      "evolution": "0.23.46",
+      "extension": "0.23.46",
+      "kernel": "0.23.46",
+      "observability": "0.23.46",
+      "sandbox": "0.23.46",
+      "web": "0.23.46",
+      "lsp": "0.23.46"
+    },
+    "unexpected": [],
+    "expected": [
+      "kernel",
+      "observability",
+      "evaluation",
+      "sandbox",
+      "cognitive",
+      "environments",
+      "browser",
+      "extension",
+      "evolution",
+      "domain-harmony",
+      "domain-ops",
+      "lsp",
+      "agent",
+      "web",
+      "cli",
+      "codexhost-bridge"
+    ]
+  },
+  "finishedAt": "2026-10-29T06:31:12.993Z",
+  "evidenceDir": "v0.23.46/20261029T063112Z"
+}

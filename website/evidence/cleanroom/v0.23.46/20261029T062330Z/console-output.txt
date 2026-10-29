@@ -1,0 +1,30 @@
+clean-room verify @hmharness/cli@0.23.46 — registry https://registry.npmjs.org — node v24.19.0 — npm 12.2.0 — Windows_NT 10.0.26340 x64
+tarball: https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.46.tgz
+sha256: bfaa73f4eb99dcd6e19be2e6cc180ffe118f19ac604035edf9a2af8566c74d3a
+registry integrity digest matches: YES
+$ npm install "C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-Nz37Fd\hmharness-cli-0.23.46.tgz" --registry https://registry.npmjs.org --cache "C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-Nz37Fd\npm-cache" --no-audit --no-fund
+  [install/stderr] npm warn cleanup Failed to remove some directories [
+  [install/stderr] npm warn cleanup   [
+  [install/stderr] npm warn cleanup     '\\\\?\\C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-Nz37Fd\\node_modules\\@hmharness\\kernel',
+  [install/stderr] npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-Nz37Fd\node_modules\@hmharness\kernel'] {
+  [install/stderr] npm warn cleanup       errno: -4048,
+  [install/stderr] npm warn cleanup       code: 'EPERM',
+  [install/stderr] npm warn cleanup       syscall: 'rmdir',
+  [install/stderr] npm warn cleanup       path: 'C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-Nz37Fd\\node_modules\\@hmharness\\kernel'
+  [install/stderr] npm warn cleanup     }
+  [install/stderr] npm warn cleanup   ]
+  [install/stderr] npm warn cleanup ]
+  [install/stderr] npm error code E404
+  [install/stderr] npm error 404 Not Found - GET https://registry.npmjs.org/@hmharness/domain-harmony/-/domain-harmony-0.23.46.tgz - Not found
+  [install/stderr] npm error 404
+  [install/stderr] npm error 404  The requested resource '@hmharness/domain-harmony@https://registry.npmjs.org/@hmharness/domain-harmony/-/domain-harmony-0.23.46.tgz' could not be found or you do not have permission to access it.
+  [install/stderr] npm error 404
+  [install/stderr] npm error 404 Note that you can also install from a
+  [install/stderr] npm error 404 tarball, folder, http url, or git url.
+  [install/stderr] npm notice
+  [install/stderr] npm notice New patch version of npm available! 12.2.0 -> 12.2.1
+  [install/stderr] npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+  [install/stderr] npm notice To update run: npm install -g npm@12.2.1
+  [install/stderr] npm notice
+  [install/stderr] npm error A complete log of this run can be found in: C:\Users\<user>\AppData\Local\Temp\hmh-cleanroom-Nz37Fd\npm-cache\_logs\2026-10-29T06_23_24_229Z-debug-0.log
+hard failure: install hard failure
