@@ -1432,7 +1432,9 @@ export async function startServer(opts: {
       // web.tunnel=true is the PERSISTED intent from the pairing modal —
       // restarts must restore the tunnel or old QRs point at dead links.
       console.log('internet: 正在启动免费隧道（cloudflared，首次会自动下载）…');
-      void tunnel.start(opts.port, 'cloudflare', (m) => console.log(m)).then((t) => {
+      // give-up notice rides the existing SSE 'line' channel — ONE message
+      // per give-up (2026-10-29 device incident: never a retry-storm spam)
+      void tunnel.start(opts.port, 'cloudflare', (m) => console.log(m), (m) => broadcast('line', { text: m, sessionId: '' })).then((t) => {
         if (t.url) console.log(`internet: ${t.url} （互联网扫码 + 6 位配对密码）`);
         else console.log(`internet: 隧道启动失败（${t.error ?? 'unknown'}）；网页 📱 弹窗里可重试或换 pinggy 线路`);
       });

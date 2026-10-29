@@ -23,6 +23,9 @@
 //      the package set below is a FLOOR, extendHeal covers the rest — see
 //      "why the heal layer exists" above installHealLayer()
 //   6. first run: `hmh init` if config.json is missing
+//   7. config default: an ABSENT web.tunnel is written as false — boards are
+//      overwhelmingly intranet and must not inherit the internet tunnel's
+//      retry storm (2026-10-29 device incident); explicit values never touched
 //
 // Usage:
 //   node install-kaihongos.cjs                 # install/upgrade to latest
@@ -34,6 +37,14 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { spawnSync } = require('child_process');
+// board config defaults live in a shared module that ships in
+// @hmharness/cli's board/ directory — resolve it whether this installer
+// runs from scripts/ (repo) or packages/cli/board/ (npm package).
+const { ensureBoardDefaults } = require(
+  fs.existsSync(path.join(__dirname, 'board-defaults.cjs'))
+    ? path.join(__dirname, 'board-defaults.cjs')
+    : path.join(__dirname, '..', 'packages', 'cli', 'board', 'board-defaults.cjs'),
+);
 
 // ---------- board constants -------------------------------------------------
 let BOARD_HOME = '/data/local/home';               // KaihongOS board home
@@ -353,6 +364,14 @@ function installHealLayer() {
     });
     log((r.stdout || r.stderr || '').trim().split('\n').slice(-3).join('\n'));
   }
+
+  // board default (2026-10-29 device incident): an ABSENT web.tunnel must
+  // not inherit the internet tunnel's all-night retry storm. Injects
+  // web.tunnel=false only where the key is missing; explicit user values
+  // are never overwritten. Idempotent — safe to run on every install.
+  const dflt = ensureBoardDefaults(path.join(HMH_HOME, 'config.json'));
+  if (dflt === 'written') log('config: web.tunnel=false 默认已写入（板级多为内网部署；需互联网隧道请显式设为 true）');
+  else if (dflt === 'corrupt' || dflt === 'write-error') log('warn: config.json ' + dflt + ' — web.tunnel 默认值未注入');
 
   console.log('\nnext steps:');
   console.log('  1. put your provider keys in ' + path.join(HMH_HOME, 'config.json'));
