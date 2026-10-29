@@ -1,0 +1,73 @@
+{
+  "version": "0.23.47",
+  "registry": "https://registry.npmjs.org",
+  "keep": false,
+  "startedAt": "2026-10-29T12:29:07.115Z",
+  "node": "v24.19.0",
+  "npm": "12.2.0",
+  "os": "Windows_NT 10.0.26340 x64",
+  "platform": "win32",
+  "tmpDir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\hmh-cleanroom-woPUy5",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.47.tgz",
+    "sha256": "0be2babe3a046b151014106ed0b2a0d402231e554ac1640bed57210d8adaa8fc",
+    "registryIntegrity": "sha512-jB+RNcEwIkp+Gp2ZKbvkFtUSOma9jWT5oK01BnzM5kmFI2PdJgjlPR/AjZ/k9cVdqVSj6+NBdEULHaluVPCSAA==",
+    "bytes": 171702
+  },
+  "packageGraph": {
+    "installed": {
+      "agent": "0.23.47",
+      "browser": "0.23.47",
+      "cli": "0.23.47",
+      "cognitive": "0.23.47",
+      "domain-harmony": "0.23.47",
+      "domain-ops": "0.23.47",
+      "environments": "0.23.47",
+      "evaluation": "0.23.47",
+      "evolution": "0.23.47",
+      "extension": "0.23.47",
+      "kernel": "0.23.47",
+      "lsp": "0.23.47",
+      "observability": "0.23.47",
+      "sandbox": "0.23.47",
+      "web": "0.23.47"
+    },
+    "pins": {
+      "agent": "0.23.47",
+      "browser": "0.23.47",
+      "cognitive": "0.23.47",
+      "domain-harmony": "0.23.47",
+      "domain-ops": "0.23.47",
+      "environments": "0.23.47",
+      "evaluation": "0.23.47",
+      "evolution": "0.23.47",
+      "extension": "0.23.47",
+      "kernel": "0.23.47",
+      "observability": "0.23.47",
+      "sandbox": "0.23.47",
+      "web": "0.23.47",
+      "lsp": "0.23.47"
+    },
+    "unexpected": [],
+    "expected": [
+      "kernel",
+      "observability",
+      "evaluation",
+      "sandbox",
+      "cognitive",
+      "environments",
+      "browser",
+      "extension",
+      "evolution",
+      "domain-harmony",
+      "domain-ops",
+      "lsp",
+      "agent",
+      "web",
+      "cli",
+      "codexhost-bridge"
+    ]
+  },
+  "finishedAt": "2026-10-29T12:31:48.147Z",
+  "evidenceDir": "v0.23.47/20261029T123148Z"
+}
