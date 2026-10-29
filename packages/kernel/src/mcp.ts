@@ -8,6 +8,7 @@
  */
 import { spawn } from 'node:child_process';
 import type { Tool } from './types.ts';
+import { httpFetch, getReader, type TransportResponse } from './http-transport.ts';
 
 export type McpServerConfig =
   | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; trusted?: boolean; trustedTools?: string[] }
@@ -81,7 +82,7 @@ export class McpClient {
       ...cfg.headers,
     };
     if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
-    await fetch(cfg.url, {
+    await httpFetch(cfg.url, {
       method: 'POST',
       headers,
       body: JSON.stringify({ jsonrpc: '2.0', method }),
@@ -182,10 +183,10 @@ export class McpClient {
       // one retry for transient transport failures: a dead/restarting MCP
       // server used to surface a bare "TypeError: fetch failed" straight to
       // the model as the tool result
-      let res: Response | undefined;
+      let res: TransportResponse | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          res = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
+          res = await httpFetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
           break;
         } catch (err) {
           if (attempt === 0 && isTransientTransport(String(err))) {
@@ -220,8 +221,8 @@ export class McpClient {
   }
 
   /** Read an SSE body up to the first `data:` JSON message, then stop. */
-  private async firstSseMessage(res: Response): Promise<unknown> {
-    const reader = res.body!.getReader();
+  private async firstSseMessage(res: TransportResponse): Promise<unknown> {
+    const reader = getReader(res);
     const decoder = new TextDecoder();
     let buf = '';
     try {

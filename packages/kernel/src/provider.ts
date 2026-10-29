@@ -7,6 +7,7 @@
  * transient 429/5xx before the stream starts; mid-stream failures surface.
  */
 import type { ChatMessage, ProviderConfig } from './types.ts';
+import { httpFetch, getReader, type TransportResponse } from './http-transport.ts';
 
 export interface ChatResponse {
   message: ChatMessage;
@@ -139,7 +140,10 @@ export async function chat(
       ? (kind, chunk) => { if (kind !== 'reset') emitted = true; opts.onDelta!(kind, chunk); }
       : undefined;
     try {
-      const res = await fetch(endpoint(cfg.baseUrl), {
+      // httpFetch: native fetch, or the node:http fallback when fetch is
+      // unusable (jitless board builds compile out WebAssembly and undici
+      // dies with "fetch failed WebAssembly is not defined" on every call)
+      const res = await httpFetch(endpoint(cfg.baseUrl), {
         method: 'POST',
         headers: mkHeaders(authScheme),
         body: JSON.stringify(body),
@@ -208,11 +212,12 @@ export async function chat(
 
 /** Assemble a ChatResponse from an SSE stream, emitting deltas as they land. */
 async function consumeStream(
-  res: Response,
+  res: TransportResponse,
   onDelta: (kind: DeltaKind, chunk: string) => void,
 ): Promise<ChatResponse> {
-  if (!res.body) throw new TypeError('provider: no response body (streaming requested)');
-  const reader = res.body.getReader();
+  // getReader: the fetch body's own reader, or the node-stream adapter -
+  // identical shape either way, so this pump never knows the transport
+  const reader = getReader(res);
   const decoder = new TextDecoder();
   let buf = '';
   let text = '';
@@ -339,7 +344,7 @@ export async function chatVision(
       const vHeaders = vAuth === 'bearer'
         ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
         : { 'Content-Type': 'application/json', [vAuth]: cfg.apiKey };
-      const res = await fetch(endpoint(cfg.baseUrl), {
+      const res = await httpFetch(endpoint(cfg.baseUrl), {
         method: 'POST',
         headers: vHeaders,
         body: JSON.stringify(body),

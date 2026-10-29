@@ -3,6 +3,7 @@
  * The kernel contract surface. Deliberately small: a Tool, a chat message,
  * a provider config. Everything else in hmharness composes from these.
  */
+import { httpFetch } from './http-transport.ts';
 
 /** A JSON-Schema-shaped parameter description (OpenAI tool-call format). */
 export interface JsonSchema {
@@ -383,13 +384,13 @@ export async function detectLocalProviders(cfg: HmhConfig, readFileFn: typeof im
     for (const port of ports) {
       try {
         const key = process.env[envVar];
-        let r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
+        let r = await httpFetch(`http://127.0.0.1:${port}/v1/models`, {
           headers: { Authorization: `Bearer ${key}` },
           signal: AbortSignal.timeout(800),
         });
         let authHeader: string | undefined;
         if (r.status === 401) {
-          r = await fetch(`http://127.0.0.1:${port}/v1/models`, {
+          r = await httpFetch(`http://127.0.0.1:${port}/v1/models`, {
             headers: { 'X-Api-Key': key },
             signal: AbortSignal.timeout(800),
           });
