@@ -1,3 +1,7 @@
+## [0.23.46] - 2026-10-29
+
+隧道重试风暴根治(设备"应用用不了"事故复盘,PR#37):①**指数退避+放弃语义**——受限网络下 cloudflared 下载失败→pinggy 兜底→3s 固定间隔无限重试的整夜循环(资源压力致任务子进程间歇静默死亡)根除:冷启动退避 3s→6s→12s→24s→48s…上限 5min;在线断线前 3 次快速后并入阶梯;连续失败 5 次(含存活<60s 短命)彻底放弃并一次性提示,仅手动重试或重启恢复;稳定在线≥60s 退线只计新回合不误杀。②**板级安装器默认 `web.tunnel=false`**——孪生安装器共享 `board-defaults.cjs`(缺失补 false/显式值绝不覆盖/corrupt 不碰/幂等);板级内网环境不再默认承受互联网隧道风暴。③tui resume picker 闪断根修(轮询条件 alpha→alpha+beta 双行齐,PR#34 内)。④browser startBrowser 测试硬编码 19223=BrowserOS 真实默认口的环境敏感根修→临时空闲口(PR#35,用户机开着 BrowserOS 时翻车)。全套 1042 测试。
+
 ## [0.23.45] - 2026-10-29
 
 测试诚实化双收官（审计文档 03 P0-2 验收门关闭 + 本机 DX 债清偿）：①**server close() 句柄全排干与 CI 假绿根修(PR#33)**——旧 close() 路径有无条件 process.exit(0),库上下文里直接击杀测试宿主进程:Windows 上与活着的 libuv async 句柄竞态触发 `UV_HANDLE_CLOSING` 断言(routes-* 四测试本机连崩三轮),Linux CI 同样被提前击杀——**此前的 CI 全绿是假绿**,掩盖自 2026-10-18 拆分起的 5 个潜伏缺陷(port-0 回显/ pair-rotate PRE-rotate 状态/两个守卫断言与产品合同不符/extension-status 环境依赖);修复=统一句柄登记表+closeOnce() LIFO 排干+closed 标志门住 SSE 写入侧+库层绝不 process.exit+close 幂等;新增 server-close 回归(挂起 SSE 连接终止且进程存活);修复后**本机全套首次全绿**(1037 零 fail)。②**clean-room 发版验真自动化(P0-2 收官,PR#34)**——`scripts/cleanroom-verify.cjs`:官方源 tarball 下载(sha256+npm integrity 双指纹)→全新目录+全新缓存隔离安装→15 包钉版核验(第 16 包 codexhost-bridge 依赖图外走 registry 确认)→关键路径实跑(check//api/state/任务受理+interrupt/rollout/resume/bench/evolve,无 key 边界如实记录)→工件归档 `website/evidence/cleanroom/`;工件写入时单点脱敏(OS 用户名→<user>,SANITIZATION.md 记 sha256 前像);单测 11 例接入 npm test 链;v0.23.44 三次运行+指挥者独立真跑均 11/11 PASS。③tui resume picker 闪断根修(轮询条件 alpha→alpha+beta 双行齐)。全套 1037 测试(本地全绿)。

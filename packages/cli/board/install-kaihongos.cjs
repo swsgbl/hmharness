@@ -78,11 +78,11 @@ let PACKAGES = ['cli', 'web', 'agent', 'kernel', 'sandbox', 'evolution',
 // the offline path tried <name>-undefined.tgz → 404 → INSTALL FAILED (directly
 // contradicting the promise above; evidence: cli 0.23.42 declares 14 deps).
 const FALLBACK_PINS = {
-  cli: '0.23.45', web: '0.23.45', agent: '0.23.45', kernel: '0.23.45',
-  sandbox: '0.23.45', evolution: '0.23.45', 'domain-ops': '0.23.45',
-  evaluation: '0.23.45', observability: '0.23.45', 'domain-harmony': '0.23.45',
-  cognitive: '0.23.45', environments: '0.23.45', lsp: '0.23.45',
-  browser: '0.23.45', extension: '0.23.45',
+  cli: '0.23.46', web: '0.23.46', agent: '0.23.46', kernel: '0.23.46',
+  sandbox: '0.23.46', evolution: '0.23.46', 'domain-ops': '0.23.46',
+  evaluation: '0.23.46', observability: '0.23.46', 'domain-harmony': '0.23.46',
+  cognitive: '0.23.46', environments: '0.23.46', lsp: '0.23.46',
+  browser: '0.23.46', extension: '0.23.46',
 };
 
 // ---------- helpers ---------------------------------------------------------
