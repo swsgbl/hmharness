@@ -14,8 +14,14 @@
  */
 import http from 'node:http';
 
-// poison BEFORE any kernel/undici code loads
+// Import FIRST with WebAssembly intact: on Node 22 the import chain of
+// provider.ts lazily instantiates undici's llhttp wasm - poisoning before
+// import crashes the driver at startup (CI, 2026-10-29). Only after the
+// modules are fully loaded do we simulate the jitless board.
+const { chat, chatVision } = await import('../provider.ts');
+const { __resetTransportForTests } = await import('../http-transport.ts');
 Object.defineProperty(globalThis, 'WebAssembly', { value: undefined, configurable: true });
+__resetTransportForTests(); // re-probe now sees no wasm -> node transport
 
 const [mode, base] = process.argv.slice(2) as [string, string];
 
@@ -25,7 +31,6 @@ function out(o: unknown): void {
 }
 
 try {
-  const { chat, chatVision } = await import('../provider.ts');
   if (mode === 'sse') {
     const deltas: Array<[string, string]> = [];
     const r = await chat(
