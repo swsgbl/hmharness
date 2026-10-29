@@ -82,6 +82,20 @@ export function __resetTransportForTests(): void {
   active = undefined;
 }
 
+/** Tests only: pin the transport. Poisoning globalThis.WebAssembly to steer
+ *  the probe is NOT CI-safe across node versions (on 22, an import-time
+ *  fetch's deferred undici wasm parse can land inside the poisoned window and
+ *  crash the process); pinning exercises the exact same code path without
+ *  touching globals. */
+export function __forceTransportForTests(mode: TransportMode): void {
+  if (mode === 'node') {
+    console.warn('[chat] fetch unavailable (jitless/no-wasm) — using node:http transport');
+    active = nodeFetch;
+  } else {
+    active = (u, i) => globalThis.fetch(u, i as RequestInit) as unknown as Promise<TransportResponse>;
+  }
+}
+
 /** Uniform reader entry for every SSE pump: the fetch path returns the
  *  body's own reader unchanged; the node fallback hands back its adapter. */
 export function getReader(res: TransportResponse): TransportReader {

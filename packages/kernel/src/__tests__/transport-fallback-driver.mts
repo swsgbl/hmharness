@@ -14,14 +14,14 @@
  */
 import http from 'node:http';
 
-// Import FIRST with WebAssembly intact: on Node 22 the import chain of
-// provider.ts lazily instantiates undici's llhttp wasm - poisoning before
-// import crashes the driver at startup (CI, 2026-10-29). Only after the
-// modules are fully loaded do we simulate the jitless board.
+// Import FIRST, then PIN the node transport. We deliberately do NOT poison
+// globalThis.WebAssembly here: on Node 22 an import-time fetch's deferred
+// undici wasm parse can land inside any poisoned window and crash the
+// process (CI, 2026-10-29). The probe's detection logic has its own unit
+// tests; the real jitless board deployment is the end-to-end arbiter.
 const { chat, chatVision } = await import('../provider.ts');
-const { __resetTransportForTests } = await import('../http-transport.ts');
-Object.defineProperty(globalThis, 'WebAssembly', { value: undefined, configurable: true });
-__resetTransportForTests(); // re-probe now sees no wasm -> node transport
+const { __forceTransportForTests } = await import('../http-transport.ts');
+__forceTransportForTests('node');
 
 const [mode, base] = process.argv.slice(2) as [string, string];
 
