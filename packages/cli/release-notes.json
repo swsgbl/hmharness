@@ -1,6 +1,11 @@
 {
   "notes": [
     {
+      "v": "0.23.48",
+      "date": "2026-10-30",
+      "note": "forge 集成:GitHub/AtomGit 仓库操作工具族(gh/ag 后端,登录引导+写操作审批);1065 测试"
+    },
+    {
       "v": "0.23.47",
       "date": "2026-10-29",
       "note": "chat 传输层 node:http 回退——jitless 板(无 wasm→fetch 全灭)任务全挂根修;1046 测试"

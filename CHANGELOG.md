@@ -1,3 +1,7 @@
+## [0.23.48] - 2026-10-30
+
+forge 集成——GitHub/AtomGit 仓库操作工具族(PR#39,第十四波 14-A,用户需求"像 VSCode 集成 GitHub 那样在智能体界面直接操作仓库"):①**gh/ag CLI 后端**,shell 调用零新第三方依赖(Windows 上 ag 安装为 ag.cmd,execFile 无法派生故走 exec+平台感知引号加固);②**工具族 15 个**——forge_status/forge_login/repo_list/repo_view/repo_create/pr_list/pr_view/pr_create/pr_merge/issue_list/issue_view/issue_create/release_list/release_view/release_create(host 参数区分 GitHub/AtomGit,两平台参数形态差异全部内化:gh -R+--json 字段表 vs ag 位置参数+布尔 --json);③**7 个写操作接审批卡**(对齐 domain-ops/harmony 写门禁先例);④未装 CLI/未登录返回安装与登录引导(forge_login 走设备码流程并轮询就绪;凭据永远留在 gh/ag 自己的存储,hmharness 不碰令牌);⑤渲染器对 gh 对象字段/ag 字符串字段双形态统一。附:CI verify 作业 preflight 改 --skip-tests(build/typecheck/test 已是独立步骤,同作业重复第二遍全量套件在 windows-latest 撞 30min 超时的假红根修)。全套 1065 测试。
+
 ## [0.23.47] - 2026-10-29
 
 chat 传输层 node:http 回退——jitless 板任务全挂根修(PR#38,设备实测取证):深开鸿板禁 RWX 必须 \`--jitless\`,该 node 构建(v24.19.0 musl)jitless 下 \`typeof WebAssembly === 'undefined'\`,而 undici fetch 依赖 wasm → 板上一切 fetch 调用 80ms 内抛 "fetch failed WebAssembly is not defined"(本地无 TLS 同样死),kernel chat 原只走 fetch → 任务全部挂死(runner 0% CPU 挂在重试)。修复:新增 \`packages/kernel/src/http-transport.ts\`——模块级 memo 探测(fetch 为函数且 WebAssembly 存在→原生 fetch 零行为变化;否则 node:http/https 回退,keep-alive Agent 单例,AbortSignal 贯穿 body 消费,错误归一保持 TRANSIENT_RE 重试语义,首次回退一条取证 warn);chat/chatVision/mcp/models 探测全部走统一传输,SSE 泵经 getReader() 零感知差异;测试隔离到子进程+\`__forceTransportForTests\` 钉选(毒化全局在 Node 22 会炸 undici 惰性 wasm 实例化,CI 三轮实证)。全套 1046 测试。
