@@ -326,6 +326,7 @@ export const forgeRepoCreateTool: Tool = {
     },
     required: ['host', 'name'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;
@@ -377,6 +378,7 @@ export const forgePrCreateTool: Tool = {
     },
     required: ['host', 'repo', 'head', 'base', 'title'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;
@@ -400,6 +402,7 @@ export const forgePrMergeTool: Tool = {
     },
     required: ['host', 'repo', 'num'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;
@@ -481,6 +484,7 @@ export const forgeIssueCreateTool: Tool = {
     },
     required: ['host', 'repo', 'title'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;
@@ -506,6 +510,7 @@ export const forgeReleaseCreateTool: Tool = {
     },
     required: ['host', 'repo', 'tag', 'name', 'body'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;
@@ -519,7 +524,7 @@ export const forgeReleaseCreateTool: Tool = {
 
 export const forgeReleaseUploadTool: Tool = {
   name: 'forge_release_upload',
-  description: 'Upload a file as an asset of an existing release. host: github|atomgit; repo owner/repo; tag; file path (must exist).',
+  description: 'Upload a file as an asset of an existing release. host: github|atomgit; repo owner/repo; tag; file path (must exist; its full path, target repo and tag are shown on the approval card — uploading moves data OFF this machine).',
   parameters: {
     type: 'object',
     properties: {
@@ -530,6 +535,7 @@ export const forgeReleaseUploadTool: Tool = {
     },
     required: ['host', 'repo', 'tag', 'file'],
   },
+  needsApproval: () => true,
   async execute(args, ctx): Promise<ToolResult> {
     const { host, err } = hostOf(args);
     if (!host || err) return err!;

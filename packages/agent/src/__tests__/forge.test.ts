@@ -356,16 +356,17 @@ test('forge_login polls the flip (3rd auth status call) and reports the device c
   }
 });
 
-test('forge tool family: 13 tools, only forge_raw approval-gated', () => {
+test('forge tool family: 13 tools; every write gated, reads and login free', () => {
   const names = forgeTools.map((t) => t.name).sort();
   assert.deepEqual(names, [
     'forge_issue_create', 'forge_issue_list', 'forge_login', 'forge_pr_checks', 'forge_pr_create',
     'forge_pr_list', 'forge_pr_merge', 'forge_raw', 'forge_release_create', 'forge_release_upload',
     'forge_repo_create', 'forge_repo_list', 'forge_status',
   ]);
+  const WRITES = new Set(['forge_repo_create', 'forge_pr_create', 'forge_pr_merge', 'forge_issue_create', 'forge_release_create', 'forge_release_upload', 'forge_raw']);
   for (const t of forgeTools) {
     const gated = t.needsApproval?.({}, CTX) === true;
-    assert.equal(gated, t.name === 'forge_raw', `${t.name} gating`);
+    assert.equal(gated, WRITES.has(t.name), `${t.name} gating (writes must ask, reads must not)`);
   }
 });
 
