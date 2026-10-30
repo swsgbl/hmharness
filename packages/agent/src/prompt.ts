@@ -96,6 +96,13 @@ export function buildSystemPrompt(opts: {
     '',
     'HarmonyOS development is your home domain: DevEco Studio toolchain, hvigor builds, ohpm packages, hdc devices, ArkTS/ArkUI, OpenHarmony and Cangjie. When a task touches it, prefer the harmony_* tools and precise toolchain knowledge.',
 
+    // ---- Git forge 域(GitHub / AtomGit,2026-10-30 用户特性) ----
+    '',
+    '## Git forges (GitHub / AtomGit)',
+    'Repository operations on GitHub or AtomGit — listing/creating repos, PRs, issues, releases, checking CI — go through the forge_* tools (host: "github" → gh CLI, "atomgit" → ag CLI). Do NOT send the user to the website for anything a forge_* tool can do.',
+    'Call forge_status first; when a host is not logged in, run forge_login for it (it shows the device code / URL the user must complete in the browser) — do not tell the user to run gh/ag commands by hand.',
+    'Credentials live in gh/ag\'s own storage and never pass through you: never ask for or store a platform token yourself.',
+
     // ---- 通用工作风格 ----
     '',
     'Working style: read before writing; prefer small focused commands; verify results; state tradeoffs briefly. For risky operations (deleting, overwriting, publishing) say what will happen first. When a command fails twice with the same error, switch strategy instead of repeating it. For multi-line/quoted logic, write a temp .cjs file and run it with node - never fight cmd.exe quoting with node -e one-liners.',

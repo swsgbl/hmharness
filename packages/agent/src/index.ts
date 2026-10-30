@@ -1,4 +1,12 @@
 export { baseTools, readFileTool, writeFileTool, listDirTool, runCommandTool, rememberTool, seeImageTool } from './tools.ts';
+export {
+  forgeTools, forgeDetect, forgeDetectHost, forgeRun, forgeLogin,
+  quoteArg, parseAuthStatus, parseJsonOut, renderRepos, renderPrs, renderIssues,
+  repoListArgs, repoCreateArgs, prListArgs, prCreateArgs, prMergeArgs, prChecksArgs,
+  issueListArgs, issueCreateArgs, releaseCreateArgs, releaseUploadArgs,
+  FORGE_BINS, installHint, loginHint,
+  type ForgeHost, type ForgeHostStatus,
+} from './forge.ts';
 export { manifestFor, capabilityReport, authorize, type CapabilityManifest, type CapabilityRisk, type PolicyMode } from './capability.ts';
 export {
   checkpointProject, createProject, findProject, interruptProject, listProjects,
