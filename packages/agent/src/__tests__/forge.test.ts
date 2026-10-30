@@ -40,7 +40,7 @@ test('quoteArg hardens shell metacharacters per platform', () => {
 
 test('parseAuthStatus reads both CLI phrasings', () => {
   assert.deepEqual(parseAuthStatus('github.com\n  ✓ Logged in to github.com account swsgbl (keyring)'), { loggedIn: true, user: 'swsgbl' });
-  assert.deepEqual(parseAuthStatus('✓ Logged in to atomgit.com as hongfu\n  Token: zKxm****1Z3g'), { loggedIn: true, user: 'hongfu' });
+  assert.deepEqual(parseAuthStatus('✓ Logged in to atomgit.com as demo-user\n  Token: zKxm****1Z3g'), { loggedIn: true, user: 'demo-user' });
   assert.deepEqual(parseAuthStatus('You are not logged into any GitHub hosts. Run gh auth login.'), { loggedIn: false });
   assert.deepEqual(parseAuthStatus(''), { loggedIn: false });
 });

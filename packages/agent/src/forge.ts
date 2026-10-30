@@ -61,7 +61,7 @@ export function quoteArg(s: string, platform: string = process.platform): string
 
 /** Parse `auth status` text for BOTH CLIs' phrasings:
  *  gh: "✓ Logged in to github.com account swsgbl (keyring)"
- *  ag: "✓ Logged in to atomgit.com as hongfu" */
+ *  ag: "✓ Logged in to atomgit.com as demo-user" */
 export function parseAuthStatus(text: string): { loggedIn: boolean; user?: string } {
   if (!/Logged in to/.test(text)) return { loggedIn: false };
   const m = /Logged in to \S+ (?:account|as) (\S+?)[\s(\r]/.exec(text) ?? /Logged in to \S+ (?:account|as) (\S+)/.exec(text);
