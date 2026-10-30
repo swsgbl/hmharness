@@ -27,7 +27,14 @@ jobs:
       - name: built CLI smoke (no model needed)
         run: node packages/cli/dist/main.js skills
       - name: npm publish preflight (ordered-set check, never publishes)
-        run: node scripts/publish-preflight.cjs 2>&1 | tee preflight-output.log
+        # --skip-tests: build/typecheck/test already ran as first-class steps
+        # above; re-running the whole suite a second time in the same job
+        # pushed past the preflight's 30min per-command timeout on
+        # windows-latest (PR#39: standalone suite 496s green, the duplicate
+        # re-run was killed at exactly 1800s with the zero-not-ok timeout
+        # signature). publish.yml keeps the full preflight — it is the only
+        # test gate there.
+        run: node scripts/publish-preflight.cjs --skip-tests 2>&1 | tee preflight-output.log
       - name: test failure excerpts (flaky forensics)
         if: failure()
         shell: pwsh

@@ -37,6 +37,10 @@ const RISK_RULES: Array<{ match: RegExp; risk: CapabilityRisk; permissions: stri
   { match: /^(harmony_emulator_(create|start|stop|delete))$/, risk: 'high', permissions: ['device.write', 'process.spawn'], network: true, sideEffects: ['device-mutation'] },
   { match: /^(harmony_build|harmony_cjpm_build|harmony_cjpm_test|harmony_lint)$/, risk: 'medium', permissions: ['process.spawn', 'fs.write'], network: true, sideEffects: ['build-artifacts'] },
   { match: /^spawn_agent$/, risk: 'high', permissions: ['agent.spawn'], network: false, sideEffects: ['subagent-run'] },
+  // git forges (GitHub/AtomGit): reads are low; writes mutate remote VCS state
+  // and are ALL approval-gated (needsApproval) like their domain-ops siblings.
+  { match: /^forge_(repo|pr|issue|release)_(create|merge|upload)$|^forge_raw$/, risk: 'high', permissions: ['net.remote', 'fs.read'], network: true, sideEffects: ['remote-vcs'] },
+  { match: /^forge_(repo|pr|issue)_list$|^forge_pr_checks$|^forge_status$/, risk: 'low', permissions: ['net.remote'], network: true, sideEffects: [] },
 ];
 
 export function manifestFor(tool: Tool): CapabilityManifest {
