@@ -78,12 +78,19 @@
 
   // side panel opener — Chrome has sidePanel.open, Firefox sidebarAction.open
   const openBtn = $('open-panel');
-  if (openBtn && api.sidePanel && typeof api.sidePanel.open === 'function') {
-    openBtn.hidden = false;
-    openBtn.addEventListener('click', () => api.sidePanel.open({}).catch(() => undefined));
-  } else if (openBtn && api.sidebarAction && typeof api.sidebarAction.open === 'function') {
-    openBtn.hidden = false;
-    openBtn.addEventListener('click', () => api.sidebarAction.open().catch(() => undefined));
+  if (openBtn) {
+    const hasSidebarApi = (api.sidePanel && typeof api.sidePanel.open === 'function') || (api.sidebarAction && typeof api.sidebarAction.open === 'function');
+    // show the button whenever we can open a real sidebar OR can open the chat
+    // as a tab (the tab fallback works EVERYWHERE — Firefox's
+    // sidebarAction.open() silently fails from an onboarding tab)
+    if (hasSidebarApi || api.tabs?.create) openBtn.hidden = false;
+    openBtn.addEventListener('click', async () => {
+      try {
+        if (api.sidePanel && typeof api.sidePanel.open === 'function') { await api.sidePanel.open({}); return; }
+        if (api.sidebarAction && typeof api.sidebarAction.open === 'function') { await api.sidebarAction.open(); return; }
+      } catch (e) { /* sidebar refused — fall through to the tab */ }
+      try { api.tabs.create({ url: api.runtime.getURL('sidepanel.html') }); } catch (e) { /* last resort */ }
+    });
   }
 
   // — chat (sidepanel only; every element is guarded so the popup is unaffected) —
@@ -96,6 +103,8 @@
 
   function renderChat() {
     if (!chatEl) return;
+    const hero = document.getElementById('hero');
+    if (hero) hero.style.display = chatMsgs.length ? 'none' : '';
     for (const el of [...chatEl.querySelectorAll('.msg')]) el.remove();
     for (const m of chatMsgs) {
       const div = document.createElement('div');
@@ -148,30 +157,13 @@
     } catch (e) { return undefined; }
   }
 
-  function renderPageChip(page) {
-    let chip = document.getElementById('page-chip');
-    if (!page) { if (chip) chip.textContent = ''; return; }
-    if (!chip) {
-      chip = document.createElement('div');
-      chip.id = 'page-chip';
-      chip.className = 'page-chip';
-      const statusEl = document.querySelector('.status');
-      statusEl?.after(chip);
-    }
-    chip.textContent = '正在阅读: ' + (page.title || page.url);
-  }
-
   if (chatEl && chatInput && chatSend) {
-    (async () => { renderPageChip(await currentPage()); })();
-    api.tabs?.onActivated?.addListener?.(() => { void currentPage().then(renderPageChip); });
-    api.tabs?.onUpdated?.addListener?.(() => { void currentPage().then(renderPageChip); });
     (async () => {
       try {
         const { hmhChat } = await api.storage.session.get('hmhChat');
         if (Array.isArray(hmhChat)) chatMsgs = hmhChat;
       } catch (e) { /* first run */ }
       renderChat();
-      if (!chatMsgs.length) push('bot', '已就绪。可以问我当前页面的事(我会先读取页面),或让我帮你点击/输入/滚动。');
     })();
 
     // AUTONOMOUS CONTINUATION: when the brain exhausts a request's round
@@ -203,6 +195,7 @@
       stopBtn.className = 'stop-btn';
       stopBtn.onclick = () => { autoChains = 0; if (abort) abort.abort(); };
       const tick = setInterval(async () => {
+        if (!chatBusy) return;
         const secs = Math.round((Date.now() - t0) / 1000);
         let feed = '';
         try {
@@ -262,6 +255,7 @@
       }
       chatBusy = false;
       chatSend.disabled = false;
+      clearInterval(tick);
       think(false);
       if (!isAuto) chatInput.focus();
     }
@@ -269,6 +263,16 @@
     chatSend.addEventListener('click', () => { void sendChat(); });
     chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); void sendChat(); }
+    });
+
+    // minimal-UI extras (round 61): suggestion chips send their text;
+    // ⚙ toggles the settings drawer (status/port/reconnect live there)
+    for (const c of document.querySelectorAll('.chip')) {
+      c.addEventListener('click', () => { chatInput.value = c.textContent.trim(); void sendChat(); });
+    }
+    $('settings-btn')?.addEventListener('click', () => {
+      const panel = $('settings');
+      if (panel) panel.hidden = !panel.hidden;
     });
 
     chatReset?.addEventListener('click', async () => {

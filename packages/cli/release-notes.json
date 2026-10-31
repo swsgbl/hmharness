@@ -1,6 +1,11 @@
 {
   "notes": [
     {
+      "v": "0.23.49",
+      "date": "2026-10-31",
+      "note": "浏览器扩展桥终局:侧栏极简界面(ChatGPT 扩展同款)+逐浏览器真 chat E2E 八台全通(Chrome/Opera GUI 手动装载,Firefox 临时载入)+浏览器版本矩阵文档(通用版/Firefox 特例/BrowserOS ACP);桥三层保活;1065 测试"
+    },
+    {
       "v": "0.23.48",
       "date": "2026-10-30",
       "note": "forge 集成:GitHub/AtomGit 仓库操作工具族(gh/ag 后端,登录引导+写操作审批);1065 测试"

@@ -1,3 +1,7 @@
+## [0.23.49] - 2026-10-31
+
+浏览器扩展桥终局轮(用户验收标准:"右侧浏览器交互,AI 交互框,实测发消息,能读懂整个网页",每台浏览器都要过):①**侧栏极简交互界面**(ChatGPT 扩展同款:居中欢迎语+三张建议卡片+单输入框,状态/端口/重连收进 ⚙ 抽屉,SVG 齿轮高对比);②**逐浏览器真 chat E2E 八台全通**(每台真启动→连接→模拟面板发消息→验证 AI 读到网页标题:Edge/Brave/Helium/Tabbit 走快捷方式通道,Chrome 156/Opera 138 品牌 137+ 移除 --load-extension → **pi computer-use GUI 手动装载**自动化三步对话框,夸克 7.4 flag+GUI,Firefox 156 **about:debugging 临时载入**隔离验证连接流 browser=firefox);③**浏览器版本矩阵文档**(扩展 README:通用扩展版=全部 Chromium 系同一份代码/Firefox 特例=XPI 临时载入持久化待 AMO/BrowserOS=ACP 通道不装扩展);④桥三层保活收尾(守护/进程看门狗/Windows 计划任务,强杀 80s 自愈实测);⑤双 bug 修复:面板计时器泄漏(回答后气泡复活)+活动环连接噪音(SW 重连行涌入面板——活动环改大脑步骤专用,取证行移守护日志)。全套 1065 测试(1 跳过=守护占端口正确跳过)。
+
 ## [0.23.48] - 2026-10-30
 
 forge 集成——GitHub/AtomGit 仓库操作工具族(PR#39,第十四波 14-A,用户需求"像 VSCode 集成 GitHub 那样在智能体界面直接操作仓库"):①**gh/ag CLI 后端**,shell 调用零新第三方依赖(Windows 上 ag 安装为 ag.cmd,execFile 无法派生故走 exec+平台感知引号加固);②**工具族 15 个**——forge_status/forge_login/repo_list/repo_view/repo_create/pr_list/pr_view/pr_create/pr_merge/issue_list/issue_view/issue_create/release_list/release_view/release_create(host 参数区分 GitHub/AtomGit,两平台参数形态差异全部内化:gh -R+--json 字段表 vs ag 位置参数+布尔 --json);③**7 个写操作接审批卡**(对齐 domain-ops/harmony 写门禁先例);④未装 CLI/未登录返回安装与登录引导(forge_login 走设备码流程并轮询就绪;凭据永远留在 gh/ag 自己的存储,hmharness 不碰令牌);⑤渲染器对 gh 对象字段/ag 字符串字段双形态统一。附:CI verify 作业 preflight 改 --skip-tests(build/typecheck/test 已是独立步骤,同作业重复第二遍全量套件在 windows-latest 撞 30min 超时的假红根修)。全套 1065 测试。

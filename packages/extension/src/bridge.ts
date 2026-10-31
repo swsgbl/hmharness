@@ -299,22 +299,20 @@ export class ExtensionBridgeServer {
       // a forensics sink you don't have when you need it). Loopback only.
       const chunks: Buffer[] = [];
       for await (const ch of req) chunks.push(ch as Buffer);
-      try {
-        const j = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { step?: string; extra?: string };
-        this.noteChatActivity(req.headers.origin ?? 'anon', `[sw] ${j.step ?? '?'}${j.extra ? ' ' + j.extra : ''}`);
-      } catch { /* keep raw */ }
-      if (process.env.HMH_BRIDGE_DEBUG === '1') console.error(`[sw-dbg] ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`);
+      // SW beacons → daemon log only (round 62): SW wake cycles fire these
+      // every reconnect; the ring stays brain-steps-only
+      console.error(`[sw-dbg] ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`);
       return this.json(res, 200, { ok: true });
     }
     if (req.method === 'GET' && url === '/v1/events') {
       if (!this.guardOrigin(req, res)) return;
-      // ATTACH FORENSICS (round 58, permanent): announce-without-attach was
-      // invisible in the field (Brave: announce ok, no attach, no clue).
-      // Every attempt lands in the activity trail — no secrets (token prefix).
+      // attach forensics: daemon-log only (round 62) — SW reconnect cycles
+      // are connection-layer noise and previously flooded the panel's
+      // activity ring, looking like eternal "thinking"
       const tok8 = (req.headers.authorization ?? '').slice(7, 15);
-      this.noteChatActivity(req.headers.origin ?? 'anon', `events attach try (token ${tok8}…)`);
+      console.error(`[attach] try token=${tok8}…`);
       const ok = await this.authorized(req, res);
-      this.noteChatActivity(req.headers.origin ?? 'anon', ok ? 'events attach AUTHORIZED' : 'events attach REJECTED (401)');
+      if (!ok) console.error('[attach] REJECTED (401)');
       if (!ok) return;
       return this.attachSse(req, res);
     }

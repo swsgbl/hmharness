@@ -46,6 +46,58 @@
 
 ---
 
+## 2026-10-31(六十二) · 面板"永恒执行中"双 bug:计时器泄漏 + 活动环连接噪音
+
+**动机**:用户实测截图——回答早已输出,"正在执行… 68s"气泡仍在走,活动流滚动的是 events attach try/AUTHORIZED 行。用户问"这是思考过程吗"。
+
+**双 bug**:①ui.js 轮询定时器(2.5s)在回合结束时不清理,每 tick 无条件重画思考气泡——回答结束后气泡被它"复活",秒数永远上涨;②活动环混入连接层噪音:Firefox 事件页每 ~30s 休眠→唤醒→重连桥,每次写 2 行 attach try/AUTHORIZED 进环,面板轮询看到"新行"永不停。这两个是 round 50/58 取证改造的副作用:取证行进了用户可见环,定时器生命周期没人管。
+
+**修复**:①sendChat 收尾 clearInterval(tick)+tick 内加 chatBusy 守卫(in-flight tick 不再画);②活动环=大脑步骤专用——attach 取证与 /v1/dbg SW 信标改为守护日志 console.error(诊断仍全程可用,只是不再打扰用户);连接层动作从面板视野里消失。
+
+**教训**:①取证数据流和产品数据流必须分通道——排障用的行进用户视野=产品缺陷;②轮询定时器与异步回合同生命周期,结束必须显式清理,"间歇性复活气泡"这类幽灵症状先查未清理的 interval。
+
+
+---
+
+## 2026-10-31(六十一) · 极简交互界面(ChatGPT 扩展同款)+ 真 Chrome 档案装载补完
+
+**动机**:用户要求交互界面参考 ChatGPT 扩展尽量简洁。原侧栏塞满状态行/工具行/端口行/提示段——杂物多。
+
+**极简重写**(sidepanel.html/ui.js/style.css):顶部只剩 logo+名称+连接点+⚙;首屏=居中 ✦ 欢迎语(智能体随时为您服务/读网页·操作浏览器·执行任务)+三张建议卡片(点击即发送);底部单输入框+发送。状态详情/端口/重连/自检/断开全部收进 ⚙ 抽屉;页面标签条删除(页面上下文仍随每条消息静默携带);无消息时显示 hero,有消息自动隐藏。
+
+**真 Chrome 档案装载补完**:round 60 的"Chrome PASS"实为 Tabbit 顶槽误判+pi 点进 BrowserClaw 同标题窗口——真 Chrome(User Data\Profile,非 Default!)从未注册。本轮:杀 BrowserClaw 去歧义 → pi 严格按『扩展程序 - Google Chrome』窗口标题操作 → 扩展列表 UIA 实证已显示 hmharness 0.23.31(已启用/未打包)→ 真 chat E2E PASS(AI 自主导航+读 "Example Domain")→ 截屏核验新 UI。**Chrome 档案名是 "Profile" 不是 "Default"——registration 探针一直读错路径,掩盖了未注册事实**。
+
+**教训**:①多浏览器机器上窗口标题后缀(- Google Chrome / - BrowserClaw)是唯一可靠判别,pi 任务必须写明;②Chrome 档案目录未必叫 Default,读 Local State 的 last_used 才是准;③截屏核验不是可选步骤——UI 改动必须眼见为实。
+
+
+---
+
+## 2026-10-31(六十) · 逐浏览器真 chat E2E:八台全通(含 Firefox 临时载入)
+
+**动机**:验收标准由用户明确——"在右侧浏览器交互,AI 交互框,实测,发消息出去,他能读懂整个网页",每台浏览器都要过(BrowserOS 走 ACP 豁免)。
+
+**方法**:每台真启动(带测试页 example.com)→ 等桥连接 → **模拟面板真实发消息**(POST /v1/chat,真大脑=runAgentTask+真 LLM)→ 验证回复含网页真实标题("Example Domain");部分浏览器用两步对话(AI 自己 page_goto 导航再读标题)证明完整闭环。
+
+**结果矩阵(全部实测通过)**:
+| 浏览器 | 通道 | chat E2E |
+|---|---|---|
+| Edge | flag(136 以下仍认) | PASS ✓ |
+| Chrome 156 | **GUI 手动装载**(pi computer-use:开发者模式+加载已解压+文件对话框;品牌 Chrome 137+ 移除 --load-extension) | PASS ✓(AI 自己导航+读标题) |
+| Brave 156 | flag(仍支持) | PASS ✓ |
+| Opera 138 | **GUI 手动装载**(同 Chrome) | PASS ✓ |
+| Quark 7.4 | flag 注册+GUI 重装 | PASS ✓ |
+| Helium | flag | PASS ✓ |
+| Tabbit | autolaunch Run 键补参 | PASS ✓ |
+| Firefox | **about:debugging 临时载入**(pi GUI;HKCU 策略实测无效;持久化需 AMO 签名) | PASS ✓(隔离验证连接流 browser=firefox) |
+| BrowserOS | ACP(用户豁免) | — |
+
+**诊断中的关键厘清**:①"chrome.exe"进程 ≠ Google Chrome——机器上 Tabbit/BrowserOS/BrowserClaw/Helium 全叫 chrome.exe,杀进程前必须看 ExecutablePath;②Chrome 单实例语义:旧进程存活时带参启动被无声吞掉;③品牌 Chrome 137+/Opera 138+ 移除 --load-extension,自动通道终结,GUI 手动一次是正解;④单槽连接:新 attach 顶旧流,"browser: chromium"≠目标浏览器——Firefox 测试必须先杀光 Chromium 系隔离验证。
+
+**教训**:①GUI 手动装载可由 pi computer-use 可靠自动化(三个对话框步骤,4 台全成功),不必求用户;②测试脚本必须先杀后启且按 ExecutablePath 精确杀;③"验证 browser 字段"才叫验证了目标浏览器——单槽机制下不隔离就是自欺。
+
+
+---
+
 ## 2026-10-28(五十九) · 当场验证轮:Brave 幽灵注册的终局诊断与手动通道定案
 
 **动机**:用户三次质问"你都验证过了吗?为什么没见你打开浏览器,我找不到扩展"——自动化测试的验证≠用户真人验证。本轮全部改为当场开真实浏览器验证。

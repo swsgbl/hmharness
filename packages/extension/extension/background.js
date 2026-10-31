@@ -513,7 +513,9 @@
       // WebDriver navigation to moz-extension:// URLs, so the extension
       // opening the page itself is the only cross-browser path)
       if (details && details.reason === 'install' && !binding.token) {
-        try { void api.tabs.create({ url: api.runtime.getURL('popup.html') }); } catch (e) { /* no tabs API (Safari?) */ }
+        // open the CHAT PANEL as the onboarding tab — it has the input box and
+        // works in every browser (popup.html is status-only, no conversation)
+        try { void api.tabs.create({ url: api.runtime.getURL('sidepanel.html') }); } catch (e) { /* no tabs API (Safari?) */ }
       }
       void attach();
     });
