@@ -52,7 +52,7 @@
 
 **事故**:SendKeys 阶段与并行会话的 GUI 自动化(它正在驱动 KaihongOS 虚拟机里的 HMH Desktop)争抢前台——我的 SetForegroundWindow(firefox) 把它的 VM 前台抢走,它的自动化又把 ZCode/VM 抢回,我的 SendKeys 打进了它的会话窗口。截屏证实冲突后立即停止全部 GUI 自动化。
 
-**已完成的部分**:上传 XPI 干净化(.amo-upload-uuid 删除——web-ext 签名时留的记账文件曾被打进 zip 导致 AMO 校验拒绝"Invalid file name in archive");干净 XPI 在 C:\Users\hongfu\.hmharness\.audit\hmharness-listed-upload.xpi;Firefox 向导停在 upload-listed 步骤。
+**已完成的部分**:上传 XPI 干净化(.amo-upload-uuid 删除——web-ext 签名时留的记账文件曾被打进 zip 导致 AMO 校验拒绝"Invalid file name in archive");干净 XPI 在 C:\Users\<user>\.hmharness\.audit\hmharness-listed-upload.xpi;Firefox 向导停在 upload-listed 步骤。
 
 **交接**:剩余两步(上传文件+填元数据+提交)交用户手填,全部文案已备好(中英名称/摘要/描述/分类/标签/MIT 许可/审核说明)。多会话桌面上 GUI 自动化=与兄弟会话争抢输入,这类操作必须等桌面空闲或由人执行。
 
