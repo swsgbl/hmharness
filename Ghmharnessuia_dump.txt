@@ -1,0 +1,562 @@
+Window: 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 — Mozilla Firefox
+Total descendants: 560
+ControlType.Pane | Non Client Input Sink Window |  | x=12 y=4 w=1280 h=4
+ControlType.Pane |  |  | x=12 y=4 w=1280 h=928
+ControlType.Menu |  | tabContextMenu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | open-tab-group-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | saved-tab-group-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | backForwardMenu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | new-tab-button-popup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-history-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-history-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-synced-tabs-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-opentabs-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-opentabs-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | sidebar-bookmarks-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | split-view-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | toolbar-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | blockedPopupOptions | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | contentAreaContextMenu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | pictureInPictureToggleContextMenu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | placesContext | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | pageActionContextMenu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | userContext-indicator-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | SyncedTabsSidebarContext | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | SyncedTabsSidebarTabsFilterContext | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | unified-extensions-context-menu | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | full-page-translations-panel-settings-menupopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Menu |  | select-translations-panel-settings-menupopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ToolBar | 菜单栏 | toolbar-menubar | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuBar | Application | main-menubar | x=12 y=4 w=435 h=20
+ControlType.MenuItem | 文件 | file-menu | x=12 y=4 w=50 h=20
+ControlType.Menu | 文件 | menu_FilePopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 编辑 | edit-menu | x=62 y=4 w=51 h=20
+ControlType.Menu | 编辑 | menu_EditPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 查看 | view-menu | x=113 y=4 w=52 h=20
+ControlType.Menu | 查看 | menu_viewPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 历史 | history-menu | x=165 y=4 w=51 h=20
+ControlType.Menu | 历史 | historyMenuPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 书签 | bookmarksMenu | x=216 y=4 w=52 h=20
+ControlType.Menu | 书签 | bookmarksMenuPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 配置文件 | profiles-menu | x=268 y=4 w=75 h=20
+ControlType.Menu | 配置文件 | menu_ProfilesPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 工具 | tools-menu | x=343 y=4 w=51 h=20
+ControlType.Menu | 工具 | menu_ToolsPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.MenuItem | 帮助 | helpMenu | x=394 y=4 w=53 h=20
+ControlType.Menu | 帮助 | menu_HelpPopup | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Button | 最小化 |  | x=1154 y=4 w=46 h=16
+ControlType.Button | 最大化 |  | x=1200 y=4 w=46 h=16
+ControlType.Button | 关闭 |  | x=1246 y=4 w=46 h=16
+ControlType.ToolBar | 浏览器标签页 | TabsToolbar | x=12 y=4 w=1280 h=44
+ControlType.Tab |  | tabbrowser-tabs | x=52 y=4 w=1038 h=44
+ControlType.TabItem | Mozilla 账户 |  | x=52 y=4 w=225 h=44
+ControlType.Button | 关闭 1 个标签页 |  | x=251 y=16 w=20 h=20
+ControlType.TabItem | 开发者中心 :: Firefox 附加组件 |  | x=277 y=4 w=225 h=44
+ControlType.Button | 关闭 1 个标签页 |  | x=476 y=16 w=20 h=20
+ControlType.TabItem | 开发者中心 :: Firefox 附加组件 |  | x=502 y=4 w=225 h=44
+ControlType.Button | 关闭 1 个标签页 |  | x=701 y=16 w=20 h=20
+ControlType.TabItem | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 |  | x=727 y=4 w=225 h=44
+ControlType.Button | 关闭 1 个标签页 |  | x=926 y=16 w=20 h=20
+ControlType.Button | 打开新标签页 (Ctrl+T) | tabs-newtab-button | x=952 y=4 w=36 h=44
+ControlType.Menu | 新建标签页 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Separator |  | customizableui-special-spring3 | x=1090 y=4 w=28 h=44
+ControlType.Button | 列出所有标签页 | alltabs-button | x=1118 y=4 w=36 h=44
+ControlType.Button | 最小化 |  | x=1154 y=4 w=46 h=44
+ControlType.Button | 最大化 |  | x=1200 y=4 w=46 h=44
+ControlType.Button | 关闭 |  | x=1246 y=4 w=46 h=44
+ControlType.ToolBar | 导航 | nav-bar | x=12 y=48 w=1280 h=40
+ControlType.Button | 侧栏 | sidebar-button | x=12 y=48 w=40 h=40
+ControlType.Button | 后退 | back-button | x=52 y=48 w=36 h=40
+ControlType.Menu | 后退 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Button | 前进 | forward-button | x=88 y=48 w=36 h=40
+ControlType.Menu | 前进 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Button | 重新加载 | reload-button | x=124 y=48 w=36 h=40
+ControlType.Separator |  | customizableui-special-spring1 | x=160 y=48 w=99 h=40
+ControlType.Group |  | urlbar | x=264 y=52 w=812 h=32
+ControlType.Button | 查看网站信息 | trust-icon-container | x=268 y=56 w=24 h=24
+ControlType.Button | 您已授予此网站更多权限。 | identity-permission-box | x=295 y=56 w=24 h=24
+ControlType.ComboBox | 使用 百度 搜索，或者输入网址 | urlbar-input | x=326 y=52 w=692 h=32
+ControlType.Text | addons.mozilla.org/zh-CN/developers/addon/submit/distribution |  | x=326 y=59 w=433 h=18
+ControlType.Button | 将标签页添加到任务栏 | taskbar-tabs-button | x=1024 y=56 w=24 h=24
+ControlType.Button | 为此页面添加书签 (Ctrl+D) | star-button-box | x=1048 y=56 w=24 h=24
+ControlType.Separator |  | customizableui-special-spring2 | x=1081 y=48 w=99 h=40
+ControlType.Button | 账户 | fxa-toolbar-menu-button | x=1180 y=48 w=36 h=40
+ControlType.Button | 扩展 | unified-extensions-button | x=1216 y=48 w=36 h=40
+ControlType.Button | Firefox | PanelUI-menu-button | x=1252 y=48 w=40 h=40
+ControlType.ToolBar |  | notifications-toolbar | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=12 y=88 w=40 h=844
+ControlType.Tab |  |  | x=12 y=88 w=40 h=215
+ControlType.TabItem | 书签 | main-button | x=12 y=88 w=40 h=38
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | AI 聊天机器人 | main-button | x=12 y=126 w=40 h=35
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | 历史记录 | main-button | x=12 y=161 w=40 h=35
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | 其他设备上的标签页 | main-button | x=12 y=196 w=40 h=35
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | 密码 | main-button | x=12 y=231 w=40 h=35
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | hmharness 浏览器助手 | main-button | x=12 y=266 w=40 h=37
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.TabItem | 定制侧栏 | main-button | x=12 y=892 w=40 h=40
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Pane |  | tabbrowser-tabpanels | x=52 y=88 w=1240 h=844
+ControlType.Pane |  | tabpanel-1 | x=52 y=88 w=1240 h=844
+ControlType.Pane |  |  | x=53 y=89 w=1239 h=843
+ControlType.Document | 开发者中心 :: Firefox 附加组件 |  | x=53 y=89 w=1239 h=843
+ControlType.Group |  | nav-menu | x=53 y=89 w=1239 h=49
+ControlType.List |  |  | x=217 y=94 w=912 h=39
+ControlType.ListItem | 附加组件开发者中心 |  | x=217 y=97 w=332 h=32
+ControlType.Hyperlink | 附加组件开发者中心 |  | x=217 y=97 w=332 h=32
+ControlType.Group |  |  | x=259 y=104 w=126 h=19
+ControlType.ListItem | 我的附加组件 |  | x=559 y=104 w=84 h=19
+ControlType.Hyperlink | 我的附加组件 |  | x=559 y=105 w=84 h=17
+ControlType.ListItem | 扩展工坊 |  | x=663 y=104 w=56 h=19
+ControlType.Hyperlink | 扩展工坊 |  | x=663 y=105 w=56 h=17
+ControlType.ListItem | 文档 |  | x=739 y=104 w=28 h=19
+ControlType.Hyperlink | 文档 |  | x=739 y=105 w=28 h=17
+ControlType.ListItem | 支持 |  | x=787 y=104 w=28 h=19
+ControlType.Hyperlink | 支持 |  | x=787 y=105 w=28 h=17
+ControlType.ListItem | 博客 |  | x=835 y=104 w=192 h=19
+ControlType.Hyperlink | 博客 |  | x=835 y=105 w=28 h=17
+ControlType.ListItem | 退出 无照片 |  | x=1027 y=94 w=112 h=38
+ControlType.Hyperlink | 退出 |  | x=1037 y=98 w=32 h=27
+ControlType.Hyperlink | 无照片 |  | x=1089 y=98 w=40 h=27
+ControlType.Image | 无照片 |  | x=1089 y=92 w=40 h=40
+ControlType.Text | 构建一流的扩展和主题 |  | x=257 y=214 w=240 h=97
+ControlType.Text | 无论是扩展开发新手，还是要对现有扩展或主题进行改进或移植，或者创建企业定制化解决方案，我们都有相关资源为您提供支持。  |  | x=517 y=214 w=592 h=42
+ControlType.Hyperlink | 访问 Firefox 扩展工坊 |  | x=517 y=274 w=156 h=20
+ControlType.Text | 我的附加组件 |  | x=217 y=415 w=912 h=32
+ControlType.Text | hmharness 浏览器桥接  |  | x=306 y=477 w=251 h=31
+ControlType.Hyperlink | 编辑产品页面 |  | x=306 y=509 w=251 h=21
+ControlType.Text | 0.23.32  |  | x=306 y=530 w=57 h=20
+ControlType.Text | 尚无评分 |  | x=849 y=497 w=64 h=21
+ControlType.Text | 创建于： |  | x=849 y=534 w=64 h=21
+ControlType.Text |   |  | x=913 y=535 w=4 h=20
+ControlType.Text | Oct. 31, 2026 |  | x=917 y=535 w=101 h=20
+ControlType.Hyperlink | 查看所有提交 |  | x=217 y=604 w=90 h=19
+ControlType.Hyperlink | 提交新附加组件 |  | x=780 y=602 w=172 h=42
+ControlType.Text |   |  | x=952 y=613 w=5 h=20
+ControlType.Hyperlink | 提交一个新主题 |  | x=957 y=602 w=172 h=42
+ControlType.Group |  |  | x=53 y=674 w=1239 h=455
+ControlType.Text | 资源 |  | x=217 y=720 w=912 h=21
+ControlType.Text | 文档 |  | x=217 y=776 w=294 h=19
+ControlType.List |  |  | x=217 y=803 w=294 h=73
+ControlType.ListItem | WebExtensions API |  | x=217 y=803 w=294 h=19
+ControlType.Hyperlink | WebExtensions API |  | x=217 y=805 w=118 h=16
+ControlType.ListItem | 扩展 |  | x=217 y=830 w=294 h=19
+ControlType.Hyperlink | 扩展 |  | x=217 y=832 w=26 h=16
+ControlType.ListItem | 主题 |  | x=217 y=857 w=294 h=19
+ControlType.Hyperlink | 主题 |  | x=217 y=859 w=26 h=16
+ControlType.Text | 工具 |  | x=521 y=776 w=294 h=19
+ControlType.List |  |  | x=521 y=803 w=294 h=73
+ControlType.ListItem | Web-Ext：构建和测试扩展 |  | x=521 y=803 w=294 h=19
+ControlType.Hyperlink | Web-Ext：构建和测试扩展 |  | x=521 y=805 w=156 h=16
+ControlType.ListItem | 附加组件验证器 |  | x=521 y=830 w=294 h=19
+ControlType.Hyperlink | 附加组件验证器 |  | x=521 y=832 w=91 h=16
+ControlType.ListItem | 管理 API 密钥 |  | x=521 y=857 w=294 h=19
+ControlType.Hyperlink | 管理 API 密钥 |  | x=521 y=859 w=79 h=16
+ControlType.Text | 推荐 |  | x=825 y=776 w=294 h=19
+ControlType.List |  |  | x=825 y=803 w=294 h=46
+ControlType.ListItem | “获取附加组件”按钮 |  | x=825 y=803 w=294 h=19
+ControlType.Hyperlink | “获取附加组件”按钮 |  | x=825 y=805 w=113 h=16
+ControlType.ListItem | 扩展推荐计划 |  | x=825 y=830 w=294 h=19
+ControlType.Hyperlink | 扩展推荐计划 |  | x=825 y=832 w=78 h=16
+ControlType.Text | 捐助 |  | x=217 y=920 w=912 h=21
+ControlType.Text | 编写代码 |  | x=217 y=976 w=294 h=19
+ControlType.Text | 贡献您的代码技能帮助附加组件越来越好。  |  | x=217 y=1007 w=228 h=15
+ControlType.Hyperlink | 入门指南 |  | x=217 y=1036 w=52 h=16
+ControlType.Text | 更多参与方式 |  | x=521 y=976 w=294 h=19
+ControlType.Text | 即使没有编写代码的技能，您也可以让 Firefox 成为最可定制的浏览器！  |  | x=521 y=1007 w=284 h=32
+ControlType.Hyperlink | 怎么做 |  | x=521 y=1052 w=39 h=16
+ControlType.Text | 联系我们 |  | x=217 y=1169 w=912 h=48
+ControlType.List |  |  | x=309 y=1261 w=240 h=74
+ControlType.ListItem | Matrix |  | x=309 y=1261 w=240 h=27
+ControlType.Hyperlink | Matrix |  | x=309 y=1265 w=70 h=17
+ControlType.ListItem | 社区论坛 |  | x=309 y=1308 w=240 h=27
+ControlType.Hyperlink | 社区论坛 |  | x=309 y=1312 w=84 h=17
+ControlType.Text | 扩展开发者订阅邮件 |  | x=549 y=1257 w=240 h=22
+ControlType.Text | 关注与扩展开发者有关的最新消息和事件。  |  | x=549 y=1294 w=238 h=36
+ControlType.Group |  | newsletter_form | x=549 y=1344 w=240 h=110
+ControlType.Edit | 电子邮件地址 | email | x=549 y=1344 w=150 h=32
+ControlType.CheckBox | 我同意 Mozilla 按照 隐私声明 中所述方式处理我的信息。 | privacy | x=549 y=1398 w=14 h=14
+ControlType.Text |   |  | x=563 y=1397 w=4 h=17
+ControlType.Group | 我同意 Mozilla 按照 隐私声明 中所述方式处理我的信息。 |  | x=567 y=1399 w=214 h=34
+ControlType.Hyperlink | 隐私声明 |  | x=673 y=1399 w=48 h=15
+ControlType.Button | 注册 |  | x=709 y=1344 w=36 h=32
+ControlType.Group |  |  | x=53 y=1494 w=1239 h=604
+ControlType.Hyperlink | 前往 Mozilla 主页 |  | x=203 y=1552 w=112 h=38
+ControlType.Group |  |  | x=203 y=1552 w=112 h=32
+ControlType.Text | 附加组件 |  | x=350 y=1552 w=115 h=22
+ControlType.Hyperlink | 附加组件 |  | x=350 y=1553 w=64 h=20
+ControlType.List |  |  | x=350 y=1584 w=115 h=323
+ControlType.ListItem | 关于 |  | x=350 y=1584 w=115 h=24
+ControlType.Hyperlink | 关于 |  | x=350 y=1585 w=36 h=21
+ControlType.ListItem | Firefox 附加组件博客 |  | x=350 y=1618 w=115 h=49
+ControlType.Hyperlink | Firefox 附加组件博客 |  | x=350 y=1620 w=99 h=45
+ControlType.ListItem | 扩展工坊 |  | x=350 y=1677 w=115 h=24
+ControlType.Hyperlink | 扩展工坊 |  | x=350 y=1678 w=72 h=21
+ControlType.ListItem | 开发者中心 |  | x=350 y=1711 w=115 h=24
+ControlType.Hyperlink | 开发者中心 |  | x=350 y=1713 w=90 h=21
+ControlType.ListItem | 开发者政策 |  | x=350 y=1745 w=115 h=25
+ControlType.Hyperlink | 开发者政策 |  | x=350 y=1747 w=90 h=21
+ControlType.ListItem | 社区博客 |  | x=350 y=1780 w=115 h=24
+ControlType.Hyperlink | 社区博客 |  | x=350 y=1781 w=72 h=21
+ControlType.ListItem | 论坛 |  | x=350 y=1814 w=115 h=24
+ControlType.Hyperlink | 论坛 |  | x=350 y=1816 w=36 h=21
+ControlType.ListItem | 报告缺陷 |  | x=350 y=1848 w=115 h=25
+ControlType.Hyperlink | 报告缺陷 |  | x=350 y=1850 w=72 h=21
+ControlType.ListItem | 评论指南 |  | x=350 y=1883 w=115 h=24
+ControlType.Hyperlink | 评论指南 |  | x=350 y=1884 w=72 h=21
+ControlType.Text | 下载 |  | x=497 y=1552 w=115 h=22
+ControlType.List |  |  | x=497 y=1584 w=115 h=230
+ControlType.ListItem | 下载 Firefox |  | x=497 y=1584 w=115 h=24
+ControlType.Hyperlink | 下载 Firefox |  | x=497 y=1585 w=99 h=21
+ControlType.ListItem | Windows |  | x=497 y=1618 w=115 h=24
+ControlType.Hyperlink | Windows |  | x=497 y=1620 w=77 h=21
+ControlType.ListItem | macOS |  | x=497 y=1652 w=115 h=25
+ControlType.Hyperlink | macOS |  | x=497 y=1654 w=61 h=21
+ControlType.ListItem | iOS |  | x=497 y=1687 w=115 h=24
+ControlType.Hyperlink | iOS |  | x=497 y=1688 w=29 h=21
+ControlType.ListItem | Android |  | x=497 y=1721 w=115 h=24
+ControlType.Hyperlink | Android |  | x=497 y=1723 w=66 h=21
+ControlType.ListItem | Linux |  | x=497 y=1755 w=115 h=25
+ControlType.Hyperlink | Linux |  | x=497 y=1757 w=45 h=21
+ControlType.ListItem | 所有平台 |  | x=497 y=1790 w=115 h=24
+ControlType.Hyperlink | 所有平台 |  | x=497 y=1791 w=72 h=21
+ControlType.Text | 最新版本 |  | x=644 y=1552 w=115 h=22
+ControlType.List |  |  | x=644 y=1584 w=115 h=58
+ControlType.ListItem | Nightly |  | x=644 y=1584 w=115 h=24
+ControlType.Hyperlink | Nightly |  | x=644 y=1585 w=61 h=21
+ControlType.ListItem | Beta |  | x=644 y=1618 w=115 h=24
+ControlType.Hyperlink | Beta |  | x=644 y=1620 w=39 h=21
+ControlType.Text | Firefox for Business |  | x=644 y=1658 w=115 h=44
+ControlType.List |  |  | x=644 y=1712 w=115 h=24
+ControlType.ListItem | 企业版 |  | x=644 y=1712 w=115 h=24
+ControlType.Hyperlink | 企业版 |  | x=644 y=1713 w=54 h=21
+ControlType.Text | 社区 |  | x=791 y=1552 w=115 h=22
+ControlType.List |  |  | x=791 y=1584 w=115 h=93
+ControlType.ListItem | Connect |  | x=791 y=1584 w=115 h=24
+ControlType.Hyperlink | Connect |  | x=791 y=1585 w=72 h=21
+ControlType.ListItem | 捐助 |  | x=791 y=1618 w=115 h=24
+ControlType.Hyperlink | 捐助 |  | x=791 y=1620 w=36 h=21
+ControlType.ListItem | 开发者 |  | x=791 y=1652 w=115 h=25
+ControlType.Hyperlink | 开发者 |  | x=791 y=1654 w=54 h=21
+ControlType.Text | 关注 |  | x=938 y=1552 w=204 h=22
+ControlType.List |  |  | x=938 y=1584 w=204 h=161
+ControlType.ListItem | Instagram |  | x=938 y=1584 w=204 h=24
+ControlType.Hyperlink | Instagram |  | x=938 y=1585 w=85 h=21
+ControlType.ListItem | YouTube |  | x=938 y=1618 w=204 h=24
+ControlType.Hyperlink | YouTube |  | x=938 y=1620 w=74 h=21
+ControlType.ListItem | TikTok |  | x=938 y=1652 w=204 h=25
+ControlType.Hyperlink | TikTok |  | x=938 y=1654 w=56 h=21
+ControlType.ListItem | Bluesky |  | x=938 y=1687 w=204 h=24
+ControlType.Hyperlink | Bluesky |  | x=938 y=1688 w=67 h=21
+ControlType.ListItem | 播客 |  | x=938 y=1721 w=204 h=24
+ControlType.Hyperlink | 播客 |  | x=938 y=1723 w=36 h=21
+ControlType.List |  |  | x=203 y=1947 w=939 h=21
+ControlType.ListItem | 隐私 |  | x=203 y=1947 w=24 h=21
+ControlType.Hyperlink | 隐私 |  | x=203 y=1952 w=24 h=15
+ControlType.Text |   |  | x=257 y=1948 w=4 h=20
+ControlType.ListItem | Cookie |  | x=261 y=1947 w=39 h=21
+ControlType.Hyperlink | Cookie |  | x=261 y=1952 w=39 h=15
+ControlType.Text |   |  | x=330 y=1948 w=5 h=20
+ControlType.ListItem | 法律 |  | x=335 y=1947 w=24 h=21
+ControlType.Hyperlink | 法律 |  | x=335 y=1952 w=24 h=15
+ControlType.Text | 本站内容以 |  | x=203 y=1997 w=60 h=15
+ControlType.Hyperlink | 知识共享署名-相同方式共享 v3.0 |  | x=263 y=1997 w=177 h=15
+ControlType.Text |  或任何更新版本授权（除非另有 |  | x=440 y=1997 w=171 h=15
+ControlType.Hyperlink | 注明 |  | x=611 y=1997 w=24 h=15
+ControlType.Text | ）。 |  | x=635 y=1997 w=24 h=15
+ControlType.Group |  | lang_form | x=938 y=1991 w=204 h=49
+ControlType.Group | 其他语言 |  | x=938 y=1996 w=48 h=16
+ControlType.Text |   |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ComboBox | 其他语言 | language | x=938 y=2013 w=204 h=27
+ControlType.List |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Čeština |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Deutsch |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Dolnoserbšćina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Ελληνικά |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (Canadian) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (British) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (US) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de Argentina) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de Chile) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de España) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de México) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | فارسی |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | suomi |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Français |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Furlan |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Frysk |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | עברית |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Hrvatski |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Hornjoserbsce |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | magyar |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Interlingua |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Italiano |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 日本語 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | ქართული |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Taqbaylit |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 한국어 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Norsk bokmål |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Nederlands |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Norsk nynorsk |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Polski |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Português (do Brasil) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Português (Europeu) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Română |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Русский |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | slovenčina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Slovenščina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Shqip |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Српски |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Svenska |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Türkçe |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Українська |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Tiếng Việt |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 中文 (简体) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 正體中文 (繁體) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Pane |  |  | x=52 y=88 w=1240 h=844
+ControlType.Pane |  |  | x=53 y=89 w=1239 h=843
+ControlType.Document | 新标签页 |  | x=53 y=89 w=1239 h=843
+ControlType.Group |  | root | x=53 y=89 w=1239 h=843
+ControlType.Group |  |  | x=76 y=112 w=150 h=136
+ControlType.Group |  |  | x=1120 y=112 w=150 h=136
+ControlType.Group |  |  | x=232 y=259 w=881 h=367
+ControlType.Text | Mozilla Firefox |  | x=247 y=259 w=851 h=94
+ControlType.Image | Mozilla Firefox |  | x=580 y=259 w=184 h=64
+ControlType.Group |  |  | x=247 y=376 w=851 h=97
+ControlType.Button | 使用 百度 搜索，或者输入网址 |  | x=247 y=398 w=851 h=52
+ControlType.Group |  |  | x=297 y=414 w=793 h=20
+ControlType.Group |  |  | x=232 y=514 w=881 h=112
+ControlType.Group | Shortcuts |  | x=232 y=514 w=881 h=112
+ControlType.Group |  |  | x=333 y=514 w=75 h=112
+ControlType.Hyperlink | Example Domain |  | x=333 y=514 w=75 h=112
+ControlType.Group |  |  | x=333 y=596 w=75 h=30
+ControlType.Button | 打开 Example Domain 的快捷菜单 |  | x=382 y=516 w=24 h=24
+ControlType.Group |  |  | x=419 y=514 w=75 h=112
+ControlType.Hyperlink | 开发者中心 :: Firefox 附加组件 |  | x=419 y=514 w=75 h=112
+ControlType.Group |  |  | x=419 y=596 w=75 h=30
+ControlType.Button | 打开 开发者中心 :: Firefox 附加组件 的快捷菜单 |  | x=468 y=516 w=24 h=24
+ControlType.Group |  |  | x=506 y=514 w=75 h=112
+ControlType.Hyperlink | WPS-支持多人在线协作编辑Word、Excel和PPT文档_WPS官方网站 |  | x=506 y=514 w=75 h=112
+ControlType.Group |  |  | x=506 y=596 w=75 h=30
+ControlType.Button | 打开 WPS-支持多人在线协作编辑Word、Excel和PPT文档_WPS官方网站 的快捷菜单 |  | x=555 y=516 w=24 h=24
+ControlType.Group |  |  | x=592 y=514 w=75 h=112
+ControlType.Hyperlink | ⁨两步验证⁩ | ⁨Mozilla 账户⁩ |  | x=592 y=514 w=75 h=112
+ControlType.Group |  |  | x=592 y=596 w=75 h=30
+ControlType.Button | 打开 ⁨两步验证⁩ | ⁨Mozilla 账户⁩ 的快捷菜单 |  | x=641 y=516 w=24 h=24
+ControlType.Group |  |  | x=678 y=514 w=75 h=112
+ControlType.Hyperlink | 知乎 - 有问题，就会有答案 |  | x=678 y=514 w=75 h=112
+ControlType.Group |  |  | x=678 y=596 w=75 h=30
+ControlType.Button | 打开 知乎 - 有问题，就会有答案 的快捷菜单 |  | x=727 y=516 w=24 h=24
+ControlType.Group |  |  | x=764 y=514 w=75 h=112
+ControlType.Hyperlink | 凤凰网 |  | x=764 y=514 w=75 h=112
+ControlType.Group |  |  | x=764 y=596 w=75 h=30
+ControlType.Button | 打开 凤凰网 的快捷菜单 |  | x=813 y=516 w=24 h=24
+ControlType.Group |  |  | x=851 y=514 w=75 h=112
+ControlType.Hyperlink | 微博 |  | x=851 y=514 w=75 h=112
+ControlType.Group |  |  | x=851 y=596 w=75 h=30
+ControlType.Button | 打开 微博 的快捷菜单 |  | x=900 y=516 w=24 h=24
+ControlType.Group |  |  | x=937 y=514 w=75 h=112
+ControlType.Hyperlink | 携程 |  | x=937 y=514 w=75 h=112
+ControlType.Group |  |  | x=937 y=596 w=75 h=30
+ControlType.Button | 打开 携程 的快捷菜单 |  | x=986 y=516 w=24 h=24
+ControlType.Group |  |  | x=1012 y=511 w=75 h=92
+ControlType.Group |  |  | x=1033 y=541 w=32 h=32
+ControlType.Button | 添加快捷方式 | main-button | x=1033 y=541 w=32 h=32
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.List |  |  | x=1238 y=878 w=32 h=32
+ControlType.Group |  |  | x=1238 y=878 w=32 h=32
+ControlType.Button | 定制 | main-button | x=1238 y=878 w=32 h=32
+ControlType.Group |  |  | x=1238 y=878 w=32 h=32
+ControlType.Group | 定制 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Pane |  | tabpanel-2 | x=52 y=88 w=1240 h=844
+ControlType.Pane |  |  | x=53 y=89 w=1239 h=843
+ControlType.Document | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 |  | x=53 y=89 w=1239 h=843
+ControlType.Group |  | aux-nav | x=917 y=90 w=236 h=32
+ControlType.List |  |  | x=917 y=90 w=236 h=32
+ControlType.ListItem | hmharness |  | x=918 y=90 w=89 h=32
+ControlType.Hyperlink | hmharness |  | x=918 y=90 w=89 h=32
+ControlType.ListItem | 工具 |  | x=1008 y=90 w=48 h=32
+ControlType.Hyperlink | 工具 |  | x=1008 y=90 w=48 h=32
+ControlType.ListItem | 返回附加组件 |  | x=1057 y=90 w=96 h=32
+ControlType.Hyperlink | 返回附加组件 |  | x=1057 y=90 w=96 h=32
+ControlType.Text | 附加组件 开发者中心 |  | x=193 y=115 w=960 h=93
+ControlType.Hyperlink | 附加组件 开发者中心 |  | x=193 y=115 w=960 h=96
+ControlType.Group |  |  | x=198 y=115 w=955 h=45
+ControlType.Group |  | site-nav | x=193 y=228 w=960 h=18
+ControlType.List |  |  | x=193 y=228 w=308 h=18
+ControlType.ListItem | 我的附加组件 |  | x=184 y=228 w=88 h=18
+ControlType.Hyperlink | 我的附加组件 |  | x=184 y=226 w=88 h=27
+ControlType.ListItem | 扩展工坊 |  | x=272 y=228 w=64 h=18
+ControlType.Hyperlink | 扩展工坊 |  | x=272 y=226 w=64 h=27
+ControlType.ListItem | 文档 |  | x=336 y=228 w=40 h=18
+ControlType.Hyperlink | 文档 |  | x=336 y=226 w=40 h=27
+ControlType.ListItem | 工具 |  | x=376 y=228 w=40 h=18
+ControlType.Hyperlink | 工具 |  | x=376 y=226 w=40 h=27
+ControlType.ListItem | 社区和支持 |  | x=416 y=228 w=76 h=18
+ControlType.Hyperlink | 社区和支持 |  | x=416 y=226 w=76 h=27
+ControlType.Group |  |  | x=193 y=268 w=960 h=33
+ControlType.Text | 提交新附加组件 |  | x=193 y=268 w=960 h=33
+ControlType.Group |  |  | x=193 y=312 w=960 h=278
+ControlType.Group |  |  | x=193 y=312 w=960 h=278
+ControlType.Text | 如何分发此版本 |  | x=193 y=313 w=960 h=18
+ControlType.Text | 首先，请选择您要如何分发此版本。 |  | x=193 y=346 w=208 h=17
+ControlType.Group | 在此网站上。您提交的内容会在 addons.mozilla.org 公开上架。 |  | x=193 y=381 w=395 h=16
+ControlType.RadioButton | 在此网站上。您提交的内容会在 addons.mozilla.org 公开上架。 | id_channel_0 | x=198 y=381 w=14 h=14
+ControlType.Group | 由您自己托管。提交的内容由 Mozilla 签名后，可在开发者中心下载 .xpi 文件，自行分发给您的用户。请确保附加组件中指定了 update_url ，Firefox 会定期连接到此网址检查并自动更新。 |  | x=193 y=408 w=958 h=35
+ControlType.RadioButton | 由您自己托管。提交的内容由 Mozilla 签名后，可在开发者中心下载 .xpi 文件，自行分发给您的用户。请确保附加组件中指定了 update_url ，Firefox 会定期连接到此网址检查并自动更新。 | id_channel_1 | x=198 y=408 w=14 h=14
+ControlType.Hyperlink | update_url |  | x=951 y=408 w=64 h=16
+ControlType.Text | 请阅读 Firefox 扩展工坊的  |  | x=193 y=465 w=156 h=17
+ControlType.Hyperlink | Add-on Distribution and Signing |  | x=349 y=466 w=197 h=16
+ControlType.Text |  一文详细了解这些选项。  |  | x=546 y=465 w=146 h=17
+ControlType.Text | 所有附加组件均需符合  |  | x=193 y=498 w=133 h=17
+ControlType.Hyperlink | Mozilla 附加组件政策 |  | x=326 y=499 w=125 h=16
+ControlType.Text | ，并在提交后随时接受人工审核。  |  | x=451 y=498 w=195 h=17
+ControlType.Button | 继续 |  | x=193 y=541 w=54 h=36
+ControlType.Group |  |  | x=53 y=923 w=1239 h=648
+ControlType.Hyperlink | 前往 Mozilla 主页 |  | x=193 y=981 w=112 h=39
+ControlType.Group |  |  | x=193 y=981 w=112 h=32
+ControlType.Text | 附加组件 |  | x=352 y=981 w=133 h=24
+ControlType.Hyperlink | 附加组件 |  | x=352 y=983 w=64 h=20
+ControlType.List |  |  | x=352 y=1015 w=133 h=350
+ControlType.ListItem | 关于 |  | x=352 y=1015 w=133 h=27
+ControlType.Hyperlink | 关于 |  | x=352 y=1018 w=36 h=21
+ControlType.ListItem | Firefox 附加组件博客 |  | x=352 y=1052 w=133 h=54
+ControlType.Hyperlink | Firefox 附加组件博客 |  | x=352 y=1055 w=116 h=48
+ControlType.ListItem | 扩展工坊 |  | x=352 y=1116 w=133 h=27
+ControlType.Hyperlink | 扩展工坊 |  | x=352 y=1119 w=72 h=21
+ControlType.ListItem | 开发者中心 |  | x=352 y=1153 w=133 h=27
+ControlType.Hyperlink | 开发者中心 |  | x=352 y=1156 w=90 h=21
+ControlType.ListItem | 开发者政策 |  | x=352 y=1190 w=133 h=27
+ControlType.Hyperlink | 开发者政策 |  | x=352 y=1193 w=90 h=21
+ControlType.ListItem | 社区博客 |  | x=352 y=1227 w=133 h=27
+ControlType.Hyperlink | 社区博客 |  | x=352 y=1230 w=72 h=21
+ControlType.ListItem | 论坛 |  | x=352 y=1264 w=133 h=27
+ControlType.Hyperlink | 论坛 |  | x=352 y=1267 w=36 h=21
+ControlType.ListItem | 报告缺陷 |  | x=352 y=1301 w=133 h=27
+ControlType.Hyperlink | 报告缺陷 |  | x=352 y=1304 w=72 h=21
+ControlType.ListItem | 评论指南 |  | x=352 y=1338 w=133 h=27
+ControlType.Hyperlink | 评论指南 |  | x=352 y=1341 w=72 h=21
+ControlType.Text | 下载 |  | x=511 y=981 w=133 h=24
+ControlType.List |  |  | x=511 y=1015 w=133 h=249
+ControlType.ListItem | 下载 Firefox |  | x=511 y=1015 w=133 h=27
+ControlType.Hyperlink | 下载 Firefox |  | x=511 y=1018 w=99 h=21
+ControlType.ListItem | Windows |  | x=511 y=1052 w=133 h=27
+ControlType.Hyperlink | Windows |  | x=511 y=1055 w=77 h=21
+ControlType.ListItem | macOS |  | x=511 y=1089 w=133 h=27
+ControlType.Hyperlink | macOS |  | x=511 y=1092 w=61 h=21
+ControlType.ListItem | iOS |  | x=511 y=1126 w=133 h=27
+ControlType.Hyperlink | iOS |  | x=511 y=1129 w=29 h=21
+ControlType.ListItem | Android |  | x=511 y=1163 w=133 h=27
+ControlType.Hyperlink | Android |  | x=511 y=1166 w=66 h=21
+ControlType.ListItem | Linux |  | x=511 y=1200 w=133 h=27
+ControlType.Hyperlink | Linux |  | x=511 y=1203 w=45 h=21
+ControlType.ListItem | 所有平台 |  | x=511 y=1237 w=133 h=27
+ControlType.Hyperlink | 所有平台 |  | x=511 y=1240 w=72 h=21
+ControlType.Text | 最新版本 |  | x=670 y=981 w=133 h=24
+ControlType.List |  |  | x=670 y=1015 w=133 h=64
+ControlType.ListItem | Nightly |  | x=670 y=1015 w=133 h=27
+ControlType.Hyperlink | Nightly |  | x=670 y=1018 w=60 h=21
+ControlType.ListItem | Beta |  | x=670 y=1052 w=133 h=27
+ControlType.Hyperlink | Beta |  | x=670 y=1055 w=39 h=21
+ControlType.Text | Firefox for Business |  | x=670 y=1092 w=133 h=48
+ControlType.List |  |  | x=670 y=1150 w=133 h=27
+ControlType.ListItem | 企业版 |  | x=670 y=1150 w=133 h=27
+ControlType.Hyperlink | 企业版 |  | x=670 y=1153 w=54 h=21
+ControlType.Text | 社区 |  | x=829 y=981 w=133 h=24
+ControlType.List |  |  | x=829 y=1015 w=133 h=101
+ControlType.ListItem | Connect |  | x=829 y=1015 w=133 h=27
+ControlType.Hyperlink | Connect |  | x=829 y=1018 w=72 h=21
+ControlType.ListItem | 捐助 |  | x=829 y=1052 w=133 h=27
+ControlType.Hyperlink | 捐助 |  | x=829 y=1055 w=36 h=21
+ControlType.ListItem | 开发者 |  | x=829 y=1089 w=133 h=27
+ControlType.Hyperlink | 开发者 |  | x=829 y=1092 w=54 h=21
+ControlType.Text | 关注 |  | x=988 y=981 w=164 h=24
+ControlType.List |  |  | x=988 y=1015 w=164 h=175
+ControlType.ListItem | Instagram |  | x=988 y=1015 w=164 h=27
+ControlType.Hyperlink | Instagram |  | x=988 y=1018 w=85 h=21
+ControlType.ListItem | YouTube |  | x=988 y=1052 w=164 h=27
+ControlType.Hyperlink | YouTube |  | x=988 y=1055 w=73 h=21
+ControlType.ListItem | TikTok |  | x=988 y=1089 w=164 h=27
+ControlType.Hyperlink | TikTok |  | x=988 y=1092 w=55 h=21
+ControlType.ListItem | Bluesky |  | x=988 y=1126 w=164 h=27
+ControlType.Hyperlink | Bluesky |  | x=988 y=1129 w=66 h=21
+ControlType.ListItem | 播客 |  | x=988 y=1163 w=164 h=27
+ControlType.Hyperlink | 播客 |  | x=988 y=1166 w=36 h=21
+ControlType.List |  |  | x=193 y=1405 w=959 h=20
+ControlType.ListItem | 隐私 |  | x=193 y=1405 w=24 h=20
+ControlType.Hyperlink | 隐私 |  | x=193 y=1408 w=24 h=15
+ControlType.Text |   |  | x=247 y=1407 w=3 h=16
+ControlType.ListItem | Cookie |  | x=250 y=1405 w=40 h=20
+ControlType.Hyperlink | Cookie |  | x=250 y=1408 w=40 h=15
+ControlType.Text |   |  | x=320 y=1407 w=3 h=16
+ControlType.ListItem | 法律 |  | x=323 y=1405 w=24 h=20
+ControlType.Hyperlink | 法律 |  | x=323 y=1408 w=24 h=15
+ControlType.Text | 本站内容以 |  | x=193 y=1446 w=60 h=15
+ControlType.Hyperlink | 知识共享署名-相同方式共享 v3.0 |  | x=253 y=1446 w=177 h=15
+ControlType.Text |  或任何更新版本授权（除非另有 |  | x=430 y=1446 w=171 h=15
+ControlType.Hyperlink | 注明 |  | x=601 y=1446 w=24 h=15
+ControlType.Text | ）。 |  | x=625 y=1446 w=24 h=15
+ControlType.Group |  | lang_form | x=988 y=1451 w=164 h=43
+ControlType.Group | 其他语言 |  | x=988 y=1452 w=48 h=18
+ControlType.Text |   |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ComboBox | 其他语言 | language | x=988 y=1471 w=164 h=23
+ControlType.List |  |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Čeština |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Deutsch |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Dolnoserbšćina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Ελληνικά |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (Canadian) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (British) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | English (US) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de Argentina) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de Chile) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de España) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Español (de México) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | فارسی |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | suomi |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Français |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Furlan |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Frysk |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | עברית |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Hrvatski |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Hornjoserbsce |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | magyar |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Interlingua |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Italiano |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 日本語 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | ქართული |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Taqbaylit |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 한국어 |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Norsk bokmål |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Nederlands |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Norsk nynorsk |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Polski |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Português (do Brasil) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Português (Europeu) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Română |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Русский |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | slovenčina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Slovenščina |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Shqip |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Српски |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Svenska |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Türkçe |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Українська |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | Tiếng Việt |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 中文 (简体) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.ListItem | 正體中文 (繁體) |  | x=∞ y=∞ w=-∞ h=-∞
+ControlType.Group |  | a11y-announcement | x=∞ y=∞ w=-∞ h=-∞

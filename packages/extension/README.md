@@ -42,11 +42,11 @@ hmh extension uninstall            # 全量撤销安装
 - 持久化:快捷方式启动=常驻;**手动装载一次=任意方式启动都在**(推荐 Chrome/Opera 用户)
 - 注意:部分浏览器(Tabit/BrowserOS/BrowserClaw/Helium)进程名叫 `chrome.exe` 但不是 Google Chrome——按 exe 路径区分
 
-### ② Firefox 特例 —— 同一份代码,XPI 装载(非通用通道)
+### ② Firefox 特例 —— 同一份代码,签名 XPI 持久化(已开通)
 
-- 当前(release 版):**about:debugging → 临时载入**(会话级,重启浏览器需重载;功能完整已实测——侧栏对话/读网页全通)
-- 永久化:需 AMO 签名(计划中);企业策略 force_installed 对未签名 XPI 实测无效
-- 装载后主机权限需在 about:addons 手动授予(结构性 opt-in)
+- **签名版已发布**:XPI 经 Mozilla AMO unlisted 渠道自动签名(0.23.32 起);**企业策略 force_installed 持久安装已实测通过**(重启浏览器仍在)
+- 用户侧:装一次永久;主机权限需在 about:addons 手动授予(结构性 opt-in)
+- 历史:未签名 XPI 的策略安装与注册表通道均无效(实证);临时载入(about:debugging)仍是免签回退
 
 ### ③ BrowserOS —— 不装扩展,走 ACP 协议(独立通道)
 

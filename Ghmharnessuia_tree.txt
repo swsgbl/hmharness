@@ -1,0 +1,389 @@
+Window | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 — Mozilla Firefox | main-window | x=12 y=4
+  Pane | Non Client Input Sink Window |  | x=12 y=4
+  Pane |  |  | x=12 y=4
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+    MenuBar | Application | main-menubar | x=12 y=4 [OFF]无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+      MenuItem | 文件 | file-menu | x=12 y=4 [OFF]所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
+
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+      MenuItem | 编辑 | edit-menu | x=62 y=4 [OFF] 
+
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      MenuItem | 查看 | view-menu | x=113 y=4 [OFF]    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+      MenuItem | 历史 | history-menu | x=165 y=4 [OFF]所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
+
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+      MenuItem | 书签 | bookmarksMenu | x=216 y=4 [OFF]    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+      MenuItem | 配置文件 | profiles-menu | x=268 y=4 [OFF]所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
+
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+      MenuItem | 工具 | tools-menu | x=343 y=4 [OFF]    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
+      MenuItem | 帮助 | helpMenu | x=394 y=4 [OFF]+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    Button | 最小化 |  | x=1154 y=4 [OFF]    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+    Button | 最大化 |  | x=1200 y=4 [OFF]
+    Button | 关闭 |  | x=1246 y=4 [OFF]
+  ToolBar | 浏览器标签页 | TabsToolbar | x=12 y=4
+    Tab |  | tabbrowser-tabs | x=52 y=4
+      TabItem | Mozilla 账户 |  | x=52 y=4
+        Button | 关闭 1 个标签页 |  | x=251 y=16
+      TabItem | 开发者中心 :: Firefox 附加组件 |  | x=277 y=4
+        Button | 关闭 1 个标签页 |  | x=476 y=16
+      TabItem | 开发者中心 :: Firefox 附加组件 |  | x=502 y=4
+        Button | 关闭 1 个标签页 |  | x=701 y=16
+      TabItem | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 |  | x=727 y=4
+        Button | 关闭 1 个标签页 |  | x=926 y=16
+      Button | 打开新标签页 (Ctrl+T) | tabs-newtab-button | x=952 y=4
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    Separator |  | customizableui-special-spring3 | x=1090 y=4    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+    Button | 列出所有标签页 | alltabs-button | x=1118 y=4
+    Button | 最小化 |  | x=1154 y=4
+    Button | 最大化 |  | x=1200 y=4
+    Button | 关闭 |  | x=1246 y=4
+  ToolBar | 导航 | nav-bar | x=12 y=48
+    Button | 侧栏 | sidebar-button | x=12 y=48
+    Button | 后退 | back-button | x=52 y=48
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    Button | 前进 | forward-button | x=88 y=48    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Button | 重新加载 | reload-button | x=124 y=48    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+    Separator |  | customizableui-special-spring1 | x=160 y=48 
+
+    Group |  | urlbar | x=264 y=52
+      Button | 查看网站信息 | trust-icon-container | x=268 y=56
+      Button | 您已授予此网站更多权限。 | identity-permission-box | x=295 y=56
+      ComboBox | 使用 百度 搜索，或者输入网址 | urlbar-input | x=326 y=52
+        Text | addons.mozilla.org/zh-CN/developers/addon/submit/distributio |  | x=326 y=59
+      Button | 将标签页添加到任务栏 | taskbar-tabs-button | x=1024 y=56
+      Button | 为此页面添加书签 (Ctrl+D) | star-button-box | x=1048 y=56
+    Separator |  | customizableui-special-spring2 | x=1081 y=48
+    Button | 账户 | fxa-toolbar-menu-button | x=1180 y=48
+    Button | 扩展 | unified-extensions-button | x=1216 y=48
+    Button | Firefox | PanelUI-menu-button | x=1252 y=48
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+  Group |  |  | x=12 y=88    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+    Tab |  |  | x=12 y=88
+      TabItem | 书签 | main-button | x=12 y=88
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      TabItem | AI 聊天机器人 | main-button | x=12 y=126    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      TabItem | 历史记录 | main-button | x=12 y=161    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      TabItem | 其他设备上的标签页 | main-button | x=12 y=196    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      TabItem | 密码 | main-button | x=12 y=231    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+      TabItem | hmharness 浏览器助手 | main-button | x=12 y=266    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    TabItem | 定制侧栏 | main-button | x=12 y=892    + FullyQualifiedErrorId : InvalidCastIConvertible
+
+ 
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Pane |  | tabbrowser-tabpanels | x=52 y=88    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 
+    Pane |  | tabpanel-1 | x=52 y=88 [OFF]
+      Pane |  |  | x=53 y=89 [OFF]
+        Document | 开发者中心 :: Firefox 附加组件 |  | x=53 y=89 [OFF]
+    Pane |  |  | x=52 y=88 [OFF]
+      Pane |  |  | x=53 y=89 [OFF]
+        Document | 新标签页 |  | x=53 y=89 [OFF]
+    Pane |  | tabpanel-2 | x=52 y=88
+      Pane |  |  | x=53 y=89
+        Document | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 |  | x=53 y=89
+无法将值“∞”转换为类型“System.Int32”。错误:“值对于 Int32 太大或太小。”
+所在位置 G:\hmharness\uia_tree.ps1:18 字符: 5
++     Write-Output ('{0}{1} | {2} | {3} | x={4} y={5}{6}' -f ('  ' * $d ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 

@@ -26,7 +26,7 @@ test('adapters: firefox manifest — event-page scripts (NO service worker), sid
   assert.equal(m.background.service_worker, undefined, 'Firefox deliberately does not support SW backgrounds');
   assert.equal(m.sidebar_action.default_panel, 'sidepanel.html');
   assert.equal(m.browser_specific_settings.gecko.id, GECKO_ID);
-  assert.equal(m.browser_specific_settings.gecko.strict_min_version, '121');
+  assert.equal(m.browser_specific_settings.gecko.strict_min_version, '121.0', 'AMO pattern requires at least major.minor');
   assert.equal(m.side_panel, undefined);
   assert.deepEqual(validateManifest('firefox', m), []);
 });

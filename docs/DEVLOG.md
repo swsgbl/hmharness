@@ -46,6 +46,34 @@
 
 ---
 
+## 2026-10-31(六十四) · 桌面争抢止损:AMO listed 提交交接给用户
+
+**动机**:继续 AMO listed 公开上架。向导推进到上传步骤(文件选择对话框由"真实鼠标 SendInput"打开——UIA Invoke 对网页文件选择器无效,Firefox 要求真实用户激活;ps1 全部需 UTF-8 BOM,否则中文正则乱码)。
+
+**事故**:SendKeys 阶段与并行会话的 GUI 自动化(它正在驱动 KaihongOS 虚拟机里的 HMH Desktop)争抢前台——我的 SetForegroundWindow(firefox) 把它的 VM 前台抢走,它的自动化又把 ZCode/VM 抢回,我的 SendKeys 打进了它的会话窗口。截屏证实冲突后立即停止全部 GUI 自动化。
+
+**已完成的部分**:上传 XPI 干净化(.amo-upload-uuid 删除——web-ext 签名时留的记账文件曾被打进 zip 导致 AMO 校验拒绝"Invalid file name in archive");干净 XPI 在 C:\Users\hongfu\.hmharness\.audit\hmharness-listed-upload.xpi;Firefox 向导停在 upload-listed 步骤。
+
+**交接**:剩余两步(上传文件+填元数据+提交)交用户手填,全部文案已备好(中英名称/摘要/描述/分类/标签/MIT 许可/审核说明)。多会话桌面上 GUI 自动化=与兄弟会话争抢输入,这类操作必须等桌面空闲或由人执行。
+
+**教训**:①多个智能体会话共享一台桌面时,GUI 自动化互为干扰源——任何 SendKeys/click 前必须截屏确认前台身份,发现冲突立即停手;②Firefox 文件选择器需要真实用户激活(SendInput 鼠标可行,UIA Invoke 无效);③ps1 中文必须 UTF-8 BOM(node 写入后补 BOM)。
+
+
+---
+
+## 2026-10-31(六十三) · Firefox 持久化收口:AMO 签名发布(九浏览器全持久)
+
+**动机**:用户"所有浏览器都持久化"并提供 AMO API 密钥(JWT issuer+secret,仅发布方需要一次)。
+
+**链路**:web-ext sign --channel=unlisted → 首次提交被 AMO 校验拦下(**strict_min_version "121" 不合格式,须 "121.0";新扩展必填 data_collection_permissions**)→ 修 manifestFor firefox 源(adapters.ts,零数据收集声明)+ bump 0.23.32 → 重签自动核准 → 签名版 XPI 部署 → **HKCU 策略修正**:ExtensionSettings 键名必须用 gecko id(bridge@hmharness.dev,与 Chromium 固定 ID 不同!)→ Firefox 启动即 force-installed → 隔离 chat E2E PASS(AI 导航+读 "Example Domain")→ **重启持久化验证 PASS**。
+
+**矩阵终态**:通用 Chromium 版(七台)+ Firefox 签名持久版 + BrowserOS ACP —— 九台浏览器全部持久化,全部真 chat 实测。
+
+**教训**:①AMO 校验是清单规范的活文档(strict_min_version 格式、data_collection_permissions 新规)——提交前用 web-ext lint 可预检;②gecko id ≠ chromium id,策略键名按平台取 ID;③用户密钥只在会话内流转(命令行/临时文件用完即删),绝不入库。
+
+
+---
+
 ## 2026-10-31(六十二) · 面板"永恒执行中"双 bug:计时器泄漏 + 活动环连接噪音
 
 **动机**:用户实测截图——回答早已输出,"正在执行… 68s"气泡仍在走,活动流滚动的是 events attach try/AUTHORIZED 行。用户问"这是思考过程吗"。

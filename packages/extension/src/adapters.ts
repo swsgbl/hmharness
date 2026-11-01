@@ -13,7 +13,7 @@
  *      non-persistent event page (feature parity via the `api` shim)
  *    - sidebar_action (Firefox's own key; no side_panel)
  *    - browser_specific_settings.gecko.id — required for storage to work
- *      reliably across installs; strict_min_version 121 = mature MV3
+ *      reliably across installs; strict_min_version 121.0 = mature MV3
  *    - MV3 host_permissions are granted per-site by the USER in Firefox:
  *      first page.read on a new site may need the user to grant access
  *      (extension settings → Permissions) — honest degradation, stated
@@ -107,6 +107,7 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
     // "Cannot access contents of url" — no amount of user consent in the
     // popup can substitute for the manifest declaration.
     host_permissions: [`http://127.0.0.1:${opts.port}/*`, '<all_urls>'],
+    icons: { 48: 'icon-48.png', 96: 'icon-96.png', 128: 'icon-128.png' },
     action: {
       default_title: 'hmharness 浏览器助手',
       default_popup: 'popup.html',
@@ -132,7 +133,14 @@ export function manifestFor(target: ExtensionTarget, opts: ManifestOptions): Rec
       ...common,
       background: { scripts: ['background.js'] },
       sidebar_action: { default_panel: 'sidepanel.html', default_title: 'hmharness 浏览器助手', open_at_install: false },
-      browser_specific_settings: { gecko: { id: GECKO_ID, strict_min_version: '121' } },
+      browser_specific_settings: {
+        gecko: {
+          id: GECKO_ID,
+          strict_min_version: '121.0',
+          // AMO-required (2025+): declare data collection — we collect nothing
+          data_collection_permissions: { required: ['none'] },
+        },
+      },
     };
   }
   // safari: no side_panel key (unsupported), popup-only surface

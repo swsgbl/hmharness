@@ -1,0 +1,178 @@
+Found tabpanel-2
+Pane |  | tabpanel-2 | x=52 y=88 w=1240 h=844
+  Pane |  |  | x=53 y=89 w=1239 h=843
+    Document | 如何分发此版本 :: 开发者中心 :: Firefox 附加组件 |  | x=53 y=89 w=1239 h=843
+      Group |  | aux-nav | x=917 y=90 w=236 h=32
+        List |  |  | x=917 y=90 w=236 h=32 [OFF]
+          ListItem | hmharness |  | x=918 y=90 w=89 h=32
+            Hyperlink | hmharness |  | x=918 y=90 w=89 h=32
+          ListItem | 工具 |  | x=1008 y=90 w=48 h=32
+            Hyperlink | 工具 |  | x=1008 y=90 w=48 h=32
+          ListItem | 返回附加组件 |  | x=1057 y=90 w=96 h=32
+            Hyperlink | 返回附加组件 |  | x=1057 y=90 w=96 h=32
+      Text | 附加组件 开发者中心 |  | x=193 y=115 w=960 h=93
+        Hyperlink | 附加组件 开发者中心 |  | x=193 y=115 w=960 h=96
+          Group |  |  | x=198 y=115 w=955 h=45
+      Group |  | site-nav | x=193 y=228 w=960 h=18
+        List |  |  | x=193 y=228 w=308 h=18
+          ListItem | 我的附加组件 |  | x=184 y=228 w=88 h=18
+            Hyperlink | 我的附加组件 |  | x=184 y=226 w=88 h=27
+          ListItem | 扩展工坊 |  | x=272 y=228 w=64 h=18
+            Hyperlink | 扩展工坊 |  | x=272 y=226 w=64 h=27
+          ListItem | 文档 |  | x=336 y=228 w=40 h=18
+            Hyperlink | 文档 |  | x=336 y=226 w=40 h=27
+          ListItem | 工具 |  | x=376 y=228 w=40 h=18
+            Hyperlink | 工具 |  | x=376 y=226 w=40 h=27
+          ListItem | 社区和支持 |  | x=416 y=228 w=76 h=18
+            Hyperlink | 社区和支持 |  | x=416 y=226 w=76 h=27
+      Group |  |  | x=193 y=268 w=960 h=33
+        Text | 提交新附加组件 |  | x=193 y=268 w=960 h=33
+      Group |  |  | x=193 y=312 w=960 h=278
+        Group |  |  | x=193 y=312 w=960 h=278
+          Text | 如何分发此版本 |  | x=193 y=313 w=960 h=18
+          Text | 首先，请选择您要如何分发此版本。 |  | x=193 y=346 w=208 h=17
+          Group | 在此网站上。您提交的内容会在 addons.mozilla.org 公开上架。 |  | x=193 y=381 w=395 h=16
+            RadioButton | 在此网站上。您提交的内容会在 addons.mozilla.org 公开上架。 | id_channel_0 | x=198 y=381 w=14 h=14
+          Group | 由您自己托管。提交的内容由 Mozilla 签名后，可在开发者中心下载 .xpi 文件，自行分发给您的用户。请确保附加组件中指定了 update_url ，Firefox 会定期连 |  | x=193 y=408 w=958 h=35
+            RadioButton | 由您自己托管。提交的内容由 Mozilla 签名后，可在开发者中心下载 .xpi 文件，自行分发给您的用户。请确保附加组件中指定了 update_url ，Firefox 会定期连 | id_channel_1 | x=198 y=408 w=14 h=14
+            Hyperlink | update_url |  | x=951 y=408 w=64 h=16
+          Text | 请阅读 Firefox 扩展工坊的  |  | x=193 y=465 w=156 h=17
+          Hyperlink | Add-on Distribution and Signing |  | x=349 y=466 w=197 h=16
+          Text |  一文详细了解这些选项。  |  | x=546 y=465 w=146 h=17
+          Text | 所有附加组件均需符合  |  | x=193 y=498 w=133 h=17
+          Hyperlink | Mozilla 附加组件政策 |  | x=326 y=499 w=125 h=16
+          Text | ，并在提交后随时接受人工审核。  |  | x=451 y=498 w=195 h=17
+          Button | 继续 |  | x=193 y=541 w=54 h=36
+      Group |  |  | x=53 y=923 w=1239 h=648
+        Hyperlink | 前往 Mozilla 主页 |  | x=193 y=981 w=112 h=39 [OFF]
+          Group |  |  | x=193 y=981 w=112 h=32 [OFF]
+        Text | 附加组件 |  | x=352 y=981 w=133 h=24 [OFF]
+          Hyperlink | 附加组件 |  | x=352 y=983 w=64 h=20 [OFF]
+        List |  |  | x=352 y=1015 w=133 h=350 [OFF]
+          ListItem | 关于 |  | x=352 y=1015 w=133 h=27 [OFF]
+            Hyperlink | 关于 |  | x=352 y=1018 w=36 h=21 [OFF]
+          ListItem | Firefox 附加组件博客 |  | x=352 y=1052 w=133 h=54 [OFF]
+            Hyperlink | Firefox 附加组件博客 |  | x=352 y=1055 w=116 h=48 [OFF]
+          ListItem | 扩展工坊 |  | x=352 y=1116 w=133 h=27 [OFF]
+            Hyperlink | 扩展工坊 |  | x=352 y=1119 w=72 h=21 [OFF]
+          ListItem | 开发者中心 |  | x=352 y=1153 w=133 h=27 [OFF]
+            Hyperlink | 开发者中心 |  | x=352 y=1156 w=90 h=21 [OFF]
+          ListItem | 开发者政策 |  | x=352 y=1190 w=133 h=27 [OFF]
+            Hyperlink | 开发者政策 |  | x=352 y=1193 w=90 h=21 [OFF]
+          ListItem | 社区博客 |  | x=352 y=1227 w=133 h=27 [OFF]
+            Hyperlink | 社区博客 |  | x=352 y=1230 w=72 h=21 [OFF]
+          ListItem | 论坛 |  | x=352 y=1264 w=133 h=27 [OFF]
+            Hyperlink | 论坛 |  | x=352 y=1267 w=36 h=21 [OFF]
+          ListItem | 报告缺陷 |  | x=352 y=1301 w=133 h=27 [OFF]
+            Hyperlink | 报告缺陷 |  | x=352 y=1304 w=72 h=21 [OFF]
+          ListItem | 评论指南 |  | x=352 y=1338 w=133 h=27 [OFF]
+            Hyperlink | 评论指南 |  | x=352 y=1341 w=72 h=21 [OFF]
+        Text | 下载 |  | x=511 y=981 w=133 h=24 [OFF]
+        List |  |  | x=511 y=1015 w=133 h=249 [OFF]
+          ListItem | 下载 Firefox |  | x=511 y=1015 w=133 h=27 [OFF]
+            Hyperlink | 下载 Firefox |  | x=511 y=1018 w=99 h=21 [OFF]
+          ListItem | Windows |  | x=511 y=1052 w=133 h=27 [OFF]
+            Hyperlink | Windows |  | x=511 y=1055 w=77 h=21 [OFF]
+          ListItem | macOS |  | x=511 y=1089 w=133 h=27 [OFF]
+            Hyperlink | macOS |  | x=511 y=1092 w=61 h=21 [OFF]
+          ListItem | iOS |  | x=511 y=1126 w=133 h=27 [OFF]
+            Hyperlink | iOS |  | x=511 y=1129 w=29 h=21 [OFF]
+          ListItem | Android |  | x=511 y=1163 w=133 h=27 [OFF]
+            Hyperlink | Android |  | x=511 y=1166 w=66 h=21 [OFF]
+          ListItem | Linux |  | x=511 y=1200 w=133 h=27 [OFF]
+            Hyperlink | Linux |  | x=511 y=1203 w=45 h=21 [OFF]
+          ListItem | 所有平台 |  | x=511 y=1237 w=133 h=27 [OFF]
+            Hyperlink | 所有平台 |  | x=511 y=1240 w=72 h=21 [OFF]
+        Text | 最新版本 |  | x=670 y=981 w=133 h=24 [OFF]
+        List |  |  | x=670 y=1015 w=133 h=64 [OFF]
+          ListItem | Nightly |  | x=670 y=1015 w=133 h=27 [OFF]
+            Hyperlink | Nightly |  | x=670 y=1018 w=60 h=21 [OFF]
+          ListItem | Beta |  | x=670 y=1052 w=133 h=27 [OFF]
+            Hyperlink | Beta |  | x=670 y=1055 w=39 h=21 [OFF]
+        Text | Firefox for Business |  | x=670 y=1092 w=133 h=48 [OFF]
+        List |  |  | x=670 y=1150 w=133 h=27 [OFF]
+          ListItem | 企业版 |  | x=670 y=1150 w=133 h=27 [OFF]
+            Hyperlink | 企业版 |  | x=670 y=1153 w=54 h=21 [OFF]
+        Text | 社区 |  | x=829 y=981 w=133 h=24 [OFF]
+        List |  |  | x=829 y=1015 w=133 h=101 [OFF]
+          ListItem | Connect |  | x=829 y=1015 w=133 h=27 [OFF]
+            Hyperlink | Connect |  | x=829 y=1018 w=72 h=21 [OFF]
+          ListItem | 捐助 |  | x=829 y=1052 w=133 h=27 [OFF]
+            Hyperlink | 捐助 |  | x=829 y=1055 w=36 h=21 [OFF]
+          ListItem | 开发者 |  | x=829 y=1089 w=133 h=27 [OFF]
+            Hyperlink | 开发者 |  | x=829 y=1092 w=54 h=21 [OFF]
+        Text | 关注 |  | x=988 y=981 w=164 h=24 [OFF]
+        List |  |  | x=988 y=1015 w=164 h=175 [OFF]
+          ListItem | Instagram |  | x=988 y=1015 w=164 h=27 [OFF]
+            Hyperlink | Instagram |  | x=988 y=1018 w=85 h=21 [OFF]
+          ListItem | YouTube |  | x=988 y=1052 w=164 h=27 [OFF]
+            Hyperlink | YouTube |  | x=988 y=1055 w=73 h=21 [OFF]
+          ListItem | TikTok |  | x=988 y=1089 w=164 h=27 [OFF]
+            Hyperlink | TikTok |  | x=988 y=1092 w=55 h=21 [OFF]
+          ListItem | Bluesky |  | x=988 y=1126 w=164 h=27 [OFF]
+            Hyperlink | Bluesky |  | x=988 y=1129 w=66 h=21 [OFF]
+          ListItem | 播客 |  | x=988 y=1163 w=164 h=27 [OFF]
+            Hyperlink | 播客 |  | x=988 y=1166 w=36 h=21 [OFF]
+        List |  |  | x=193 y=1405 w=959 h=20 [OFF]
+          ListItem | 隐私 |  | x=193 y=1405 w=24 h=20 [OFF]
+            Hyperlink | 隐私 |  | x=193 y=1408 w=24 h=15 [OFF]
+          Text |   |  | x=247 y=1407 w=3 h=16 [OFF]
+          ListItem | Cookie |  | x=250 y=1405 w=40 h=20 [OFF]
+            Hyperlink | Cookie |  | x=250 y=1408 w=40 h=15 [OFF]
+          Text |   |  | x=320 y=1407 w=3 h=16 [OFF]
+          ListItem | 法律 |  | x=323 y=1405 w=24 h=20 [OFF]
+            Hyperlink | 法律 |  | x=323 y=1408 w=24 h=15 [OFF]
+        Text | 本站内容以 |  | x=193 y=1446 w=60 h=15 [OFF]
+        Hyperlink | 知识共享署名-相同方式共享 v3.0 |  | x=253 y=1446 w=177 h=15 [OFF]
+        Text |  或任何更新版本授权（除非另有 |  | x=430 y=1446 w=171 h=15 [OFF]
+        Hyperlink | 注明 |  | x=601 y=1446 w=24 h=15 [OFF]
+        Text | ）。 |  | x=625 y=1446 w=24 h=15 [OFF]
+        Group |  | lang_form | x=988 y=1451 w=164 h=43 [OFF]
+          Group | 其他语言 |  | x=988 y=1452 w=48 h=18 [OFF]
+          Text |   |  | x=INF y=INF w=INF h=INF [OFF]
+          ComboBox | 其他语言 | language | x=988 y=1471 w=164 h=23 [OFF]
+            List |  |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Čeština |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Deutsch |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Dolnoserbšćina |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Ελληνικά |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | English (Canadian) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | English (British) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | English (US) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Español (de Argentina) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Español (de Chile) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Español (de España) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Español (de México) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | فارسی |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | suomi |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Français |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Furlan |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Frysk |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | עברית |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Hrvatski |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Hornjoserbsce |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | magyar |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Interlingua |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Italiano |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | 日本語 |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | ქართული |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Taqbaylit |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | 한국어 |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Norsk bokmål |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Nederlands |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Norsk nynorsk |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Polski |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Português (do Brasil) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Português (Europeu) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Română |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Русский |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | slovenčina |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Slovenščina |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Shqip |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Српски |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Svenska |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Türkçe |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Українська |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | Tiếng Việt |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | 中文 (简体) |  | x=INF y=INF w=INF h=INF [OFF]
+              ListItem | 正體中文 (繁體) |  | x=INF y=INF w=INF h=INF [OFF]

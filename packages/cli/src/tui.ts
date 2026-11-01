@@ -388,7 +388,11 @@ export class TuiRuntime {
     // keys itself - no click capture, native selection stays native.
     // Bracketed paste (?2004h): multi-line pastes arrive delimited and
     // insert as one reviewable input instead of auto-submitting per line.
-    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1007h\x1b[?2004h\x1b[?1000h\x1b[?1002h\x1b[?1006h');
+    // 2026-11-01 用户反馈根修:移除全局鼠标跟踪(1000h/1002h/1006h)——它
+    // 禁用了终端原生文本选择/复制(终端把鼠标事件发给 TUI 而不是自己处理
+    // 选中)。?1007 alternate scroll 让滚轮照常工作;原生选择/复制完全正常。
+    // 鼠标点击通过 tui-mouse.ts 的 enableMouseForPicker() 在需要时临时开启。
+    stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1l\x1b[?1007h\x1b[?2004h');
     stdin.setRawMode?.(true);
     stdin.resume();
     stdin.setEncoding('utf8');
@@ -886,7 +890,7 @@ export class TuiRuntime {
     // modal state was
     // T24: capture is never enabled; reset any reporting mode unconditionally
     // on exit (defensive - covers a stray enable from an older version)
-    stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?2004l\x1b[?1007l\x1b[?1l\x1b[?25h\x1b[?1049l');
+    stdout.write('\x1b[?2004l\x1b[?1007l\x1b[?1l\x1b[?25h\x1b[?1049l');
     this.restoreConsole?.();
     if (this.fatalHandler) {
       process.off('unhandledRejection', this.fatalHandler);

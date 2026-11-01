@@ -126,3 +126,27 @@ export function dispatchClick(col: number, row: number): boolean {
 export function regionCount(): number {
   return regions.length;
 }
+
+/**
+ * 2026-11-01 用户反馈根修:全局鼠标跟踪禁用了终端原生文本选择/复制。
+ * DSH-TUI 的方案是自建选中引擎(83KB selection.ts);hmh 用更轻的方案:
+ * 只在有可点击 UI 时开启鼠标跟踪,picker 关闭后立即释放给终端原生选择。
+ *
+ * 用法:tui.ts 在渲染 picker/palette 前调 enableMouseForPicker(),
+ * picker 关闭后调 disableMouse()。主输入/阅读模式终端原生选择完全正常。
+ */
+export function enableMouseForPicker(): void {
+  process.stdout.write(ENABLE_MOUSE)
+}
+
+export function disableMouseForPicker(): void {
+  process.stdout.write(DISABLE_MOUSE)
+}
+
+/** 检测当前终端是否支持原生选择(非 alt-screen 模式)。 */
+export function terminalSupportsNativeSelection(): boolean {
+  // Windows Terminal / ConEmu / most modern terminals support Shift+Select
+  // even with mouse tracking; but plain select requires mouse tracking OFF.
+  // We default to OFF (native select works) unless explicitly overridden.
+  return !process.env.HMH_TUI_FORCE_MOUSE
+}
