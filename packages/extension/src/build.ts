@@ -3,7 +3,7 @@
  *
  * `hmh extension build --target=firefox` (or =all) writes a LOADABLE,
  * per-browser unpacked directory: the zero-build payload (background.js,
- * popup/sidepanel HTML, ui.js, style.css) copied verbatim + a manifest
+ * popup/sidepanel HTML, ui.js, style.css, and icons) copied verbatim + a manifest
  * generated for the target from the adapters matrix, then machine-
  * validated (validateManifest) before the directory is declared done.
  * No bundler — same discipline as the web package's embedded SPA.
@@ -13,7 +13,16 @@ import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { EXTENSION_TARGETS, manifestFor, TARGET_SPECS, validateManifest, type ExtensionTarget } from './adapters.ts';
 
-export const PAYLOAD_FILES = ['background.js', 'popup.html', 'sidepanel.html', 'ui.js', 'style.css'] as const;
+export const PAYLOAD_FILES = [
+  'background.js',
+  'popup.html',
+  'sidepanel.html',
+  'ui.js',
+  'style.css',
+  'icon-48.png',
+  'icon-96.png',
+  'icon-128.png',
+] as const;
 
 /** The zero-build payload directory inside this package (works from src/
  *  under tsx and from dist/ after tsc — both sit one level under the
