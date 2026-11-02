@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
-<meta name="description" content="hmharness 十五问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
+<meta name="description" content="hmharness 十六问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -67,7 +67,7 @@
     },
     {
       "@type": "Question",
-      "name": "hmharness 的自进化是真的吗？",
+      "name": "hmharness 的「自进化」是真的吗？",
       "acceptedAnswer": { "@type": "Answer", "text": "机制真实、效果诚实。技能晋升要过双门禁（A/B 双样本基准 + 保留门）再进金丝雀（20% 会话），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月的公开数据集显示：月 1 零统计可靠晋升（门在正确拒绝噪声）但自暴露修复 7 个生产缺陷；月 2 修复 8 个；月 3 零生产缺陷、首次 REJECT 判定、首个跨尺度稳定正效应（真实但小：恰好 1 个中文精确输出案例，×3 复现）。「越用越聪明」尚未证实，被证实的是门与审计在正确工作——全部判定记录与原始日志原样公开在证据页。补充（2026-09）：认知维度拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +8.3%~+39.8%、harmonyos +11.7% 均 improving。" }
     },
     {
@@ -87,7 +87,7 @@
     },
     {
       "@type": "Question",
-      "name": "hmharness 支持哪些系统和模型？",
+      "name": "hmharness 支持哪些操作系统和模型？",
       "acceptedAnswer": { "@type": "Answer", "text": "Windows 优先（鸿蒙工具链、模拟器、TUI 终端适配均在此验证）；macOS/Linux 社区支持。模型任意 OpenAI 兼容厂商均可：GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat / vision / evolve / bench 各走各的），密钥只存在本机 HMH_HOME。" }
     },
     {
@@ -107,12 +107,12 @@
     },
     {
       "@type": "Question",
-      "name": "AI 候选会靠啰嗦通过基准测试吗？怎么防？",
+      "name": "AI 候选会靠「啰嗦」通过基准测试吗？怎么防？",
       "acceptedAnswer": { "@type": "Answer", "text": "会，hmharness 用双保险防：四种断言模式（exact/regex/none/any）钉死输出形状 + 成本门 cand > max(基线×1.3, 基线+8)。token 按 CJK≈1、ASCII≈1/4 估算，换中文灌水也绕不过；+8 绝对余量地板修复过微型考题连续误杀 10 个候选的事故。成本只否决不判分，通过率门仍是主判据。" }
     },
     {
       "@type": "Question",
-      "name": "Agent 怎么记住踩过的坑？",
+      "name": "Agent 怎么记住踩过的坑？记错了怎么办？",
       "acceptedAnswer": { "@type": "Answer", "text": "hmharness 的 memory.retrieve 是计分检索：置信度×0.4 + 新鲜度×0.2 + 词法相关×0.4，查询先分词再部分计分，替代会漏检的 AND 子串匹配。五层记忆只增不删、每条带溯源，工作区标签隔离（本区×2.5/他区×0.3）。" }
     }
   ]
@@ -156,7 +156,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十五问</h1>
+  <h1>hmharness 十六问</h1>
   <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
 </div></header>
 
@@ -165,7 +165,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 <section class="qa" id="what-is-hmharness">
   <h2><a class="qn" href="#what-is-hmharness">Q1</a>hmharness 是什么？</h2>
   <div class="tldr">hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
-  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 16 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、1065 个单元测试 CI 全绿才发版；CLI / TUI / Web 三前端，zh/en 双语。</p>
+  <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 16 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、1068 个单元测试门禁（最新 CI：1067 通过 / 1 跳过）；CLI / TUI / Web 三前端，zh/en 双语。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="./">官网首页</a></p>
 </section>
 
@@ -275,6 +275,13 @@ DevEco 或 CLI / SDK 版本:
   <div class="tldr">hmharness 的记忆检索是计分制不是全文匹配：置信度 ×0.4 + 新鲜度 ×0.2 + 词法相关 ×0.4，查询先分词再部分计分——检索「hvigor build windows」这类带无关词的查询也能命中该命中的经验，硬过滤条件不变。</div>
   <p>旧方案 AND 子串匹配会在查询里混入无关词时全部漏检（旧 AND 检索 miss 的根因）；计分检索允许部分词法得分，排序公式在 <code>memory.retrieve</code> 中可审计。五层记忆（working/episodic/semantic/procedural/world）只增不删、每条带溯源——记错可查证，标记可追踪。工作区隔离用标签制：本区记忆 ×2.5 加权，他区降权 ×0.3 但不消失。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/CHANGELOG.md">CHANGELOG 0.23.26（memory.retrieve）</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE 认知层</a></p>
+</section>
+
+<section class="qa" id="vs-deveco-cli">
+  <h2><a class="qn" href="#vs-deveco-cli">Q16</a>hmharness 和 DevEco CLI 什么关系？</h2>
+  <div class="tldr">互补，不是二选一。DevEco CLI 是华为官方命令行工具，覆盖构建、打包、签名、上架等命令行化；hmharness 是独立开源智能体框架，把可调用工具、模型路由、API 索引和自进化审计放在同一套终端工作流里。</div>
+  <p>hmharness 不替代官方工具链，也不与华为、开放原子基金会有隶属或背书关系。它在命令行化之上提供四类增量：密钥只存本地、任意 OpenAI 兼容模型可换、API 知识图谱查不到即拒绝（927 个 d.ts 的 20,241 符号），以及带双门禁与公开证据页的可审计自进化。两者可以同时使用。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP API 知识图谱</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/website/faq.html">FAQ structured data</a></p>
 </section>
 
 </main>
