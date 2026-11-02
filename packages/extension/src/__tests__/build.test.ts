@@ -29,6 +29,11 @@ test('build: all targets produce loadable unpacked dirs with validated manifests
       const html = await readFile(join(r.dir, f), 'utf8');
       assert.ok(html.includes('ui.js') && html.includes('style.css'), `${r.target}/${f} missing asset links`);
     }
+    // manifests reference icons; every referenced icon must be copied byte-for-byte
+    const icons = m.icons as Record<string, string>;
+    for (const icon of Object.values(icons)) {
+      await readFile(join(r.dir, icon));
+    }
   }
   // target delta is real: chromium has side_panel, firefox sidebar_action, safari neither
   const chromium = JSON.parse(await readFile(join(out, 'chromium', 'manifest.json'), 'utf8'));
