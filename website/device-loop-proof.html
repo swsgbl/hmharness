@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall 的设备回路</title>
+<meta name="description" content="hmharness 模拟器设备回路证据页：公开记录 scaffold、schema_check、build、install、launch、hilog 回读 EntryAbility onCreate、uninstall 七步，并链接公开 e2e-device.mts、ROADMAP 与 DEVLOG。">
+<link rel="canonical" href="https://swsgbl.github.io/hmharness/device-loop-proof.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall 的设备回路",
+  "description": "公开证据索引：hmharness 在模拟器上跑通 scaffold、schema_check、build、install、launch、hilog 与 uninstall，并可用 scripts/e2e-device.mts 复现实验。",
+  "inLanguage": "zh-CN",
+  "datePublished": "2026-11-16",
+  "dateModified": "2026-11-16",
+  "url": "https://swsgbl.github.io/hmharness/device-loop-proof.html",
+  "author": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "publisher": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "about": {"@type": "SoftwareApplication", "name": "hmharness", "softwareVersion": "0.23.50", "applicationCategory": "DeveloperApplication", "license": "https://opensource.org/licenses/MIT"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "用 hmharness 在鸿蒙模拟器上验证完整设备回路",
+  "supply": [
+    {"@type": "HowToSupply", "name": "Node.js 22+"},
+    {"@type": "HowToSupply", "name": "本机鸿蒙 SDK、hvigorw 与 hdc"},
+    {"@type": "HowToSupply", "name": "已启动并可被 hdc list targets 识别的模拟器"}
+  ],
+  "step": [
+    {"@type": "HowToStep", "name": "scaffold", "text": "公开 e2e-device.mts 调用 scaffoldProject 创建 DevE2E 工程；2026-09-05 公开记录为 19 个文件。"},
+    {"@type": "HowToStep", "name": "schema_check", "text": "构建前执行配置结构校验；公开记录为 3 个配置全部通过。"},
+    {"@type": "HowToStep", "name": "build", "text": "调用 harmony_build 执行 hvigor 构建；公开记录输出 BUILD SUCCESSFUL。"},
+    {"@type": "HowToStep", "name": "install", "text": "通过 hdc 安装到 127.0.0.1:5555 模拟器；公开记录 bundle installed。"},
+    {"@type": "HowToStep", "name": "launch", "text": "启动 EntryAbility；公开记录 start ability successfully。"},
+    {"@type": "HowToStep", "name": "logs", "text": "回读 hilog 并核对应用自身日志；公开记录命中 EntryAbility onCreate。"},
+    {"@type": "HowToStep", "name": "uninstall", "text": "清理安装包；公开记录 uninstall clean。"}
+  ]
+}
+</script>
+<style>
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--maxw:920px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}
+.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+header{padding:64px 0 34px}
+.eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:1px}
+h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}
+.summary{max-width:720px;color:var(--dim)}
+.answer{margin:24px 0;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
+section{padding:32px 0}
+h2{font-size:24px;color:#fff;margin-bottom:14px}
+p{color:var(--dim)}.summary,.answer{font-size:16px}
+.steps{display:grid;gap:12px;margin-top:18px}
+.step{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}
+.num{min-width:34px;height:34px;border-radius:50%;background:rgba(79,216,235,.14);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-weight:800}
+.step h3{font-size:16px;color:#fff;margin-bottom:4px}.step p{font-size:14.5px}
+code,pre{font-family:Consolas,"Cascadia Code",monospace}
+code{color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px}
+pre{margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(5,14,28,.82);color:var(--ice);overflow-x:auto;white-space:pre}
+.sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sources div{display:grid;grid-template-columns:190px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
+.boundary li{margin:8px 0 0 20px;color:var(--dim)}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}
+footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
+@media(max-width:620px){.step{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <div class="logo"><span>hm</span> hmharness</div>
+  <div><a href="./">首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="eyebrow">设备回路证据索引 · EVIDENCE DATE 2026-09-05</div>
+  <h1>hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall</h1>
+  <p class="summary">本页回答一个具体问题：AI 生成的鸿蒙工程是否真的进了模拟器、启动了 Ability、打出了自己的日志，并在验证后清理？下面每一步都指向公开脚本或公开开发记录，不做口头承诺。</p>
+  <div class="answer">可以。公开记录显示，hmharness 以 <code>127.0.0.1:5555</code> 模拟器为 hdc 目标，一次跑通 <code>scaffold → schema_check → build → install → launch → hilog → uninstall</code>，hilog 回读到应用自身的 <code>EntryAbility onCreate</code>，全链零人工介入。当前公开脚本仍可用来在你自己的 SDK 与模拟器环境中复现实验。</div>
+  <div class="actions">
+    <a class="btn btn-primary" href="https://github.com/swsgbl/hmharness/blob/main/scripts/e2e-device.mts">查看 e2e-device.mts</a>
+    <a class="btn" href="#reproduce">复现命令</a>
+    <a class="btn" href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈</a>
+  </div>
+</div></header>
+
+<section id="seven-steps"><div class="wrap">
+  <h2>七步链路与公开证据</h2>
+  <p>下列结果来自 2026-09-05 已公开的 ROADMAP 与 DEVLOG 记录；实验脚本在仓库 <code>scripts/e2e-device.mts</code> 中公开。页面本身不把历史记录冒充为当前运行结果。</p>
+  <div class="steps">
+    <div class="step" data-step="scaffold"><div class="num">1</div><div><h3>scaffold：生成工程</h3><p><code>scaffoldProject</code> 创建 <code>DevE2E</code> 工程与 <code>com.example.deve2e</code>；公开记录生成 19 个文件。</p></div></div>
+    <div class="step" data-step="schema_check"><div class="num">2</div><div><h3>schema_check：构建前门禁</h3><p>校验工程配置结构；公开记录 3 个配置全部通过，错误在进入构建前暴露。</p></div></div>
+    <div class="step" data-step="build"><div class="num">3</div><div><h3>build：真实 hvigor 构建</h3><p><code>harmony_build</code> 调用本机工具链；公开记录输出 <code>BUILD SUCCESSFUL</code>。</p></div></div>
+    <div class="step" data-step="install"><div class="num">4</div><div><h3>install：安装到模拟器</h3><p>通过 hdc 写入 <code>127.0.0.1:5555</code>；公开记录 <code>bundle installed</code>。</p></div></div>
+    <div class="step" data-step="launch"><div class="num">5</div><div><h3>launch：启动 Ability</h3><p>启动应用 Ability；公开记录 <code>start ability successfully</code>。</p></div></div>
+    <div class="step" data-step="logs"><div class="num">6</div><div><h3>logs：回读 hilog 生命周期证据</h3><p>等待日志落盘后回读并筛选应用日志；公开记录命中 <code>EntryAbility onCreate</code>，证明应用确在模拟器上运行。</p></div></div>
+    <div class="step" data-step="uninstall"><div class="num">7</div><div><h3>uninstall：清理设备</h3><p>按 bundle 卸载测试应用；公开记录 <code>clean</code>，避免把验证残留留给下一个实验。</p></div></div>
+  </div>
+</div></section>
+
+<section id="sources"><div class="wrap">
+  <h2>证据来源</h2>
+  <div class="sources">
+    <div><b>公开脚本</b><span><a href="https://github.com/swsgbl/hmharness/blob/main/scripts/e2e-device.mts">scripts/e2e-device.mts</a>：默认目标 <code>127.0.0.1:5555</code>，按顺序执行七步并打印每步输出。</span></div>
+    <div><b>路线图记录</b><span><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">docs/ROADMAP.md</a> 2026-09-05「设备回路打通」：模拟器经 hdc 与真机同通道，脚本归档可重复跑。</span></div>
+    <div><b>开发日志</b><span><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">docs/DEVLOG.md</a> 2026-09-05「设备回路打通」：19 文件、3 配置、BUILD SUCCESSFUL、bundle installed、start ability successfully、EntryAbility onCreate、uninstall clean。</span></div>
+    <div><b>签名与设备测试</b><span><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名封装+设备测试」</a>：签名后的 HAP 约 54404b，在模拟器 install→launch→hilog 验证；<code>harmony_device_test</code> 四步判定全 PASS。</span></div>
+  </div>
+</div></section>
+
+<section id="reproduce"><div class="wrap">
+  <h2>如何在你自己的环境复现</h2>
+  <p>复现依赖你的本机工具链与模拟器状态；hmharness 不提供绕过厂商渠道的模拟器镜像下载。先确认 <code>hdc list targets</code> 能看到目标，再运行公开脚本：</p>
+  <pre>git clone https://github.com/swsgbl/hmharness.git
+cd hmharness
+npm install &amp;&amp; npm run build
+npx tsx scripts/e2e-device.mts 127.0.0.1:5555</pre>
+  <p>顺序执行到最终输出 <code>DEVICE E2E COMPLETE</code> 后，再核对 install、launch、hilog 与 uninstall 输出；若失败，保留脱敏后的第一步错误输出，并带到 <a href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈 Discussion</a>。</p>
+</div></section>
+
+<section id="boundaries"><div class="wrap">
+  <h2>边界声明</h2>
+  <div class="boundary">
+    <ul>
+      <li>本页索引的是 2026-09-05 公开记录；线上复现结果取决于你的 SDK、签名材料、模拟器镜像与 hdc 连接状态。</li>
+      <li>模拟器系统镜像的自动下载本体仍受厂商公开通道限制；hmharness 只诚实报告已安装镜像与缺失类型。</li>
+      <li>设备回路证明不等于所有 HarmonyOS API 已覆盖，也不代表任意工程无需签名即可安装。</li>
+      <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
+    </ul>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a>
+  <div class="legal">HarmonyOS、鸿蒙、OpenHarmony、DevEco Studio 与 hdc 等名称归各自权利人所有，此处仅为描述性合理使用。页面证据来自公开仓库文档与可复现脚本。© 2026 hmharness contributors · MIT License</div>
+</div></footer>
+</body>
+</html>
