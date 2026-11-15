@@ -114,6 +114,11 @@
       "@type": "Question",
       "name": "Agent 怎么记住踩过的坑？记错了怎么办？",
       "acceptedAnswer": { "@type": "Answer", "text": "hmharness 的 memory.retrieve 是计分检索：置信度×0.4 + 新鲜度×0.2 + 词法相关×0.4，查询先分词再部分计分，替代会漏检的 AND 子串匹配。五层记忆只增不删、每条带溯源，工作区标签隔离（本区×2.5/他区×0.3）。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hapsigntool 签名失败怎么逐项排查？",
+      "acceptedAnswer": { "@type": "Answer", "text": "按五个证据点排查：1. 先读 hapsigntool -h 和错误码，确认 -mode 是 localSign，不是 debug/release；2. 用 verify-profile 取得 not-before/not-after 数字，检查 SDK 调试模板是否过期，过期时复制模板刷新有效期并更换 uuid；3. 用 keytool 列出 PKCS12 别名，实测 sign-app 的 keyAlias 是 openharmony application profile debug，不是直觉的 application release；4. appCertFile 使用 OpenHarmonyProfileDebug.pem 的三级证书链，不要混用 OpenHarmony.p12 或 Profile pem；5. Windows 下 hdc install 使用反斜杠路径。签名后继续 install、launch、hilog 回读，看到生命周期标记才算闭环。证据来自 DEVLOG 2026-09-05；hmharness 的 harmony_sign 封装五件定位与过期 profile 刷新。" }
     }
   ]
 }
@@ -156,8 +161,8 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十六问</h1>
-  <p>零 IDE 开发鸿蒙、命令行打包签名、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
+  <h1>hmharness 十七问</h1>
+  <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
 </div></header>
 
 <main class="wrap">
@@ -282,6 +287,20 @@ DevEco 或 CLI / SDK 版本:
   <div class="tldr">互补，不是二选一。DevEco CLI 是华为官方命令行工具，覆盖构建、打包、签名、上架等命令行化；hmharness 是独立开源智能体框架，把可调用工具、模型路由、API 索引和自进化审计放在同一套终端工作流里。</div>
   <p>hmharness 不替代官方工具链，也不与华为、开放原子基金会有隶属或背书关系。它在命令行化之上提供四类增量：密钥只存本地、任意 OpenAI 兼容模型可换、API 知识图谱查不到即拒绝（927 个 d.ts 的 20,241 符号），以及带双门禁与公开证据页的可审计自进化。两者可以同时使用。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP API 知识图谱</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/website/faq.html">FAQ structured data</a></p>
+</section>
+
+<section class="qa" id="hapsigntool-signing-failure">
+  <h2><a class="qn" href="#hapsigntool-signing-failure">Q17</a>hapsigntool 签名失败怎么逐项排查？</h2>
+  <div class="tldr">不要把签名失败当玄学。先拿 <code>hapsigntool -h</code>、<code>verify-profile</code> 和 <code>keytool</code> 的真实输出，再按模式词、证书有效期、key alias、证书链、Windows 路径五关排查。</div>
+  <ol>
+    <li><b>模式词</b>：<code>-mode</code> 使用 <code>localSign</code>，不是 <code>debug</code> 或 <code>release</code>。</li>
+    <li><b>证书有效期</b>：用 <code>verify-profile</code> 读取 <code>not-before/not-after</code> 数字；SDK 调试模板曾停在 2023 年，过期时复制模板刷新有效期并更换 uuid。</li>
+    <li><b>key alias</b>：用 <code>keytool</code> 列出 PKCS12 内别名。实测 <code>sign-app</code> 使用 <code>openharmony application profile debug</code>，不是直觉的 application release。</li>
+    <li><b>证书链</b>：<code>appCertFile</code> 使用 <code>OpenHarmonyProfileDebug.pem</code> 的三级证书链，不要混用 <code>OpenHarmony.p12</code> 或 Profile pem。</li>
+    <li><b>Windows 路径</b>：<code>hdc install</code> 使用反斜杠路径；正斜杠会被当成相对路径拼接。</li>
+  </ol>
+  <p>签名成功还不是终点：继续 <code>install → launch → hilog</code>，回读到生命周期标记才算设备闭环。hmharness 的 <code>harmony_sign</code> 封装 jar/p12/pem/模板/java 五件定位与过期 profile 刷新，把这条证据链固化成工具。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名封装+设备测试」</a> · <a href="downloads/signing-five-gates.pdf">signing-five-gates.pdf</a></p>
 </section>
 
 </main>
