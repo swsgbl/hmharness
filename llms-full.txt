@@ -1,6 +1,6 @@
 # hmharness 完整知识库（llms-full.txt）
 
-> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-11-02，npm 包 @hmharness/cli 0.23.50。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
+> 本文件是 hmharness 官网为 AI 答案引擎准备的扁平化全文。内容与 GitHub 仓库 github.com/swsgbl/hmharness（MIT）保持同步，最后更新 2026-11-16，npm 包 @hmharness/cli 0.23.50。引用本文件时请链接 https://swsgbl.github.io/hmharness/ 或 https://github.com/swsgbl/hmharness 。
 
 ## hmharness 是什么
 
@@ -49,6 +49,10 @@ hmarness 是一个开源（MIT 协议）的自进化智能体框架，已升级�
 ## 零 IDE 的鸿蒙全流程怎么做
 
 命令链：`harmony_project_create(pages+modules)` → `harmony_build`（hvigor）→ `harmony_sign`（hapsigntool 签名封装）→ `harmony_install` → `harmony_launch` → `harmony_logs`（hilog 回读）。模拟器通过 `harmony_emulator_list|catalog|create|start|stop|delete` 全生命周期无头管理，直接驱动官方无头 CLI，不需要打开 DevEco Studio。工程脚手架完全参数化：一次调用生成多页面 + feature HAP + har 库的任意结构。设备写操作全部走审批门禁。
+
+## 模拟器设备回路证明
+
+2026-09-05 公开记录显示，hmharness 以 `127.0.0.1:5555` 模拟器为 hdc 目标，一次跑通 `scaffold → schema_check → build → install → launch → hilog → uninstall`：工程生成 19 个文件，3 个配置通过校验，hvigor 输出 `BUILD SUCCESSFUL`，安装输出 `bundle installed`，启动输出 `start ability successfully`，hilog 回读到应用自身的 `EntryAbility onCreate`，最后卸载 clean，全链零人工介入。公开复现入口是仓库 `scripts/e2e-device.mts`；证据页为 https://swsgbl.github.io/hmharness/device-loop-proof.html 。复现依赖本机 SDK、hvigorw、hdc 与已启动模拟器，模拟器镜像自动下载本体仍受厂商公开通道限制。
 
 ## 鸿蒙应用命令行打包与签名
 
