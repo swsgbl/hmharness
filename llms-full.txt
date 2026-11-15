@@ -58,6 +58,17 @@ hmharness 封装了 hapsigntool 全链（jar/p12/pem/模板/java 五件定位）
 - 支持过期 profile 的检测与刷新路径
 这套封装让鸿蒙签名可以进 CI，而不依赖 DevEco Studio 图形界面。
 
+## hapsigntool 签名失败怎么逐项排查
+
+按五个证据点排查，先取工具输出再做判断：
+1. **模式词**：`hapsigntool -h` 显示本地签名模式是 `localSign`，不是 `debug` 或 `release`。
+2. **证书有效期**：用 `verify-profile` 读取 `not-before/not-after` 数字。SDK 自带调试模板曾停在 2023 年；过期时复制模板刷新有效期并更换 uuid，再生成 profile。
+3. **key alias**：用 `keytool` 列出 PKCS12 证书别名。实测 `sign-app` 使用 `openharmony application profile debug`，不是直觉的 application release。
+4. **证书链**：`appCertFile` 使用 `OpenHarmonyProfileDebug.pem` 的三级证书链，不要混用 `OpenHarmony.p12` 或 Profile pem。
+5. **Windows 路径**：`hdc install` 只吃反斜杠路径，正斜杠会被当成相对路径拼接。
+
+签名后继续 `install → launch → hilog`，回读到生命周期标记才算设备闭环。hmharness 的 `harmony_sign` 封装 jar/p12/pem/模板/java 五件定位与过期 profile 刷新。证据：DEVLOG 2026-09-05。
+
 ## 鸿蒙 CI/CD 自动化
 
 hmharness 把 hvigor 构建、签名、hdc 装机、hilog 日志全部做成 Agent 可调用工具（也可当普通 CLI 用），因此鸿蒙应用的自动打包、签名、装机验证可以脚本化。危险操作默认审批门禁（TTY 问 y/N；非交互默认拒绝；`--yes` 放行；破坏性命令模式硬拒绝），审批过的模式可落 rules 文件复用。
