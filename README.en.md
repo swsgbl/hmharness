@@ -48,6 +48,8 @@ npm install -g @hmharness/cli     # Node >= 22
 hmh init                    # creates ~/.hmharness (config + state dirs)
 ```
 
+Before configuring a model, split install failures with model-free checks: `npm list -g @hmharness/cli` verifies the installed version, `hmh --help` verifies the entrypoint, and `hmh check | devices` reports local toolchain and device visibility. See the [Quickstart verification matrix](https://swsgbl.github.io/hmharness/quickstart-matrix.html).
+
 **Option 2: from source** (development / trying it out):
 
 ```bash

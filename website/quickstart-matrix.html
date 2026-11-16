@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hmharness Quickstart 验证矩阵：npm 安装、hmh check 与设备可见性</title>
+<meta name="description" content="hmharness 快速开始排障页：逐步核对 Node 版本、npm 包元数据、CLI help、hmh check 与 hmh devices，说明 2026-11-16 Windows 隔离前缀安装实测结果与每一步能证明什么。">
+<link rel="canonical" href="https://swsgbl.github.io/hmharness/quickstart-matrix.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "hmharness Quickstart 验证矩阵：npm 安装、hmh check 与设备可见性",
+  "description": "用可复现命令核对 hmharness 标准桌面安装路径，并明确每一步验证与不验证什么。",
+  "inLanguage": "zh-CN",
+  "datePublished": "2026-11-16",
+  "dateModified": "2026-11-16",
+  "url": "https://swsgbl.github.io/hmharness/quickstart-matrix.html",
+  "author": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "publisher": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "about": {"@type": "SoftwareApplication", "name": "hmharness", "softwareVersion": "0.23.50", "applicationCategory": "DeveloperApplication", "license": "https://opensource.org/licenses/MIT"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "Verify an hmharness npm quickstart before running a model task",
+  "supply": [
+    {"@type": "HowToSupply", "name": "Node.js 22 or newer"},
+    {"@type": "HowToSupply", "name": "npm access to registry.npmjs.org"},
+    {"@type": "HowToSupply", "name": "Optional local HarmonyOS SDK, hvigorw, hdc, and a running device"}
+  ],
+  "step": [
+    {"@type": "HowToStep", "name": "Check runtime and package metadata", "text": "Run node --version, npm --version, and npm view @hmharness/cli version engines bin --json. Node must be 22 or newer."},
+    {"@type": "HowToStep", "name": "Install into a fresh prefix", "text": "Run npm install --prefix <empty-dir> @hmharness/cli@0.23.50, then confirm npm list reports the expected package version."},
+    {"@type": "HowToStep", "name": "Run hmh --help", "text": "Confirm the hmh binary resolves and prints the command surface. In 0.23.50, use npm list for the package version because --help does not advertise a --version flag."},
+    {"@type": "HowToStep", "name": "Run hmh check", "text": "Run hmh check with an isolated HMH_HOME. This is a direct toolchain check and does not require a model provider."},
+    {"@type": "HowToStep", "name": "Run hmh devices", "text": "Run hmh devices. No devices connected is a valid pre-emulator result, not a package-install failure."}
+  ]
+}
+</script>
+<style>
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--ok:#7DDF9A;--warn:#F5C66B;--maxw:980px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}
+.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+header{padding:60px 0 32px}
+.eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:1px}
+h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}
+.summary{max-width:760px;color:var(--dim)}
+.answer{margin:24px 0;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
+section{padding:32px 0}
+h2{font-size:24px;color:#fff;margin-bottom:14px}
+p{color:var(--dim)}.summary,.answer{font-size:16px}
+.matrix{display:grid;gap:12px;margin-top:18px}
+.row{display:grid;grid-template-columns:150px 1fr 1fr;gap:14px;align-items:start;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}
+.row h3{font-size:15.5px;color:#fff;margin-bottom:5px}
+.row p{font-size:14.5px}
+.status{font-size:13px;font-weight:750;color:var(--ok)}
+.status.partial{color:var(--warn)}
+code,pre{font-family:Consolas,"Cascadia Code",monospace}
+code{color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px}
+pre{margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(5,14,28,.82);color:var(--ice);overflow-x:auto;white-space:pre}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
+.panel h3{font-size:16px;color:#fff;margin-bottom:8px}
+.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:14.5px}
+.sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sources div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
+.boundary li{margin:8px 0 0 20px;color:var(--dim)}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}
+footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
+@media(max-width:700px){.row{grid-template-columns:1fr}.two{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <div class="logo"><span>hm</span> hmharness</div>
+  <div><a href="./">首页</a> · <a href="faq.html">FAQ</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="eyebrow">QUICKSTART VERIFICATION MATRIX · SMOKE DATE 2026-11-16</div>
+  <h1>hmharness 快速开始验证矩阵</h1>
+  <p class="summary">安装失败通常不是模型问题。本页把标准 npm 路径拆成可独立核对的五步，并给出一次 Windows 隔离前缀安装的真实读数：包能装、CLI 能解析，工具链检查不冒充设备可见，设备未连接也不冒充安装失败。</p>
+  <div class="answer">2026-11-16 在 Windows / Node 24.19 / npm 12.2 上，用一个空 npm prefix 与独立 <code>HMH_HOME</code> 安装 <code>@hmharness/cli@0.23.50</code>：npm 元数据声明 Node &gt;= 22、bin 为 <code>hmh</code>；安装完成；<code>hmh --help</code> 正常；<code>hmh check</code> 不需要模型并报出 hdc、hvigorw、ohpm 与 cjpm 的状态；<code>hmh devices</code> 如实返回无设备。cjpm 版本探针失败被原样保留为本机排障信号，不包装成通过。</div>
+  <div class="actions">
+    <a class="btn btn-primary" href="#standard-path">按矩阵自检</a>
+    <a class="btn" href="https://www.npmjs.com/package/@hmharness/cli">npm 包</a>
+    <a class="btn" href="https://github.com/swsgbl/hmharness/discussions/4">提交环境反馈</a>
+  </div>
+</div></header>
+
+<section id="matrix"><div class="wrap">
+  <h2>五步验证矩阵</h2>
+  <p>“结果”列是 2026-11-16 一次本机 smoke；“你要证明”列才是其他用户应复用的判定标准。工具路径已从 smoke 记录中脱敏，矩阵只保留状态与判定。</p>
+  <div class="matrix" aria-label="Quickstart verification matrix">
+    <div class="row" data-check="runtime"><div><h3>运行时</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b>Node <code>24.19.0</code>，npm <code>12.2.0</code>，Windows_NT。</p></div><div><p><b>你要证明：</b>Node 满足 npm 元数据声明的 <code>&gt;=22</code>；低于 22 先升级 Node，再排查 hmharness。</p></div></div>
+    <div class="row" data-check="package"><div><h3>包元数据</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b><code>npm view @hmharness/cli@0.23.50</code> 返回 version <code>0.23.50</code>、engines <code>&gt;=22</code>、bin <code>hmh -&gt; dist/main.js</code>。</p></div><div><p><b>你要证明：</b>公开 registry 可达，且你安装的版本、入口和 Node 要求一致。</p></div></div>
+    <div class="row" data-check="install"><div><h3>隔离安装</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b>空 prefix 安装完成，新增 44 个包，耗时 4 秒；<code>npm list</code> 显示 <code>@hmharness/cli@0.23.50</code>。</p></div><div><p><b>你要证明：</b>依赖能解析、CLI 入口存在。全局安装用户用 <code>npm list -g @hmharness/cli</code> 核对版本。</p></div></div>
+    <div class="row" data-check="help"><div><h3>命令面</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b><code>hmh --help</code> 打印 init、check、devices、tools、mcp、tui、web 等命令；0.23.50 未在帮助中提供独立 <code>--version</code> 标志。</p></div><div><p><b>你要证明：</b>shell 能找到 <code>hmh</code>。版本用 npm list 确认；<code>command not found</code> 先查 npm prefix 与 PATH。</p></div></div>
+    <div class="row" data-check="toolchain"><div><h3>工具链</h3><span class="status partial">PARTIAL</span></div><div><p><b>Smoke 结果：</b>独立 <code>HMH_HOME</code> 下执行 <code>hmh check</code>：hdc OK、hvigorw OK、ohpm OK；cjpm 探针报版本命令失败。</p></div><div><p><b>你要证明：</b>本机 SDK/工具可被发现，且失败项可定位。这个命令是直连工具检查，不需要模型 API key。</p></div></div>
+    <div class="row" data-check="device"><div><h3>设备可见性</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b><code>hmh devices</code> 返回“没有连接设备，请启动模拟器或接入已授权设备”。</p></div><div><p><b>你要证明：</b>设备枚举路径能运行。无设备是启动模拟器前的合法状态，不代表 npm 安装失败。</p></div></div>
+  </div>
+</div></section>
+
+<section id="standard-path"><div class="wrap">
+  <h2>标准桌面复现命令</h2>
+  <p>先做这组无模型检查，再进入 <code>hmh init</code> 和厂商配置；可把 prefix 换成任意空目录，避免污染全局环境。</p>
+  <pre>node --version
+npm --version
+npm view @hmharness/cli@0.23.50 version engines bin --json
+
+npm install --prefix ./hmh-smoke @hmharness/cli@0.23.50
+npm list --prefix ./hmh-smoke @hmharness/cli
+
+# Windows
+set HMH_HOME=%CD%\hmh-smoke-home
+.\hmh-smoke\node_modules\.bin\hmh.cmd --help
+.\hmh-smoke\node_modules\.bin\hmh.cmd check
+.\hmh-smoke\node_modules\.bin\hmh.cmd devices
+
+# macOS / Linux
+export HMH_HOME="$PWD/hmh-smoke-home"
+./hmh-smoke/node_modules/.bin/hmh --help
+./hmh-smoke/node_modules/.bin/hmh check
+./hmh-smoke/node_modules/.bin/hmh devices</pre>
+  <p>全局安装后等价检查是 <code>npm list -g @hmharness/cli</code>、<code>hmh --help</code>、<code>hmh check</code>、<code>hmh devices</code>。提交反馈时粘贴 OS/Node、npm list 结果、脱敏后的 check 输出和第一个卡点，不要粘贴 API key、cookie、私人路径或设备/账号标识。</p>
+</div></section>
+
+<section id="troubleshooting"><div class="wrap">
+  <h2>首错分流</h2>
+  <div class="two">
+    <div class="panel"><h3>安装 / 入口</h3><ul>
+      <li><code>Unsupported engine</code>：先升级 Node 到 22+，再重试。</li>
+      <li><code>hmh: command not found</code>：核对 npm 全局 bin 目录是否在 PATH；隔离 prefix 用户直接调用 <code>node_modules/.bin</code> 下的入口。</li>
+      <li>需要确认版本：使用 <code>npm list -g @hmharness/cli</code>，不要把交互 REPL 当作版本命令。</li>
+    </ul></div>
+    <div class="panel"><h3>工具链 / 设备</h3><ul>
+      <li><code>hmh check</code> 缺 hdc、hvigorw 或 ohpm：先安装或配置 SDK/DevEco CLI，再复跑 check。</li>
+      <li>单项工具探针失败：保留原始第一行错误并附 OS/Node 与工具版本，反馈到环境 Discussion。</li>
+      <li><code>hmh devices</code> 无设备：先启动模拟器或接入已授权调试设备，再复跑 devices；这不需要模型配置。</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="routes"><div class="wrap">
+  <h2>三条安装路径的验证边界</h2>
+  <div class="matrix">
+    <div class="row"><div><h3>标准桌面</h3><span class="status">SMOKE TESTED</span></div><div><p><code>npm install -g @hmharness/cli</code>，随后执行本页五步。2026-11-16 的隔离 prefix smoke 覆盖该路径的包解析、CLI 入口、help、check 与 devices。</p></div><div><p>适合大多数 Windows/macOS/Linux 桌面用户；域工具按本机可用性降级。</p></div></div>
+    <div class="row"><div><h3>源码运行</h3><span class="status">PUBLIC DOCS</span></div><div><p>clone 仓库后执行 <code>npm install &amp;&amp; npm run build &amp;&amp; npm link -w @hmharness/cli</code>，入口与 <code>hmh init</code> 见 README。</p></div><div><p>适合贡献者。2026-11-16 smoke 未重新执行源码 link 路径，不把它冒充为当日实测。</p></div></div>
+    <div class="row"><div><h3>板端安装</h3><span class="status">PUBLIC DOCS</span></div><div><p>KaihongOS/OpenHarmony 无 npm 或只读根分区时，公开文档给出 <code>node scripts/install-kaihongos.cjs</code> 与九个板端坑位说明。</p></div><div><p>适合板端用户。2026-11-16 smoke 未覆盖板端，不把桌面结果外推到板端。</p></div></div>
+  </div>
+</div></section>
+
+<section id="sources"><div class="wrap">
+  <h2>证据来源</h2>
+  <div class="sources">
+    <div><b>公开 README</b><span><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README quickstart</a>：npm/源码/板端三条路径、Node &gt;= 22、<code>hmh check | devices</code>。</span></div>
+    <div><b>npm 元数据</b><span><a href="https://www.npmjs.com/package/@hmharness/cli?activeTab=code">@hmharness/cli</a>：0.23.50 声明 <code>engines.node &gt;=22</code> 与 <code>bin.hmh</code>。</span></div>
+    <div><b>公开 CLI 源码</b><span>npm 包内 <code>dist/main.js</code>：help 文档化 <code>--help</code>、<code>devices|check</code> 为 direct tool run / no model。</span></div>
+    <div><b>可复现 smoke</b><span>2026-11-16 本机空 npm prefix + 独立 <code>HMH_HOME</code> 输出；本页只公开脱敏状态，不公开本机绝对路径。</span></div>
+    <div><b>环境反馈</b><span><a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>：收集 OS/Node、工具版本、真机或模拟器、首个卡点与脱敏 check 输出。</span></div>
+  </div>
+</div></section>
+
+<section id="boundaries"><div class="wrap">
+  <h2>边界声明</h2>
+  <div class="boundary"><ul>
+    <li>2026-11-16 smoke 只覆盖 Windows、Node 24.19、npm 12.2 与公开 npm 包的隔离前缀安装；不等价于 macOS/Linux 或板端全量验证。</li>
+    <li><code>hmh check</code> 证明本机工具链可见性，不证明模型端点、签名材料、SDK 许可或完整设备回路已经可用。</li>
+    <li><code>hmh devices</code> 为空说明当前没有可见设备；完整构建、签名、安装与日志链路见<a href="device-loop-proof.html">设备回路证明页</a>。</li>
+    <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
+  </ul></div>
+</div></section>
+
+<footer><div class="wrap">
+  <a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a>
+  <div class="legal">HarmonyOS、鸿蒙、OpenHarmony、DevEco Studio、hdc 等名称归各自权利人所有，此处仅为描述性合理使用。© 2026 hmharness contributors · MIT License</div>
+</div></footer>
+</body>
+</html>
