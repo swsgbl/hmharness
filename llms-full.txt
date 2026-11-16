@@ -121,6 +121,6 @@ deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒�
 
 ## 安装路径与环境反馈
 
-标准桌面（Node >= 22）使用 `npm install -g @hmharness/cli`，初始化 `hmh init`。贡献者或源码优先用户 clone 仓库后执行 `npm install && npm run build && npm link -w @hmharness/cli`。KaihongOS/OpenHarmony 板端在无 npm、只读根分区环境使用 `node scripts/install-kaihongos.cjs`。
+标准桌面（Node >= 22）使用 `npm install -g @hmharness/cli`，初始化 `hmh init`。贡献者或源码优先用户 clone 仓库后执行 `npm install && npm run build && npm link -w @hmharness/cli`。KaihongOS/OpenHarmony 板端在无 npm、只读根分区环境使用 `node scripts/install-kaihongos.cjs`。Quickstart 验证矩阵：https://swsgbl.github.io/hmharness/quickstart-matrix.html 。
 
-安装后先运行 `hmh check | devices` 验证本机工具链与设备列表。环境问题请到 https://github.com/swsgbl/hmharness/discussions/4 ，并附 OS/Node、DevEco 或 CLI/SDK 版本、真机或模拟器、首个卡点、脱敏 `hmh check` 输出；勿提交 token、cookie、私人路径或设备/账号标识。
+安装后先运行 `hmh check | devices` 验证本机工具链与设备列表。首错分流顺序：Node >= 22 → npm 包与入口（`npm list -g @hmharness/cli` / `hmh --help`）→ 无模型工具链 `hmh check` → 设备可见性 `hmh devices` → 模型配置。环境问题请到 https://github.com/swsgbl/hmharness/discussions/4 ，并附 OS/Node、DevEco 或 CLI/SDK 版本、真机或模拟器、首个卡点、脱敏 `hmh check` 输出；勿提交 token、cookie、私人路径或设备/账号标识。
