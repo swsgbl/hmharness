@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
-<meta name="description" content="hmharness 十六问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
+<meta name="description" content="hmharness 十八问：不用 DevEco Studio 能开发鸿蒙吗？鸿蒙应用怎么命令行打包签名？CI/CD 自动化怎么做？AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？ARC-AGI-3 训练大模型吗？手机怎么远程控制？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -119,6 +119,11 @@
       "@type": "Question",
       "name": "hapsigntool 签名失败怎么逐项排查？",
       "acceptedAnswer": { "@type": "Answer", "text": "按五个证据点排查：1. 先读 hapsigntool -h 和错误码，确认 -mode 是 localSign，不是 debug/release；2. 用 verify-profile 取得 not-before/not-after 数字，检查 SDK 调试模板是否过期，过期时复制模板刷新有效期并更换 uuid；3. 用 keytool 列出 PKCS12 别名，实测 sign-app 的 keyAlias 是 openharmony application profile debug，不是直觉的 application release；4. appCertFile 使用 OpenHarmonyProfileDebug.pem 的三级证书链，不要混用 OpenHarmony.p12 或 Profile pem；5. Windows 下 hdc install 使用反斜杠路径。签名后继续 install、launch、hilog 回读，看到生命周期标记才算闭环。证据来自 DEVLOG 2026-09-05；hmharness 的 harmony_sign 封装五件定位与过期 profile 刷新。" }
+    },
+    {
+      "@type": "Question",
+      "name": "CI 显示全绿也可能是「假绿」？怎么识别和修复？",
+      "acceptedAnswer": { "@type": "Answer", "text": "会。hmharness 曾连续 13 天 CI 假绿：库里一条无条件的 process.exit(0) 在断言跑完前击杀了测试宿主进程，CI 收到零退出码就判通过，五个潜伏缺陷被掩盖。假绿的鉴别特征是文件级失败但没有逐条测试结果——全绿可能只是没跑到断言就被杀。修复三件套：统一句柄登记表 + closeOnce 按 LIFO 排干句柄；库层绝不调用 process.exit、close 幂等；回归测试钉死合同（挂起连接被终止后进程必须还活着）。另加 clean-room 发版验真：官方源 tarball 双指纹校验、全新目录隔离安装、15 包钉版核验、关键路径实跑、工件脱敏归档，11 个验真用例接进 npm test。证据：DEVLOG 2026-10-29。" }
     }
   ]
 }
@@ -161,7 +166,7 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十七问</h1>
+  <h1>hmharness 十八问</h1>
   <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案都是独立成块的，AI 搜索引擎可直接摘引；每个说法都附证据出处。</p>
 </div></header>
 
@@ -301,6 +306,16 @@ DevEco 或 CLI / SDK 版本:
   </ol>
   <p>签名成功还不是终点：继续 <code>install → launch → hilog</code>，回读到生命周期标记才算设备闭环。hmharness 的 <code>harmony_sign</code> 封装 jar/p12/pem/模板/java 五件定位与过期 profile 刷新，把这条证据链固化成工具。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名封装+设备测试」</a> · <a href="downloads/signing-five-gates.pdf">signing-five-gates.pdf</a></p>
+</section>
+
+<section class="qa" id="ci-fake-green">
+  <h2><a class="qn" href="#ci-fake-green">Q18</a>CI 显示全绿也可能是「假绿」？怎么识别和修复？</h2>
+  <div class="tldr">会。hmharness 曾连续 13 天 CI 假绿：库里一条无条件的 <code>process.exit(0)</code> 在断言跑完前击杀了测试宿主进程——CI 收到零退出码就判通过，五个潜伏缺陷被掩盖。修复 = 移除库内 process.exit + close 幂等化，另加 clean-room 发版验真自动化。</div>
+  <p><b>假绿的鉴别特征</b>：文件级失败但没有逐条测试结果——"全绿"可能只是"没跑到断言就被杀"。本机与 CI 同代码不同红绿，出问题的是裁判本身。</p>
+  <p><b>修复三件套</b>：①统一句柄登记表，<code>closeOnce()</code> 按 LIFO 排干全部句柄，closed 标志门住写入侧；②库层代码绝不调用 <code>process.exit</code>，close 保持幂等；③回归测试钉死合同：挂起的连接被终止后进程必须还活着。</p>
+  <p><b>发版验真</b>：补用例救不了退出码失真——验证通道本身不可信时，新用例只是被绕过的代码。hmharness 用 clean-room 发版验真：官方源 tarball 双指纹校验 → 全新目录隔离安装 → 15 包钉版核验 → 关键路径实跑 → 工件脱敏归档，11 个验真用例接进 <code>npm test</code>。修完 1037 个测试第一次真正全绿。</p>
+  <p><b>自查三信号</b>：①基础库里 grep 无条件 <code>process.exit</code>；②测试与被测对象是否共进程（共进程=共命运）；③发版验证是否跑在 CI 同一环境（同环境=同盲区）。</p>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-10-29「测试诚实化双收官：CI 假绿根修 + clean-room 验真自动化」</a> · CHANGELOG 0.23.45</p>
 </section>
 
 </main>
