@@ -1,0 +1,83 @@
+name: Environment report
+description: Report the first hmharness quickstart blocker with sanitized check output.
+title: "[Environment] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        hmharness is an open-source HarmonyOS/OpenHarmony development agent harness. This report only covers the local quickstart environment: runtime, package resolution, CLI entry, toolchain discovery, and device visibility.
+
+        Do not paste API keys, cookies, tokens, account identifiers, device serial numbers, signed URLs, or private absolute paths. Keep tool names, versions, exit codes, and the first error line.
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: Install route
+      options:
+        - npm global or isolated prefix
+        - Source clone and npm link
+        - KaihongOS or OpenHarmony board route
+        - Not installed yet
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Node and package manager versions
+      placeholder: node -v; npm -v
+      description: Run `node --version` and `npm --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: package-check
+    attributes:
+      label: Package resolution output
+      description: For an isolated prefix, run `npm list --prefix ./hmh-smoke @hmharness/cli`. For a global install, run `npm list -g @hmharness/cli`.
+      placeholder: "@hmharness/cli@0.23.50"
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: first-blocker
+    attributes:
+      label: First blocker
+      options:
+        - Node version or unsupported engine
+        - npm install or package resolution
+        - hmh command not found
+        - hmh --help did not run
+        - hmh check tool probe failed
+        - hmh devices showed no device
+        - Model or provider configuration
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: check-output
+    attributes:
+      label: Sanitized hmh check output
+      description: Remove private absolute paths and identifiers before submitting. `hmh check` does not require a model provider.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: devices-output
+    attributes:
+      label: Sanitized hmh devices output
+      description: No connected device is a valid pre-emulator result; it is not automatically an installation failure.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected result and actual first error
+      description: Include the first relevant error line and what you expected the command to prove.
+    validations:
+      required: true
