@@ -15,7 +15,7 @@
   "description": "用可复现命令核对 hmharness 标准桌面安装路径，并明确每一步验证与不验证什么。",
   "inLanguage": "zh-CN",
   "datePublished": "2026-11-16",
-  "dateModified": "2026-11-16",
+  "dateModified": "2026-11-17",
   "url": "https://swsgbl.github.io/hmharness/quickstart-matrix.html",
   "author": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
   "publisher": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
@@ -98,7 +98,8 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
   <div class="actions">
     <a class="btn btn-primary" href="#standard-path">按矩阵自检</a>
     <a class="btn" href="https://www.npmjs.com/package/@hmharness/cli">npm 包</a>
-    <a class="btn" href="https://github.com/swsgbl/hmharness/discussions/4">提交环境反馈</a>
+    <a class="btn" href="https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml">环境 Issue 模板</a>
+    <a class="btn" href="https://github.com/swsgbl/hmharness/discussions/4">环境 Discussion</a>
   </div>
 </div></header>
 
@@ -136,7 +137,7 @@ export HMH_HOME="$PWD/hmh-smoke-home"
 ./hmh-smoke/node_modules/.bin/hmh --help
 ./hmh-smoke/node_modules/.bin/hmh check
 ./hmh-smoke/node_modules/.bin/hmh devices</pre>
-  <p>全局安装后等价检查是 <code>npm list -g @hmharness/cli</code>、<code>hmh --help</code>、<code>hmh check</code>、<code>hmh devices</code>。提交反馈时粘贴 OS/Node、npm list 结果、脱敏后的 check 输出和第一个卡点，不要粘贴 API key、cookie、私人路径或设备/账号标识。</p>
+  <p>全局安装后等价检查是 <code>npm list -g @hmharness/cli</code>、<code>hmh --help</code>、<code>hmh check</code>、<code>hmh devices</code>。需要求助时打开<a href="https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml">环境 Issue 模板</a>，按字段提交 OS/Node、npm list 结果、脱敏后的 check/devices 输出和第一个卡点；不要粘贴 API key、cookie、私人路径或设备/账号标识。自由讨论仍可使用 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>。</p>
 </div></section>
 
 <section id="troubleshooting"><div class="wrap">
@@ -149,7 +150,7 @@ export HMH_HOME="$PWD/hmh-smoke-home"
     </ul></div>
     <div class="panel"><h3>工具链 / 设备</h3><ul>
       <li><code>hmh check</code> 缺 hdc、hvigorw 或 ohpm：先安装或配置 SDK/DevEco CLI，再复跑 check。</li>
-      <li>单项工具探针失败：保留原始第一行错误并附 OS/Node 与工具版本，反馈到环境 Discussion。</li>
+      <li>单项工具探针失败：保留原始第一行错误并附 OS/Node 与工具版本，用环境 Issue 模板提交。</li>
       <li><code>hmh devices</code> 无设备：先启动模拟器或接入已授权调试设备，再复跑 devices；这不需要模型配置。</li>
     </ul></div>
   </div>
@@ -171,7 +172,7 @@ export HMH_HOME="$PWD/hmh-smoke-home"
     <div><b>npm 元数据</b><span><a href="https://www.npmjs.com/package/@hmharness/cli?activeTab=code">@hmharness/cli</a>：0.23.50 声明 <code>engines.node &gt;=22</code> 与 <code>bin.hmh</code>。</span></div>
     <div><b>公开 CLI 源码</b><span>npm 包内 <code>dist/main.js</code>：help 文档化 <code>--help</code>、<code>devices|check</code> 为 direct tool run / no model。</span></div>
     <div><b>可复现 smoke</b><span>2026-11-16 本机空 npm prefix + 独立 <code>HMH_HOME</code> 输出；本页只公开脱敏状态，不公开本机绝对路径。</span></div>
-    <div><b>环境反馈</b><span><a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>：收集 OS/Node、工具版本、真机或模拟器、首个卡点与脱敏 check 输出。</span></div>
+    <div><b>环境反馈</b><span><a href="https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml">环境 Issue 模板</a>：按 Quickstart 矩阵收集 OS/Node、安装路线、包解析、check/devices 与首个卡点；自由讨论见 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>。</span></div>
   </div>
 </div></section>
 
