@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hmharness 如何约束 Prompt Injection：不可信输入的四层边界</title>
+<meta name="description" content="hmharness 不宣称解决 Prompt Injection。本页按 public main 29d4a4d 解释审批门、HMH_HOME 硬边界、破坏性命令硬拒、deny-by-default 能力与出站白名单、MCP 只读默认，以及 auto/--yes 的例外。">
+<link rel="canonical" href="https://swsgbl.github.io/hmharness/prompt-injection-guardrails.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B1E3A'/><circle cx='32' cy='18' r='9' fill='%234FD8EB'/><text x='32' y='52' font-size='26' font-weight='bold' text-anchor='middle' fill='white' font-family='monospace'>hm</text></svg>">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "hmharness 如何约束 Prompt Injection",
+  "description": "以审批、持久硬墙、能力边界和 MCP 默认只读组成纵深防御，降低不可信输入变成高危动作的概率；不宣称 Prompt Injection 已被解决。",
+  "inLanguage": "zh-CN",
+  "datePublished": "2026-11-19",
+  "dateModified": "2026-11-19",
+  "url": "https://swsgbl.github.io/hmharness/prompt-injection-guardrails.html",
+  "author": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "publisher": {"@type": "Organization", "name": "hmharness contributors", "url": "https://github.com/swsgbl/hmharness"},
+  "about": {"@type": "SoftwareApplication", "name": "hmharness", "softwareVersion": "0.23.50", "applicationCategory": "DeveloperApplication", "license": "https://opensource.org/licenses/MIT"},
+  "proficiencyLevel": "Developer",
+  "articleSection": "Agent security"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "hmharness 解决了 Prompt Injection 吗？",
+      "acceptedAnswer": {"@type": "Answer", "text": "没有。hmharness 不宣称能识别或消除所有藏在网页、文件或工具输出里的恶意指令。它的安全目标是纵深防御：即使模型被不可信内容影响，写入、执行、联网、读取密钥和修改审批规则也必须经过审批或能力边界，破坏性模式还会被硬拒。"}
+    },
+    {
+      "@type": "Question",
+      "name": "非交互模式下审批门会发生什么？",
+      "acceptedAnswer": {"@type": "Answer", "text": "公开 README 和测试说明：默认 ask 模式在 TTY 中询问 y/N；在非 TTY 的管道或服务进程中默认拒绝。--yes 或 approval:auto 会显式放行，这是用户选择扩大授权，不是防注入能力。"}
+    },
+    {
+      "@type": "Question",
+      "name": "不可信网页内容能让 hmharness 修改审批规则吗？",
+      "acceptedAnswer": {"@type": "Answer", "text": "不能把普通内容直接等同于写权限。edit_file 采用工作区分级：工作区内编辑免逐次审批；进入 HMH_HOME 的 config.json、workspaces.json、approved-rules.json 永远审批。源码注释明确说明这是防止一次未审批编辑改写 approval:auto 或 trusted MCP 后解除其他防线。"}
+    },
+    {
+      "@type": "Question",
+      "name": "外部 MCP 工具是否默认完全可信？",
+      "acceptedAnswer": {"@type": "Answer", "text": "不是。MCP 客户端把远端工具投影为同形 Tool，测试要求每个不可信 server 工具都有 needsApproval 门。浏览器扩展的 MCP 面默认只暴露 status、tabs、page_read 三个只读工具；extension_page_act 需要 HMH_MCP_EXTENSION_ACT=1 显式授权。"}
+    },
+    {
+      "@type": "Question",
+      "name": "出站网络和密钥如何限制？",
+      "acceptedAnswer": {"@type": "Answer", "text": "Capability Broker 采用 deny-by-default：没有 live grant 即拒绝；token 有 subject、scope、resource、operation、expiry 和 provenance 并留下审计。network grant 可配置 allowedHosts 出站白名单，域外主机被拒。SecretBroker 只把密钥值给有 live grant 的调用方，日志和模型上下文看到的是引用并在泄漏时 redact。"}
+    },
+    {
+      "@type": "Question",
+      "name": "哪些命令会被硬拒？",
+      "acceptedAnswer": {"@type": "Answer", "text": "公开源码中的 DENY_PATTERNS 覆盖盘根/系统/家目录递归删除、格式化磁盘、关机或强制结束 explorer、Run 自启动注册表变更，以及 curl/iwr 下载后直接交给 shell 执行等模式。硬拒不是完整沙箱，用户仍应结合最小工作区和最小授权运行。"}
+    }
+  ]
+}
+</script>
+<style>
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--line:rgba(79,216,235,.22);--card:rgba(13,32,58,.72);--warn:#F5C66B;--ok:#7DDF9A;--maxw:980px}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.9);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+header{padding:58px 0 30px}.eyebrow{color:var(--cyan);font-size:13px;font-weight:750}h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}.summary{max-width:780px;color:var(--dim)}
+.intro,.answer{max-width:840px;margin-top:20px;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice);font-size:16px}.bridge{margin-top:8px;color:var(--dim)}
+.answer.warn{border-color:var(--warn);background:rgba(245,198,107,.09)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}.btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
+section{padding:32px 0}h2{font-size:24px;color:#fff;margin-bottom:14px}p{color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.layer{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}.layer span{font-size:12px;color:var(--cyan)}.layer strong{display:block;color:#fff;margin:4px 0 6px}.layer p{font-size:14.5px}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}.panel h3{font-size:16px;color:#fff;margin-bottom:8px}.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:14.5px}
+.table-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:8px}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:#fff;background:rgba(79,216,235,.08);font-size:13px}td{color:var(--dim);font-size:14.5px}td code,li code{font-family:Consolas,"Cascadia Code",monospace;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}.sources div{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}.boundary li{margin:8px 0 0 20px;color:var(--dim)}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
+@media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.panels{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}@media(max-width:500px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav><div class="wrap"><div class="logo"><span>hm</span> hmharness</div><div><a href="./">首页</a> · <a href="faq.html">FAQ</a> · <a href="ecosystem-radar.html">生态雷达</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div></div></nav>
+
+<header><div class="wrap">
+  <div class="eyebrow">AGENT SECURITY · PUBLIC MAIN 29D4A4D</div>
+  <h1>hmharness 如何约束 Prompt Injection</h1>
+  <p class="summary">Prompt Injection 没有“一句话修复”。本页把 hmharness 在公开源码里已经落地的审批、硬拒、状态根保护和能力边界拆开，说明它降低的是什么风险，以及哪些风险仍然存在。</p>
+  <div class="intro">hmharness 是一个开源的 HarmonyOS/OpenHarmony 开发智能体框架：它把工程创建、检查、构建、签名、安装、启动、日志读取和结果验证接成本地工具链，让 AI 不只是生成代码，还要用本机环境证明结果；同时通过审批、预算、canary 和回滚约束自进化行为。它不是 DevEco Studio 的替代品，而是开发智能体和鸿蒙工具链之间的验证层。<div class="bridge">本页只展开其中一环：不可信输入试图变成高危动作时，边界在哪里。</div></div>
+  <div class="answer warn"><strong>先说边界：hmharness 不解决 Prompt Injection。</strong>它没有宣称能识别所有藏在网页、文件、issue、工具输出或其他模型上下文里的恶意指令。这里的价值是纵深防御：即使模型被诱导，动作面也被拆成审批、路径、密钥、网络和 MCP 权限，多防线共同缩小爆炸半径。</div>
+  <div class="answer">四层边界分别是：1）动作先过审批，非交互默认拒绝；2）审批规则所在 HMH_HOME 永远审批，破坏性命令模式硬拒；3）能力访问 deny-by-default，网络和密钥可用 live grant 约束；4）外部 MCP 工具逐项门控，浏览器动作默认不暴露。auto 和 --yes 是显式扩大授权的例外，不是安全证明。</div>
+  <div class="actions"><a class="btn btn-primary" href="#four-layers">看四层边界</a><a class="btn" href="#decision-table">查动作表</a><a class="btn" href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/agent/src/tools.ts">审批源码</a><a class="btn" href="https://github.com/swsgbl/hmharness/discussions/4">反馈边界</a></div>
+</div></header>
+
+<section id="four-layers"><div class="wrap">
+  <h2>四层边界</h2>
+  <p>这四层不是四个同义词：它们分别拦截“模型要行动”、“行动要改规则”、“行动要用能力”和“外部工具要接入”四类路径。</p>
+  <div class="grid">
+    <div class="layer"><span>01</span><strong>审批门</strong><p><code>run_command</code> 与 <code>write_file</code> 需要审批；默认 ask 在 TTY 问 y/N，在非 TTY 中拒绝。测试覆盖 yes/auto/ask 三条路径。</p></div>
+    <div class="layer"><span>02</span><strong>持久硬墙</strong><p>盘根、系统目录、家目录递归删除等命令模式硬拒；<code>HMH_HOME</code> 内配置与审批规则永远审批，防止一次写入解除其他门。</p></div>
+    <div class="layer"><span>03</span><strong>能力边界</strong><p>Capability Broker 对能力访问 deny-by-default；grant 有期限和审计，网络可限定 allowedHosts，密钥只在 live grant 下换成真实值。</p></div>
+    <div class="layer"><span>04</span><strong>MCP 边界</strong><p>远端 MCP 工具投影后仍要求 <code>needsApproval</code>；浏览器扩展 MCP 默认只读三件，页面动作需 <code>HMH_MCP_EXTENSION_ACT=1</code>。</p></div>
+  </div>
+</div></section>
+
+<section id="decision-table"><div class="wrap">
+  <h2>动作与边界</h2>
+  <p>下表把常见“被诱导后的动作”映射到公开实现。它不是威胁模型全集，只是可核查的主路径。</p>
+  <div class="table-wrap"><table><thead><tr><th>被诱导的动作面</th><th>边界</th><th>公开证据</th></tr></thead><tbody>
+    <tr><td>执行 shell 命令</td><td><code>run_command</code> 需要审批；非交互默认拒绝；破坏性模式硬拒</td><td><code>packages/agent/src/tools.ts</code>；<code>runner.test.ts</code></td></tr>
+    <tr><td>改写 approval:auto、trusted MCP、HMH_HOME 配置</td><td>工作区内编辑免逐次审批，但 HMH_HOME 永远审批</td><td><code>tools.ts</code> 的 workspace-write 分级</td></tr>
+    <tr><td>命令链、命令替换、管道外传、读取密钥文件</td><td>red-team 检测路径穿越、command injection 和 secret exfiltration</td><td><code>sandbox/src/__tests__/redteam.test.ts</code></td></tr>
+    <tr><td>访问域外主机</td><td>network grant 可配置 allowedHosts；域外拒绝并记录原因</td><td><code>sandbox/src/broker.ts</code> 与 <code>broker2.test.ts</code></td></tr>
+    <tr><td>拿到 API key</td><td>SecretBroker 只返回引用；live grant 才解析值，输出会 redact</td><td><code>sandbox/src/broker.ts</code></td></tr>
+    <tr><td>调用不可信外部 MCP 工具</td><td>投影工具带 <code>needsApproval</code> 门</td><td><code>kernel/src/__tests__/mcp.test.ts</code></td></tr>
+    <tr><td>经浏览器扩展操作页面</td><td>默认 status/tabs/page_read 只读；page_act 需环境变量显式授权</td><td><code>docs/DEVLOG.md</code> 2026-10-05 MCP 追记</td></tr>
+  </tbody></table></div>
+  <div class="panels">
+    <div class="panel"><h3>这套设计降低什么</h3><ul><li>不可信文本不能直接等同于高权限工具调用。</li><li>一次提示绕过还需要面对路径、命令、密钥、网络和 MCP 权限。</li><li>审批规则本身被列为高影响状态，不能被普通工作区编辑静默改写。</li></ul></div>
+    <div class="panel"><h3>它不消除什么</h3><ul><li>模型仍可能被诱导生成错误分析或无害但浪费的调用。</li><li><code>--yes</code>、<code>approval:auto</code> 和过度宽泛的授权会削弱交互门。</li><li>模式匹配不是完整沙箱；高危环境仍要最小工作区、最小账号和隔离运行。</li></ul></div>
+  </div>
+</div></section>
+
+<section id="deployment"><div class="wrap">
+  <h2>建议部署姿势</h2>
+  <div class="panels">
+    <div class="panel"><h3>默认跑法</h3><ul><li>保持默认 ask，让写入、执行和外发副作用逐次确认。</li><li>把模型可见的网页、issue、文件内容当作数据，不当作新的系统指令。</li><li>CI 或服务进程使用非交互路径时，接受默认拒绝而不是自动放行。</li><li>密钥留在 HMH_HOME 或环境变量，不进入仓库、日志和模型上下文。</li></ul></div>
+    <div class="panel"><h3>升级授权时</h3><ul><li>只为具体工具、资源和时间段发 grant，避免长期通配授权。</li><li>MCP server 只在理解其工具面和权限要求后加入信任。</li><li>启用 auto 前先确认失败成本、回滚路径和审计位置。</li><li>浏览器页面动作保持默认关闭，确需启用时使用专用浏览器上下文。</li></ul></div>
+  </div>
+</div></section>
+
+<section id="sources"><div class="wrap">
+  <h2>证据来源</h2>
+  <p>以下链接均指向 public main <code>29d4a4d</code>，不是本地未提交代码。</p>
+  <div class="sources">
+    <div><b>审批默认</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/README.md#L117">README</a>：危险操作默认审批；非交互默认拒绝；破坏性模式硬拒；auto/--yes 显式放行。</span></div>
+    <div><b>HMH_HOME 与 deny-first</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/docs/ARCHITECTURE.md#L130-L133">ARCHITECTURE</a>：状态根隔离、仓库零密钥、工具执行 deny-first。</span></div>
+    <div><b>硬拒与规则保护</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/agent/src/tools.ts#L17-L27">DENY_PATTERNS</a>；<a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/agent/src/tools.ts#L84-L109">HMH_HOME always gated</a>。</span></div>
+    <div><b>能力与出站</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/sandbox/src/broker.ts#L4-L13">Capability Broker</a>；<a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/sandbox/src/__tests__/broker2.test.ts">egress 与 secret 测试</a>。</span></div>
+    <div><b>攻击用例</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/sandbox/src/__tests__/redteam.test.ts">red-team suite</a>：路径穿越、命令注入、secret exfiltration。</span></div>
+    <div><b>MCP 边界</b><span><a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/packages/kernel/src/__tests__/mcp.test.ts#L16-L19">untrusted server tools are gated</a>；<a href="https://github.com/swsgbl/hmharness/blob/29d4a4de3d55727d1d50bc1a271659558b0242e0/docs/DEVLOG.md#L335">extension MCP 默认只读</a>。</span></div>
+  </div>
+</div></section>
+
+<section id="boundaries"><div class="wrap">
+  <h2>边界声明</h2>
+  <div class="boundary"><ul>
+    <li>本页不是安全审计结论，也不是对全部输入向量、模型或部署环境的保证。</li>
+    <li>Prompt Injection 是开放问题；hmharness 提供的是可核查的权限与动作边界。</li>
+    <li><code>approval:auto</code>、<code>--yes</code>、过宽 grant 或用户手动确认恶意动作都会降低防线。</li>
+    <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
+  </ul></div>
+</div></section>
+
+<footer><div class="wrap"><a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="ecosystem-radar.html">生态雷达防过时指南</a> · <a href="llms.txt">llms.txt</a><div class="legal">HarmonyOS、鸿蒙、OpenHarmony、DevEco Studio 等名称归各自权利人所有，此处仅为描述性合理使用。© 2026 hmharness contributors · MIT License</div></div></footer>
+</body>
+</html>
