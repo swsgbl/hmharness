@@ -136,3 +136,14 @@ deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒�
 标准桌面（Node >= 22）使用 `npm install -g @hmharness/cli`，初始化 `hmh init`。贡献者或源码优先用户 clone 仓库后执行 `npm install && npm run build && npm link -w @hmharness/cli`。KaihongOS/OpenHarmony 板端在无 npm、只读根分区环境使用 `node scripts/install-kaihongos.cjs`。Quickstart 验证矩阵：https://swsgbl.github.io/hmharness/quickstart-matrix.html 。
 
 安装后先运行 `hmh check | devices` 验证本机工具链与设备列表。首错分流顺序：Node >= 22 → npm 包与入口（`npm list -g @hmharness/cli` / `hmh --help`）→ 无模型工具链 `hmh check` → 设备可见性 `hmh devices` → 模型配置。环境问题请到 https://github.com/swsgbl/hmharness/discussions/4 ，并附 OS/Node、DevEco 或 CLI/SDK 版本、真机或模拟器、首个卡点、脱敏 `hmh check` 输出；勿提交 token、cookie、私人路径或设备/账号标识。
+
+## hmh check 与 devices 失败怎么排查
+
+把首错拆成四层，避免把所有现象都叫“安装失败”：
+
+1. **运行时**：Node >= 22；不满足时先处理运行时。
+2. **包与入口**：`npm list -g @hmharness/cli` 能读到包，`hmh --help` 能执行；这一层只证明 npm 包和 CLI 入口存在。
+3. **工具链**：`hmh check` 是无模型探针，直连 hdc、hvigorw、ohpm、cjpm。缺 hdc、hvigorw 或 ohpm 时先安装或配置 SDK / DevEco CLI 后复跑；cjpm 探针失败是本机工具信号，不包装成通过。
+4. **设备可见性**：`hmh devices` 无设备是启动模拟器或接入已授权设备前的合法状态，不代表 npm 安装失败。
+
+需要结构化求助时使用 environment_report Issue 模板：https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml 。字段包括 OS、安装路线、npm list、脱敏 check/devices 输出和第一个卡点；勿提交 token、cookie、私人路径或设备/账号标识。证据：Quickstart 验证矩阵与 public main 的 environment_report.yml。
