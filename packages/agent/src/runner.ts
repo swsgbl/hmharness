@@ -678,7 +678,17 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
     time: new Date().toISOString(),
     session: session.id,
     task: opts.task.slice(0, 120),
-    outcome: result.turns >= cfg.maxTurns ? 'turn-budget' : 'ok',
+    // 2026-11-25: use the kernel's own stop reason (the same signal the
+    // observability trajectory, the cognitive recorder and the routing
+    // backfill already consume above) instead of re-deriving a two-valued
+    // "turn-budget"/"ok" from the turn count. The old line made every task
+    // that merely finished inside the budget read as "ok", so the impact
+    // loop's okRate measured "did not time out", not outcome.
+    // SCOPE - honest boundary: reason==='final' means "the model produced a
+    // final answer", NOT "the answer is correct". Correctness needs an
+    // external verifier; this fix aligns the signal and stops mis-labelling
+    // valve/interrupt stops as successes.
+    outcome: result.reason === 'final' ? 'ok' : result.reason,
     turns: result.turns,
     toolUses: result.toolUses,
     toolsUsed: [...new Set(toolsUsed)],
@@ -714,23 +724,29 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
  *  journal only; failures never surface into the user's chat. */
 async function triggerBackgroundEvolve(home: string): Promise<void> {
   try {
-    const { runEvolution } = await import('@hmharness/evolution');
+    const { buildCaseRunner, runEvolution } = await import('@hmharness/evolution');
     const { defaultConfig, loadConfig, resolveProvider, chat } = await import('@hmharness/kernel');
     const cfg = await loadConfig();
     const provider = resolveProvider(cfg, 'evolve');
     if (!provider.apiKey) return; // no provider configured - stay quiet
     const reg = nativeRegistry(0);
+    // 2026-11-25 root cause #2: this runner used to drop the skills prompt
+    // (its signature ignored the second argument), so the baseline and the
+    // candidate got identical messages and the gate compared A against A.
+    // Non-tool cases now go through the shared case-runner, which always
+    // injects; tool cases pass the prompt into the loop's system prompt.
+    const plainRunCase = buildCaseRunner({ chat: (msgs) => chat(provider, msgs) });
     await runEvolution({
       home,
       provider,
-      runCase: async (c) => {
+      runCase: async (c, skillsPrompt) => {
         if (c.tools) {
           const { buildSystemPrompt } = await import('./prompt.ts');
           const res2 = await runLoop({
             provider,
             registry: reg,
             messages: [
-              { role: 'system', content: buildSystemPrompt({ cwd: process.cwd(), home, memory: '', skills: '', insights: '', model: provider.model }) },
+              { role: 'system', content: buildSystemPrompt({ cwd: process.cwd(), home, memory: '', skills: skillsPrompt ?? '', insights: '', model: provider.model }) },
               { role: 'user', content: c.prompt },
             ],
             ctx: { cwd: process.cwd(), home },
@@ -738,8 +754,7 @@ async function triggerBackgroundEvolve(home: string): Promise<void> {
           });
           return res2.text;
         }
-        const r = await chat(provider, [{ role: 'user', content: c.prompt }]);
-        return r.message.content ?? '';
+        return plainRunCase(c, skillsPrompt ?? '');
       },
       log: () => undefined,
     });

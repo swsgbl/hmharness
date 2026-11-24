@@ -2811,15 +2811,15 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     if (line === '/evolve') {
       rt.setBusy(true, '/evolve');
       try {
+        const { buildCaseRunner } = await import('@hmharness/evolution');
         const { chat } = await import('@hmharness/kernel');
+        // 2026-11-25 root cause #2: the old runner here dropped the skills
+        // prompt, so /evolve measured A against A. Shared case-runner now.
+        const runCase = buildCaseRunner({ chat: (msgs) => chat(resolveProvider(cfg, 'evolve'), msgs) });
         const report = await runEvolution({
           home,
           provider: resolveProvider(cfg, 'evolve'),
-          runCase: async (c) => {
-            if (c.tools) return t.cmdEvolveHint;
-            const r = await chat(resolveProvider(cfg, 'evolve'), [{ role: 'user', content: c.prompt }]);
-            return r.message.content ?? '';
-          },
+          runCase: async (c, skillsPrompt) => (c.tools ? t.cmdEvolveHint : runCase(c, skillsPrompt ?? '')),
           log: (l) => rt.addText(l, 'dim'),
         });
         rt.addText(t.tuiEvolveDone(report.proposals.length, report.insightCount, report.noteCount));

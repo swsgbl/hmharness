@@ -16,6 +16,7 @@
  * analysis cannot tune them after seeing results (pre-registration rule).
  */
 import { createHash } from 'node:crypto';
+import { normalizeRegex } from './bench.ts';
 
 /* ---------------- pre-registered constants (frozen before any run) ---------------- */
 
@@ -155,7 +156,10 @@ export function judgeOutput(output: string, t: Pick<ExperimentTask, 'assertion'>
   }
   if (a.expectRegex !== undefined) {
     try {
-      if (!new RegExp(a.expectRegex).test(body)) return { pass: false, detail: `regex mismatch: /${a.expectRegex.slice(0, 60)}/`, falseCompletion: DONE_RE.test(body) };
+      // normalizeRegex: .task files carry JS-literal delimiters (/^\d+$/);
+      // without it the judge compared against the literal text "^\d+$" and
+      // 13 gate cases were unpassable (2026-11-25 root cause)
+      if (!new RegExp(normalizeRegex(a.expectRegex)).test(body)) return { pass: false, detail: `regex mismatch: /${a.expectRegex.slice(0, 60)}/`, falseCompletion: DONE_RE.test(body) };
     } catch {
       return { pass: false, detail: `invalid regex in case: ${a.expectRegex.slice(0, 40)}`, falseCompletion: false };
     }

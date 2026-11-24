@@ -53,6 +53,27 @@ export function matchExpect(output: string, expect: string[]): boolean {
   return expect.every((e) => lower.includes(e.toLowerCase()));
 }
 
+/** Strip JS regex-literal delimiters: `/^\d+$/i` -> `^\d+$`.
+ *  .task data files write expect-regex with slashes (bench/cases/*.task,
+ *  HarmonyBench exports); callers hand the value to `new RegExp(...)`, which
+ *  treats the slashes as literal characters — so `/^\d+$/` matched the
+ *  literal text "^\d+$" and never a digit. 13 of 35 gate cases were
+ *  unpassable for this reason (2026-11-25; three-arm v1/v2 root cause).
+ *  Flags are dropped on purpose: the assertions are case-sensitive.
+ *  A bare pattern (no leading slash) is returned untouched, and a pattern
+ *  whose first slash is never closed is treated as literal. */
+export function normalizeRegex(pattern: string): string {
+  if (pattern.length < 2 || pattern[0] !== '/') return pattern;
+  let escaped = false;
+  for (let i = 1; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '/') return pattern.slice(1, i);
+  }
+  return pattern;
+}
+
 /** Fence convention: when the reply is a fenced block, assertions test the
  *  fence INNER content (day-55 finding: models preserve literals verbatim
  *  inside code fences while normalizing them in prose - the fence is the
@@ -71,7 +92,9 @@ export function matchCase(output: string, c: Pick<BenchCase, 'expect' | 'expectE
   }
   if (c.expectRegex !== undefined) {
     try {
-      if (!new RegExp(c.expectRegex).test(body)) return { pass: false, detail: `regex mismatch: /${c.expectRegex.slice(0, 60)}/` };
+      // defense in depth: case objects built by hand (not via listCases)
+      // may still carry the delimiters
+      if (!new RegExp(normalizeRegex(c.expectRegex)).test(body)) return { pass: false, detail: `regex mismatch: /${c.expectRegex.slice(0, 60)}/` };
     } catch {
       return { pass: false, detail: `invalid regex in case: ${c.expectRegex.slice(0, 40)}` };
     }
@@ -115,7 +138,9 @@ export async function listCases(home: string): Promise<BenchCase[]> {
       prompt,
       expect: list('expect') ?? [],
       expectExact: pick('expect-exact')?.replace(/^"|"$/g, ''),
-      expectRegex: pick('expect-regex'),
+      // normalized at the parse boundary so every consumer (matchCase,
+      // three-arm judgeOutput, experiment drivers) gets a bare pattern
+      expectRegex: pick('expect-regex') !== undefined ? normalizeRegex(pick('expect-regex') as string) : undefined,
       expectNone: list('expect-none'),
       expectAny: list('expect-any'),
       tools: pick('tools') === 'loop',
