@@ -157,3 +157,40 @@ test('AWM clusters: repeated task archetypes surface as workflow candidates', as
   assert.equal(clusters[0].tasks.length, 3);
   await rm(home, { recursive: true, force: true });
 });
+
+// 2026-11-25 regression (plan audit): the agent logged the outcome as
+// 'ok' whenever the loop merely finished inside the turn budget, so a task
+// stopped by the token valve, the turn valve, an idle detector or an
+// interrupt all counted as successes in the impact loop's okRate - the rate
+// that graduates or retires canary skills. These outcomes now mirror the
+// kernel's LoopResult.reason and must NOT count as ok.
+test('impact okRate counts only genuine final answers, never valve/idle/interrupt stops', async () => {
+  const home = await freshHome();
+  try {
+    await writeDraft(home, 'sk', '# sk\nA skill.');
+    await promoteSkill(home, 'sk', { canary: true });
+    const stop: Array<Insight['outcome']> = ['turn-valve', 'token-valve', 'idle', 'interrupted', 'turn-budget'];
+    const lines: string[] = [];
+    let n = 0;
+    // 10 exposed sessions, every one stopped by a valve/interrupt: okRate must be 0
+    for (const o of stop) for (let k = 0; k < 2; k++) {
+      lines.push(JSON.stringify({ time: new Date(Date.now() - (40 - n) * 60_000).toISOString(), session: `e${n}`, task: `t${n}`, outcome: o, turns: 9, toolUses: 2, toolsUsed: ['read_file'], skillsInjected: ['sk'] } satisfies Insight));
+      n++;
+    }
+    // 10 control sessions, all genuine final answers: okRate 1.0
+    for (let k = 0; k < 10; k++) {
+      lines.push(JSON.stringify({ time: new Date(Date.now() - (40 - n) * 60_000).toISOString(), session: `c${n}`, task: `t${n}`, outcome: 'ok', turns: 2, toolUses: 1, toolsUsed: ['read_file'], skillsInjected: [] } satisfies Insight));
+      n++;
+    }
+    await writeFile(join(home, 'insights', 'insights.jsonl'), lines.join('\n') + '\n', 'utf8');
+    const rep = await impactReport(home);
+    const row = rep.rows.find((r) => r.skill === 'sk');
+    assert.ok(row, 'canary row present');
+    assert.equal(row.exposed.sessions, 10);
+    assert.equal(row.exposed.okRate, 0, 'no valve/interrupt stop may count as ok');
+    assert.equal(row.control.okRate, 1);
+    assert.equal(row.verdict, 'retire', 'a skill whose sessions never reach a final answer is harmful, not neutral');
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});

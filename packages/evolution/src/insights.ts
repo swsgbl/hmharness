@@ -12,7 +12,15 @@ export interface Insight {
   time: string;
   session: string;
   task: string;
-  outcome: 'ok' | 'turn-budget' | 'error';
+  /** How the task's agent loop stopped. `ok` = the model produced a final
+   *  answer. The rest mirror the kernel's `LoopResult.reason` (2026-11-25;
+   *  before that the agent re-derived a two-valued 'ok' | 'turn-budget' from
+   *  the turn count, so a loop stopped by the token valve or an interrupt
+   *  was logged as a success). 'turn-budget' is kept because it is what
+   *  historical records on disk contain.
+   *  NOTE: `ok` is "finished with an answer", not "the answer is correct" -
+   *  correctness is not observable from inside the loop. */
+  outcome: 'ok' | 'turn-budget' | 'error' | 'turn-valve' | 'token-valve' | 'idle' | 'interrupted';
   turns: number;
   toolUses: number;
   toolsUsed: string[];
