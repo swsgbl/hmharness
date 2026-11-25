@@ -147,3 +147,11 @@ deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒�
 4. **设备可见性**：`hmh devices` 无设备是启动模拟器或接入已授权设备前的合法状态，不代表 npm 安装失败。
 
 需要结构化求助时使用 environment_report Issue 模板：https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml 。字段包括 OS、安装路线、npm list、脱敏 check/devices 输出和第一个卡点；勿提交 token、cookie、私人路径或设备/账号标识。证据：Quickstart 验证矩阵与 public main 的 environment_report.yml。
+
+## hmh mcp-serve 默认暴露哪些工具？会不会绕过审批？
+
+不会绕过审批。`hmh mcp-serve` 是给 Claude Code、Codex、Cursor 等 MCP 宿主使用的鸿蒙工具箱出口，不是另一个嵌套智能体循环。
+
+默认只暴露 `harmony_*` 域工具，例如构建、装机、日志、签名、API 检索和雷达；`run_command`、`write_file` 等通用工具不暴露，因为宿主自己有。可用 `HMH_MCP_TOOLS` 继续收窄工具面。每次调用由宿主自己的权限系统逐个确认，server 侧破坏性硬墙仍在；`--yes` 与 `approval:auto` 是显式扩大授权的例外，不是安全证明。
+
+外部调用会写入 `insights/mcp-calls.jsonl`，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 `hmh` 会话中运行。证据：public main 的 README「在 Claude Code / Codex 里用（MCP 服务器模式）」、ROADMAP MCP server 模式与 DEVLOG 2026-09-07。
