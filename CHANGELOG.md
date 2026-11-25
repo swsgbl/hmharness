@@ -1,3 +1,19 @@
+## [0.23.53] - 2026-11-26
+
+现代 Web 改造(基于 modern-web-guidance 技能的全项目升级,PR#44):三处界面全面加固,非界面代码按指南现代化。
+
+**网页端安全**:① nonce 随机数 CSP(`script-src 'nonce-…' 'strict-dynamic'`)+ 基础安全头(X-Content-Type-Options / Referrer-Policy / Cross-Origin-Resource-Policy / Permissions-Policy / frame-ancestors 'none')+ `POST /api/csp-report` 上报接口;② GSAP CDN 脚本移除——入场动效改用 Web Animations API(仅动 opacity 与独立 transform 属性,fill 仅 backwards,实时跟随"减少动效")。
+
+**网页端无障碍**:地标(aside/main)、导航与输入的可访问名称随语言同步、会动作的元素全部原生 button、三个弹层的背景置为 inert(键盘出不去)、右栏标准 tablist(方向键/Home/End)、统一的 focus-visible 焦点环、100dvh、减少动效、强制色、根元素 color-scheme。顺带修掉两个原有缺陷:命令面板的回车缺输入法组合保护(选词即误执行);Shift+Enter 换行被 preventDefault 吞掉(占位文字承诺了换行,0.23.52 实测"第一行第二行"连在一起)。键盘走查:右栏关闭时旧版有 8 个看不见的焦点停靠点,新版 0 个。
+
+**官网(6 页 + 生成页)**:首页去掉 GSAP CDN 改原生动画,并加动效开关(记住偏好);每页都有 <main>、跳转链接与 color-scheme;导航锚点不再被导航栏遮挡;强制色模式下标题与统计数字可见(此前是透明的);表头 scope、可滚动区键盘可达、字号用 rem、打印样式;320–1280 四种宽度零横向溢出(此前首页在 320/768、FAQ 在 320 溢出)。`scripts/check-website.cjs` 新增三组守门规则(无第三方资源/内联事件/横向裁切,页面结构,测试数四处一致),并修正首页过期的测试数。
+
+**浏览器扩展侧栏**:标题与主地标、端口输入有标签、状态点用形状 + 可访问名称区分状态、对话区 role=log 且只追加新消息(此前每条消息重建全部,读屏会重读整段)、输入法回车兜底、统一焦点环。
+
+**非界面代码**:`toSorted`/`toReversed`/`findLast` 13 处、`Error(msg, { cause })` 5 处、`AbortSignal.timeout` 3 处(kernel 新增 `deadlineSignal`)、`structuredClone` 1 处;修复 Git Bash 下恢复检查点必败(tar 把盘符当远程主机)。
+
+**测试**:CI 实测 1126(1125 通过 / 1 跳过)。
+
 ## [0.23.52] - 2026-11-25
 
 技能正文可达性(PR#43):自进化晋升的技能在真实会话里基本没被读过。对会话历史的审计(`website/evidence/experiments/skill-reach-2026-11-25/`):注入了技能的 2228 个会话里只有 43 个(1.9%)读到过任何 SKILL.md,77 次读取里 23 次因路径猜错失败。两处修复:①系统提示词的技能清单每行加子目录标记(`[active]` / `[canary]`),并给出"标记 → 路径"的图例,根目录是本次会话真实的 HMH_HOME(不逐行写完整路径:120 行的技能库每次调用会多约 1800 token);②`parseDescription` 规范化换行并支持折叠块标量——此前该库 120 行清单里 65 行的描述是字面的 `name: <技能名>`(CRLF frontmatter 没被解析),修后为 0。新增 7 个回归测试;全套 1090 测试(CI 实测: 1089 通过 / 1 跳过; 本机主套件 1087 + scripts 44, 零失败)。**未证明**:修复后的技能读取率(待带技能的隔离环境做对照实验)。
