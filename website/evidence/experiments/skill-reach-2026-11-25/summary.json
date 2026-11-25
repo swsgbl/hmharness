@@ -1,0 +1,36 @@
+{
+  "title": "技能正文可达性审计: 模型到底读没读过技能文件",
+  "date": "2026-11-25",
+  "question": "自进化晋升的技能, 在真实会话里有没有被模型读到正文?",
+  "method": "洞察记录(insights/*.jsonl)里 skillsInjected 非空的会话 = 注入过技能的会话; 在这些会话的转录里找 read_file 且路径含 SKILL.md 的调用。",
+  "scope": "一台维护者机器, HMH_HOME 下的全部洞察与会话文件。只发布计数。",
+  "results": {
+    "insightRecords": 2521,
+    "sessionsWithSkillsInjected": 2228,
+    "sessionsThatReadAnySkillFile": 43,
+    "sharePercent": 1.9,
+    "readFileCallsOnSkillFile": 77,
+    "readFileCallsThatFailed": 23
+  },
+  "libraryAudit": {
+    "listedLines": 120,
+    "skillsWithCrlfFrontmatter": 65,
+    "descriptionCameOutAsNameField": 65,
+    "descriptionCameOutAsNameFieldAfterFix": 0
+  },
+  "reading": [
+    "注入了技能的 2228 个会话里, 只有 43 个(1.9%)读到过任何 SKILL.md; 这 43 个里还包括读取其它框架技能目录的, hmharness 自己技能的读取率更低。",
+    "77 次读取里 23 次失败: 系统提示词的技能清单只有 '- 名字: 描述', 不带文件位置, 而 SKILL.md 分布在 skills/<name>/、skills/active/<name>/、skills/canary/<name>/ 三处, 模型在猜路径。",
+    "清单里 120 行有 65 行的描述是字面的 'name: <技能名>': 这些文件带标准 frontmatter 但是 CRLF 换行, 只认 LF 的正则没匹配到 frontmatter, 回落后取到了 frontmatter 里的 name 字段 —— 模型无从知道这些技能是做什么的。",
+    "两处合起来: 即便门控完美、晋升了再好的技能, 技能正文在 98% 以上的真实会话里到不了模型眼前。"
+  ],
+  "fix": "清单每行加子目录标记([active] / [canary]), 系统提示词给出 '标记 → 路径' 的图例(根目录是本次会话真实的 HMH_HOME); parseDescription 先规范化换行, 支持 CRLF frontmatter 与折叠块标量, frontmatter 缺 description 时回落到正文而不是别的字段。回归测试: packages/evolution/src/__tests__/skills-prompt.test.ts, packages/agent/src/__tests__/prompt-skills.test.ts。",
+  "notShown": [
+    "修复之后读取率会升到多少, 尚未测量(需要 A/B: 带技能的隔离 home, 对照旧提示词与新提示词)。审计脚本的读取率统计可以在修复上线后重跑。"
+  ],
+  "limitations": [
+    "单机、单一使用者; 技能库构成(90 个从其它框架导入的顶层技能 + 34 个 active + 13 个 canary)是这台机器特有的。",
+    "读取率按 '会话里出现过至少一次成功的 SKILL.md 读取' 计, 不区分读的是不是 hmharness 自己的技能。"
+  ],
+  "reproduce": "node website/evidence/experiments/skill-reach-2026-11-25/audit.mjs"
+}

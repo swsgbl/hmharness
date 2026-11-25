@@ -167,9 +167,30 @@ async function scan(dir: string, exclude: string[], state: SkillState): Promise<
   return entries;
 }
 
+/** Sub-folder of the skills root a SKILL.md lives in, or '' for the top-level
+ *  layout: skills\<name>\SKILL.md → '', skills\active\<name>\SKILL.md → 'active'.
+ *  Derived from the file path: top-level and active/ entries both carry
+ *  state 'active', so the state alone cannot tell the model where to read. */
+function folderTag(file: string): string {
+  const norm = file.replace(/\\/g, '/');
+  const i = norm.lastIndexOf('/skills/');
+  if (i < 0) return '';
+  const parts = norm.slice(i + '/skills/'.length).split('/');
+  return parts.length > 2 ? parts[0] : '';
+}
+
+/** One line per skill. The line carries the skill's sub-folder as a short tag
+ *  (`- name [canary]: description`); the system prompt supplies the
+ *  "tag → path" legend under the real HMH_HOME. Before 2026-11-25 the line had
+ *  no location at all: SKILL.md files sit in three different folders and the
+ *  model had to guess — in the session history it read a skill body in 1.9% of
+ *  the sessions that had skills injected (23 of 77 reads failed on the path). */
 export function skillsToPrompt(entries: SkillEntry[]): string {
   if (entries.length === 0) return '';
-  return entries.map((s) => `- ${s.name}: ${s.description || '(no description)'}`).join('\n');
+  return entries.map((s) => {
+    const tag = folderTag(s.file);
+    return `- ${s.name}${tag ? ` [${tag}]` : ''}: ${s.description || '(no description)'}`;
+  }).join('\n');
 }
 
 /** Write (or overwrite) a draft; drafts are cheap and reversible by deletion. */
@@ -299,14 +320,36 @@ function sanitize(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60) || 'skill';
 }
 
-function parseDescription(text: string): string {
-  // frontmatter "description:" line, or first non-heading non-empty line
-  const fm = text.match(/^---\n([\s\S]*?)\n---/);
-  if (fm) {
-    const m = fm[1].match(/^description:\s*(.+)$/m);
-    if (m) return m[1].trim().slice(0, 120);
+/** The frontmatter `description`: inline (optionally quoted) or a folded/literal block scalar. '' when absent. */
+function frontmatterDescription(fm: string): string {
+  const lines = fm.split('\n');
+  const i = lines.findIndex((l) => /^description:/.test(l));
+  if (i < 0) return '';
+  const inline = lines[i].replace(/^description:\s*/, '').trim();
+  if (!/^[>|][+-]?$/.test(inline)) return inline.replace(/^["']|["']$/g, '').trim();
+  // block scalar: every following indented line belongs to it
+  const folded: string[] = [];
+  for (const l of lines.slice(i + 1)) {
+    if (!/^\s/.test(l) || !l.trim()) break;
+    folded.push(l.trim());
   }
-  for (const line of text.split('\n')) {
+  return folded.join(' ');
+}
+
+/** One-line description of a SKILL.md: the frontmatter `description`, else the
+ *  first non-heading non-empty line of the BODY. Line endings are normalised
+ *  first: 65 of 107 skills in a real library had CRLF frontmatter, which the
+ *  LF-only regex missed, so their "description" came out as the frontmatter's
+ *  "name: <skill>" line and the model could not tell what they were for.
+ *  Frontmatter without a description falls through to the body, never to
+ *  another frontmatter field. Exported for tests. */
+export function parseDescription(text: string): string {
+  const lf = text.replace(/\r\n/g, '\n');
+  const fm = lf.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
+  const body = fm ? lf.slice(fm[0].length) : lf;
+  const fromFm = fm ? frontmatterDescription(fm[1]) : '';
+  if (fromFm) return fromFm.trim().slice(0, 120);
+  for (const line of body.split('\n')) {
     const t = line.trim();
     if (t && !t.startsWith('#') && !t.startsWith('---')) return t.slice(0, 120);
   }

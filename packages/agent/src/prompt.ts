@@ -9,6 +9,7 @@
  */
 import type { HmhConfig } from '@hmharness/kernel';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export function buildSystemPrompt(opts: {
   cwd: string;
@@ -132,10 +133,16 @@ export function buildSystemPrompt(opts: {
     parts.push('', '## Long-term memory', opts.memory.trim());
   }
   if (opts.skills.trim()) {
+    // Where to read a skill body: the list lines carry only a sub-folder tag
+    // ([active] / [canary]); spell out tag → path under THIS home (an isolated
+    // HMH_HOME cannot be guessed). 2026-11-25: without this the model read a
+    // skill body in 1.9% of the sessions that had skills injected.
+    const skillsRoot = join(opts.home, 'skills');
     parts.push(
       '',
       '## Skill library',
-      'Read a skill file with read_file before applying it the first time.',
+      `Each skill is a SKILL.md file. Untagged entry: ${join(skillsRoot, '<name>', 'SKILL.md')}. Tagged entry [tag]: ${join(skillsRoot, '<tag>', '<name>', 'SKILL.md')}.`,
+      'Read the skill file with read_file before applying it the first time.',
       opts.skills.trim(),
     );
   }
