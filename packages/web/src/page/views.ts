@@ -309,7 +309,7 @@ export const VIEWS = `  /* ---- board / devices / skills views ---- */
           .catch(function (e) { run.disabled = false; out.style.display = 'block'; out.textContent = String(e); });
       }
       run.onclick = function () { send(false); };
-      input.onkeydown = function (ev) { if (ev.key === 'Enter' && !ev.isComposing) send(false); };
+      input.onkeydown = function (ev) { if (enterConfirmed(ev)) send(false); };
       card.appendChild(head); card.appendChild(cmd); card.appendChild(out);
       box.appendChild(card);
     });

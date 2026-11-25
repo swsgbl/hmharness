@@ -334,6 +334,105 @@ export function esc(s: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Motion layer (2026-11-25, modern-web-guidance `motion`): the page's entrance effects on
+ *  the Web Animations API. `element.animate()` is Baseline widely available, so the page needs
+ *  no third-party animation library — it used to block on a synchronous GSAP script from
+ *  jsDelivr: a render-blocking request to a third party on every load (the page waited on it
+ *  offline, behind a network filter or when the CDN itself was down), and a script source a
+ *  nonce-only CSP cannot admit. Rules followed here: only `opacity` and the individual
+ *  transform properties `translate`/`scale` are animated (compositor thread, and they compose
+ *  with — never clobber — an element's own `transform`); animations fill backwards only, so a
+ *  staggered element holds its first keyframe through its delay while the element's OWN styles
+ *  stay the final state (nothing is left hidden when an animation is cut); spatial motion is
+ *  off under prefers-reduced-motion, tracked live. `window`/`document` are parameters so node
+ *  tests drive it with fakes. */
+export function createMotion(win?: any, doc?: any) {
+  var w = win || window;
+  var d = doc || document;
+  var root = d.documentElement;
+  var supported = !!(root && typeof root.animate === 'function');
+  var reduce = false;
+  var mq: any = null;
+  try { mq = w.matchMedia('(prefers-reduced-motion: reduce)'); reduce = !!mq.matches; } catch (e) { /* no matchMedia: static */ }
+  function refresh() { try { reduce = !!mq.matches; } catch (e) { /* keep the last reading */ } }
+  try { if (mq && mq.addEventListener) mq.addEventListener('change', refresh); } catch (e) { /* preference is read once */ }
+
+  // the curves the old library named power2.out / power3.out / back.out(1.6) / back.out(2.2)
+  var POWER2 = 'cubic-bezier(0, 0, 0.58, 1)';
+  var POWER3 = 'cubic-bezier(0.215, 0.61, 0.355, 1)';
+  var BACK = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+  var BACK_HARD = 'cubic-bezier(0.2, 1.9, 0.4, 1)';
+  var TAG = 'hmh-motion';
+
+  function toArr(el: any): any[] {
+    if (!el) return [];
+    if (typeof el === 'string') return Array.prototype.slice.call(d.querySelectorAll(el));
+    if (typeof el.length === 'number') return Array.prototype.slice.call(el);
+    return [el];
+  }
+  function play(els: any[], keyframes: any[], opt: { d: number; e: string; step?: number }) {
+    if (reduce || !supported) return;
+    for (var i = 0; i < els.length; i++) {
+      try {
+        // the old overwrite:'auto': restart only OUR interrupted entrances
+        var running = els[i].getAnimations ? els[i].getAnimations() : [];
+        for (var j = 0; j < running.length; j++) if (running[j].id === TAG) running[j].cancel();
+        var a = els[i].animate(keyframes, { duration: opt.d, easing: opt.e, delay: i * (opt.step || 0), fill: 'backwards' });
+        a.id = TAG;
+      } catch (e) { /* an element that cannot animate simply rests in its final state */ }
+    }
+  }
+
+  return {
+    // live: the reduced-motion preference can change while the page is open
+    get ok() { return supported && !reduce; },
+    viewIn: function (el: any) {
+      play(toArr(el), [{ opacity: 0, translate: '0 14px' }, { opacity: 1, translate: '0 0' }], { d: 320, e: POWER2 });
+    },
+    stagger: function (sel: any, scope?: any) {
+      play(toArr(scope ? (scope.querySelectorAll ? scope.querySelectorAll(sel) : []) : sel),
+        [{ opacity: 0, translate: '0 10px' }, { opacity: 1, translate: '0 0' }], { d: 300, e: POWER2, step: 40 });
+    },
+    popIn: function (el: any) {
+      play(toArr(el), [{ opacity: 0, translate: '0 8px', scale: '0.94' }, { opacity: 1, translate: '0 0', scale: '1' }], { d: 360, e: BACK });
+    },
+    userBubble: function (el: any) {
+      play(toArr(el), [{ opacity: 0, translate: '26px 0' }, { opacity: 1, translate: '0 0' }], { d: 280, e: POWER3 });
+    },
+    rowIn: function (el: any) {
+      play(toArr(el), [{ opacity: 0, translate: '0 8px' }, { opacity: 1, translate: '0 0' }], { d: 240, e: POWER2 });
+    },
+    tick: function (el: any) {
+      play(toArr(el), [{ scale: '1.3' }, { scale: '1' }], { d: 320, e: BACK_HARD });
+    },
+  };
+}
+
+/** The three modal overlays (#wspick, #cmdpal, #pairmod) are custom overlays, not <dialog>
+ *  (modern-web-guidance `accessibility`): while one carries the .on class, the regions behind
+ *  it are inert, so Tab and assistive tech cannot reach the background. The state is always
+ *  re-derived from the overlay classes — never stored — so no open/close path can leave the
+ *  page inert by mistake. `sync()` is returned for the close paths that move focus back into
+ *  the page right away (the observer only runs a microtask later). */
+export function wireModalInert(doc?: any) {
+  var d = doc || document;
+  var regions = Array.prototype.slice.call(d.querySelectorAll('#side, #main, #rightbar'));
+  var overlays = Array.prototype.slice.call(d.querySelectorAll('#wspick, #cmdpal, #pairmod'));
+  var mo: any = null;
+  function sync() {
+    var open = overlays.some(function (o: any) { return o.classList.contains('on'); });
+    regions.forEach(function (r: any) {
+      if (open) r.setAttribute('inert', ''); else r.removeAttribute('inert');
+    });
+  }
+  if (typeof MutationObserver === 'function' && overlays.length) {
+    mo = new MutationObserver(sync);
+    overlays.forEach(function (o: any) { mo.observe(o, { attributes: true, attributeFilter: ['class'] }); });
+  }
+  sync();
+  return { sync, disconnect() { if (mo) mo.disconnect(); } };
+}
+
 export function uiLiteSource(): string {
   // __name polyfill: tsx/esbuild (keep-names) rewrites inner function decls as
   // `var f = __name(function f(){...})` INSIDE the serialized bodies - the
@@ -343,6 +442,6 @@ export function uiLiteSource(): string {
   return [prelude,
     tokLine, renderInlineBlocks, inlineMd,
     fuzzyMatchScore, parseUnifiedDiff, looksLikeDiff, renderMarkdown, extractPlan, extractDeliverables, zhTask,
-    classifyToolPhase, hasPlanText, esc]
+    classifyToolPhase, hasPlanText, esc, createMotion, wireModalInert]
     .map(function (f) { return typeof f === 'string' ? f : f.toString(); }).join('\n');
 }

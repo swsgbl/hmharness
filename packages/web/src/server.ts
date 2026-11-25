@@ -24,6 +24,7 @@ import {
 import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
 import { buildRegistry, runAgentTask } from '@hmharness/agent';
 import { PAGE } from './page.ts';
+import { BASE_HEADERS, CSP_REPORT_ENDPOINT, PIN_PAGE, documentHeaders, newNonce, stamp, summarizeCspReport } from './security-headers.ts';
 import { tunnel, isInternetTunnelHost, type TunnelState } from './tunnel.ts';
 import {
   insideRoot, toRel, fuzzyScore, parseImageDataUrl, buildAttachmentsPrefix, buildImagePrefix,
@@ -165,40 +166,6 @@ function recordPinFailure(ip: string): void {
   if (f.n >= 3) { f.until = Date.now() + 60_000; f.n = 0; }
   pinFailures.set(ip, f);
 }
-
-/** Phone-side PIN entry page (internet pairing only; minimal, self-contained). */
-const PIN_PAGE = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<title>配对 hmh</title><style>
-:root{color-scheme:light dark}
-body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#141416;color:#f5f5f6;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.card{width:100%;max-width:320px;padding:28px 24px;text-align:center}
-h1{font-size:18px;margin:0 0 6px}
-p{color:#95979d;font-size:13px;margin:0 0 18px}
-input{width:100%;box-sizing:border-box;padding:12px;font:24px/1 monospace;letter-spacing:8px;text-align:center;border-radius:10px;border:1px solid #33353a;background:#1e2024;color:#f5f5f6;outline:none}
-button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:10px;background:#2f81f7;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
-#st{margin-top:12px;font-size:12px;color:#95979d;min-height:18px}
-.err{color:#f85149}
-</style></head><body><div class="card"><h1>输入配对密码</h1>
-<p>密码显示在电脑上的配对窗口中（6 位数字）</p>
-<input id="pin" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••" autofocus>
-<button onclick="go()">连接</button><div id="st"></div>
-<script>
-var st=document.getElementById('st');
-document.getElementById('pin').addEventListener('keydown',function(e){if(e.key==='Enter')go()});
-async function go(){
-  var pin=document.getElementById('pin').value.trim();
-  if(pin.length!==6){st.className='err';st.textContent='请输入 6 位密码';return}
-  st.className='';st.textContent='正在验证…';
-  try{
-    var r=await fetch('/pair/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pin:pin})});
-    var j=await r.json();
-    if(j.ok){st.textContent='配对成功，正在进入…';location.href='/';return}
-    st.className='err';st.textContent=j.error||'验证失败';
-    if(j.rescan)st.textContent='二维码已过期，请在电脑上重新扫码';
-  }catch(e){st.className='err';st.textContent='网络异常，请重试'}
-}
-</script></div></body></html>`;
 
 /** Version of THIS serving process's code. The CLI's version-aware daemon
  *  check compares the SERVED value against its own instead of trusting the
@@ -809,6 +776,9 @@ export async function startServer(opts: {
   // listen() (port 0 → OS-assigned). The Host allowlist reads it per-request.
   let actualPort = opts.port;
   const server = createServer(async (req, res) => {
+    // baseline hardening on EVERY response, before any route can write one
+    // (security-headers.ts); the three HTML documents add the nonce CSP below
+    for (const [name, value] of Object.entries(BASE_HEADERS)) res.setHeader(name, value);
     // ---- mobile pairing routes run BEFORE the exposure gate: the phone's
     // ONLY proof is the QR-borne one-time token (or the tunnel PIN). These
     // two routes never expose task data by themselves. ----
@@ -825,7 +795,7 @@ export async function startServer(opts: {
           res.writeHead(302, { location: '/' }); res.end(); return;
         }
         if (!pairingValid() || !safeEqual(url.searchParams.get('token') ?? '', pairToken)) {
-          res.writeHead(401, { 'content-type': 'text/html; charset=utf-8' });
+          res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', ...documentHeaders(newNonce()) });
           res.end('<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><body style="font:15px/1.6 -apple-system,sans-serif;display:grid;place-items:center;min-height:100dvh;margin:0;background:#141416;color:#f5f5f6"><div style=text-align:center><div style=font-size:44px>⏱️</div><h3>配对链接已失效</h3><p style=color:#95979d>请在电脑上的 hmh 网页点 📱 重新扫码</p></div></body>');
           return;
         }
@@ -837,8 +807,9 @@ export async function startServer(opts: {
         }
         // internet pairing: the QR token opened the door, the 6-digit PIN
         // (shown on the computer) keeps anyone else who copied the link out.
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end(PIN_PAGE);
+        const pinNonce = newNonce();
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...documentHeaders(pinNonce) });
+        res.end(stamp(PIN_PAGE, pinNonce));
         return;
       }
       if (req.method === 'POST' && url.pathname === '/pair/verify') {
@@ -925,9 +896,21 @@ export async function startServer(opts: {
       return;
     }
     try {
+      if (req.method === 'POST' && url.pathname === CSP_REPORT_ENDPOINT) {
+        // Content-Security-Policy violation reports (Reporting-Endpoints "hmh-csp").
+        // Arrives behind the exposure gate like every other API call. Logged, not
+        // stored: a report names the blocked directive/URI, never page content.
+        // Malformed or oversized bodies are dropped, never surfaced as errors.
+        let summary: string | null = null;
+        try { summary = summarizeCspReport(JSON.parse((await readBody(req, 16_000)) || 'null')); } catch { /* not a report */ }
+        if (summary) console.error('[csp-report]', summary);
+        res.writeHead(204); res.end();
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(PAGE);
+        const pageNonce = newNonce();
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...documentHeaders(pageNonce) });
+        res.end(stamp(PAGE, pageNonce));
         return;
       }
       // remote/extension routes live in routes/remote.ts (web split slice 4);

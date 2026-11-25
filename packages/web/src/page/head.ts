@@ -1,6 +1,8 @@
 /**
  * @hmharness/web - page/head.ts - 文档头与全部 CSS(三栏布局/主题 token/响应式断点/各视图样式,含 W7 右栏与 W6 输入区)
- * P1-3 拆分自 page.ts(基线 682d4fc 行 14-481):逐字搬运的页面
+ * 2026-11-26 追加(modern-web-guidance):统一的 :focus-visible 焦点环、100dvh、根元素 color-scheme、
+ * 减少动效、强制色、触屏目标尺寸、安全区内边距,以及按钮化元素的 UA 样式复位。
+ * 这些不变量由 __tests__/a11y.test.ts 逐条断言。P1-3 拆分自 page.ts(基线 682d4fc 行 14-481):逐字搬运的页面
  * 源码片段,由 page.ts 装配层按序拼接,字节级一致由拆分期守门脚本校验。
  * 模板字面量规则同 page.ts:无裸反引号,页面 JS 内不用插值(字符串拼接),
  * 正则反斜杠双写。
@@ -9,15 +11,19 @@ export const HEAD = `<!doctype html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
 <title>hmh web</title>
 <style>
+  /* theme: the page ships its own dark/light/system tokens below; color-scheme makes the
+     browser-drawn UI (form controls, scrollbars, canvas) follow the active one. The root
+     defaults to dark; applyTheme() (page/chrome.ts) moves the root to the saved theme. */
   :root { --bg:#101418; --panel:#171d24; --panel2:#1c242e; --line:#242c36; --text:#dbe4ee; --dim:#7d8b9c;
-          --accent:#31a8ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149; --mono:ui-monospace,Consolas,monospace; }
+          --accent:#31a8ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149; --mono:ui-monospace,Consolas,monospace; color-scheme:dark; }
   /* A11 theme: light + system modes override the semantic tokens; the page
      only ever reads var(--*) so one switch flips everything */
   body[data-theme="light"] { --bg:#f5f7fa; --panel:#ffffff; --panel2:#eef1f5; --line:#dde3ea; --text:#1c2733; --dim:#5b6b7c;
-          --accent:#0a7fd4; --ok:#1a7f37; --warn:#9a6700; --err:#cf222e; }
+          --accent:#0a7fd4; --ok:#1a7f37; --warn:#9a6700; --err:#cf222e; color-scheme:light; }
   @media (prefers-color-scheme: dark) {
     body[data-theme="system"] { --bg:#101418; --panel:#171d24; --panel2:#1c242e; --line:#242c36; --text:#dbe4ee; --dim:#7d8b9c;
           --accent:#31a8ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149; }
@@ -26,9 +32,10 @@ export const HEAD = `<!doctype html>
     body[data-theme="system"] { --bg:#f5f7fa; --panel:#ffffff; --panel2:#eef1f5; --line:#dde3ea; --text:#1c2733; --dim:#5b6b7c;
           --accent:#0a7fd4; --ok:#1a7f37; --warn:#9a6700; --err:#cf222e; }
   }
+  body[data-theme="system"] { color-scheme:light dark; }
   /* A6 plan card: pinned checklist at the top of the conversation */
   #plancard { margin:8px 16px 0; padding:8px 12px; background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--warn); border-radius:8px; font-size:12.5px; }
-  #plancard .phead { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--warn); cursor:pointer; }
+  #plancard .phead { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--warn); }
   #plancard .psteps { margin-top:6px; }
   #plancard .pstep { display:flex; gap:7px; align-items:flex-start; padding:2px 0; }
   #plancard .pstep input { margin-top:3px; }
@@ -38,7 +45,7 @@ export const HEAD = `<!doctype html>
   .toolrow.subagent .nm { color:var(--accent); font-weight:600; }
   /* A9 deliverables chips */
   #deliv { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 4px; }
-  #deliv .deliv { font-size:11px; font-family:var(--mono); color:var(--accent); background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 7px; cursor:pointer; }
+  #deliv .deliv { font-size:11px; font-family:var(--mono); line-height:inherit; color:var(--accent); background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 7px; cursor:pointer; }
   #deliv .deliv:hover { border-color:var(--accent); }
   /* A8 permission preset popover */
   #presetpop { display:none; position:absolute; bottom:calc(100% + 6px); right:0; z-index:60; width:270px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; }
@@ -52,9 +59,19 @@ export const HEAD = `<!doctype html>
   .acts .fb.on { color:var(--ok); }
   * { box-sizing:border-box; }
   html, body { height:100%; }
-  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,"Segoe UI",sans-serif; overflow:hidden; }
-  #app { display:grid; grid-template-columns:264px 1fr auto; grid-template-rows:100vh; height:100vh; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,"Segoe UI",sans-serif; overflow:hidden; overflow-wrap:break-word; accent-color:var(--accent); }
+  /* dvh: on phones the browser chrome shows/hides while the page is open; 100vh is the
+     LARGEST viewport there and left the composer under the URL bar (older browsers
+     keep the 100vh line above) */
+  #app { display:grid; grid-template-columns:264px 1fr auto; grid-template-rows:100vh; height:100vh; grid-template-rows:100dvh; height:100dvh; }
   body.sidemin #app { grid-template-columns:56px 1fr auto; }
+  /* focus: one visible ring for everything the keyboard can reach. Inputs used to switch
+     their outline off and only recolor a 1px border. #input is the exception: its card
+     already highlights through #inputcard:focus-within. */
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #input:focus-visible { outline:none; }
+  /* text for assistive tech only (the page heading, the layout is icon-first) */
+  .visually-hidden { position:absolute !important; clip-path:inset(50%) !important; overflow:hidden !important; width:1px !important; height:1px !important; margin:-1px !important; padding:0 !important; border:0 !important; white-space:nowrap !important; }
   /* min-height:0 everywhere content must shrink inside the grid/flex chain,
      otherwise the transcript grows past 100vh and pushes the composer
      off-screen (invisible with overflow:hidden) */
@@ -91,17 +108,22 @@ export const HEAD = `<!doctype html>
   #wscur #wscur-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
   #wslist { display:none; background:var(--panel2); border:1px solid var(--line); border-radius:8px; margin-top:4px; padding:4px; max-height:240px; overflow-y:auto; }
   #wsbox.open #wslist { display:block; }
-  .wsi { position:relative; padding:6px 8px 6px 10px; border-radius:6px; cursor:pointer; }
+  /* a workspace row = one switch button + its remove button (siblings, so both are real
+     buttons a keyboard can reach; the row itself is just the box) */
+  .wsi { position:relative; border-radius:6px; }
   .wsi:hover { background:var(--bg); }
   .wsi.on { background:var(--bg); }
+  .wsi .wmain { display:block; width:100%; text-align:left; background:none; border:0; color:inherit; font:inherit; padding:6px 8px 6px 10px; border-radius:6px; cursor:pointer; }
   .wsi .nm { font-size:12.5px; display:flex; gap:7px; align-items:center; padding-right:18px; }
   .wsi .nm .dot { width:6px; height:6px; border-radius:50%; background:var(--line); flex:none; }
   .wsi.on .nm .dot { background:var(--ok); }
   .wsi .pt { font-size:10.5px; color:var(--dim); font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
-  .wsi .wsx { position:absolute; right:5px; top:5px; visibility:hidden; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 4px; border-radius:4px; }
-  .wsi:hover .wsx { visibility:visible; }
+  /* shown on hover AND when the remove button itself has keyboard focus: an opacity:0
+     button stays in the tab order, a visibility:hidden one never reaches the keyboard */
+  .wsi .wsx { position:absolute; right:5px; top:5px; opacity:0; pointer-events:none; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 4px; border-radius:4px; }
+  .wsi:hover .wsx, .wsi .wsx:focus-visible { opacity:1; pointer-events:auto; }
   .wsi .wsx:hover { color:var(--err); }
-  .wsadd { font-size:12px; color:var(--dim); padding:6px 8px; cursor:pointer; border-top:1px dashed var(--line); margin-top:2px; }
+  .wsadd { display:block; width:100%; text-align:left; background:none; font-family:inherit; border:0; border-top:1px dashed var(--line); color:var(--dim); font-size:12px; padding:6px 8px; cursor:pointer; margin-top:2px; }
   .wsadd:hover { color:var(--accent); }
 
   /* ---- workspace directory picker ---- */
@@ -111,25 +133,26 @@ export const HEAD = `<!doctype html>
   #wsp-head { display:flex; align-items:center; font-weight:600; font-size:14px; }
   #wsp-close { margin-left:auto; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:2px 6px; border-radius:6px; }
   #wsp-close:hover { color:var(--text); background:var(--panel2); }
-  #wsp-path { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:6px 9px; font:12px var(--mono); outline:none; }
+  #wsp-path { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:6px 9px; font:12px var(--mono); }
   #wsp-path:focus { border-color:var(--accent); }
   #wsp-crumb { display:flex; flex-wrap:wrap; gap:2px; font-size:12px; color:var(--dim); font-family:var(--mono); align-items:center; }
-  #wsp-crumb span.pc { color:var(--accent); cursor:pointer; }
-  #wsp-crumb span.pc:hover { text-decoration:underline; }
+  #wsp-crumb .pc, #wsp-crumb .seg { background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; }
+  #wsp-crumb .pc { color:var(--accent); }
+  #wsp-crumb .pc:hover { text-decoration:underline; }
   #wsp-crumb span.sep { color:var(--line); }
-  #wsp-crumb span.seg { cursor:pointer; }
-  #wsp-crumb span.seg:hover { color:var(--text); text-decoration:underline; }
+  #wsp-crumb .seg { cursor:pointer; }
+  #wsp-crumb .seg:hover { color:var(--text); text-decoration:underline; }
   #wsp-list { min-height:180px; max-height:300px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:4px; }
-  .wsp-item { display:flex; gap:8px; align-items:center; padding:5px 9px; border-radius:6px; cursor:pointer; font-size:12.5px; }
+  .wsp-item { display:flex; width:100%; text-align:left; gap:8px; align-items:center; background:none; border:0; color:inherit; font-family:inherit; padding:5px 9px; border-radius:6px; cursor:pointer; font-size:12.5px; }
   .wsp-item:hover { background:var(--panel2); }
   .wsp-item .ic { color:var(--warn); flex:none; }
   .wsp-item.up { color:var(--dim); border-bottom:1px dashed var(--line); margin-bottom:2px; border-radius:0; }
   #wsp-foot { display:flex; gap:8px; align-items:center; }
   #wsp-sel { color:var(--dim); font-size:11px; font-family:var(--mono); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #wsp-name { width:150px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:5px 8px; font:12px inherit; outline:none; }
+  #wsp-name { width:150px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:5px 8px; font:12px inherit; }
   #wsp-name:focus { border-color:var(--accent); }
   #search { margin:4px 12px 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px;
-            padding:6px 9px; font:12.5px inherit; outline:none; width:calc(100% - 24px); }
+            padding:6px 9px; font:12.5px inherit; width:calc(100% - 24px); }
   #search:focus { border-color:var(--accent); }
   #sesslist { flex:1; overflow-y:auto; padding:2px 6px; min-height:0; }
   #sesslist .grp { font-size:11px; color:var(--dim); padding:8px 8px 4px; text-transform:uppercase; letter-spacing:.08em; }
@@ -140,15 +163,18 @@ export const HEAD = `<!doctype html>
   .sess .time { color:var(--dim); font-family:var(--mono); font-size:11px; flex:none; }
   .sess .task { color:var(--dim); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sess { position:relative; }
-  .sess .sacts { position:absolute; right:4px; top:3px; display:none; gap:2px; background:var(--panel); padding:0 2px; border-radius:6px; z-index:5; }
-  .sess:hover .sacts { display:flex; }
+  /* hover-only actions that the keyboard can still reach: the buttons are laid out at
+     opacity 0 (so they stay focusable) and appear on row hover or when one of them has
+     focus. display:none would have taken them out of the tab order for good. */
+  .sess .sacts { position:absolute; right:4px; top:3px; display:flex; gap:2px; background:var(--panel); padding:0 2px; border-radius:6px; z-index:5; opacity:0; pointer-events:none; }
+  .sess:hover .sacts, .sess .sacts:focus-within { opacity:1; pointer-events:auto; }
   /* ---- responsive (docx P1 #10 Mobile Web): tablet -> right column becomes a
      bottom sheet; phone -> sidebar becomes an overlay drawer with a hamburger,
-     hover-only affordances become always-visible. Key actions never need hover. */
+     hover-only affordances become always-visible. Key actions never need hover. ---- */
   @media (max-width: 768px) {
-    .sess .sacts { display:flex; opacity:.85; }
+    .sess .sacts { opacity:.85; pointer-events:auto; }
     .sess { padding-right: 66px; }
-    #rightbar.open { position:fixed; left:0; right:0; bottom:0; top:auto; width:auto !important; height:62vh; border-left:0; border-top:1px solid var(--line); border-radius:14px 14px 0 0; z-index:70; box-shadow:0 -18px 50px rgba(0,0,0,.5); }
+    #rightbar.open { position:fixed; left:0; right:0; bottom:0; top:auto; width:auto !important; height:62vh; height:62dvh; border-left:0; border-top:1px solid var(--line); border-radius:14px 14px 0 0; z-index:70; box-shadow:0 -18px 50px rgba(0,0,0,.5); padding-bottom:env(safe-area-inset-bottom, 0px); }
     #rdrag { display:none; }
     #rtab-preview-pane .pvcode, #rtab-detail-pane #dbody pre { font-size:11px; }
     #approval button { padding:10px 18px; }
@@ -157,12 +183,15 @@ export const HEAD = `<!doctype html>
   }
   @media (max-width: 640px) {
     #app { grid-template-columns:1fr auto; }
-    body.mobside #side { position:fixed; left:0; top:0; bottom:0; width:280px; z-index:80; box-shadow:14px 0 40px rgba(0,0,0,.5); }
+    body.mobside #side { position:fixed; left:0; top:0; bottom:0; width:280px; z-index:80; box-shadow:14px 0 40px rgba(0,0,0,.5); padding-left:env(safe-area-inset-left, 0px); }
     body:not(.mobside) #side { display:none; }
     body.mobside::after { content:''; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:75; }
     #sideburger { display:inline-flex !important; }
     #viewchip, #home { display:none; }
-    #composer { padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+    #composer { padding:8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+    /* viewport-fit=cover draws edge to edge under the notch; these insets are 0 on
+       desktop and in portrait, so the layout there is byte-for-byte what it was */
+    #topbar { padding-top:calc(9px + env(safe-area-inset-top, 0px)); padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
     #input { font-size:16px !important; } /* >=16px stops iOS zoom-on-focus */
     .vhead h2 { font-size:14px; }
     #deliv .deliv { font-size:10px; }
@@ -192,7 +221,8 @@ export const HEAD = `<!doctype html>
   #cmdpal { display:none; position:fixed; inset:0; background:rgba(4,8,12,.55); z-index:90; align-items:flex-start; justify-content:center; padding-top:12vh; }
   #cmdpal.on { display:flex; }
   #cmdpal .card { width:520px; max-width:92vw; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); overflow:hidden; }
-  #cmdpal input { width:100%; background:var(--bg); border:0; border-bottom:1px solid var(--line); color:var(--text); font:14px inherit; padding:12px 14px; outline:none; }
+  #cmdpal input { width:100%; background:var(--bg); border:0; border-bottom:1px solid var(--line); color:var(--text); font:14px inherit; padding:12px 14px; }
+  #cmdpal-in:focus-visible { outline-offset:-2px; }
   #cmdpal .list { max-height:330px; overflow-y:auto; padding:5px; }
   #cmdpal .row { display:flex; gap:10px; align-items:baseline; padding:8px 11px; border-radius:8px; cursor:pointer; font-size:13px; }
   #cmdpal .row.sel { background:var(--panel2); }
@@ -202,7 +232,7 @@ export const HEAD = `<!doctype html>
   .sess .sacts button { background:none; border:0; color:var(--dim); cursor:pointer; font-size:12px; padding:1px 4px; border-radius:4px; }
   .sess .sacts button:hover { color:var(--accent); background:var(--panel2); }
   .sess .sacts button.del:hover { color:var(--err); }
-  .sess .ren { background:var(--bg); color:var(--text); border:1px solid var(--accent); border-radius:5px; font:12px inherit; padding:1px 4px; outline:none; width:95%; }
+  .sess .ren { background:var(--bg); color:var(--text); border:1px solid var(--accent); border-radius:5px; font:12px inherit; padding:1px 4px; width:95%; }
   #sidefoot { border-top:1px solid var(--line); padding:8px 14px; font-size:11.5px; color:var(--dim); white-space:nowrap; overflow:hidden; }
   body.sidemin .minhide { display:none !important; }
   body.sidemin #sidefoot { text-align:center; padding:8px 2px; font-size:10px; }
@@ -210,19 +240,24 @@ export const HEAD = `<!doctype html>
   /* ---- main + views ---- */
   #main { display:flex; flex-direction:column; min-width:0; }
   #topbar { display:flex; gap:10px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
-  .chip { font-size:11.5px; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
-  .chip.model { color:var(--accent); cursor:pointer; position:relative; }
+  /* the chips that act (model, locale, goal) are real buttons: the two extra declarations
+     undo the UA button font so they render exactly like the static span chips beside them;
+     button.chip drops the UA border. modelwrap is a flex box so the row keeps its height. */
+  .modelwrap { display:flex; position:relative; }
+  .chip { font-size:11.5px; font-family:inherit; line-height:inherit; padding:2px 9px; border-radius:11px; background:var(--panel2); color:var(--dim); }
+  button.chip { border:0; cursor:pointer; }
+  .chip.model { color:var(--accent); }
   .chip.model:hover { background:var(--panel); }
   #modelpick { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:60; min-width:250px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:4px; box-shadow:0 12px 36px rgba(0,0,0,.5); }
   #modelpick.on { display:block; }
-  .mp-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:7px; cursor:pointer; font-size:12.5px; }
+  /* provider rows that switch the model are buttons; the dimmed preset hints stay divs */
+  .mp-row { display:flex; width:100%; text-align:left; background:none; border:0; color:inherit; font-family:inherit; line-height:inherit; align-items:center; gap:8px; padding:7px 10px; border-radius:7px; cursor:pointer; font-size:12.5px; }
   .mp-row:hover { background:var(--panel2); }
   .mp-row .dot2 { width:7px; height:7px; border-radius:50%; background:var(--line); flex:none; }
   .mp-row.cur .dot2 { background:var(--ok); }
   .mp-row .mm { font-family:var(--mono); color:var(--accent); }
   .mp-row .mp-p { color:var(--dim); font-size:10.5px; margin-left:auto; }
   .mp-empty { color:var(--dim); font-size:11.5px; padding:8px 10px; max-width:280px; }
-  button.chip.locale { border:0; cursor:pointer; }
   button.chip.locale:hover { color:var(--accent); }
   #busy { margin-left:auto; font-size:12px; color:var(--dim); }
   #busy.on { color:var(--warn); }
@@ -288,7 +323,7 @@ export const HEAD = `<!doctype html>
   .stats { color:var(--dim); font-family:var(--mono); font-size:11.5px; border-top:1px dashed var(--line); margin-top:10px; padding-top:6px; }
   #tobot { position:absolute; right:32px; bottom:130px; display:none; }
   #empty { color:var(--dim); text-align:center; margin:auto; max-width:430px; }
-  #empty .ex { font-family:var(--mono); font-size:12.5px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:6px 0; cursor:pointer; }
+  #empty .ex { display:block; width:100%; text-align:inherit; color:inherit; line-height:inherit; font-family:var(--mono); font-size:12.5px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:6px 0; cursor:pointer; }
   #empty .ex:hover { border-color:var(--accent); color:var(--text); }
 
   /* ---- board / devices / skills ---- */
@@ -308,7 +343,7 @@ export const HEAD = `<!doctype html>
   .sshcard .sshhead b { color:var(--accent); }
   .sshcard .sshhead .st { color:var(--ok); font-size:12px; margin-left:auto; }
   .sshcmd { display:flex; gap:8px; margin-top:10px; }
-  .sshcmd input { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font:13px var(--mono); outline:none; }
+  .sshcmd input { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font:13px var(--mono); }
   .sshcmd input:focus { border-color:var(--accent); }
   .sshout { margin-top:10px; background:#0a0f14; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:var(--mono); font-size:12px; white-space:pre-wrap; max-height:280px; overflow-y:auto; }
   .sshout .err { color:var(--err); }
@@ -327,6 +362,13 @@ export const HEAD = `<!doctype html>
   #approval { display:none; background:#2a2313; border:1px solid var(--warn); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
   #approval.pulse { animation:pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,179,65,0); } 50% { box-shadow:0 0 0 4px rgba(227,179,65,.25); } }
+  /* reduced motion: the run indicator keeps turning, slowly, so "work is going on" stays
+     visible without the fast spin or the pulsing halo; scrolling is no longer smoothed */
+  @media (prefers-reduced-motion: reduce) {
+    #rs-spin { animation-duration:6s; }
+    #approval.pulse { animation:none; }
+    #log { scroll-behavior:auto; }
+  }
   #approval .name { color:var(--warn); font-family:var(--mono); }
   .riskbadge { font-size:11px; border-radius:9px; padding:1px 9px; font-weight:600; }
   .riskbadge.low { background:rgba(63,185,80,.15); color:var(--ok); }
@@ -336,9 +378,9 @@ export const HEAD = `<!doctype html>
   #connchip.reconnecting { display:inline-block; background:rgba(227,179,65,.18); color:var(--warn); }
   #inputcard { display:flex; flex-direction:column; gap:8px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--bg); }
   #inputcard:focus-within { border-color:var(--accent); }
-  textarea { border:0; outline:none; resize:none; background:transparent; color:var(--text); font:inherit; min-height:44px; max-height:160px; }
+  textarea { border:0; resize:none; background:transparent; color:var(--text); font:inherit; min-height:44px; max-height:160px; }
   #tools-row { display:flex; align-items:center; gap:8px; }
-  select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:4px 8px; font-size:12px; outline:none; cursor:pointer; }
+  select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:4px 8px; font-size:12px; cursor:pointer; }
   #tokchip { color:var(--dim); font-family:var(--mono); font-size:11.5px; }
   #send { margin-left:auto; min-width:72px; transition:background .12s ease; }
   #send.stop { background:var(--err); color:#fff; }
@@ -359,6 +401,9 @@ export const HEAD = `<!doctype html>
      拖拽记忆（localStorage hmh-right-w）。取代旧的单功能工具详情抽屉。 */
   #rightbar { width:0; overflow:hidden; border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; position:relative; }
   #rightbar.open { width:360px; }
+  /* a closed right column clips its content but does not remove it: without this, Tab
+     walked through seven invisible controls (five tabs + collapse/close) on every pass */
+  #rightbar:not(.open) > * { visibility:hidden; }
   #rdrag { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5; }
   #rightbar.open #rdrag:hover { background:var(--accent); opacity:.35; }
   #rhead { display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); }
@@ -459,7 +504,7 @@ export const HEAD = `<!doctype html>
   .provform { border:1px solid var(--accent); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--panel); }
   .provform .fgrid { display:grid; grid-template-columns:110px 1fr; gap:7px 10px; align-items:center; }
   .provform label { font-size:12px; color:var(--dim); }
-  .provform input[type=text], .provform input[type=password] { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:5px 8px; font:12px var(--mono); outline:none; width:100%; }
+  .provform input[type=text], .provform input[type=password] { background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:5px 8px; font:12px var(--mono); width:100%; }
   .provform input:focus { border-color:var(--accent); }
   .presetgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
   .presetrow { display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; }
@@ -467,10 +512,29 @@ export const HEAD = `<!doctype html>
   .presetrow .penv { font-size:10.5px; color:var(--dim); font-family:var(--mono); }
   .setrow { display:flex; align-items:center; gap:12px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px; }
   .setrow:last-of-type { border-bottom:0; }
-  .setrow span { flex:1; }
-  .setrow input[type=number] { width:80px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:4px 8px; font:12px var(--mono); outline:none; }
+  .setrow span, .setrow label { flex:1; }
+  .setrow input[type=number] { width:80px; background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:4px 8px; font:12px var(--mono); }
   #set-msg { color:var(--ok); font-size:12.5px; margin-left:10px; }
   #set-msg.err { color:var(--err); }
+
+  /* ---- accessibility additions (2026-11-25, modern-web-guidance) ---- */
+  /* headings wrap as a block, never leaving a lone word on the last line */
+  .vhead h2, #empty-title { text-wrap:balance; }
+  /* touch: controls a finger has to hit get a real target (24x24 CSS px is the WCAG floor;
+     standalone small buttons get more). Mouse/keyboard layouts are untouched. */
+  @media (pointer: coarse) {
+    :where(#collapse, .wsacts button, .codebar .copy, .diffbox .dhead .copy, .qrow button, #qclear, .attchip .atx, .sess .sacts button) { min-block-size:32px; min-inline-size:28px; }
+    :where(button.ghost.sm, button.primary.sm, .rtab, select, #wsp-close) { min-block-size:36px; }
+    .wsi .wsx { min-block-size:28px; min-inline-size:28px; }
+  }
+  /* forced colors (Windows High Contrast): the browser flattens every author color, so
+     "current/selected" — shown by accent text and a tinted background — would vanish.
+     Redraw those states with a system-colored inset outline plus weight. */
+  @media (forced-colors: active) {
+    .nav.on, .rtab[aria-selected="true"], .wsi.on, .mp-row.cur, #cmdpal .row.sel, .pickrow.sel, .projgrp.cur, .wsp-item:hover { outline:1px solid CanvasText; outline-offset:-1px; }
+    .nav.on, .wsi.on .nm, .rtab[aria-selected="true"], .mp-row.cur { font-weight:700; }
+    .wsi.on .nm .dot, .mp-row.cur .dot2 { background:CanvasText; }
+  }
 </style>
 </head>
 `;

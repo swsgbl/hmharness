@@ -57,7 +57,7 @@ export interface Evaluator<Input = unknown> {
 
 /** Shared scoring helper: all-or-nothing evidence -> 1 or 0; partial allowed. */
 export function scoreFromEvidence(evidence: Evidence[], failures: Failure[]): { score: number; passed: boolean } {
-  const ranked = [...evidence].sort((a, b) => EVIDENCE_RANK[a.kind] - EVIDENCE_RANK[b.kind]);
+  const ranked = evidence.toSorted((a, b) => EVIDENCE_RANK[a.kind] - EVIDENCE_RANK[b.kind]);
   const passing = ranked.filter((e) => e.passed !== false).length;
   // an llmJudge/selfReport-only pass is never a full pass (evidence-first rule)
   const weakestPass = ranked.length > 0 ? EVIDENCE_RANK[ranked[ranked.length - 1].kind] : EVIDENCE_RANK.selfReport;

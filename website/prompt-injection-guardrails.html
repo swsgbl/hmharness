@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>hmharness 如何约束 Prompt Injection：不可信输入的四层边界</title>
 <meta name="description" content="hmharness 不宣称解决 Prompt Injection。本页按 public main 29d4a4d 解释审批门、HMH_HOME 硬边界、破坏性命令硬拒、deny-by-default 能力与出站白名单、MCP 只读默认，以及 auto/--yes 的例外。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/prompt-injection-guardrails.html">
@@ -63,30 +65,53 @@
 }
 </script>
 <style>
-:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--line:rgba(79,216,235,.22);--card:rgba(13,32,58,.72);--warn:#F5C66B;--ok:#7DDF9A;--maxw:980px}
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--line:rgba(79,216,235,.22);--card:rgba(13,32,58,.72);--warn:#F5C66B;--ok:#7DDF9A;--maxw:980px;color-scheme:dark;}
 *{margin:0;padding:0;box-sizing:border-box}body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
-nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.9);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
-header{padding:58px 0 30px}.eyebrow{color:var(--cyan);font-size:13px;font-weight:750}h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}.summary{max-width:780px;color:var(--dim)}
-.intro,.answer{max-width:840px;margin-top:20px;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice);font-size:16px}.bridge{margin-top:8px;color:var(--dim)}
+nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.9);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}nav .wrap{display:flex;justify-content:space-between;align-items:center;min-height:60px;flex-wrap:wrap;gap:8px 16px;padding-top:8px;padding-bottom:8px;font-size:0.90625rem}.logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+header{padding:58px 0 30px}.eyebrow{color:var(--cyan);font-size:0.8125rem;font-weight:750}h1{margin:10px 0 14px;font-size:clamp(1.75rem,4.5vw,2.625rem);line-height:1.22;color:#fff}.summary{max-width:780px;color:var(--dim)}
+.intro,.answer{max-width:840px;margin-top:20px;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice);font-size:1rem}.bridge{margin-top:8px;color:var(--dim)}
 .answer.warn{border-color:var(--warn);background:rgba(245,198,107,.09)}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}.btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
-section{padding:32px 0}h2{font-size:24px;color:#fff;margin-bottom:14px}p{color:var(--dim)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.layer{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}.layer span{font-size:12px;color:var(--cyan)}.layer strong{display:block;color:#fff;margin:4px 0 6px}.layer p{font-size:14.5px}
-.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}.panel h3{font-size:16px;color:#fff;margin-bottom:8px}.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:14.5px}
-.table-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:8px}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:#fff;background:rgba(79,216,235,.08);font-size:13px}td{color:var(--dim);font-size:14.5px}td code,li code{font-family:Consolas,"Cascadia Code",monospace;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
-.sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}.sources div{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+section{padding:32px 0}h2{font-size:1.5rem;color:#fff;margin-bottom:14px}p{color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.layer{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}.layer span{font-size:0.75rem;color:var(--cyan)}.layer strong{display:block;color:#fff;margin:4px 0 6px}.layer p{font-size:0.90625rem}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}.panel h3{font-size:1rem;color:#fff;margin-bottom:8px}.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:0.90625rem}
+.table-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:8px}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:#fff;background:rgba(79,216,235,.08);font-size:0.8125rem}td{color:var(--dim);font-size:0.90625rem}td code,li code{font-family:Consolas,"Cascadia Code",monospace;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}.sources div{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:0.90625rem}
 .boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}.boundary li{margin:8px 0 0 20px;color:var(--dim)}
-footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:0.8125rem;text-align:center}footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.panels{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}@media(max-width:500px){.grid{grid-template-columns:1fr}}
+/* long unbreakable tokens and URLs wrap instead of widening the page */
+body{overflow-wrap:break-word}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+/* anchor targets (the skip link, the FAQ's Q-links) land clear of the sticky nav */
+html{scroll-padding-top:76px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.table-wrap:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,.skip{display:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">跳到主要内容</a>
 <nav><div class="wrap"><div class="logo"><span>hm</span> hmharness</div><div><a href="./">首页</a> · <a href="faq.html">FAQ</a> · <a href="ecosystem-radar.html">生态雷达</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div></div></nav>
 
+<main>
 <header><div class="wrap">
-  <div class="eyebrow">AGENT SECURITY · PUBLIC MAIN 29D4A4D</div>
-  <h1>hmharness 如何约束 Prompt Injection</h1>
+  <div class="eyebrow" lang="en">AGENT SECURITY · PUBLIC MAIN 29D4A4D</div>
+  <h1 id="main" tabindex="-1">hmharness 如何约束 Prompt Injection</h1>
   <p class="summary">Prompt Injection 没有“一句话修复”。本页把 hmharness 在公开源码里已经落地的审批、硬拒、状态根保护和能力边界拆开，说明它降低的是什么风险，以及哪些风险仍然存在。</p>
   <div class="intro">hmharness 是一个开源的 HarmonyOS/OpenHarmony 开发智能体框架：它把工程创建、检查、构建、签名、安装、启动、日志读取和结果验证接成本地工具链，让 AI 不只是生成代码，还要用本机环境证明结果；同时通过审批、预算、canary 和回滚约束自进化行为。它不是 DevEco Studio 的替代品，而是开发智能体和鸿蒙工具链之间的验证层。<div class="bridge">本页只展开其中一环：不可信输入试图变成高危动作时，边界在哪里。</div></div>
   <div class="answer warn"><strong>先说边界：hmharness 不解决 Prompt Injection。</strong>它没有宣称能识别所有藏在网页、文件、issue、工具输出或其他模型上下文里的恶意指令。这里的价值是纵深防御：即使模型被诱导，动作面也被拆成审批、路径、密钥、网络和 MCP 权限，多防线共同缩小爆炸半径。</div>
@@ -108,7 +133,7 @@ footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);fon
 <section id="decision-table"><div class="wrap">
   <h2>动作与边界</h2>
   <p>下表把常见“被诱导后的动作”映射到公开实现。它不是威胁模型全集，只是可核查的主路径。</p>
-  <div class="table-wrap"><table><thead><tr><th>被诱导的动作面</th><th>边界</th><th>公开证据</th></tr></thead><tbody>
+  <div class="table-wrap" tabindex="0" role="region" aria-label="动作与边界表"><table><thead><tr><th scope="col">被诱导的动作面</th><th scope="col">边界</th><th scope="col">公开证据</th></tr></thead><tbody>
     <tr><td>执行 shell 命令</td><td><code>run_command</code> 需要审批；非交互默认拒绝；破坏性模式硬拒</td><td><code>packages/agent/src/tools.ts</code>；<code>runner.test.ts</code></td></tr>
     <tr><td>改写 approval:auto、trusted MCP、HMH_HOME 配置</td><td>工作区内编辑免逐次审批，但 HMH_HOME 永远审批</td><td><code>tools.ts</code> 的 workspace-write 分级</td></tr>
     <tr><td>命令链、命令替换、管道外传、读取密钥文件</td><td>red-team 检测路径穿越、command injection 和 secret exfiltration</td><td><code>sandbox/src/__tests__/redteam.test.ts</code></td></tr>
@@ -153,6 +178,8 @@ footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);fon
     <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
   </ul></div>
 </div></section>
+
+</main>
 
 <footer><div class="wrap"><a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="ecosystem-radar.html">生态雷达防过时指南</a> · <a href="llms.txt">llms.txt</a><div class="legal">HarmonyOS、鸿蒙、OpenHarmony、DevEco Studio 等名称归各自权利人所有，此处仅为描述性合理使用。© 2026 hmharness contributors · MIT License</div></div></footer>
 </body>

@@ -77,7 +77,8 @@ export function sdkVersion(): string {
     // fail cryptically later (the apimatrix knows both version shapes)
     parseSdkVersion(raw);
   } catch (err) {
-    throw new Error(`HM_SDK_VERSION="${raw}" is not a valid SDK version (${String(err).slice(0, 90)}). Expected "6.1.1(24)" or "26.0.0" style.`);
+    // message stays as the user reads it; the parser error rides along as the cause
+    throw new Error(`HM_SDK_VERSION="${raw}" is not a valid SDK version (${String(err).slice(0, 90)}). Expected "6.1.1(24)" or "26.0.0" style.`, { cause: err });
   }
   return raw;
 }

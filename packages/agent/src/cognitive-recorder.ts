@@ -172,7 +172,7 @@ export class CognitiveRunRecorder {
           tags: ['run', success ? 'ok' : 'fail', traj.environment.id],
         });
       }
-      const primary = [...written].sort((a, b) => b.traj.metrics.actions - a.traj.metrics.actions)[0]!;
+      const primary = written.toSorted((a, b) => b.traj.metrics.actions - a.traj.metrics.actions)[0]!;
       return { trajectoryId: primary.traj.id };
     } catch {
       return null; // cognitive recording is best-effort, never fatal

@@ -261,11 +261,22 @@ export const COMPOSER = `  // ---- composer ----
     if (palMode) {
       if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palItems.length - 1, palSel + 1); renderPal(); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(0, palSel - 1); renderPal(); return; }
-      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (palItems[palSel]) pickPal(palItems[palSel]); return; }
-      if (e.key === 'Escape') { e.preventDefault(); closePal(); return; }
+      // the palette's Enter never reaches the text: not a newline, and not a pick
+      // while an IME candidate is still open
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (enterConfirmed(e) && palItems[palSel]) pickPal(palItems[palSel]);
+        return;
+      }
+      if (e.key === 'Escape' && !e.isComposing) { e.preventDefault(); closePal(); return; }
     }
-    if (e.key === 'Enter' && !e.isComposing) {
+    // Shift+Enter (without Ctrl) is left to the browser: that is the newline the placeholder
+    // promises. Until 2026-11-26 every Enter was cancelled first, so the newline never came.
+    // The other Enters are always the send key, never a newline — cancelled BEFORE the
+    // composition check, so the Enter that confirms an IME candidate cannot leave one behind.
+    if (e.key === 'Enter' && (e.ctrlKey || !e.shiftKey)) {
       e.preventDefault();
+      if (!enterConfirmed(e)) return;
       if (e.ctrlKey) {
         // settled design W6: 运行中 Ctrl+Enter = 注入当前轮;空闲时与 Enter 同义
         var it = this.value.trim();
@@ -279,7 +290,7 @@ export const COMPOSER = `  // ---- composer ----
         }
         return;
       }
-      if (!e.shiftKey) document.getElementById('send').click();
+      document.getElementById('send').click();
     }
   };
   document.getElementById('input').oninput = function () {

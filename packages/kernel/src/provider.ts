@@ -8,6 +8,7 @@
  */
 import type { ChatMessage, ProviderConfig } from './types.ts';
 import { httpFetch, getReader, type TransportResponse } from './http-transport.ts';
+import { deadlineSignal } from './deadline.ts';
 
 export interface ChatResponse {
   message: ChatMessage;
@@ -338,8 +339,9 @@ export async function chatVision(
   // same auth negotiation as chat(): explicit header, Bearer, then X-Api-Key
   let vAuth: string = cfg.authHeader ?? 'bearer';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
+    // one deadline per attempt, nothing to clear in a finally; a timeout now
+    // surfaces as TimeoutError ("...aborted due to timeout") instead of AbortError
+    const signal = deadlineSignal(opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
     try {
       const vHeaders = vAuth === 'bearer'
         ? { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
@@ -348,7 +350,7 @@ export async function chatVision(
         method: 'POST',
         headers: vHeaders,
         body: JSON.stringify(body),
-        signal: ctrl.signal,
+        signal,
       });
       if (res.status === 401 && !cfg.authHeader && vAuth === 'bearer' && cfg.apiKey) {
         vAuth = 'X-Api-Key';
@@ -369,8 +371,6 @@ export async function chatVision(
       lastError = String(err);
       if (!/abort|fetch failed|ECONN|timeout/i.test(lastError)) throw err;
       await sleep(1500 * (attempt + 1));
-    } finally {
-      clearTimeout(timer);
     }
   }
   throw new Error(`provider: vision call failed after retry (${cfg.baseUrl}): ${lastError}`);

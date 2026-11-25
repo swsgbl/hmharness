@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>hmharness — 自进化的鸿蒙开发智能体框架，跨环境 Cognitive Runtime</title>
 <meta name="description" content="零依赖内核 + 自进化一等公民 + MCP 生态 + 认知层（世界模型/校准/探索/迁移）。一句话创建鸿蒙工程、构建、装机运行；认知层从经验中学习，有学习曲线为证。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/">
@@ -18,78 +20,127 @@
   --navy:#0B1E3A; --navy2:#123B6E; --cyan:#4FD8EB; --ice:#EAF4FA;
   --text:#DCE8F2; --dim:#8FA8C0; --card:rgba(13,32,58,.72); --line:rgba(79,216,235,.22);
   --radius:18px; --maxw:1120px;
+  color-scheme:dark;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;overflow-x:hidden;line-height:1.65}
+/* scroll-padding-top: the sticky nav is 64px tall; without it the anchor targets landed
+   with their heading under the bar */
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+/* no overflow-x:hidden here any more: the nav wraps instead (see nav .wrap), so nothing
+   is wider than the viewport and nothing gets clipped */
+body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.65;overflow-wrap:break-word}
 #rain{position:fixed;inset:0;z-index:0;opacity:.55}
 .vignette{position:fixed;inset:0;z-index:1;background:radial-gradient(ellipse at 50% 0%,transparent 30%,rgba(7,17,33,.88) 100%);pointer-events:none}
 .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px}
 a{color:var(--cyan);text-decoration:none}
 nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(9,22,42,.72);border-bottom:1px solid var(--line)}
-nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:#fff}
-.logo .star{color:var(--cyan);font-size:20px}
-.navlinks{display:flex;gap:26px;align-items:center;font-size:14.5px}
+/* min-height + wrap: the row grows and breaks instead of running past the viewport on
+   widths between a phone and a laptop (a fixed 64px did, masked by overflow-x:hidden) */
+nav .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;min-height:64px;padding-top:8px;padding-bottom:8px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.125rem;color:#fff}
+.logo .star{color:var(--cyan);font-size:1.25rem}
+.navlinks{display:flex;flex-wrap:wrap;gap:6px 26px;align-items:center;justify-content:flex-end;margin-left:auto;font-size:0.90625rem}
 .navlinks a{color:var(--dim);transition:color .2s}
 .navlinks a:hover{color:#fff}
-.lang{cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ice);font-size:13px;background:transparent;transition:border-color .2s}
+.lang{cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--ice);font-family:inherit;font-size:0.8125rem;background:transparent;transition:border-color .2s}
 .lang:hover{border-color:var(--cyan)}
-.btn{display:inline-block;padding:10px 22px;border-radius:999px;font-weight:600;font-size:14.5px;border:1px solid transparent;cursor:pointer;transition:transform .15s,box-shadow .2s}
+.lang[aria-pressed="false"]{opacity:.6}
+.lang:disabled{opacity:.45;cursor:default}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+.btn{display:inline-block;padding:10px 22px;border-radius:999px;font-weight:600;font-size:0.90625rem;border:1px solid transparent;cursor:pointer;transition:transform .18s ease-out,box-shadow .2s}
 .btn:active{transform:scale(.97)}
+@media (hover:hover){.btn:hover{transform:scale(1.04)}}
 .btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;box-shadow:0 6px 26px rgba(79,216,235,.35)}
 .btn-primary:hover{box-shadow:0 8px 34px rgba(79,216,235,.55)}
 .btn-ghost{border-color:var(--line);color:var(--ice)}
 .btn-ghost:hover{border-color:var(--cyan)}
 .hero{text-align:center;padding:110px 0 80px}
-.hero h1{font-size:clamp(42px,7vw,76px);font-weight:800;letter-spacing:0;
+.hero h1{font-size:clamp(2.625rem,7vw,4.75rem);font-weight:800;letter-spacing:0;
   background:linear-gradient(120deg,#FFFFFF 20%,var(--cyan) 70%,#2FA8D8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero .tag{margin:18px 0 10px;font-size:clamp(18px,2.6vw,24px);color:var(--cyan);letter-spacing:0}
-.hero p.sub{max-width:720px;margin:0 auto 34px;color:var(--dim);font-size:17px}
+.hero .tag{margin:18px 0 10px;font-size:clamp(1.125rem,2.6vw,1.5rem);color:var(--cyan);letter-spacing:0}
+.hero p.sub{max-width:720px;margin:0 auto 34px;color:var(--dim);font-size:1.0625rem}
 .cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
 .term{max-width:640px;margin:56px auto 0;background:rgba(5,14,28,.9);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden;text-align:left}
 .term-bar{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .term-bar i{width:11px;height:11px;border-radius:50%;background:#31507A}
 .term-bar i:first-child{background:#E5484D}.term-bar i:nth-child(2){background:#F5A623}
-.term-body{padding:22px 24px;font-family:"Cascadia Code",Consolas,"JetBrains Mono",monospace;font-size:13.5px;line-height:1.75;color:var(--dim);white-space:pre;overflow-x:auto}
+.term-body{padding:22px 24px;font-family:"Cascadia Code",Consolas,"JetBrains Mono",monospace;font-size:0.84375rem;line-height:1.75;color:var(--dim);white-space:pre;overflow-x:auto}
 .term-body .w{color:#fff;font-weight:700}.term-body .c{color:var(--cyan)}.term-body .g{color:#7DDF9A}
 section{padding:86px 0}
-h2.sec{font-size:clamp(28px,4vw,40px);font-weight:800;text-align:center;letter-spacing:0;margin-bottom:14px}
+h2.sec{font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;text-align:center;letter-spacing:0;margin-bottom:14px}
 p.secdesc{text-align:center;color:var(--dim);max-width:680px;margin:0 auto 46px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+/* min(300px,100%): a 300px column plus the page padding was wider than a 320px phone */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:20px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;transition:transform .2s,border-color .2s,box-shadow .25s;backdrop-filter:blur(8px)}
 .card:hover{transform:translateY(-4px);border-color:rgba(79,216,235,.55);box-shadow:0 16px 46px rgba(0,0,0,.35)}
-.card .ic{font-size:26px;margin-bottom:12px}
-.card h3{font-size:17.5px;margin-bottom:8px;color:#fff}
-.card p{font-size:14.5px;color:var(--dim)}
-.card code{font-family:Consolas,monospace;font-size:12.5px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px}
+.card .ic{font-size:1.625rem;margin-bottom:12px}
+.card h3{font-size:1.09375rem;margin-bottom:8px;color:#fff}
+.card p{font-size:0.90625rem;color:var(--dim)}
+.card code{font-family:Consolas,monospace;font-size:0.78125rem;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px;text-align:center}
 .stat{padding:26px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
-.stat b{display:block;font-size:40px;font-weight:800;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.stat span{color:var(--dim);font-size:14px}
+.stat b{display:block;font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat span{color:var(--dim);font-size:0.875rem}
 .steps{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 .step{display:flex;gap:18px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;min-width:0}
 .step>div{min-width:0;max-width:100%}
-.step .n{flex:none;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
-.step pre{flex:1;min-width:0;max-width:100%;font-family:Consolas,monospace;font-size:13px;color:#9FE8F5;background:rgba(5,14,28,.75);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
-.step .cap{color:var(--dim);font-size:13px;margin-bottom:8px}
+.step .n{flex:none;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:0.9375rem}
+.step pre{flex:1;min-width:0;max-width:100%;font-family:Consolas,monospace;font-size:0.8125rem;color:#9FE8F5;background:rgba(5,14,28,.75);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+.step .cap{color:var(--dim);font-size:0.8125rem;margin-bottom:8px}
 .loop{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:8px}
-.node{padding:12px 22px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:14.5px}
+.node{padding:12px 22px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:0.90625rem}
 .node b{color:var(--cyan)}
-.arrow{color:var(--dim);font-size:18px}
-footer{border-top:1px solid var(--line);padding:44px 0 54px;color:var(--dim);font-size:13px}
+.arrow{color:var(--dim);font-size:1.125rem}
+footer{border-top:1px solid var(--line);padding:44px 0 54px;color:var(--dim);font-size:0.8125rem}
 footer .cols{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;margin-bottom:26px}
-footer h4{color:#fff;font-size:14px;margin-bottom:10px}
+footer h3{color:#fff;font-size:0.875rem;margin-bottom:10px}
 footer li{list-style:none;margin:6px 0}
 .legal{max-width:880px;border-top:1px dashed var(--line);padding-top:20px;line-height:1.8}
-@media(max-width:640px){.navlinks a:not(.btn){display:none}.term-body{font-size:11.5px}}
+.grow{flex:1;min-width:0}
+.pt-10{padding-top:10px}.pt-20{padding-top:20px}.pt-30{padding-top:30px}
+/* p.secdesc sets margin-top:0 with higher specificity than a bare class would have */
+p.mt-34{margin-top:34px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.term-body:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* touch: the text links and the small nav buttons get a finger-sized target without
+   moving anything in the row */
+@media (pointer: coarse){.navlinks a:not(.btn),.lang{padding-top:12px;padding-bottom:12px;margin-top:-12px;margin-bottom:-12px}}
+/* reduced motion: only spatial movement is switched off; color and shadow transitions stay */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .btn{transition:box-shadow .2s}
+  .btn:active,.btn:hover{transform:none}
+  .card{transition:border-color .2s,box-shadow .25s}
+  .card:hover{transform:none}
+}
+/* forced colors: the browser drops the gradient behind the headline text, which would
+   leave the page title and the statistics transparent */
+@media (forced-colors: active){
+  #rain,.vignette{display:none}
+  .hero h1,.stat b{-webkit-text-fill-color:CanvasText;background:none}
+}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,#rain,.vignette,.skip{display:none}
+  .hero h1,.stat b{-webkit-text-fill-color:#000;background:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+}
+@media(max-width:640px){.navlinks a:not(.btn){display:none}.term-body{font-size:0.71875rem}}
 </style>
 </head>
 <body>
-<canvas id="rain"></canvas><div class="vignette"></div>
+<a class="skip" href="#main" data-i18n="skip_link">跳到主要内容</a>
+<canvas id="rain" aria-hidden="true"></canvas><div class="vignette" aria-hidden="true"></div>
 
 <nav><div class="wrap">
-  <div class="logo"><span class="star">✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px;margin-left:6px">hmharness</span></div>
+  <div class="logo"><span class="star" aria-hidden="true">✦</span> hm <span class="logo-sub">hmharness</span></div>
   <div class="navlinks">
     <a href="#features" data-i18n="nav_features">特性</a>
     <a href="#cognitive" data-i18n="nav_cognitive">认知层</a>
@@ -98,13 +149,15 @@ footer li{list-style:none;margin:6px 0}
     <a href="#models" data-i18n="nav_models">模型路由</a>
     <a href="evidence/" data-i18n="nav_evidence">证据</a>
     <a href="faq.html" data-i18n="nav_faq">FAQ</a>
-    <button class="lang" id="langBtn" onclick="toggleLang()">EN</button>
+    <button class="lang" id="motionBtn" type="button" aria-pressed="true" data-i18n="motion_btn">动效</button>
+    <button class="lang" id="langBtn" type="button">EN</button>
     <a class="btn btn-primary" href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener">GitHub</a>
   </div>
 </div></nav>
 
+<main>
 <header class="hero"><div class="wrap">
-  <h1>hmharness</h1>
+  <h1 id="main" tabindex="-1">hmharness</h1>
   <div class="tag" data-i18n="hero_tag">自 进 化 · 零 依 赖</div>
   <p class="sub" data-i18n="hero_sub">为鸿蒙 (HarmonyOS/OpenHarmony) 开发全流程而生的自进化智能体框架 —— 零依赖内核 + 自进化一等公民 + MCP 生态借力。一句话创建工程、构建、装机、跑模拟器;每一步进化都有基准门禁与回滚。</p>
   <div class="cta">
@@ -113,8 +166,8 @@ footer li{list-style:none;margin:6px 0}
     <a class="btn btn-ghost" href="device-loop-proof.html">模拟器全链路证明</a>
     <a class="btn btn-ghost" href="quickstart-matrix.html">快速开始验证矩阵</a>
   </div>
-  <div class="term"><div class="term-bar"><i></i><i></i><i></i></div>
-<div class="term-body"><span class="c">$ hmh tui</span>
+  <div class="term"><div class="term-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="term-body" tabindex="0" role="region" aria-label="终端演示" data-i18n-aria="term_label"><span class="c">$ hmh tui</span>
 <span class="w">⚙ hmharness</span> · <span class="c">your-model</span> · my-app · <span class="g">○ idle</span>
 <span class="w" data-i18n="term_tagline">网页端已就绪 → http://127.0.0.1:7788</span>
 
@@ -142,7 +195,7 @@ footer li{list-style:none;margin:6px 0}
   </div>
 </div></section>
 
-<section id="cognitive" style="padding-top:20px"><div class="wrap">
+<section id="cognitive" class="pt-20"><div class="wrap">
   <h2 class="sec" data-i18n="cog_title">认知层 — harness 从经验中学习，有学习曲线为证</h2>
   <p class="secdesc" data-i18n="cog_lead">世界模型从每次任务的工具轨迹中学习并反哺系统提示;探索引擎优先探测模型预测最差的动作(预测误差=信息增益);校准可靠度随使用提升 — <b>五环境曲线全有读数,四环境 improving</b>。这不是宣称,是 <code>hmh cognitive calibration --trend</code> 的输出。</p>
   <div class="cards">
@@ -155,75 +208,76 @@ footer li{list-style:none;margin:6px 0}
   </div>
 </div></section>
 
-<section style="padding-top:20px"><div class="wrap">
+<section class="pt-20"><div class="wrap">
   <div class="stats">
     <div class="stat"><b>16</b><span data-i18n="s1">单仓 16 包</span></div>
     <div class="stat"><b>0</b><span data-i18n="s2">运行时依赖(内核)</span></div>
-    <div class="stat"><b>1068</b><span data-i18n="s3">单元测试(1067 通过/1 跳过)</span></div>
+    <div class="stat"><b>1090</b><span data-i18n="s3">单元测试(1089 通过/1 跳过)</span></div>
     <div class="stat"><b>5</b><span data-i18n="s4">环境适配器</span></div>
   </div>
 </div></section>
 
-<section id="install" style="padding-top:30px"><div class="wrap">
+<section id="install" class="pt-30"><div class="wrap">
   <h2 class="sec" data-i18n="ins_title">四步上手</h2>
   <p class="secdesc" data-i18n="ins_desc">Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。</p>
-  <div class="steps" aria-label="Install paths">
-    <div class="step"><div class="n">A</div><div style="flex:1"><div class="cap" data-i18n="route_npm_h">标准桌面:直接用 npm</div><pre>npm install -g @hmharness/cli</pre></div></div>
-    <div class="step"><div class="n">B</div><div style="flex:1"><div class="cap" data-i18n="route_source_h">贡献者 / 源码优先</div><pre>git clone https://github.com/swsgbl/hmharness.git
-npm install &amp;&amp; npm run build</pre><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="route_source_docs">完整贡献安装文档</a></div></div>
-    <div class="step"><div class="n">C</div><div style="flex:1"><div class="cap" data-i18n="route_board_h">KaihongOS / OpenHarmony 板端</div><pre>node scripts/install-kaihongos.cjs</pre></div></div>
+  <div class="steps">
+    <div class="step"><div class="n" aria-hidden="true">A</div><div class="grow"><div class="cap" id="cap-npm" data-i18n="route_npm_h">标准桌面:直接用 npm</div><pre role="region" aria-labelledby="cap-npm"><code>npm install -g @hmharness/cli</code></pre></div></div>
+    <div class="step"><div class="n" aria-hidden="true">B</div><div class="grow"><div class="cap" id="cap-src" data-i18n="route_source_h">贡献者 / 源码优先</div><pre role="region" aria-labelledby="cap-src"><code>git clone https://github.com/swsgbl/hmharness.git
+npm install &amp;&amp; npm run build</code></pre><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="route_source_docs">完整贡献安装文档</a></div></div>
+    <div class="step"><div class="n" aria-hidden="true">C</div><div class="grow"><div class="cap" id="cap-board" data-i18n="route_board_h">KaihongOS / OpenHarmony 板端</div><pre role="region" aria-labelledby="cap-board"><code>node scripts/install-kaihongos.cjs</code></pre></div></div>
   </div>
   <p class="secdesc" data-i18n="ins_verify">安装后先运行 <code>hmh check | devices</code> 验证工具链与设备；反馈环境问题时请附脱敏输出，或按 <a href="quickstart-matrix.html">快速开始验证矩阵</a> 分流首错。</p>
   <p class="secdesc" data-i18n="ins_standard">下面是标准 npm 路径的四步流程；源码与板端边界见仓库 README 和板端指南。</p>
   <div class="steps">
-    <div class="step"><div class="n">1</div><div style="flex:1"><div class="cap" data-i18n="ins1">npm 安装(已发布,零构建)</div><pre>npm install -g @hmharness/cli   # Node >= 22</pre></div></div>
-    <div class="step"><div class="n">2</div><div style="flex:1"><div class="cap" data-i18n="ins2">初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)</div><pre>hmh init
+    <div class="step"><div class="n" aria-hidden="true">1</div><div class="grow"><div class="cap" id="cap-1" data-i18n="ins1">npm 安装(已发布,零构建)</div><pre role="region" aria-labelledby="cap-1"><code>npm install -g @hmharness/cli   # Node >= 22</code></pre></div></div>
+    <div class="step"><div class="n" aria-hidden="true">2</div><div class="grow"><div class="cap" id="cap-2" data-i18n="ins2">初始化并配置厂商(任意 OpenAI 兼容端点;支持多厂商按用途路由)</div><pre role="region" aria-labelledby="cap-2"><code>hmh init
 notepad %USERPROFILE%\.hmharness\config.json
-  { "provider": { "baseUrl": "…", "apiKey": "…", "model": "…" } }</pre></div></div>
-    <div class="step"><div class="n">3</div><div style="flex:1"><div class="cap" data-i18n="ins3">一条命令起飞:全屏 TUI,网页端自动就绪</div><pre>hmh tui          # 全屏 TUI + 自动后台启动网页端
-hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div></div>
-    <div class="step"><div class="n">4</div><div style="flex:1"><div class="cap" data-i18n="ins4">让它自己变强</div><pre>hmh evolve --every=30   # 常驻自进化(双门禁,回归即回滚)</pre></div></div>
+  { "provider": { "baseUrl": "…", "apiKey": "…", "model": "…" } }</code></pre></div></div>
+    <div class="step"><div class="n" aria-hidden="true">3</div><div class="grow"><div class="cap" id="cap-3" data-i18n="ins3">一条命令起飞:全屏 TUI,网页端自动就绪</div><pre role="region" aria-labelledby="cap-3"><code>hmh tui          # 全屏 TUI + 自动后台启动网页端
+hmh web start    # 或单独后台启动网页(零窗口,stop/status)</code></pre></div></div>
+    <div class="step"><div class="n" aria-hidden="true">4</div><div class="grow"><div class="cap" id="cap-4" data-i18n="ins4">让它自己变强</div><pre role="region" aria-labelledby="cap-4"><code>hmh evolve --every=30   # 常驻自进化(双门禁,回归即回滚)</code></pre></div></div>
   </div>
 </div></section>
 
-<section id="evo" style="padding-top:20px"><div class="wrap">
+<section id="evo" class="pt-20"><div class="wrap">
   <h2 class="sec" data-i18n="evo_title">严格提升,否则回退</h2>
   <p class="secdesc" data-i18n="evo_desc">借鉴 Darwin Gödel Machine 与 GDPevo 的机制教训:每轮优化有度量、有快照、防背题、可回滚;进化循环无法触碰配置与安全设置。</p>
   <div class="loop">
-    <div class="node"><b data-i18n="n1">洞察</b> insights</div><span class="arrow">→</span>
-    <div class="node"><b data-i18n="n2">提案</b> drafts</div><span class="arrow">→</span>
-    <div class="node"><b data-i18n="n3">训练门</b> bench A/B ×2</div><span class="arrow">→</span>
-    <div class="node"><b data-i18n="n4">晋升</b> snapshot</div><span class="arrow">→</span>
-    <div class="node"><b data-i18n="n5">保留门</b> holdout</div><span class="arrow">↺</span>
+    <div class="node"><b data-i18n="n1">洞察</b> insights</div><span class="arrow" aria-hidden="true">→</span>
+    <div class="node"><b data-i18n="n2">提案</b> drafts</div><span class="arrow" aria-hidden="true">→</span>
+    <div class="node"><b data-i18n="n3">训练门</b> bench A/B ×2</div><span class="arrow" aria-hidden="true">→</span>
+    <div class="node"><b data-i18n="n4">晋升</b> snapshot</div><span class="arrow" aria-hidden="true">→</span>
+    <div class="node"><b data-i18n="n5">保留门</b> holdout</div><span class="arrow" aria-hidden="true">↺</span>
   </div>
-  <p class="secdesc" style="margin-top:34px" data-i18n="evo_outro">上一次会话踩过的坑,下一次开局就知道(检索式长期记忆自动注入,蒸馏层只增不删);每一轮进化都落在 evolution/log.jsonl,全程可审计。</p>
+  <p class="secdesc mt-34" data-i18n="evo_outro">上一次会话踩过的坑,下一次开局就知道(检索式长期记忆自动注入,蒸馏层只增不删);每一轮进化都落在 evolution/log.jsonl,全程可审计。</p>
 </div></section>
 
-<section id="models" style="padding-top:10px"><div class="wrap">
-  <h2 class="sec" data-i18n="mod_title">模型无关 · 按用途路由</h2>
+<section id="models" class="pt-10"><div class="wrap">
+  <h2 class="sec" id="models-title" data-i18n="mod_title">模型无关 · 按用途路由</h2>
   <p class="secdesc" data-i18n="mod_desc">任意 OpenAI 兼容厂商:GLM / DeepSeek / 通义 / Kimi / OpenRouter / Anthropic / OpenAI / Ollama / LM Studio……chat、vision、evolve、bench 各走各的,密钥只存在本机 HMH_HOME。</p>
   <div class="steps">
-    <div class="step"><div class="n">✦</div><div style="flex:1"><pre>{
+    <div class="step"><div class="n" aria-hidden="true">✦</div><div class="grow"><pre role="region" aria-labelledby="models-title"><code>{
   "providers": { "a": { "baseUrl": "…", "model": "strong" },
                  "v": { "baseUrl": "…", "model": "vision" } },
   "routing": { "chat": "a", "vision": "v", "evolve": "a", "bench": "a" }
-}</pre></div></div>
+}</code></pre></div></div>
   </div>
 </div></section>
+</main>
 
 <footer><div class="wrap">
   <div class="cols">
-    <div><h4>✦ hmharness</h4><ul>
+    <div><h3><span aria-hidden="true">✦ </span>hmharness</h3><ul>
       <li><a href="https://github.com/swsgbl/hmharness" target="_blank" rel="noopener" data-i18n="f_repo">GitHub 仓库</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" data-i18n="f_arch">架构设计</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md" target="_blank" rel="noopener" data-i18n="f_road">路线图</a></li>
     </ul></div>
-    <div><h4 data-i18n="f_eco">生态</h4><ul>
+    <div><h3 data-i18n="f_eco">生态</h3><ul>
       <li><a href="https://developer.huawei.com/consumer/cn/deveco-studio/" target="_blank" rel="noopener">DevEco Studio</a></li>
       <li><a href="https://www.openharmony.cn" target="_blank" rel="noopener">OpenHarmony</a></li>
       <li><a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a></li>
     </ul></div>
-    <div><h4 data-i18n="f_docs">文档</h4><ul>
+    <div><h3 data-i18n="f_docs">文档</h3><ul>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.md" target="_blank" rel="noopener">README(中文)</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/README.en.md" target="_blank" rel="noopener">README(English)</a></li>
       <li><a href="https://github.com/swsgbl/hmharness/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="f_contrib">参与贡献</a></li>
@@ -244,69 +298,6 @@ hmh web start    # 或单独后台启动网页(零窗口,stop/status)</pre></div
   </div>
 </div></footer>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
-<script>
-/* ---- motion layer: GSAP via CDN; full no-op fallback when unreachable or
-   when the user prefers reduced motion ---- */
-(function () {
-  if (typeof gsap === 'undefined') return;
-  var reduce = false;
-  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
-  if (reduce) return;
-
-  // hero: title, tag, sub, CTAs drift in, then the terminal pops
-  var hero = gsap.timeline({ defaults: { ease: 'power3.out' } })
-hero.from('.hero h1', { y: 34, autoAlpha: 0, duration: 0.7 });
-hero.from('.hero .tag', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.35');
-hero.from('.hero .sub', { y: 16, autoAlpha: 0, duration: 0.5 }, '-=0.3');
-hero.from('.cta .btn', { y: 12, autoAlpha: 0, duration: 0.4, stagger: 0.09 }, '-=0.25');
-hero.from('.term', { y: 26, scale: 0.97, autoAlpha: 0, duration: 0.6, ease: 'back.out(1.4)', clearProps: 'transform,visibility' }, '-=0.25');
-hero.from('.term-body span', { autoAlpha: 0, duration: 0.18, stagger: 0.05, clearProps: 'opacity,visibility' }, '-=0.2');;
-  hero.from('nav .logo, nav .navlinks > *', { y: -12, autoAlpha: 0, duration: 0.35, stagger: 0.05, clearProps: 'transform,visibility' }, 0);
-
-  // sections + cards drift in as they scroll into view
-  var seen = new WeakSet();
-  function reveal(el, sel) {
-    if (seen.has(el)) return;
-    seen.add(el);
-    gsap.fromTo(el, { y: 22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: 'power2.out', clearProps: 'transform,visibility' });
-    if (sel) {
-      gsap.fromTo(el.querySelectorAll(sel), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.08, clearProps: 'transform,visibility' });
-    }
-  }
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) {
-      if (!en.isIntersecting) return;
-      var t = en.target;
-      if (t.dataset.anim === 'stats') {
-        if (!seen.has(t)) {
-          seen.add(t);
-          t.querySelectorAll('.stat b').forEach(function (b) {
-            var to = Number(b.textContent) || 0;
-            var o = { n: 0 };
-            gsap.to(o, { n: to, duration: 0.9, ease: 'power2.out', onUpdate: function () { b.textContent = String(Math.round(o.n)); } });
-          });
-          gsap.fromTo(t.querySelectorAll('.stat'), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.45, stagger: 0.07, ease: 'power2.out', clearProps: 'transform,visibility' });
-        }
-        return;
-      }
-      var host = t.closest('section') || t;
-      reveal(host, t.dataset.anim === 'cards' ? '.card' : t.dataset.anim === 'steps' ? '.step' : t.dataset.anim === 'loop' ? '.node' : null);
-    });
-  }, { threshold: 0.25 });
-  document.querySelectorAll('h2.sec, p.secdesc, .stats').forEach(function (el) { io.observe(el); });
-  document.querySelectorAll('section .grid, section .steps, section .loop').forEach(function (el) {
-    el.setAttribute('data-anim', el.classList.contains('grid') ? 'cards' : el.classList.contains('steps') ? 'steps' : 'loop');
-    io.observe(el);
-  });
-
-  // nav button + CTA micro-interactions
-  document.querySelectorAll('.btn').forEach(function (b) {
-    b.addEventListener('mouseenter', function () { gsap.to(b, { scale: 1.04, duration: 0.18, ease: 'power2.out' }); });
-    b.addEventListener('mouseleave', function () { gsap.to(b, { scale: 1, duration: 0.25, ease: 'power2.out' }); });
-  });
-})();
-</script>
 <script>
 /* ---- i18n ---- */
 const I18N = {
@@ -339,7 +330,7 @@ const I18N = {
     cg4_h: '五层记忆 + 数据治理', cg4_p: 'working/episodic/semantic/procedural/world 五层,只增不删+完整溯源(来源/会话/环境/时间);矛盾检测打标待审;<code>cognitive export</code> 单文件全量导出、<code>purge</code> 显式确认删除。',
     cg5_h: '多智能体治理', cg5_p: 'spawn_agent 全部走角色契约拓扑 + 共享预算 + 跨进程不可变审计(<code>multi-agent.jsonl</code>);supervisor 可看心跳/超时/取消级联。',
     cg6_h: '手机远程控制', cg6_p: 'WiFi 扫码直连(免密)+ cloudflared 免费隧道互联网模式(6 位配对密码);配对会话持久化,服务器重启不重扫;断线自动重连。',
-    s1: '单仓 16 包', s2: '运行时依赖(内核)', s3: '单元测试(1067 通过/1 跳过)', s4: '环境适配器',
+    s1: '单仓 16 包', s2: '运行时依赖(内核)', s3: '单元测试(1089 通过/1 跳过)', s4: '环境适配器',
     ins_title: '四步上手',
     ins_desc: 'Node ≥ 22 + 鸿蒙工具链(hvigorw / hdc / DevEco 或命令行等价物)。任意 OpenAI 兼容厂商均可。',
     route_npm_h: '标准桌面:直接用 npm',
@@ -361,7 +352,9 @@ const I18N = {
     f_repo: 'GitHub 仓库', f_arch: '架构设计', f_road: '路线图',
     f_eco: '生态', f_docs: '文档', f_contrib: '参与贡献', f_faq: '常见问题 FAQ', f_feedback: '环境反馈',
     legal: '<b>非官方声明:</b>hmharness 是独立社区开源项目(MIT),与华为(Huawei)、开放原子开源基金会均无隶属、合作或背书关系。"HarmonyOS"、"鸿蒙"、"OpenHarmony"、"DevEco Studio" 等名称与标志归各自权利人所有,此处仅为描述性合理使用。本项目为净室(clean-room)重写,不继承任何上游运行时能力;自进化机制参考 Darwin Gödel Machine、GDPevo、Penguin Harness 等公开研究思想(无代码复制)。<br>© 2026 hmharness contributors · MIT License',
-    _langBtn: 'EN'
+    _langBtn: 'EN',
+    skip_link: '跳到主要内容', motion_btn: '动效', term_label: '终端演示',
+    motion_os: '系统已开启“减少动效”，页面按该设置保持静止'
   },
   en: {
     _title: 'hmharness — self-evolving agent framework for HarmonyOS, cross-environment Cognitive Runtime',
@@ -414,7 +407,9 @@ const I18N = {
     f_repo: 'GitHub Repository', f_arch: 'Architecture', f_road: 'Roadmap',
     f_eco: 'Ecosystem', f_docs: 'Docs', f_contrib: 'Contributing', f_faq: 'FAQ', f_feedback: 'Environment feedback',
     legal: '<b>Non-affiliation notice:</b> hmharness is an independent community open-source project (MIT). It is not affiliated with, endorsed by, or cooperating with Huawei or the OpenAtom Foundation. "HarmonyOS", "OpenHarmony", "DevEco Studio" and related names and marks belong to their respective owners; used here descriptively under fair use. This project is a clean-room rewrite that inherits no upstream runtime capability; self-evolution mechanisms reference public research ideas from Darwin Gödel Machine, GDPevo and Penguin Harness (no code copied).<br>© 2026 hmharness contributors · MIT License',
-    _langBtn: '中文'
+    _langBtn: '中文',
+    skip_link: 'Skip to main content', motion_btn: 'Motion', term_label: 'Terminal demo',
+    motion_os: 'Your system asks for reduced motion, so the page stays still'
   }
 };
 
@@ -427,13 +422,21 @@ function applyLang(lang) {
     const v = dict[el.dataset.i18n];
     if (v !== undefined) el.innerHTML = v;
   }
+  // accessible names follow the language too
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) {
+    const v = dict[el.dataset.i18nAria];
+    if (v !== undefined) el.setAttribute('aria-label', v);
+  }
   document.getElementById('langBtn').textContent = dict._langBtn;
+  const motionBtn = document.getElementById('motionBtn');
+  if (motionBtn.disabled) motionBtn.title = dict.motion_os;
   try { localStorage.setItem('hmh-lang', lang); } catch (e) {}
 }
 function toggleLang() {
   const cur = document.documentElement.lang.startsWith('zh') ? 'zh' : 'en';
   applyLang(cur === 'zh' ? 'en' : 'zh');
 }
+document.getElementById('langBtn').addEventListener('click', toggleLang);
 (function () {
   let lang = null;
   try { lang = localStorage.getItem('hmh-lang'); } catch (e) {}
@@ -445,33 +448,151 @@ function toggleLang() {
   applyLang(lang);
 })();
 
-/* ---- Matrix-style rain, brand-tuned ---- */
-(function(){
-  const cv = document.getElementById('rain'), cx = cv.getContext('2d');
-  const GLYPHS = '01✦HM自进化-{}<>/;$#'.split('');
-  let W, H, cols, drops, speeds;
-  function fit(){
-    W = cv.width = innerWidth; H = cv.height = innerHeight;
-    cols = Math.floor(W / 16);
-    drops = Array.from({length: cols}, () => Math.random() * -H / 16);
-    speeds = Array.from({length: cols}, () => 0.45 + Math.random() * 0.75);
+/* ---- motion + the Matrix-style rain (brand-tuned, decorative) ----
+   Web Animations API and IntersectionObserver only. Until 0.23.52 this was GSAP loaded
+   from a CDN: a render-blocking third-party request that sat in front of the i18n block
+   above, so a slow CDN also delayed the language switch. Nothing here is needed to read
+   the page. Without it, or when the user prefers reduced motion or switches motion off
+   (#motionBtn), every element rests in its final state. Only opacity and the individual
+   transform properties are animated, and animations fill backwards only: an element holds
+   its first keyframe through its delay and keeps its own CSS the moment they end. */
+(function () {
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  function off() { try { return localStorage.getItem('hmh-motion') === 'off'; } catch (e) { return false; } }
+  function on() { return !reduce && !off(); }
+  var btn = document.getElementById('motionBtn');
+  btn.disabled = reduce;   // the system setting wins: there is nothing to switch while it asks for stillness
+  function syncBtn() {
+    btn.setAttribute('aria-pressed', on() ? 'true' : 'false');
+    if (reduce) btn.title = I18N[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'].motion_os;
   }
-  fit(); addEventListener('resize', fit);
-  function frame(){
-    cx.fillStyle = 'rgba(11,30,58,0.14)';
-    cx.fillRect(0, 0, W, H);
-    cx.font = '14px Consolas, monospace';
-    for (let i = 0; i < cols; i++){
-      const y = drops[i] * 16;
-      const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
-      cx.fillStyle = Math.random() < 0.06 ? 'rgba(234,244,250,0.92)' : 'rgba(79,216,235,0.72)';
-      cx.fillText(ch, i * 16, y);
-      if (y > H && Math.random() > 0.985) drops[i] = 0;
-      drops[i] += speeds[i];
+
+  var can = typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function';
+  var POWER2 = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';    // power2.out
+  var POWER3 = 'cubic-bezier(0.215, 0.61, 0.355, 1)';    // power3.out
+  var BACK = 'cubic-bezier(0.34, 1.56, 0.64, 1)';        // back.out(1.4)
+  var FADE = [{ opacity: 0 }, { opacity: 1 }];
+  function rise(px) { return [{ opacity: 0, translate: '0 ' + px + 'px' }, { opacity: 1, translate: '0 0' }]; }
+  function all(sel) { return document.querySelectorAll(sel); }
+  function play(els, kf, opt) {
+    if (!can || !on()) return;
+    Array.prototype.forEach.call(els, function (el, i) {
+      try { el.animate(kf, { duration: opt.d, easing: opt.e || POWER2, delay: (opt.delay || 0) + i * (opt.step || 0), fill: 'backwards' }); } catch (e) {}
+    });
+  }
+
+  // hero: title, tag, sub, CTAs drift in, then the terminal pops (the same beats as before)
+  play(all('.hero h1'), rise(34), { d: 700, e: POWER3 });
+  play(all('.hero .tag'), rise(16), { d: 500, delay: 350 });
+  play(all('.hero .sub'), rise(16), { d: 500, delay: 550 });
+  var ctaEnd = 800 + (all('.cta .btn').length - 1) * 90 + 400;
+  play(all('.cta .btn'), rise(12), { d: 400, delay: 800, step: 90 });
+  var termAt = ctaEnd - 250;
+  play(all('.term'), [{ opacity: 0, translate: '0 26px', scale: '0.97' }, { opacity: 1, translate: '0 0', scale: '1' }], { d: 600, e: BACK, delay: termAt });
+  play(all('.term-body span'), FADE, { d: 180, delay: termAt + 400, step: 50 });
+  play(all('nav .logo, nav .navlinks > *'), [{ opacity: 0, translate: '0 -12px' }, { opacity: 1, translate: '0 0' }], { d: 350, step: 50 });
+
+  // sections + cards drift in as they scroll into view; the statistics count up
+  var seen = new WeakSet();
+  function countUp(b) {
+    var to = Number(b.textContent) || 0, t0 = null;
+    function tick(t) {
+      if (t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / 900), e = 1 - (1 - p) * (1 - p);   // power2.out
+      b.textContent = String(Math.round(to * e));
+      if (p < 1) requestAnimationFrame(tick);
     }
-    requestAnimationFrame(frame);
+    requestAnimationFrame(tick);
   }
-  frame();
+  function reveal(host, sel) {
+    if (seen.has(host)) return;
+    seen.add(host);
+    play(host, rise(22), { d: 500 });
+    if (sel) play(host.querySelectorAll(sel), rise(16), { d: 450, delay: 80, step: 60 });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting || !on()) return;
+        var t = en.target;
+        if (t.dataset.anim === 'stats') {
+          if (!seen.has(t)) {
+            seen.add(t);
+            if (can) t.querySelectorAll('.stat b').forEach(countUp);
+            play(t.querySelectorAll('.stat'), rise(16), { d: 450, step: 70 });
+          }
+          return;
+        }
+        var host = t.closest('section') || t;
+        reveal(host, t.dataset.anim === 'cards' ? '.card' : t.dataset.anim === 'steps' ? '.step' : t.dataset.anim === 'loop' ? '.node' : null);
+      });
+    }, { threshold: 0.25 });
+    all('h2.sec, p.secdesc, .stats').forEach(function (el) { io.observe(el); });
+    all('section .grid, section .steps, section .loop').forEach(function (el) {
+      el.setAttribute('data-anim', el.classList.contains('grid') ? 'cards' : el.classList.contains('steps') ? 'steps' : 'loop');
+      io.observe(el);
+    });
+  }
+
+  /* the rain: decorative, behind everything. It follows the same switch, and it stops
+     while the tab is hidden instead of painting frames nobody sees */
+  var rain = (function () {
+    const cv = document.getElementById('rain'), cx = cv.getContext('2d');
+    const GLYPHS = '01✦HM自进化-{}<>/;$#'.split('');
+    let W, H, cols, drops, speeds, raf = 0;
+    function fit(){
+      W = cv.width = innerWidth; H = cv.height = innerHeight;
+      cols = Math.floor(W / 16);
+      drops = Array.from({length: cols}, () => Math.random() * -H / 16);
+      speeds = Array.from({length: cols}, () => 0.45 + Math.random() * 0.75);
+    }
+    function frame(){
+      cx.fillStyle = 'rgba(11,30,58,0.14)';
+      cx.fillRect(0, 0, W, H);
+      cx.font = '14px Consolas, monospace';
+      for (let i = 0; i < cols; i++){
+        const y = drops[i] * 16;
+        const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+        cx.fillStyle = Math.random() < 0.06 ? 'rgba(234,244,250,0.92)' : 'rgba(79,216,235,0.72)';
+        cx.fillText(ch, i * 16, y);
+        if (y > H && Math.random() > 0.985) drops[i] = 0;
+        drops[i] += speeds[i];
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    addEventListener('resize', fit);
+    fit();
+    return {
+      start: function () { cancelAnimationFrame(raf); cv.style.display = ''; frame(); },
+      stop: function (hide) { cancelAnimationFrame(raf); cx.clearRect(0, 0, W, H); cv.style.display = hide ? 'none' : ''; }
+    };
+  })();
+  function syncRain() {
+    if (on() && !document.hidden) rain.start(); else rain.stop(!on());
+  }
+  document.addEventListener('visibilitychange', syncRain);
+  // what has already played stays; the switch governs the rain and what has not revealed
+  // yet, and anything still playing comes to rest at once
+  btn.addEventListener('click', function () {
+    try { localStorage.setItem('hmh-motion', off() ? 'on' : 'off'); } catch (e) {}
+    if (!on()) document.getAnimations().forEach(function (a) { if (!(a instanceof CSSTransition)) a.cancel(); });
+    syncBtn();
+    syncRain();
+  });
+  syncBtn();
+  syncRain();
+
+  /* code blocks become keyboard-scrollable, but only the ones that actually overflow:
+     a tabindex on a block that fits would only add an empty tab stop */
+  function tabStops() {
+    all('pre, .term-body').forEach(function (el) {
+      if (el.scrollWidth > el.clientWidth + 1) el.tabIndex = 0; else el.removeAttribute('tabindex');
+    });
+  }
+  addEventListener('resize', tabStops);
+  addEventListener('load', tabStops);   // again once the fonts are in: metrics move a little
+  tabStops();
 })();
 </script>
 </body>

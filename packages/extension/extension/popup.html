@@ -3,33 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>hmharness 桥接</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1><span class="logo"></span>hmharness 浏览器桥接</h1>
+  <header><h1><span class="logo" aria-hidden="true"></span>hmharness 浏览器桥接</h1></header>
 
-  <div class="status"><span class="dot" id="dot"></span><span class="txt" id="status-txt">读取状态…</span></div>
+  <main>
+    <div class="status"><span class="dot" id="dot" role="img" aria-label="连接状态未知"></span><span class="txt" id="status-txt" role="status">读取状态…</span></div>
 
-  <div class="row">
-    <button id="open-panel" class="primary" style="flex:1" hidden>打开对话面板（侧栏）</button>
-  </div>
-  <div class="row">
-    <input id="port" class="mono" inputmode="numeric" placeholder="端口 7789" spellcheck="false">
-    <button id="setport">设置端口并连接</button>
-  </div>
-  <div class="row">
-    <button id="reconnect">重新连接</button>
-    <button id="unpair" style="margin-left:auto">断开并取消授权</button>
-  </div>
+    <div class="row">
+      <button id="open-panel" type="button" class="primary grow" hidden>打开对话面板（侧栏）</button>
+    </div>
+    <div class="row">
+      <label class="lbl" for="port">端口</label>
+      <input id="port" class="mono" inputmode="numeric" placeholder="7789" spellcheck="false" autocomplete="off">
+      <button id="setport" type="button">设置端口并连接</button>
+    </div>
+    <div class="row">
+      <button id="reconnect" type="button">重新连接</button>
+      <button id="unpair" type="button" class="push">断开并取消授权</button>
+    </div>
 
-  <hr class="sep">
-  <div class="row"><button id="read" style="flex:1">读取当前页（自检）</button></div>
-  <pre id="out"></pre>
+    <hr class="sep">
+    <div class="row"><button id="read" type="button" class="grow">读取当前页（自检）</button></div>
+    <pre id="out" tabindex="0" role="region" aria-label="自检输出"></pre>
 
-  <p class="hint">点上方按钮或在侧栏中直接<b>与智能体对话</b> — 它能读取/操作你当前的标签页。
-  桥服务运行时(<b class="mono">hmh extension start</b>)<b>自动连接,无需任何输入</b>;
-  桥未运行时每 30 秒自动重试,启动 CLI 即连。</p>
+    <p class="hint">点上方按钮或在侧栏中直接<b>与智能体对话</b> — 它能读取/操作你当前的标签页。
+    桥服务运行时(<b class="mono">hmh extension start</b>)<b>自动连接,无需任何输入</b>;
+    桥未运行时每 30 秒自动重试,启动 CLI 即连。</p>
+  </main>
 
   <script src="ui.js"></script>
 </body>

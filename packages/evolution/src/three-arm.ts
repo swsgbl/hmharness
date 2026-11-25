@@ -113,8 +113,8 @@ function seededOrderStr(items: string[], seed: number): string[] {
  *  by id; the FULL assertion spec serialized into evalset's assertion.expect
  *  so the hash is content-sensitive to every mode, not just the primary). */
 export function buildTaskSetHash(tasks: ExperimentTask[]): { setId: string; datasetHash: string; canonical: string } {
-  const rows = [...tasks]
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const rows = tasks
+    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map((t) => ({ id: t.id, prompt: t.prompt, assertion: { kind: primaryKind(t), expect: JSON.stringify(t.assertion) }, holdout: t.split === 'protect' }));
   const canonical = JSON.stringify({ kind: 'hmharness-eval-taskset', version: 1, id: 'three-arm-2026-10-27', revision: 1, tasks: rows });
   return { setId: 'three-arm-2026-10-27', datasetHash: createHash('sha256').update(canonical).digest('hex'), canonical };

@@ -18,7 +18,7 @@
 import { appendFile, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { execFile as execCb } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, basename, relative } from 'node:path';
 import { sandbox, type SandboxSession } from '@hmharness/sandbox';
 
 export type ProjectState = 'created' | 'active' | 'paused' | 'completed' | 'archived';
@@ -256,7 +256,10 @@ export async function restoreCheckpoint(home: string, rec: ProjectRecord, checkp
     const tarFile = join(dir, '..', `cp-${Date.now()}.tar`);
     await git(['archive', '--format=tar', `--output=${tarFile}`, cpRef.tree], { cwd: rec.workspace, timeoutMs: 120_000 });
     await new Promise<void>((res, rej) => {
-      execCb('tar', ['-xf', tarFile, '-C', dir], { timeout: 120_000, windowsHide: true }, (err) => err ? rej(err) : res());
+      // relative paths from the temp dir: an absolute `C:\…` argument makes GNU tar
+      // (first on PATH under Git Bash/MSYS) read the drive letter as a remote host
+      // ("tar: Cannot connect to C: resolve failed"); Windows' own bsdtar takes both
+      execCb('tar', ['-xf', basename(tarFile), '-C', relative(tmpdir(), dir)], { cwd: tmpdir(), timeout: 120_000, windowsHide: true }, (err) => err ? rej(err) : res());
     });
     await rm(tarFile, { force: true });
   }

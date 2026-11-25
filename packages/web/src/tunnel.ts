@@ -148,7 +148,10 @@ async function download(url: string, dest: string, log?: (m: string) => void): P
     throw new Error('download truncated');
   } catch (err) {
     if (existsSync(dest)) unlinkSync(dest);
-    throw new Error(`${lastErr}; fetch: ${err instanceof Error ? err.message : String(err)}`);
+    // keep the combined message (the log shows it) AND chain the original error:
+    // `{ cause }` is the non-enumerable spec property; assigning `.cause` after
+    // construction would create an enumerable one
+    throw new Error(`${lastErr}; fetch: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 }
 

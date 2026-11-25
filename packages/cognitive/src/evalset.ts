@@ -42,7 +42,7 @@ export interface EvalTaskSet {
 
 /** Canonical JSON: tasks sorted by id, key order fixed — the hash basis. */
 export function canonicalTaskSet(set: Omit<EvalTaskSet, 'createdAt'> & { createdAt?: string }): string {
-  const tasks = [...set.tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const tasks = set.tasks.toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return JSON.stringify({ kind: set.kind, version: set.version, id: set.id, revision: set.revision, tasks: tasks.map((t) => ({ id: t.id, prompt: t.prompt, assertion: t.assertion, holdout: t.holdout === true })) });
 }
 

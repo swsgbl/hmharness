@@ -80,7 +80,7 @@ export async function buildConditionedGate(home: string, tau: number): Promise<L
     const usable = all.filter((t) => t.steps.length > 0 && t.environment.id === 'terminal');
     // deterministic split (seed 1) — analysis-only, no decision leakage
     const rng = mulberry32(hashSeed('p2a-intervention-1'));
-    const shuffled = [...usable].sort(() => rng() - 0.5);
+    const shuffled = usable.toSorted(() => rng() - 0.5);
     const train = shuffled.slice(0, Math.floor(shuffled.length * 0.7));
     const bump = (m: StatTable, k: string, ok: boolean) => {
       const e = m.get(k) ?? { s: 0, f: 0 };

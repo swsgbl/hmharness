@@ -204,7 +204,7 @@ export function humanFromJudgeScores(scores: number[]): DimensionScore {
  */
 export function formatHMHScore(score: HMHScore): string {
   const lines = [`HMH Score v${score.version}: ${score.composite}/100`];
-  const sorted = [...score.dimensions].sort((a, b) => b.score - a.score);
+  const sorted = score.dimensions.toSorted((a, b) => b.score - a.score);
   for (const d of sorted) {
     const bar = '█'.repeat(Math.round(d.score / 10)) + '░'.repeat(10 - Math.round(d.score / 10));
     lines.push(`  ${d.dimension.padEnd(16)} ${bar} ${String(d.score).padStart(3)}  (${d.method})`);

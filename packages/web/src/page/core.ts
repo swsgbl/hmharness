@@ -1,51 +1,23 @@
 /**
- * @hmharness/web - page/core.ts - 页面 JS 内核:GSAP 动效层、per-session 视图容器(W15)、i18n LABELS 双语表、视图切换、渲染原语(el/thinkBlock/sayBlock)、运行状态与任务驾驶舱、renderState、模型选择器
+ * @hmharness/web - page/core.ts - 页面 JS 内核:动效层(createMotion,uilite.ts)、per-session 视图容器(W15)、i18n LABELS 双语表、视图切换、渲染原语(el/thinkBlock/sayBlock)、运行状态与任务驾驶舱、renderState、模型选择器
  * P1-3 拆分自 page.ts(基线 682d4fc 行 708-1276):逐字搬运的页面
  * 源码片段,由 page.ts 装配层按序拼接,字节级一致由拆分期守门脚本校验。
  * 模板字面量规则同 page.ts:无裸反引号,页面 JS 内不用插值(字符串拼接),
  * 正则反斜杠双写。
  */
 export const CORE = `(function () {
-  /* ---- motion layer (GSAP via CDN; everything degrades to no-animation
-     when the CDN is unreachable or the user prefers reduced motion) ---- */
-  var AN = (function () {
-    var has = typeof gsap !== 'undefined';
-    var reduce = false;
-    try { reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
-    function go(fn) { if (has && !reduce) { try { fn(); } catch (e) {} } }
-    function tgt(el) { return typeof el === 'string' ? document.querySelectorAll(el) : el; }
-    return {
-      ok: has && !reduce,
-      viewIn: function (el) {
-        go(function () { gsap.fromTo(tgt(el), { y: 14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32, ease: 'power2.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
-      },
-      stagger: function (sel, root) {
-        go(function () {
-          var list = (root || document).querySelectorAll(sel);
-          gsap.fromTo(list, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.3, ease: 'power2.out', stagger: 0.04, overwrite: 'auto', clearProps: 'transform,visibility' });
-        });
-      },
-      popIn: function (el) {
-        go(function () { gsap.fromTo(tgt(el), { scale: 0.94, y: 8, autoAlpha: 0 }, { scale: 1, y: 0, autoAlpha: 1, duration: 0.36, ease: 'back.out(1.6)', overwrite: 'auto', clearProps: 'transform,visibility' }); });
-      },
-      userBubble: function (el) {
-        go(function () { gsap.fromTo(tgt(el), { x: 26, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.28, ease: 'power3.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
-      },
-      rowIn: function (el) {
-        go(function () { gsap.fromTo(tgt(el), { y: 8, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.24, ease: 'power2.out', overwrite: 'auto', clearProps: 'transform,visibility' }); });
-      },
-      tick: function (el) {
-        go(function () { gsap.fromTo(tgt(el), { scale: 1.3 }, { scale: 1, duration: 0.32, ease: 'back.out(2.2)', overwrite: 'auto', clearProps: 'transform' }); });
-      },
-      count: function (el, to, suffix) {
-        go(function () {
-          var o = { n: 0 };
-          gsap.to(o, { n: to, duration: 0.9, ease: 'power2.out', onUpdate: function () { el.textContent = Math.round(o.n) + (suffix || ''); } });
-        });
-      }
-    };
-  })();
+  /* ---- motion layer: createMotion() from uilite.ts (inlined above) — Web Animations
+     API, so the page loads no third-party script. Until 2026-11-25 this was GSAP
+     loaded by a synchronous script tag from jsDelivr: a render-blocking request to
+     a third party on every load (the page waited on it offline, behind a network
+     filter or when the CDN itself was down), and a script source a nonce-only CSP
+     cannot admit. Opacity and the individual transform properties only; spatial
+     motion is off under prefers-reduced-motion. ---- */
+  var AN = createMotion(window, document);
   window.__AN = AN;
+  /* ---- focus (uilite.ts): the modal overlays make the page behind them inert.
+     syncModals() must run BEFORE focus moves back into the page on a close path. ---- */
+  var syncModals = wireModalInert(document).sync;
   var log = document.getElementById('log');
   /* ---- per-session views (2026-09-28, deepseek-harness semantics) ----
      Every session owns ONE dedicated container + state; "the current session"
@@ -149,6 +121,9 @@ export const CORE = `(function () {
            provName:'名称', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader(可选)', provSupportsVision:'支持视觉', provKeyPhNew:'新 provider 需要填写 apiKey', provKeyPhEdit:'留空=保持原密钥；输入空格再清空=删除密钥',
            provDeleteConfirm:'删除该 provider?（config.json 就地改写，不可撤销）', presetEnv:'需环境变量', presetLocal:'本地端点',
            rtabDetail:'详情', rtabFiles:'文件', rtabPreview:'预览', rcollapse:'折叠右栏', rclose:'关闭右栏',
+           a11yInput:'任务输入框', a11yGoal:'会话目标', a11yMode:'审批模式', a11yCmdPal:'命令面板', a11yCmdPalIn:'搜索命令、视图或会话', a11yLocale:'切换语言', a11yModel:'切换模型', a11yNav:'视图导航', a11yDock:'会话详情', a11yTabs:'详情标签页',
+           a11yCollapse:'收起侧栏', a11yExpand:'展开侧栏', a11ySessMenu:'会话列表', a11yRefreshSess:'刷新会话列表', a11yTheme:'切换主题', a11yPair:'手机远程控制', a11yAttach:'添加图片附件', a11yPreset:'权限预设', a11yClose:'关闭',
+           a11yToBottom:'回到底部', a11yGoalSave:'保存目标', a11yGoalClear:'清除目标',
            pvHint:'在文件树或对话中点击文件路径在此预览', pvBinary:'二进制文件，无法预览（', pvTrunc:'(仅前 64KB)', pvNotFile:'文件不存在或在工作区外',
            slashHint:'↑↓ 选择 · Enter 插入 · Esc 关闭', atHint:'↑↓ 选择 · Enter 插入路径 · Esc 关闭', injHint:'运行中: Enter=排队 · Ctrl+Enter=注入当前轮', injected:'已注入当前轮', queueNone:'(空)',
            atNone:'无匹配文件 — 继续输入或按 Esc 关闭',
@@ -181,6 +156,9 @@ export const CORE = `(function () {
            provName:'name', provBaseUrl:'baseUrl', provModel:'model', provApiKey:'apiKey', provAuthHeader:'authHeader (optional)', provSupportsVision:'supports vision', provKeyPhNew:'a new provider needs its apiKey', provKeyPhEdit:'blank = keep the existing key; type a space then clear = remove it',
            provDeleteConfirm:'Delete this provider? (config.json is rewritten in place, not recoverable)', presetEnv:'needs env var', presetLocal:'local endpoint',
            rtabDetail:'Detail', rtabFiles:'Files', rtabPreview:'Preview', rcollapse:'collapse', rclose:'close',
+           a11yInput:'Task input', a11yGoal:'Session goal', a11yMode:'Approval mode', a11yCmdPal:'Command palette', a11yCmdPalIn:'Search commands, views or sessions', a11yLocale:'Switch language', a11yModel:'Switch model', a11yNav:'Views', a11yDock:'Session details', a11yTabs:'Detail tabs',
+           a11yCollapse:'Collapse sidebar', a11yExpand:'Expand sidebar', a11ySessMenu:'Session list', a11yRefreshSess:'Refresh session list', a11yTheme:'Switch theme', a11yPair:'Remote control from phone', a11yAttach:'Add image attachments', a11yPreset:'Permission presets', a11yClose:'Close',
+           a11yToBottom:'Scroll to bottom', a11yGoalSave:'Save goal', a11yGoalClear:'Clear goal',
            pvHint:'click a file path in the file tree or the chat to preview it here', pvBinary:'binary file, cannot preview (', pvTrunc:'(first 64KB only)', pvNotFile:'file not found or outside the workspace',
           slashHint:'↑↓ select · Enter insert · Esc close', atHint:'↑↓ select · Enter insert path · Esc close', injHint:'while running: Enter=queue · Ctrl+Enter=inject this turn', injected:'injected into the current turn', queueNone:'(empty)',
           atNone:'no matching files — keep typing or press Esc',
@@ -191,9 +169,21 @@ export const CORE = `(function () {
   // (sessions, cognitive panel...) can fire BEFORE setLabels() runs, and an
   // unguarded L.none2 on the empty-sessions path crashed the whole bootstrap
   L = LABELS.zh;
+  // a tooltip is mouse-only. Controls named by an icon or by their title carry that text
+  // as their accessible name too (named); fields whose only visible hint is a placeholder
+  // get the same text as a name (labelled). Controls with visible text stay named by it.
+  function named(id, text) { var el = document.getElementById(id); if (el) { el.title = text; el.setAttribute('aria-label', text); } }
+  function labelled(id, text) { var el = document.getElementById(id); if (el) el.setAttribute('aria-label', text); }
+  /** The Enter that SUBMITS — never the Enter that confirms an IME candidate (Chinese/
+   *  Japanese/Korean input). isComposing covers Chrome and Firefox; Safari delivers that
+   *  confirming keydown after compositionend with keyCode 229, so that is checked too. */
+  function enterConfirmed(e) { return e.key === 'Enter' && !e.isComposing && e.keyCode !== 229; }
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
     document.title = L.title;
+    // the page language follows the locale: assistive tech picks its voice from the html lang
+    document.documentElement.lang = L.localeKey;
+    document.getElementById('app-title').textContent = L.title;
     updateSendBtn();
     document.getElementById('ap-yes').textContent = L.approve;
     document.getElementById('ap-no').textContent = L.deny;
@@ -225,9 +215,35 @@ export const CORE = `(function () {
     document.getElementById('wsp-name').placeholder = L.wsName;
     document.getElementById('wsp-cancel').textContent = L.cancel;
     document.getElementById('wsp-ok').textContent = L.wsOk;
-    document.getElementById('ws-new').title = L.pickTitle;
-    document.getElementById('ws-open').title = L.wsOpen;
-    document.getElementById('wscur').title = L.wsSwitch;
+    labelled('input', L.a11yInput);
+    labelled('search', L.searchPh);
+    labelled('goal-input', L.a11yGoal);
+    labelled('mode', L.a11yMode);
+    labelled('wsp-path', L.wsPath);
+    labelled('wsp-name', L.wsName);
+    labelled('cmdpal', L.a11yCmdPal);
+    labelled('cmdpal-in', L.a11yCmdPalIn);
+    labelled('rightbar', L.a11yDock);
+    document.querySelector('#rtabs').setAttribute('aria-label', L.a11yTabs);
+    document.querySelector('#side nav').setAttribute('aria-label', L.a11yNav);
+    // visible text ("zh") first, the action after it
+    document.getElementById('locale-chip').setAttribute('aria-label', (loc || 'zh') + ' · ' + L.a11yLocale);
+    named('ws-new', L.pickTitle);
+    named('ws-open', L.wsOpen);
+    named('wscur', L.wsSwitch);
+    named('ws-refresh', L.a11yRefreshSess);
+    named('sideburger', L.a11ySessMenu);
+    named('theme-chip', L.a11yTheme);
+    named('phone-pair', L.a11yPair);
+    named('attach', L.a11yAttach);
+    named('preset-btn', L.a11yPreset);
+    named('tobot', L.a11yToBottom);
+    named('goal-set', L.a11yGoalSave);
+    named('goal-clear', L.a11yGoalClear);
+    named('wsp-close', L.a11yClose);
+    named('collapse', document.body.classList.contains('sidemin') ? L.a11yExpand : L.a11yCollapse);
+    // the model chip is named by the model it shows; the action is its tooltip
+    document.getElementById('model').title = L.a11yModel;
     var navNames = { chat:L.navChat, board:L.navBoard, cognitive:L.navCog, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
       var txt = n.querySelector('.txt');
@@ -249,8 +265,8 @@ export const CORE = `(function () {
     document.getElementById('rtab-detail').textContent = L.rtabDetail;
     document.getElementById('rtab-files').textContent = L.rtabFiles;
     document.getElementById('rtab-preview').textContent = L.rtabPreview;
-    document.getElementById('rcollapse').title = L.rcollapse;
-    document.getElementById('rclose').title = L.rclose;
+    named('rcollapse', L.rcollapse);
+    named('rclose', L.rclose);
     var pvh = document.querySelector('#pview .hint');
     if (pvh) pvh.textContent = L.pvHint;
     if (document.getElementById('dempty')) document.getElementById('dempty').textContent = L.dempty;
@@ -260,7 +276,9 @@ export const CORE = `(function () {
   function switchView(v) {
     curView = v;
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
-      n.classList.toggle('on', n.getAttribute('data-view') === v);
+      var on = n.getAttribute('data-view') === v;
+      n.classList.toggle('on', on);
+      if (on) n.setAttribute('aria-current', 'page'); else n.removeAttribute('aria-current');
     });
     ['chat', 'board', 'cognitive', 'devices', 'ssh', 'skills', 'settings', 'label'].forEach(function (k) {
       var elv = document.getElementById('view-' + k);
@@ -286,6 +304,7 @@ export const CORE = `(function () {
   function applySide(min) {
     document.body.classList.toggle('sidemin', min);
     document.getElementById('collapse').textContent = min ? '\\u00BB' : '\\u00AB';
+    if (L) named('collapse', min ? L.a11yExpand : L.a11yCollapse);
     try { localStorage.setItem('hmh-side-min', min ? '1' : '0'); } catch (e) {}
   }
   document.getElementById('collapse').onclick = function () {
@@ -469,6 +488,20 @@ export const CORE = `(function () {
     // (wired at the retry discard path below)
   })();
 
+  /** Topbar goal chip: the dart is decoration (hidden from assistive tech); only the goal
+   *  text is read out, and the full goal stays as the tooltip since the chip truncates. */
+  function setGoalChip(goal) {
+    var gc = document.getElementById('goal-chip');
+    if (!gc) return;
+    if (!goal) { gc.style.display = 'none'; gc.removeAttribute('title'); return; }
+    gc.style.display = '';
+    gc.textContent = '';
+    var ico = document.createElement('span'); ico.setAttribute('aria-hidden', 'true'); ico.textContent = '🎯 ';
+    var tx = document.createElement('span'); tx.textContent = String(goal);
+    gc.appendChild(ico); gc.appendChild(tx);
+    gc.title = String(goal);
+  }
+
   function renderState(s) {
     state = s;
     setLabels(s.locale || 'zh');
@@ -493,9 +526,7 @@ export const CORE = `(function () {
     if (pp) pp.style.display = (s.exposure && s.exposure !== 'loopback') ? '' : 'none';
     // A11 theme + A6 goal from the persisted state
     applyTheme((s.settings && s.settings.theme) || 'dark');
-    var gc = document.getElementById('goal-chip');
-    if (s.goal) { gc.style.display = ''; gc.textContent = '🎯 ' + s.goal; gc.title = s.goal; }
-    else { gc.style.display = 'none'; }
+    setGoalChip(s.goal);
     if (s.workspace) {
       var wsPrev = curWs && curWs.path;
       curWs = s.workspace;
@@ -514,6 +545,8 @@ export const CORE = `(function () {
   }
 
   /* ---- model picker (switches routing.chat; server persists + broadcasts) ---- */
+  var modelPickClose = null;      // closes the picker built by the last renderModelPick
+  var modelPickFocusOut = null;   // its focusout listener, replaced on every rebuild
   function renderModelPick(s) {
     var chip = document.getElementById('model');
     var old = document.getElementById('modelpick');
@@ -528,7 +561,9 @@ export const CORE = `(function () {
       pick.appendChild(e);
     }
     list.forEach(function (p) {
-      var row = document.createElement('div');
+      // a real button: the row switches the chat model, so the keyboard must reach it
+      var row = document.createElement('button');
+      row.type = 'button';
       row.className = 'mp-row' + (p.purposes && p.purposes.indexOf('chat') >= 0 ? ' cur' : '');
       var d = document.createElement('span'); d.className = 'dot2';
       var nm = document.createElement('span'); nm.textContent = p.name;
@@ -536,7 +571,7 @@ export const CORE = `(function () {
       var pp = document.createElement('span'); pp.className = 'mp-p'; pp.textContent = (p.purposes || []).join('/');
       row.appendChild(d); row.appendChild(nm); row.appendChild(mm); row.appendChild(pp);
       row.onclick = function () {
-        pick.classList.remove('on');
+        setModelPick(false);
         fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: p.name }) })
           .then(function (r) { return r.json(); })
           .then(function (d2) { if (d2 && d2.error) alert(d2.error); })
@@ -558,20 +593,30 @@ export const CORE = `(function () {
       row.title = p.local ? '\\u672C\\u5730\\u63A8\\u7406\\u7AEF\\u70B9,\\u624B\\u5DE5\\u5199\\u5165 config.json \\u5373\\u53EF' : '\\u8BBE\\u7F6E\\u73AF\\u5883\\u53D8\\u91CF ' + p.envVar + ' \\u540E\\u8FD0\\u884C hmh providers --scan';
       pick.appendChild(row);
     });
-    chip.appendChild(pick);
-    chip.onclick = function (ev) {
-      if (ev.target.closest && ev.target.closest('.mp-row')) return;
-      var wasOff = !pick.classList.contains('on');
-      pick.classList.toggle('on');
-      if (wasOff) {
+    // the picker hangs off the trigger's wrapper, not off the button itself: a button may
+    // not contain interactive content, and the rows are buttons now
+    var wrap = chip.parentNode;
+    if (modelPickFocusOut) wrap.removeEventListener('focusout', modelPickFocusOut);
+    wrap.appendChild(pick);
+    function setModelPick(on) {
+      pick.classList.toggle('on', on);
+      chip.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (on) {
         window.__AN.popIn(pick);
         window.__AN.stagger('.mp-row', pick);
       }
-    };
+    }
+    chip.setAttribute('aria-expanded', 'false');
+    chip.onclick = function () { setModelPick(!pick.classList.contains('on')); };
+    // focus leaving the chip and its rows closes the picker: that is the keyboard way out
+    modelPickFocusOut = function (ev) { if (!wrap.contains(ev.relatedTarget)) setModelPick(false); };
+    wrap.addEventListener('focusout', modelPickFocusOut);
+    modelPickClose = function () { setModelPick(false); };
   }
+  // a click anywhere else closes the picker (focusout alone would miss browsers that do
+  // not focus a button on click)
   document.addEventListener('click', function (ev) {
-    var pick = document.getElementById('modelpick');
-    var chip = document.getElementById('model');
-    if (pick && pick.classList.contains('on') && !chip.contains(ev.target)) pick.classList.remove('on');
+    var wrap = document.querySelector('.modelwrap');
+    if (modelPickClose && !(wrap && wrap.contains(ev.target))) modelPickClose();
   });
 `;

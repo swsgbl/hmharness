@@ -91,7 +91,7 @@ export function computeMetrics(input: RunMetricInput): MetricReport {
   if (input.deltaAccuracy !== undefined) report.worldModelDeltaAccuracy = input.deltaAccuracy;
   if (input.costUsd !== undefined) report.costUsd = Number(input.costUsd.toFixed(4));
   if (input.actionLatenciesMs?.length) {
-    const sorted = [...input.actionLatenciesMs].sort((a, b) => a - b);
+    const sorted = input.actionLatenciesMs.toSorted((a, b) => a - b);
     report.latency = {
       p50Ms: quantile(sorted, 0.5),
       p95Ms: quantile(sorted, 0.95),

@@ -17,9 +17,9 @@ export const SHELL = `  // ---- sidebar actions ----
     v.loaded = true;
     v.cwd = (curWs && curWs.path) || '';
     v.root.innerHTML = '<div id="empty"><div style="font-size:30px">\\u2699\\uFE0F</div><div style="margin:8px 0 4px;font-size:16px">' + L.emptyTitle + '</div><div style="font-size:12.5px">' + L.emptySub + '</div><div style="margin-top:14px"></div>' +
-      '<div class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</div>' +
-      '<div class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</div>' +
-      '<div class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</div></div>';
+      '<button type="button" class="ex" data-ex="运行鸿蒙工具链体检并逐项总结">运行鸿蒙工具链体检并逐项总结</button>' +
+      '<button type="button" class="ex" data-ex="列出已连接的设备和模拟器">列出已连接的设备和模拟器</button>' +
+      '<button type="button" class="ex" data-ex="扫描开源鸿蒙生态雷达并总结简报">扫描开源鸿蒙生态雷达并总结简报</button></div>';
     mountView(sid);
     wireExamples();
     document.getElementById('rightbar').classList.remove('open');
@@ -79,6 +79,9 @@ export const SHELL = `  // ---- sidebar actions ----
     var lan = pairMode === 'lan';
     pel('pair-lan').style.borderColor = lan ? 'var(--accent)' : 'var(--line)';
     pel('pair-wan').style.borderColor = lan ? 'var(--line)' : 'var(--accent)';
+    // the two mode buttons are toggles: the state is announced, not only bordered
+    pel('pair-lan').setAttribute('aria-pressed', lan ? 'true' : 'false');
+    pel('pair-wan').setAttribute('aria-pressed', lan ? 'false' : 'true');
     if (lan) {
       pairUrl = (pairData && pairData.lanPairingUrl) || '';
       pel('pair-pin').style.display = 'none';
@@ -137,9 +140,13 @@ export const SHELL = `  // ---- sidebar actions ----
       });
   }
   var pairPolls = 0;
+  var pairTrigger = null;   // where focus goes back when the pairing dialog closes
   function openPairModal() {
     var mod = pel('pairmod');
+    pairTrigger = document.activeElement;
     mod.classList.add('on');
+    // a dialog takes the focus when it opens; the page behind it is inert by now
+    pel('pair-lan').focus();
     refreshPair();
     clearInterval(pairTimer);
     pairTimer = setInterval(function () {
@@ -183,12 +190,15 @@ export const SHELL = `  // ---- sidebar actions ----
     var b = pel('pair-copy'); b.textContent = '已复制 ✓';
     setTimeout(function () { b.textContent = '复制链接'; }, 1400);
   };
-  pel('pair-close').onclick = function () {
+  function closePairModal() {
     pel('pairmod').classList.remove('on');
+    syncModals();
     clearInterval(pairTimer);
-  };
-  el('pairmod').onclick = function (e) {
-    if (e.target === this) { this.classList.remove('on'); clearInterval(pairTimer); }
+    if (pairTrigger && pairTrigger.focus) pairTrigger.focus();
+  }
+  pel('pair-close').onclick = closePairModal;
+  pel('pairmod').onclick = function (e) {
+    if (e.target === this) closePairModal();
   };
 
   /* ---- command palette (docx Web 专项): Ctrl+K opens a global console with
@@ -228,6 +238,7 @@ export const SHELL = `  // ---- sidebar actions ----
   function closeCmdPal() {
     palOpen = false;
     document.getElementById('cmdpal').classList.remove('on');
+    syncModals();   // the input must be focusable again before focus returns to it
     document.getElementById('input').focus();
   }
   function renderCmdPal(q) {
@@ -258,16 +269,23 @@ export const SHELL = `  // ---- sidebar actions ----
   var cmdIn = document.getElementById('cmdpal-in');
   cmdIn.oninput = function () { palSelIdx = 0; renderCmdPal(this.value); };
   cmdIn.onkeydown = function (e) {
+    if (e.isComposing) return;   // the IME owns the keys while a candidate is being composed
     if (e.key === 'ArrowDown') { e.preventDefault(); palSelIdx = Math.min(palActs.length - 1, palSelIdx + 1); renderCmdPal(this.value); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); palSelIdx = Math.max(0, palSelIdx - 1); renderCmdPal(this.value); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (palActs[palSelIdx]) { palActs[palSelIdx].run(); closeCmdPal(); } }
+    else if (enterConfirmed(e)) { e.preventDefault(); if (palActs[palSelIdx]) { palActs[palSelIdx].run(); closeCmdPal(); } }
     else if (e.key === 'Escape') { e.preventDefault(); closeCmdPal(); }
   };
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
       if (palOpen) closeCmdPal(); else openCmdPal();
-    } else if (e.key === 'Escape' && palOpen) { closeCmdPal(); }
+    } else if (e.key === 'Escape' && !e.isComposing) {
+      // Escape (never the IME's own cancel) closes whichever overlay is open; they never
+      // open on top of each other
+      if (palOpen) closeCmdPal();
+      else if (pel('wspick').classList.contains('on')) closePick();
+      else if (pel('pairmod').classList.contains('on')) closePairModal();
+    }
   });
 
   api('/api/state').then(function (r) { return r.json(); }).then(renderState);
