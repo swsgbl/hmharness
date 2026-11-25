@@ -56,7 +56,7 @@ function deltaKeys(t: Transition): string[] {
 export function mineCausalLinks(transitions: Transition[], opts: { minSupport?: number; minLift?: number } = {}): CausalLink[] {
   const minSupport = opts.minSupport ?? 2;
   const minLift = opts.minLift ?? 0.2;
-  const chronological = [...transitions].sort((a, b) => String(a.observation.timestamp).localeCompare(String(b.observation.timestamp)));
+  const chronological = transitions.toSorted((a, b) => String(a.observation.timestamp).localeCompare(String(b.observation.timestamp)));
 
   // runs per action type
   const runs = new Map<string, number>();

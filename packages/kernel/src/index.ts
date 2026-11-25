@@ -14,3 +14,4 @@ export * from './goal.ts';
 export * from './mcp2026.ts';
 export * from './adaptive-router.ts';
 export * from './qrcode.ts';
+export * from './deadline.ts';

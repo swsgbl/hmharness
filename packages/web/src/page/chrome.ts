@@ -18,6 +18,10 @@ export const CHROME = `  // ---- locale switch (persisted server-side; SSE state
   // ---- A11 theme (dark/light/system; CSS tokens only, persisted) ----
   function applyTheme(mode) {
     document.body.setAttribute('data-theme', mode || 'dark');
+    // the ROOT's color-scheme is what the browser looks at for the UI it draws itself
+    // (scrollbars, form controls, canvas). body[data-theme] carries the color tokens;
+    // this line carries the scheme, so a light theme stops showing dark-native controls
+    document.documentElement.style.colorScheme = mode === 'light' ? 'light' : mode === 'system' ? 'light dark' : 'dark';
     var chip = document.getElementById('theme-chip');
     chip.textContent = mode === 'light' ? '☀' : mode === 'system' ? '◐' : '🌓';
   }
@@ -35,23 +39,39 @@ export const CHROME = `  // ---- locale switch (persisted server-side; SSE state
   // ---- A8 permission presets (ask/auto/yolo cards with danger notes) ----
   var presetBtn = document.getElementById('preset-btn');
   var presetPop = document.getElementById('presetpop');
-  presetBtn.onclick = function (ev) { ev.stopPropagation(); presetPop.classList.toggle('on'); };
+  function setPresetPop(on) {
+    presetPop.classList.toggle('on', on);
+    presetBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
+  presetBtn.onclick = function (ev) { ev.stopPropagation(); setPresetPop(!presetPop.classList.contains('on')); };
   Array.prototype.forEach.call(presetPop.querySelectorAll('.preset'), function (b) {
     b.onclick = function () {
       var modeSel = document.getElementById('mode');
       modeSel.value = b.getAttribute('data-mode');
-      presetPop.classList.remove('on');
+      setPresetPop(false);
       if (modeSel.onchange) modeSel.onchange();
     };
   });
-  document.addEventListener('click', function () { presetPop.classList.remove('on'); });
+  document.addEventListener('click', function (ev) {
+    if (!presetBtn.parentNode.contains(ev.target)) setPresetPop(false);
+  });
+  // keyboard: leaving the button and its three presets closes the popover, as a click
+  // elsewhere does for the mouse
+  presetBtn.parentNode.addEventListener('focusout', function (ev) {
+    if (!this.contains(ev.relatedTarget)) setPresetPop(false);
+  });
 
   // ---- A6 session goal (chip toggles the goal row; shared kernel store) ----
   var goalChip = document.getElementById('goal-chip');
   var goalRow = document.getElementById('goalrow');
+  function setGoalRow(open) {
+    goalRow.style.display = open ? 'flex' : 'none';
+    goalChip.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
   goalChip.onclick = function () {
-    goalRow.style.display = goalRow.style.display === 'none' ? 'flex' : 'none';
-    if (goalRow.style.display === 'flex') {
+    var open = goalRow.style.display === 'none';
+    setGoalRow(open);
+    if (open) {
       var inp = document.getElementById('goal-input');
       inp.placeholder = L ? L.goalPh : '会话目标';
       // strip the display prefix - editing must not bake '\\uD83C\\uDFAF ' into the saved goal
@@ -65,14 +85,14 @@ export const CHROME = `  // ---- locale switch (persisted server-side; SSE state
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goal: v, sessionId: curSid || '' })
     });
-    goalRow.style.display = 'none';
+    setGoalRow(false);
   };
   document.getElementById('goal-clear').onclick = function () {
     fetch('/api/goal', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goal: '', sessionId: curSid || '' })
     });
-    goalRow.style.display = 'none';
+    setGoalRow(false);
   };
 
   // ---- A6 plan card (checkable numbered-step list pinned at the top) ----
@@ -124,7 +144,9 @@ export const CHROME = `  // ---- locale switch (persisted server-side; SSE state
     wrap.style.flexWrap = 'wrap';
     wrap.style.gap = '6px';
     paths.forEach(function (p) {
-      var chip = document.createElement('span');
+      // a real button: each chip opens the file preview, so the keyboard must reach it
+      var chip = document.createElement('button');
+      chip.type = 'button';
       chip.className = 'deliv';
       chip.textContent = p.split(/[\\\\/]/).pop();
       chip.title = p;
@@ -139,9 +161,7 @@ export const CHROME = `  // ---- locale switch (persisted server-side; SSE state
    *  functions injected above — no page-local copies. */
   es.addEventListener('goal', function (e) {
     var g = JSON.parse(e.data).goal;
-    var gc = document.getElementById('goal-chip');
-    if (g) { gc.style.display = ''; gc.textContent = '\\uD83C\\uDFAF ' + g; gc.title = g; }
-    else { gc.style.display = 'none'; }
+    setGoalChip(g);
     if (state) state.goal = g || null;
   });
 `;

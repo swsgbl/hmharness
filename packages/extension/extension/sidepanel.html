@@ -3,50 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>hmharness</title>
+  <meta name="color-scheme" content="dark">
+  <title>hmharness 对话</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="chat-layout">
   <header class="top">
-    <span class="logo"></span><span class="name">hmharness</span>
-    <span class="dot" id="dot" title="连接状态"></span>
-    <button id="settings-btn" class="ghost" title="设置" aria-label="设置">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    <span class="logo" aria-hidden="true"></span><h1 class="name">hmharness</h1>
+    <span class="dot" id="dot" role="img" aria-label="连接状态未知" title="连接状态未知"></span>
+    <button id="settings-btn" type="button" class="ghost" title="设置" aria-label="设置" aria-expanded="false" aria-controls="settings">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
   </button>
   </header>
 
+  <main>
   <div id="settings" hidden>
-    <div class="set-row"><span class="txt dim" id="status-txt">读取状态…</span></div>
+    <div class="set-row"><span class="txt" id="status-txt" role="status">读取状态…</span></div>
     <div class="set-row">
-      <input id="port" class="mono" inputmode="numeric" placeholder="端口 7789" spellcheck="false">
-      <button id="setport">设置端口</button>
+      <label class="lbl" for="port">端口</label>
+      <input id="port" class="mono" inputmode="numeric" placeholder="7789" spellcheck="false" autocomplete="off">
+      <button id="setport" type="button">设置端口</button>
     </div>
     <div class="set-row">
-      <button id="reconnect">重连</button>
-      <button id="read">自检</button>
-      <button id="chat-reset">清空对话</button>
-      <button id="unpair" class="dim2" style="margin-left:auto">断开</button>
+      <button id="reconnect" type="button">重连</button>
+      <button id="read" type="button">自检</button>
+      <button id="chat-reset" type="button">清空对话</button>
+      <button id="unpair" type="button" class="dim2 push">断开</button>
     </div>
-    <pre id="out"></pre>
+    <pre id="out" tabindex="0" role="region" aria-label="自检输出"></pre>
   </div>
 
-  <div id="chat" aria-live="polite">
+  <div id="chat" role="log" aria-label="对话记录">
     <div id="hero">
-      <div class="hero-icon">✦</div>
-      <div class="hero-title">智能体随时为您服务</div>
-      <div class="hero-sub">读网页 · 操作浏览器 · 执行任务</div>
+      <div class="hero-icon" aria-hidden="true">✦</div>
+      <h2 class="hero-title">智能体随时为您服务</h2>
+      <p class="hero-sub">读网页 · 操作浏览器 · 执行任务</p>
       <div class="chips">
-        <button class="chip">总结这个页面</button>
-        <button class="chip">这个页面讲了什么?</button>
-        <button class="chip">把页面里的链接列出来</button>
+        <button type="button" class="chip">总结这个页面</button>
+        <button type="button" class="chip">这个页面讲了什么?</button>
+        <button type="button" class="chip">把页面里的链接列出来</button>
       </div>
     </div>
   </div>
 
   <div class="composer">
-    <input id="chat-input" placeholder="问点什么…" enterkeyhint="send" autocomplete="off">
-    <button id="chat-send" class="primary" aria-label="发送">➤</button>
+    <input id="chat-input" type="text" aria-label="问点什么…" placeholder="问点什么…" enterkeyhint="send" autocomplete="off">
+    <button id="chat-send" type="button" class="primary" aria-label="发送">➤</button>
   </div>
+  </main>
 
   <script src="ui.js"></script>
 </body>

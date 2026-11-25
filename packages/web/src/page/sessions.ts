@@ -58,14 +58,14 @@ export const SESSIONS = `  /** W15: reflect runningSids onto every session row b
       if (t2) t2.replaceWith(input); else b.appendChild(input);
       input.focus();
       input.onkeydown = function (ev) {
-        if (ev.key === 'Enter' && !ev.isComposing) {
+        if (enterConfirmed(ev)) {
           ev.preventDefault();
           var v = input.value.trim();
           if (!v) { loadSessions(); return; }
           fetch('/api/sessions/' + encodeURIComponent(s.id) + '/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: v }) })
             .then(function () { loadSessions(); });
         }
-        if (ev.key === 'Escape') loadSessions();
+        if (ev.key === 'Escape' && !ev.isComposing) loadSessions();
       };
     }));
     acts.appendChild(mk('\\uD83D\\uDCE5', '', L ? L.sesArchive : 'archive', function () {

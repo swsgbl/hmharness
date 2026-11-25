@@ -129,8 +129,8 @@ export function buildTaskSetHashV2(tasks: ExperimentTask[]): { setId: string; da
     : t.assertion.expectAny?.length ? 'expect-any'
     : t.assertion.expectNone?.length ? 'expect-none'
     : 'expect';
-  const rows = [...tasks]
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const rows = tasks
+    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map((t) => ({ id: t.id, prompt: t.prompt, assertion: { kind: primaryKind(t), expect: JSON.stringify(t.assertion) }, holdout: t.split === 'protect' }));
   const canonical = JSON.stringify({ kind: 'hmharness-eval-taskset', version: 1, id: 'three-arm-v2-2026-10-28', revision: 1, tasks: rows });
   return { setId: 'three-arm-v2-2026-10-28', datasetHash: createHash('sha256').update(canonical).digest('hex'), canonical };

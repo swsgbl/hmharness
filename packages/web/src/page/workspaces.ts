@@ -20,6 +20,10 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
       renderSessions(document.getElementById('search').value);
     });
   }
+  function setWsBox(open) {
+    document.getElementById('wsbox').classList.toggle('open', open);
+    document.getElementById('wscur').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
   function renderWsList() {
     document.getElementById('wscur-name').textContent = curWs.name || '…';
     var box = document.getElementById('ws-items');
@@ -36,6 +40,8 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
       var pt = document.createElement('div'); pt.className = 'pt'; pt.textContent = w.path;
       var x = document.createElement('button'); x.className = 'wsx'; x.type = 'button'; x.textContent = '\\u00D7';
       x.title = L ? L.wsRemove : 'remove';
+      // the name disambiguates: "remove" alone reads the same on every row
+      x.setAttribute('aria-label', (L ? L.wsRemove : 'remove') + ' ' + w.name);
       x.onclick = function (ev) {
         ev.stopPropagation();
         fetch('/api/workspaces/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })
@@ -46,13 +52,17 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
           })
           .catch(function (e) { alert(String(e)); });
       };
-      item.appendChild(nm); item.appendChild(pt); item.appendChild(x);
-      item.onclick = function () {
-        if (w.id === curWs.id) { document.getElementById('wsbox').classList.remove('open'); return; }
+      // the switch target is a real button and the remove button its sibling: a button
+      // may not contain another one, and the keyboard has to reach both
+      var main = document.createElement('button'); main.type = 'button'; main.className = 'wmain';
+      main.appendChild(nm); main.appendChild(pt);
+      item.appendChild(main); item.appendChild(x);
+      main.onclick = function () {
+        if (w.id === curWs.id) { setWsBox(false); return; }
         fetch('/api/workspaces/use', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })
           .then(function (r) { return r.json(); })
           .then(function (d) {
-            document.getElementById('wsbox').classList.remove('open');
+            setWsBox(false);
             if (d.error) { alert(d.error); return; }
             if (d.items) wsItems = d.items;
             curWs = w;
@@ -66,7 +76,7 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
   }
   document.getElementById('wscur').onclick = function () {
     var box = document.getElementById('wsbox');
-    box.classList.toggle('open');
+    setWsBox(!box.classList.contains('open'));
     if (box.classList.contains('open')) {
       renderWsList();
       window.__AN.stagger('#ws-items .wsi');
@@ -76,15 +86,25 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
 
   /* ---- workspace directory picker (server-side drive/folder listing) ---- */
   var pickPath = '';
+  var pickTrigger = null;   // where focus goes back when the picker closes
   function openPick() {
-    document.getElementById('wsbox').classList.remove('open');
+    pickTrigger = document.activeElement;
+    setWsBox(false);
     document.getElementById('wspick').classList.add('on');
     document.getElementById('wsp-name').value = '';
     loadFs('');
     window.__AN.popIn(document.getElementById('wsp-card'));
+    // a dialog takes the focus when it opens; the page behind it is inert by now
+    document.getElementById('wsp-path').focus();
   }
   function closePick() {
     document.getElementById('wspick').classList.remove('on');
+    syncModals();
+    // back to the control that opened the picker (the list's add button is hidden again
+    // once the list is closed, so its owner gets the focus)
+    var t = pickTrigger;
+    if (t && t.offsetParent === null) t = document.getElementById('wscur');
+    if (t && t.focus) t.focus();
   }
   document.getElementById('wsp-close').onclick = closePick;
   document.getElementById('wsp-cancel').onclick = closePick;
@@ -92,12 +112,13 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
     if (e.target === this) closePick();
   };
   document.getElementById('wsp-path').onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.isComposing) loadFs(this.value.trim());
+    if (enterConfirmed(e)) loadFs(this.value.trim());
   };
   function renderCrumb(segs) {
     var c = document.getElementById('wsp-crumb');
     c.innerHTML = '';
-    var pc = document.createElement('span');
+    var pc = document.createElement('button');
+    pc.type = 'button';
     pc.className = 'pc';
     pc.textContent = L ? L.thisPC : 'This PC';
     pc.onclick = function () { loadFs(''); };
@@ -106,8 +127,10 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
       var sep = document.createElement('span');
       sep.className = 'sep';
       sep.textContent = ' \\u203A ';
+      sep.setAttribute('aria-hidden', 'true');
       c.appendChild(sep);
-      var seg = document.createElement('span');
+      var seg = document.createElement('button');
+      seg.type = 'button';
       seg.className = 'seg';
       seg.textContent = s.name;
       seg.title = s.path;
@@ -129,16 +152,18 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
       renderCrumb(d.segments || []);
       list.innerHTML = '';
       if (d.parent) {
-        var up = document.createElement('div');
+        var up = document.createElement('button');
+        up.type = 'button';
         up.className = 'wsp-item up';
-        up.innerHTML = '<span class="ic">\\u2191</span> ' + (L ? L.up : 'up');
+        up.innerHTML = '<span class="ic" aria-hidden="true">\\u2191</span> ' + (L ? L.up : 'up');
         up.onclick = function () { loadFs(d.parent); };
         list.appendChild(up);
       }
       (d.dirs || []).forEach(function (dir) {
-        var item = document.createElement('div');
+        var item = document.createElement('button');
+        item.type = 'button';
         item.className = 'wsp-item';
-        var ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = '\\uD83D\\uDCC1';
+        var ic = document.createElement('span'); ic.className = 'ic'; ic.setAttribute('aria-hidden', 'true'); ic.textContent = '\\uD83D\\uDCC1';
         var nm = document.createElement('span'); nm.textContent = dir.name;
         item.appendChild(ic); item.appendChild(nm);
         item.onclick = function () { loadFs(dir.path); };
@@ -148,6 +173,12 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
         list.innerHTML += '<div class="hint">' + L.none2 + '</div>';
       }
       window.__AN.stagger('.wsp-item', list);
+      // keyboard: the row that was just activated went away with the previous listing,
+      // which drops the focus to the page; park it on the first row of the new listing
+      if (!document.getElementById('wspick').contains(document.activeElement)) {
+        var first = list.querySelector('.wsp-item');
+        if (first) first.focus();
+      }
     }).catch(function (e) { list.innerHTML = '<div class="hint err">' + esc(String(e)) + '</div>'; });
   }
   function submitPick() {
@@ -164,6 +195,6 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
   }
   document.getElementById('wsp-ok').onclick = submitPick;
   document.getElementById('wsp-name').onkeydown = function (e) {
-    if (e.key === 'Enter' && !e.isComposing) submitPick();
+    if (enterConfirmed(e)) submitPick();
   };
 `;

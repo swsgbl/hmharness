@@ -57,18 +57,13 @@ function opsDir(home: string): string {
 }
 
 async function fetchJson(url: string, timeoutMs = 15_000): Promise<unknown> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: { 'User-Agent': 'hmharness-radar/0.1', Accept: 'application/json' },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  // declarative deadline: no controller/timer bookkeeping (every caller uses the default)
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: { 'User-Agent': 'hmharness-radar/0.1', Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
 }
 
 async function fetchSource(src: RadarSource): Promise<RadarItem[]> {

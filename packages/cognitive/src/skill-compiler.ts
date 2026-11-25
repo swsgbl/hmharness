@@ -258,7 +258,7 @@ export function minePreconditions(
     ...(used >= minBandSupport && ratios.length > 0
       ? {
           positionBand: (() => {
-            const s = [...ratios].sort((a, b) => a - b);
+            const s = ratios.toSorted((a, b) => a - b);
             const q = (p: number) => Number(s[Math.min(s.length - 1, Math.max(0, Math.ceil(p * s.length) - 1))].toFixed(2));
             return { p10: q(0.1), p90: q(0.9) };
           })(),

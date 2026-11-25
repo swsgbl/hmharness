@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process';
 import type { Tool } from './types.ts';
 import { httpFetch, getReader, type TransportResponse } from './http-transport.ts';
+import { deadlineSignal } from './deadline.ts';
 
 export type McpServerConfig =
   | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; trusted?: boolean; trustedTools?: string[] }
@@ -177,8 +178,8 @@ export class McpClient {
       ...cfg.headers,
     };
     if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    // deadline covers the POST and the body read alike; nothing to clear
+    const signal = deadlineSignal(timeoutMs);
     try {
       // one retry for transient transport failures: a dead/restarting MCP
       // server used to surface a bare "TypeError: fetch failed" straight to
@@ -186,7 +187,7 @@ export class McpClient {
       let res: TransportResponse | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          res = await httpFetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal: ctrl.signal });
+          res = await httpFetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(payload), signal });
           break;
         } catch (err) {
           if (attempt === 0 && isTransientTransport(String(err))) {
@@ -214,9 +215,9 @@ export class McpClient {
       const hint = isTransientTransport(msg)
         ? ` - the MCP server at ${cfg.url} is unreachable or cut the connection`
         : '';
-      throw new Error(`mcp/${this.serverName}: request failed (${msg})${hint}`);
-    } finally {
-      clearTimeout(timer);
+      // message unchanged (the model sees String(err): annotation + hint only); the
+      // transport error is chained for logs and programmatic callers
+      throw new Error(`mcp/${this.serverName}: request failed (${msg})${hint}`, { cause: err });
     }
   }
 

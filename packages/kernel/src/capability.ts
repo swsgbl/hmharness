@@ -132,7 +132,7 @@ export class CapabilityRegistry {
   private rules: PolicyRule[];
 
   constructor(rules: PolicyRule[] = DEFAULT_POLICY_RULES) {
-    this.rules = [...rules].sort((a, b) => a.priority - b.priority);
+    this.rules = rules.toSorted((a, b) => a.priority - b.priority);
   }
 
   /** Register a capability. Duplicate ids are rejected (supply-chain safety). */

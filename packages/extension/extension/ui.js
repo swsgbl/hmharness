@@ -31,13 +31,22 @@
     });
   }
 
+  // status text is a live region (role="status"): write it only when it really changes,
+  // or the 2-second poll would keep announcing the same line
+  function setText(el, text) { if (el && el.textContent !== text) el.textContent = text; }
+
+  // The dot is the only status cue on the side-panel header, where the text sits in a
+  // drawer that is closed by default: a colour alone says nothing, so its accessible
+  // name (and tooltip) always carries the state.
   function render(st) {
     const dot = $('dot');
     const txt = $('status-txt');
-    if (!st) { dot.className = 'dot'; txt.textContent = '后台无响应'; return; }
-    if (!st.paired) { dot.className = 'dot off'; txt.textContent = '桥未运行或未授权 — 终端执行 hmh extension start 后自动连接(30s 内)'; }
-    else if (st.attached) { dot.className = 'dot on'; txt.textContent = `已连接 hmh 桥 (127.0.0.1:${st.port}) · ${st.browser}`; }
-    else { dot.className = 'dot pair'; txt.textContent = `已授权 · 连接中… (127.0.0.1:${st.port})`; }
+    if (!dot) return;
+    const say = (cls, label) => { dot.className = cls; dot.setAttribute('aria-label', label); dot.title = label; };
+    if (!st) { say('dot', '后台无响应'); setText(txt, '后台无响应'); }
+    else if (!st.paired) { say('dot off', '桥未运行或未授权'); setText(txt, '桥未运行或未授权 — 终端执行 hmh extension start 后自动连接(30s 内)'); }
+    else if (st.attached) { say('dot on', '已连接'); setText(txt, `已连接 hmh 桥 (127.0.0.1:${st.port}) · ${st.browser}`); }
+    else { say('dot pair', '已授权,连接中'); setText(txt, `已授权 · 连接中… (127.0.0.1:${st.port})`); }
   }
 
   async function refresh() {
@@ -100,13 +109,22 @@
   const chatReset = $('chat-reset');
   let chatBusy = false;
   let chatMsgs = [];
+  // messages already in the transcript. #chat is a log (role="log": only additions are
+  // announced), so the transcript APPENDS what is new instead of rebuilding: a rebuild
+  // made a screen reader re-read the whole conversation on every message.
+  let rendered = 0;
 
   function renderChat() {
     if (!chatEl) return;
     const hero = document.getElementById('hero');
-    if (hero) hero.style.display = chatMsgs.length ? 'none' : '';
-    for (const el of [...chatEl.querySelectorAll('.msg')]) el.remove();
-    for (const m of chatMsgs) {
+    if (hero) hero.hidden = chatMsgs.length > 0;
+    if (chatMsgs.length < rendered) {
+      // cleared: drop the transcript (the activity bubble is not a message)
+      for (const el of [...chatEl.querySelectorAll('.msg:not(.thinking)')]) el.remove();
+      rendered = 0;
+    }
+    const bubble = chatEl.querySelector('.thinking');
+    for (const m of chatMsgs.slice(rendered)) {
       const div = document.createElement('div');
       div.className = 'msg ' + (m.role === 'user' ? 'user' : 'bot');
       const who = document.createElement('b');
@@ -114,7 +132,9 @@
       const span = document.createElement('span');
       span.textContent = m.text;
       div.append(who, span);
-      chatEl.append(div);
+      // before the activity bubble, so "正在执行…" always stays the last line
+      chatEl.insertBefore(div, bubble);
+      rendered++;
     }
     chatEl.scrollTop = chatEl.scrollHeight;
   }
@@ -141,7 +161,13 @@
 
   function push(role, text) {
     chatMsgs.push({ role, text });
-    if (chatMsgs.length > 40) chatMsgs.splice(0, chatMsgs.length - 40);
+    while (chatMsgs.length > 40) {
+      // the transcript keeps the last 40: the oldest one leaves the array AND the page
+      chatMsgs.shift();
+      const first = chatEl?.querySelector('.msg:not(.thinking)');
+      if (first) first.remove();
+      rendered = Math.max(0, rendered - 1);
+    }
     renderChat();
     try { void api.storage.session.set({ hmhChat: chatMsgs.slice(-20) }); } catch (e) { /* session storage refused */ }
   }
@@ -163,7 +189,11 @@
         const { hmhChat } = await api.storage.session.get('hmhChat');
         if (Array.isArray(hmhChat)) chatMsgs = hmhChat;
       } catch (e) { /* first run */ }
+      // restoring the last conversation is history, not news: the log is silent while it
+      // is filled, and announces from the next message on
+      chatEl.setAttribute('aria-live', 'off');
       renderChat();
+      setTimeout(() => chatEl.setAttribute('aria-live', 'polite'), 250);
     })();
 
     // AUTONOMOUS CONTINUATION: when the brain exhausts a request's round
@@ -191,9 +221,10 @@
       let abort = null;
       let lastLines = '';
       const stopBtn = document.createElement('button');
+      stopBtn.type = 'button';
       stopBtn.textContent = '停止';
       stopBtn.className = 'stop-btn';
-      stopBtn.onclick = () => { autoChains = 0; if (abort) abort.abort(); };
+      stopBtn.addEventListener('click', () => { autoChains = 0; if (abort) abort.abort(); });
       const tick = setInterval(async () => {
         if (!chatBusy) return;
         const secs = Math.round((Date.now() - t0) / 1000);
@@ -262,7 +293,9 @@
 
     chatSend.addEventListener('click', () => { void sendChat(); });
     chatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); void sendChat(); }
+      // Enter sends — unless it is the Enter that confirms an IME candidate (isComposing;
+      // Safari reports keyCode 229 on that keydown even after compositionend)
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); void sendChat(); }
     });
 
     // minimal-UI extras (round 61): suggestion chips send their text;
@@ -270,9 +303,11 @@
     for (const c of document.querySelectorAll('.chip')) {
       c.addEventListener('click', () => { chatInput.value = c.textContent.trim(); void sendChat(); });
     }
-    $('settings-btn')?.addEventListener('click', () => {
+    $('settings-btn')?.addEventListener('click', (event) => {
       const panel = $('settings');
-      if (panel) panel.hidden = !panel.hidden;
+      if (!panel) return;
+      panel.hidden = !panel.hidden;
+      event.currentTarget.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
     });
 
     chatReset?.addEventListener('click', async () => {

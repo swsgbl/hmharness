@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>OpenHarmony 生态雷达如何避免过时建议：hmharness 的四层防线</title>
 <meta name="description" content="hmharness 生态雷达用快照 diff、源新鲜度、14 天简报有效期和人工审批防止 OpenHarmony 生态建议过时。2026-11-18 对四个默认 GitHub 源做独立读回，一个源被 90 天门禁判为 STALE。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/ecosystem-radar.html">
@@ -52,17 +54,17 @@
 }
 </script>
 <style>
-:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--line:rgba(79,216,235,.22);--card:rgba(13,32,58,.72);--ok:#7DDF9A;--warn:#F5C66B;--maxw:980px}
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--line:rgba(79,216,235,.22);--card:rgba(13,32,58,.72);--ok:#7DDF9A;--warn:#F5C66B;--maxw:980px;color-scheme:dark;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
 nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;min-height:60px;flex-wrap:wrap;gap:8px 16px;padding-top:8px;padding-bottom:8px;font-size:0.90625rem}
 .logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
 header{padding:60px 0 32px}
-.eyebrow{color:var(--cyan);font-size:13px;font-weight:750}
-h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}
+.eyebrow{color:var(--cyan);font-size:0.8125rem;font-weight:750}
+h1{margin:10px 0 14px;font-size:clamp(1.75rem,4.5vw,2.625rem);line-height:1.22;color:#fff}
 .summary{max-width:780px;color:var(--dim)}
 .intro{max-width:820px;margin-top:20px;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice)}
 .bridge{margin-top:8px;color:var(--dim)}
@@ -71,49 +73,74 @@ h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#f
 .btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}
 .btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
 section{padding:32px 0}
-h2{font-size:24px;color:#fff;margin-bottom:14px}
+h2{font-size:1.5rem;color:#fff;margin-bottom:14px}
 p{color:var(--dim)}
-.answer,.intro{font-size:16px}
+.answer,.intro{font-size:1rem}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .layer{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}
 .layer strong{display:block;color:#fff;margin-bottom:6px}
-.layer span{font-size:12px;color:var(--cyan)}
-.layer p{font-size:14.5px}
+.layer span{font-size:0.75rem;color:var(--cyan)}
+.layer p{font-size:0.90625rem}
 .table-wrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:8px}
 table{width:100%;border-collapse:collapse;min-width:780px}
 th,td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:#fff;background:rgba(79,216,235,.08);font-size:13px}
-td{color:var(--dim);font-size:14.5px}
+th{color:#fff;background:rgba(79,216,235,.08);font-size:0.8125rem}
+td{color:var(--dim);font-size:0.90625rem}
 td code,li code{font-family:Consolas,"Cascadia Code",monospace;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
-.status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:750}
+.status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:750}
 .fresh{color:var(--ok);background:rgba(125,223,154,.12)}.stale{color:var(--warn);background:rgba(245,198,107,.12)}
-.flow{counter-reset:step;margin-top:18px}
+.flow{counter-reset:step;list-style:none;margin-top:18px}
 .flow li{position:relative;margin:12px 0 12px 44px;color:var(--dim)}
-.flow li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:1px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);color:var(--cyan);font-size:13px;font-weight:750;display:flex;align-items:center;justify-content:center}
+/* the number circle sits in the 44px margin the item reserves (at left:0 it was drawn over
+   the first characters of the text); the circle is the list number */
+.flow li::before{counter-increment:step;content:counter(step) / "";position:absolute;left:-44px;top:1px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);color:var(--cyan);font-size:0.8125rem;font-weight:750;display:flex;align-items:center;justify-content:center}
 .panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
 .panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
-.panel h3{font-size:16px;color:#fff;margin-bottom:8px}
-.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:14.5px}
+.panel h3{font-size:1rem;color:#fff;margin-bottom:8px}
+.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:0.90625rem}
 .sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .sources div{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}
-.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:0.90625rem}
 .boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
 .boundary li{margin:8px 0 0 20px;color:var(--dim)}
-footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:0.8125rem;text-align:center}
 footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.panels{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}
 @media(max-width:500px){.grid{grid-template-columns:1fr}}
+/* long unbreakable tokens and URLs wrap instead of widening the page */
+body{overflow-wrap:break-word}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+/* anchor targets (the skip link, the FAQ's Q-links) land clear of the sticky nav */
+html{scroll-padding-top:76px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.table-wrap:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,.skip{display:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">跳到主要内容</a>
 <nav><div class="wrap">
   <div class="logo"><span>hm</span> hmharness</div>
   <div><a href="./">首页</a> · <a href="faq.html">FAQ</a> · <a href="quickstart-matrix.html">快速开始</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
 </div></nav>
 
+<main>
 <header><div class="wrap">
-  <div class="eyebrow">ECOSYSTEM RADAR GUARDRAILS · READBACK 2026-11-18 09:34 CST</div>
-  <h1>OpenHarmony 生态雷达如何避免过时建议</h1>
+  <div class="eyebrow" lang="en">ECOSYSTEM RADAR GUARDRAILS · READBACK 2026-11-18 09:34 CST</div>
+  <h1 id="main" tabindex="-1">OpenHarmony 生态雷达如何避免过时建议</h1>
   <p class="summary">生态建议最常见的失败不是模型不会总结，而是它拿到的是旧世界。本页把 hmharness 生态雷达拆成四层可验证防线，并用一次独立的四源 API 读回展示为什么 HTTP 200 不能当 freshness。</p>
   <div class="intro">hmharness 是一个开源的 HarmonyOS/OpenHarmony 开发智能体框架：它把工程创建、检查、构建、签名、安装、启动、日志读取和结果验证接成本地工具链，让 AI 不只是生成代码，还要用本机环境证明结果；同时通过审批、预算、canary 和回滚约束自进化行为。它不是 DevEco Studio 的替代品，而是开发智能体和鸿蒙工具链之间的验证层。
     <div class="bridge">本页只展开其中一环：生态雷达如何防止建议建立在上游生态的旧状态上。</div>
@@ -141,9 +168,9 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 <section id="snapshot"><div class="wrap">
   <h2>2026-11-18 四源独立读回</h2>
   <p>下表不是模型判断，而是对公开 main 代码中四个默认 GitHub commit feed 的独立 API 读回。年龄按 2026-11-18 01:34 UTC 计算；“fresh/STALE”按源码中的 90 天阈值复算。</p>
-  <div class="table-wrap">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="四源读回表">
     <table>
-      <thead><tr><th>默认源</th><th>最新条目</th><th>日期</th><th>年龄</th><th>90 天门禁</th></tr></thead>
+      <thead><tr><th scope="col">默认源</th><th scope="col">最新条目</th><th scope="col">日期</th><th scope="col">年龄</th><th scope="col">90 天门禁</th></tr></thead>
       <tbody>
         <tr><td>OpenHarmony 文档<br><code>openharmony/docs</code></td><td><a href="https://github.com/openharmony/docs/commit/f41b9345badd47c7ab0c263344cd7f4b5a549afb"><code>f41b9345</code></a></td><td>2026-05-26</td><td>176 天</td><td><span class="status stale">STALE</span></td></tr>
         <tr><td>ArkUI 框架<br><code>openharmony/arkui_ace_engine</code></td><td><a href="https://github.com/openharmony/arkui_ace_engine/commit/21b150e7bb1d5308846f8e5be8ef0482fb433315"><code>21b150e7</code></a></td><td>2026-10-07</td><td>42 天</td><td><span class="status fresh">fresh</span></td></tr>
@@ -157,7 +184,7 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 
 <section id="flow"><div class="wrap">
   <h2>从扫描到建议的门禁流程</h2>
-  <ol class="flow">
+  <ol class="flow" role="list">
     <li>并行拉取每个源的公开条目；每个请求有超时，单源失败只记录错误，不让其他源失效。</li>
     <li>第一次扫描建立基线，不做变更分析；后续扫描按 ID 与快照比较，只输出新条目。</li>
     <li>读取最新条目日期并复算 90 天阈值；无日期或过旧都按失败源处理。</li>
@@ -198,6 +225,8 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
     <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
   </ul></div>
 </div></section>
+
+</main>
 
 <footer><div class="wrap">
   <a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="quickstart-matrix.html">快速开始验证矩阵</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="llms.txt">llms.txt</a>

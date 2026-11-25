@@ -172,7 +172,7 @@ export async function retrieveInsights(home: string, task: string, opts: { topK?
   const q = bigrams(task);
   if (q.size === 0) return rows.slice(-topK).map((r) => formatInsight(r, opts.workspace)).join('\n');
   // newest first within the pool, so idx IS the recency rank
-  const newestFirst = [...rows].reverse();
+  const newestFirst = rows.toReversed();
   const scored = newestFirst
     .map((r, idx) => ({ r, s: jaccard(q, bigrams(r.task)) + (1 - idx / (newestFirst.length + 1)) * 1e-4 }))
     .filter((x) => x.s > INSIGHT_SIM_FLOOR)

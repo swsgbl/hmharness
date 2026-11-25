@@ -125,7 +125,7 @@ function nodeFetch(url: string, init: TransportRequest): Promise<TransportRespon
     try {
       target = new URL(url);
     } catch (err) {
-      reject(new Error(`fetch failed invalid URL: ${String(err)}`));
+      reject(new Error(`fetch failed invalid URL: ${String(err)}`, { cause: err }));
       return;
     }
     const secure = target.protocol === 'https:';

@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
 <meta name="description" content="hmharness 二十问：不用 DevEco Studio 能开发鸿蒙吗？命令行打包签名、CI/CD、hmh check 与 devices 排障、hmh mcp-serve 默认工具面与审批边界、AI 编造鸿蒙 API 怎么防？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
@@ -143,40 +145,64 @@
   --navy:#0B1E3A; --navy2:#123B6E; --cyan:#4FD8EB; --ice:#EAF4FA;
   --text:#DCE8F2; --dim:#8FA8C0; --card:rgba(13,32,58,.72); --line:rgba(79,216,235,.22);
   --radius:18px; --maxw:880px;
-}
+;color-scheme:dark;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.75}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 a{color:var(--cyan);text-decoration:none}
 a:hover{text-decoration:underline}
 nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(9,22,42,.72);border-bottom:1px var(--line) solid}
-nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;font-size:14.5px}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;min-height:60px;flex-wrap:wrap;gap:8px 16px;padding-top:8px;padding-bottom:8px;font-size:0.90625rem}
 .logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
+.logo .logo-sub{color:var(--dim);font-weight:400;font-size:0.8125rem}
 header{padding:64px 0 30px;text-align:center}
-header h1{font-size:clamp(26px,4.4vw,38px);color:#fff}
+header h1{font-size:clamp(1.625rem,4.4vw,2.375rem);color:#fff}
 header p{color:var(--dim);margin-top:12px;max-width:640px;margin-left:auto;margin-right:auto}
 .tldr{background:rgba(79,216,235,.08);border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:12px;padding:16px 18px;margin:0 0 12px;color:var(--ice)}
-.tldr::before{content:"一句话答案";display:block;font-size:12px;color:var(--cyan);letter-spacing:2px;margin-bottom:6px}
+.tldr-label{display:block;font-size:0.75rem;color:var(--cyan);letter-spacing:2px;margin-bottom:6px}
 .qa{padding:26px 0;border-bottom:1px dashed var(--line);scroll-margin-top:76px}
-.qa h2{font-size:19px;color:#fff;margin-bottom:14px}
+.qa h2{font-size:1.1875rem;color:#fff;margin-bottom:14px}
 .qa h2 a.qn{color:var(--cyan);margin-right:8px;font-family:Consolas,monospace}
-.qa p{color:var(--dim);font-size:15px;margin-bottom:10px}
-.qa code{font-family:Consolas,monospace;font-size:13px;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
-.qa pre{font-family:Consolas,monospace;font-size:13px;color:var(--ice);background:rgba(79,216,235,.08);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
-.src{font-size:13px;color:var(--dim)}
+.qa p{color:var(--dim);font-size:0.9375rem;margin-bottom:10px}
+.qa code{font-family:Consolas,monospace;font-size:0.8125rem;color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
+.qa pre{font-family:Consolas,monospace;font-size:0.8125rem;color:var(--ice);background:rgba(79,216,235,.08);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.src{font-size:0.8125rem;color:var(--dim)}
 .src b{color:var(--ice)}
-footer{padding:44px 0 54px;color:var(--dim);font-size:13px;text-align:center}
+footer{padding:44px 0 54px;color:var(--dim);font-size:0.8125rem;text-align:center}
 footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--line);padding-top:18px;line-height:1.8}
+/* long unbreakable tokens and URLs wrap instead of widening the page */
+body{overflow-wrap:break-word}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+/* anchor targets (the skip link, the FAQ's Q-links) land clear of the sticky nav */
+html{scroll-padding-top:76px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.table-wrap:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,.skip{display:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+}
+pre code{background:none;padding:0;color:inherit;border-radius:0}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">跳到主要内容</a>
 <nav><div class="wrap">
-  <div class="logo"><span>✦</span> hm <span style="color:var(--dim);font-weight:400;font-size:13px">hmharness · FAQ</span></div>
+  <div class="logo"><span aria-hidden="true">✦</span> hm <span class="logo-sub">hmharness · FAQ</span></div>
   <div><a href="./">← 返回首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a> · <a href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈</a></div>
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 二十问</h1>
+  <h1 id="main" tabindex="-1">hmharness 二十问</h1>
   <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案独立成块，AI 搜索引擎可直接摘引；每个说法附证据出处。</p>
 </div></header>
 
@@ -184,49 +210,49 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 
 <section class="qa" id="what-is-hmharness">
   <h2><a class="qn" href="#what-is-hmharness">Q1</a>hmharness 是什么？</h2>
-  <div class="tldr">hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>hmharness 是一个开源（MIT 协议）的鸿蒙 HarmonyOS/OpenHarmony 开发智能体框架：终端一句话跑通「建工程 → 构建 → 签名 → 装机 → 日志」全流程，不打开 DevEco Studio、不登录华为账号、模型任意换，且自带可审计的自进化机制。</div>
   <p>安装即用：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 配置任意 OpenAI 兼容厂商 → <code>hmh "创建一个双页面工程，构建签名装到模拟器跑起来"</code>。单仓 16 包（含 cognitive 认知层与 environments 环境适配）、内核 0 运行时依赖、1090 个单元测试门禁（最新 CI：1089 通过 / 1 跳过）；CLI / TUI / Web 三前端，zh/en 双语。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="./">官网首页</a></p>
 </section>
 
 <section class="qa" id="no-ide">
   <h2><a class="qn" href="#no-ide">Q2</a>鸿蒙开发必须用 DevEco Studio 吗？</h2>
-  <div class="tldr">不是必须。DevEco Studio 是官方主力 IDE，但开源的 hmharness 证明了零 IDE 路线：纯终端驱动官方无头工具链完成脚手架、构建、签名、装机、日志，模拟器全生命周期无头管理——适合脚本化、CI 化与 AI Agent 化场景。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>不是必须。DevEco Studio 是官方主力 IDE，但开源的 hmharness 证明了零 IDE 路线：纯终端驱动官方无头工具链完成脚手架、构建、签名、装机、日志，模拟器全生命周期无头管理——适合脚本化、CI 化与 AI Agent 化场景。</div>
   <p>hmharness 直接驱动官方无头 CLI：<code>harmony_project_create</code>（参数化多页面/多模块/feature HAP/har 库）→ <code>harmony_build</code> → <code>harmony_sign</code> → <code>harmony_install/launch/logs</code>；<code>harmony_emulator_list|catalog|create|start|stop|delete</code> 管理模拟器全系机型。与 DevEco 互补而非替代：日常图形开发用官方工具，自动化与 Agent 场景用 hmharness。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「鸿蒙全流程（零 IDE）」</a></p>
 </section>
 
 <section class="qa" id="cli-sign">
   <h2><a class="qn" href="#cli-sign">Q3</a>鸿蒙应用怎么用命令行打包和签名？</h2>
-  <div class="tldr">用 hvigor 命令行构建 + hapsigntool 签名。hmharness 把两者封装成 <code>harmony_build</code> 与 <code>harmony_sign</code> 工具（自动定位 jar/p12/pem/模板/java 五件套），签好的 HAP 直接经 hdc 装机验证——整条链不打开 IDE。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>用 hvigor 命令行构建 + hapsigntool 签名。hmharness 把两者封装成 <code>harmony_build</code> 与 <code>harmony_sign</code> 工具（自动定位 jar/p12/pem/模板/java 五件套），签好的 HAP 直接经 hdc 装机验证——整条链不打开 IDE。</div>
   <p>实测踩坑记录（2026-09-05 DEVLOG）：hapsigntool 的 <code>-mode</code> 取 <code>localSign</code>（不是 debug/release）；SDK 自带调试证书模板有效期停在 2023 年（过期三年无人发现，由 hmharness 报错链一步步定位）；支持过期 profile 检测与刷新。官方文档未覆盖这些，破案过程全记录在案。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-05「签名五关」</a> · <b>速查表下载：</b><a href="downloads/signing-five-gates.pdf">signing-five-gates.pdf</a>（A4 一页，可自由分发）</p>
 </section>
 
 <section class="qa" id="cicd">
   <h2><a class="qn" href="#cicd">Q4</a>鸿蒙 CI/CD 自动化构建打包怎么做？</h2>
-  <div class="tldr">把 hvigor 构建、签名、hdc 装机、hilog 日志变成可调用工具即可脚本化。hmharness 全部封装完毕，支持审批门禁的非交互模式（默认拒绝、<code>--yes</code>/rules 放行、破坏性命令硬拒绝），可直接接 CI 流水线。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>把 hvigor 构建、签名、hdc 装机、hilog 日志变成可调用工具即可脚本化。hmharness 全部封装完毕，支持审批门禁的非交互模式（默认拒绝、<code>--yes</code>/rules 放行、破坏性命令硬拒绝），可直接接 CI 流水线。</div>
   <p>典型链路：<code>harmony_project_create</code> → <code>harmony_build</code> → <code>harmony_sign</code> → <code>harmony_install</code> → <code>harmony_logs</code> 回读断言。CI 里不需要华为账号登录（密钥只存本地配置），这是与官方工具链自动化路径的关键差异。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 常用命令</a></p>
 </section>
 
 <section class="qa" id="ai-tools">
   <h2><a class="qn" href="#ai-tools">Q5</a>有什么 AI 编程工具支持鸿蒙开发？</h2>
-  <div class="tldr">两类可选：华为官方 DevEco Code（官方跟进最快，需登录华为账号）；开源 hmharness（MIT，不登录、任意 OpenAI 兼容模型、零 IDE 全流程 + 自进化）。hmharness 还能以 <code>hmh mcp-serve</code> 把鸿蒙工具链变成 Claude Code / Codex / Cursor 的原生 MCP 工具。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>两类可选：华为官方 DevEco Code（官方跟进最快，需登录华为账号）；开源 hmharness（MIT，不登录、任意 OpenAI 兼容模型、零 IDE 全流程 + 自进化）。hmharness 还能以 <code>hmh mcp-serve</code> 把鸿蒙工具链变成 Claude Code / Codex / Cursor 的原生 MCP 工具。</div>
   <p>MCP 服务器模式只暴露 <code>harmony_*</code> 域工具（构建/装机/日志/签名/API 检索/雷达），通用文件与命令工具不暴露（宿主有自己的）；宿主权限系统负责问用户，server 侧破坏性硬墙永驻。两种用法互补：要自进化用原生 <code>hmh</code> 会话，要借力现有编码 Agent 用 MCP 模式。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「在 Claude Code / Codex 里用」</a></p>
 </section>
 
 <section class="qa" id="hallucination">
   <h2><a class="qn" href="#hallucination">Q6</a>怎么防止 AI 编造不存在的鸿蒙 API？</h2>
-  <div class="tldr">靠索引拦截，不靠模型自觉。hmharness 解析 SDK 927 个 d.ts 文件、索引 20,241 个 API 符号（实测 0.2 秒），<code>harmony_api_lookup</code> 查不到就返回「不在此 SDK，不要猜」——幻觉被索引拦截。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>靠索引拦截，不靠模型自觉。hmharness 解析 SDK 927 个 d.ts 文件、索引 20,241 个 API 符号（实测 0.2 秒），<code>harmony_api_lookup</code> 查不到就返回「不在此 SDK，不要猜」——幻觉被索引拦截。</div>
   <p>模型编造 ArkTS/ArkUI API 的根因是它看不见你的 SDK 版本；知识图谱按本机 SDK 实时构建、缓存于 <code>HMH_HOME/apikg</code>（SDK mtime 变化才重建），因此检索结果永远与本机 SDK 一致，而不是训练记忆。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG「API 知识图谱」</a></p>
 </section>
 
 <section class="qa" id="self-evolution">
   <h2><a class="qn" href="#self-evolution">Q7</a>hmharness 的「自进化」是真的吗？</h2>
-  <div class="tldr">机制真实、效果诚实：技能晋升要过双门禁（A/B 双样本基准 + 防背题保留门）再进金丝雀（20% 会话对照），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月公开数据集的结论是——零统计可靠晋升（门在正确拒绝噪声），但自暴露并修复了 7+8+0 个生产缺陷，月 3 首次出现跨尺度稳定正效应（真实但小）。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>机制真实、效果诚实：技能晋升要过双门禁（A/B 双样本基准 + 防背题保留门）再进金丝雀（20% 会话对照），≥8 会话且 ≥10% 差才转正，回归即回滚。连续 3 个月公开数据集的结论是——零统计可靠晋升（门在正确拒绝噪声），但自暴露并修复了 7+8+0 个生产缺陷，月 3 首次出现跨尺度稳定正效应（真实但小）。</div>
   <p>逐月事实：月 1 修复 7 个生产缺陷、零晋升；月 2 修复 8 个、门持续拒绝；月 3（2026-09-15 复盘）零生产缺陷、程序史首个 REJECT 行动判定、首个跨 4 报告 ×3 复现的正效应——恰好 1 个中文精确输出案例，不足以过 10% 门。「越用越聪明」尚未被证实，被证实的是门与审计面在正确工作；全部判定记录、被拒候选与原始日志<a href="evidence/">原样公开</a>。代码级自进化默认关闭，只允许改 <code>packages/*/src/*.ts</code>、永禁内核循环。</p>
   <p>认知维度补充（2026-09/10 更新）：0.23.x 系列把「学习」拆到可测的校准维后，自进化首次有了持续为正的读数——预测可靠度学习曲线 terminal +5.9%、harmonyos +14.4%、browser +37.6%（无头 Chrome CDP 探索）、arc3 +76.2%（LLM 实玩轨迹，样本薄）均 improving，desktop 1.00 flat 是确定性工具的完美校准（<code>hmh cognitive calibration --trend</code> 可复现），迁移实验中校准差 +0.4166 为纯 harness 净贡献（LLM 未参与）。详见 <a href="#cognitive-what">Q11</a>。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/SELFFEED-month3-final-review.md">SELFFEED 月 3 终局复盘</a> · <a href="evidence/ds-2026-09/">首月数据集</a></p>
@@ -234,35 +260,35 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 
 <section class="qa" id="vs-deveco">
   <h2><a class="qn" href="#vs-deveco">Q8</a>hmharness 和 DevEco Studio / DevEco Code 是什么关系？</h2>
-  <div class="tldr">互补而非替代，且与华为无任何官方关系：hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书，为净室重写。官方工具链适合日常图形开发；hmharness 面向脚本化/CI/Agent 场景——不登录账号、模型任意换、内核可改。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>互补而非替代，且与华为无任何官方关系：hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书，为净室重写。官方工具链适合日常图形开发；hmharness 面向脚本化/CI/Agent 场景——不登录账号、模型任意换、内核可改。</div>
   <p>选型建议：要官方支持与最新特性跟随，用 DevEco；要在终端/CI/Agent 里无人值守跑鸿蒙全流程，用 hmharness；两者也可以同时用（hmharness 操作的工程就是标准鸿蒙工程）。</p>
   <p class="src"><b>出处：</b><a href="./">官网法律声明</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 诚实注脚</a></p>
 </section>
 
 <section class="qa" id="pricing">
   <h2><a class="qn" href="#pricing">Q9</a>hmharness 收费吗？怎么安装？</h2>
-  <div class="tldr">免费开源（MIT）。三步安装：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 在 <code>~/.hmharness/config.json</code> 配任意 OpenAI 兼容厂商，然后 <code>hmh "任务"</code> 直接运行。模型侧费用按你选的厂商计。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>免费开源（MIT）。三步安装：<code>npm install -g @hmharness/cli</code>（Node >= 22）→ <code>hmh init</code> → 在 <code>~/.hmharness/config.json</code> 配任意 OpenAI 兼容厂商，然后 <code>hmh "任务"</code> 直接运行。模型侧费用按你选的厂商计。</div>
   <p>源码运行同样三行：clone → <code>npm install && npm run build</code> → <code>npm link -w @hmharness/cli</code>。</p>
   <p>按环境选择：标准桌面直接 npm 安装；贡献者 / 源码优先用户走 clone、build、link；KaihongOS / OpenHarmony 板端在无 npm、只读根分区环境使用 <code>node scripts/install-kaihongos.cjs</code>。安装后先运行 <code>hmh check | devices</code> 验证工具链与设备列表。</p>
   <p>环境问题请到 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>，并附下面的脱敏信息；不要提交 token、cookie、私人路径或设备/账号标识。</p>
-  <pre>OS / Node:
+  <pre role="region" aria-label="环境反馈模板"><code>OS / Node:
 DevEco 或 CLI / SDK 版本:
 真机或模拟器:
 首个卡点:
-脱敏 hmh check 输出:</pre>
+脱敏 hmh check 输出:</code></pre>
   <p class="src"><b>出处：</b><a href="https://www.npmjs.com/package/@hmharness/cli">npm @hmharness/cli</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 安装路径</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/KAIHONGOS.md">板端指南</a></p>
 </section>
 
 <section class="qa" id="platforms">
   <h2><a class="qn" href="#platforms">Q10</a>hmharness 支持哪些操作系统和模型？</h2>
-  <div class="tldr">Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证），macOS/Linux 社区支持；模型任意 OpenAI 兼容厂商——GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat/vision/evolve/bench 各走各的），密钥只存本机。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>Windows 优先（鸿蒙工具链/模拟器/TUI 均在此验证），macOS/Linux 社区支持；模型任意 OpenAI 兼容厂商——GLM、DeepSeek、通义、Kimi、OpenRouter、Anthropic、OpenAI、Ollama、LM Studio 等，支持按用途路由（chat/vision/evolve/bench 各走各的），密钥只存本机。</div>
   <p>多厂商路由示例配置与上下文窗口自适应（压缩预算随模型窗口缩放）见 README「模型路由」一节。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 模型路由</a></p>
 </section>
 
 <section class="qa" id="cognitive-what">
   <h2><a class="qn" href="#cognitive-what">Q11</a>hmharness 的认知层是什么？harness 真的从经验中学习吗？</h2>
-  <div class="tldr">认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习并反哺系统提示；校准可靠度随使用提升——<b>五环境曲线全有读数，四环境 improving</b>。这不是宣称，是 <code>hmh cognitive calibration --trend --env=terminal</code> 的输出。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>认知层是 hmharness 区别于普通 Agent 框架的核心增量：世界模型从每次任务的工具轨迹中学习并反哺系统提示；校准可靠度随使用提升——<b>五环境曲线全有读数，四环境 improving</b>。这不是宣称，是 <code>hmh cognitive calibration --trend --env=terminal</code> 的输出。</div>
   <p>认知层包含世界模型（信念表+预测置信+误差聚类）、五层记忆（working/episodic/semantic/procedural/world，只增不删+溯源）、目标系统（图谱/分解/漂移检测）、探索引擎（不确定性×信息增益×校准导向）、技能编译（经验→可验证技能→门禁晋升）、进化 2.0 治理（候选契约/序贯门禁/reward-hacking 检测）。15 条 <code>hmh cognitive</code> 子命令全部可用。</p>
   <p>研究定论（消融 11 轮）：单任务提示层 0 / 跨任务复利 0 / <b>校准维 +0.4166</b>（唯一持续为正，LLM 未参与 = 纯 harness 净贡献） / 学习曲线五环境全有读数——terminal +5.9%、harmonyos +14.4%、browser +37.6%（无头 Chrome CDP 探索）、arc3 +76.2%（ARC-AGI-3 LLM 实玩轨迹，样本薄）均 improving，desktop 1.00 flat（确定性工具完美校准）。harness 的实证价值在让模型更准地预期世界，而非替模型答题。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP §26 研究终局表</a> · <a href="./#cognitive">官网认知层节</a></p>
@@ -270,14 +296,14 @@ DevEco 或 CLI / SDK 版本:
 
 <section class="qa" id="arc-train">
   <h2><a class="qn" href="#arc-train">Q12</a>ARC-AGI-3 是用来训练大模型的吗？</h2>
-  <div class="tldr">不是。hmharness 的权重从不更新（微调走独立轨道，已收官）；ARC-AGI-3 是<b>外部考官</b>——衡量"固定模型 + 认知层"的组合在未知环境的表现。harness 的净贡献可以完全分离。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>不是。hmharness 的权重从不更新（微调走独立轨道，已收官）；ARC-AGI-3 是<b>外部考官</b>——衡量"固定模型 + 认知层"的组合在未知环境的表现。harness 的净贡献可以完全分离。</div>
   <p>证据：迁移双臂实验中 LLM 完全未参与，校准差 +0.4166 是纯框架增量。学习环只走 harness 层（记忆/技能/工作流/世界模型），模型权重更新有最高证据门槛（0.95）且不通过 ARC 进行。视觉实玩 ARC 游戏（帧渲染→模型推理→reasoning 入档）测的是"固定模型+harness"的联合表现，通过消融实验可分离 harness 贡献。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/environments/src/arc3-rest.ts">ARC-AGI-3 REST 桥源码</a></p>
 </section>
 
 <section class="qa" id="phone-remote">
   <h2><a class="qn" href="#phone-remote">Q13</a>手机怎么远程控制 hmharness？</h2>
-  <div class="tldr">WiFi 扫码直连（免密，同网段信任）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化 + 断线自动重连。<code>hmh web start --exposure=lan --token-gen</code> 后网页 📱 图标打开配对窗口。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>WiFi 扫码直连（免密，同网段信任）+ cloudflared 免费隧道互联网模式（6 位配对密码）+ 配对会话持久化 + 断线自动重连。<code>hmh web start --exposure=lan --token-gen</code> 后网页 📱 图标打开配对窗口。</div>
   <p>WiFi 模式手机扫二维码即连（服务器记住配对过的局域网 IP）；互联网模式自动下载 cloudflared 并启动免费 Quick Tunnel（死亡自动重启、意图持久化到 config）。配对会话持久化——服务器重启不重扫。支持任意 OpenAI 兼容模型（包括 GLM-5.3-flash 视觉模型看 ARC 游戏帧选动作）。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README 手机远程控制</a></p>
 </section>
@@ -285,28 +311,28 @@ DevEco 或 CLI / SDK 版本:
 
 <section class="qa" id="cost-gate">
   <h2><a class="qn" href="#cost-gate">Q14</a>AI 候选会靠「啰嗦」通过基准测试吗？怎么防？</h2>
-  <div class="tldr">会，且真实发生过。hmharness 的防法是双保险：判卷用四种断言模式钉死输出形状（一字不差 / 正则 / 禁词表 / 多候选），再加成本门——候选输出 token 成本超过基线 1.3 倍且超出超过 8 个 token 即判「成本回归」，靠啰嗦刷分直接出局。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>会，且真实发生过。hmharness 的防法是双保险：判卷用四种断言模式钉死输出形状（一字不差 / 正则 / 禁词表 / 多候选），再加成本门——候选输出 token 成本超过基线 1.3 倍且超出超过 8 个 token 即判「成本回归」，靠啰嗦刷分直接出局。</div>
   <p>成本公式：<code>cand &gt; max(base × 1.3, base + 8)</code>。token 估算按「中日韩字符≈1、ASCII≈1/4」——切回中文灌水同样绕不过帽。乘法帽曾把期望输出只有 4 个 token 的微型考题变成 Hair Trigger（余量仅 1 token，连续 10 个候选被误杀），<code>+8</code> 绝对余量地板修复了它——真啰嗦是 2-10 倍量级，针尖级扰动不该死。成本只否决不判分：通过率门仍是主判据，双指标各管一半。全部判定有 10 个单元测试守护（bench.ts / evolve.ts）。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/evolve.ts">packages/evolution/src/evolve.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/packages/evolution/src/__tests__/gate.test.ts">gate.test.ts</a> · <b>速查表下载：</b><a href="downloads/ai-bench-anticheat.pdf">ai-bench-anticheat.pdf</a>（A4 一页，可自由分发）</p>
 </section>
 
 <section class="qa" id="memory-retrieval">
   <h2><a class="qn" href="#memory-retrieval">Q15</a>Agent 怎么记住踩过的坑？记错了怎么办？</h2>
-  <div class="tldr">hmharness 的记忆检索是计分制不是全文匹配：置信度 ×0.4 + 新鲜度 ×0.2 + 词法相关 ×0.4，查询先分词再部分计分——检索「hvigor build windows」这类带无关词的查询也能命中该命中的经验，硬过滤条件不变。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>hmharness 的记忆检索是计分制不是全文匹配：置信度 ×0.4 + 新鲜度 ×0.2 + 词法相关 ×0.4，查询先分词再部分计分——检索「hvigor build windows」这类带无关词的查询也能命中该命中的经验，硬过滤条件不变。</div>
   <p>旧方案 AND 子串匹配会在查询里混入无关词时全部漏检（旧 AND 检索 miss 的根因）；计分检索允许部分词法得分，排序公式在 <code>memory.retrieve</code> 中可审计。五层记忆（working/episodic/semantic/procedural/world）只增不删、每条带溯源——记错可查证，标记可追踪。工作区隔离用标签制：本区记忆 ×2.5 加权，他区降权 ×0.3 但不消失。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/CHANGELOG.md">CHANGELOG 0.23.26（memory.retrieve）</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE 认知层</a></p>
 </section>
 
 <section class="qa" id="vs-deveco-cli">
   <h2><a class="qn" href="#vs-deveco-cli">Q16</a>hmharness 和 DevEco CLI 什么关系？</h2>
-  <div class="tldr">互补，不是二选一。DevEco CLI 是华为官方命令行工具，覆盖构建、打包、签名、上架等命令行化；hmharness 是独立开源智能体框架，把可调用工具、模型路由、API 索引和自进化审计放在同一套终端工作流里。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>互补，不是二选一。DevEco CLI 是华为官方命令行工具，覆盖构建、打包、签名、上架等命令行化；hmharness 是独立开源智能体框架，把可调用工具、模型路由、API 索引和自进化审计放在同一套终端工作流里。</div>
   <p>hmharness 不替代官方工具链，也不与华为、开放原子基金会有隶属或背书关系。它在命令行化之上提供四类增量：密钥只存本地、任意 OpenAI 兼容模型可换、API 知识图谱查不到即拒绝（927 个 d.ts 的 20,241 符号），以及带双门禁与公开证据页的可审计自进化。两者可以同时使用。</p>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP API 知识图谱</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/website/faq.html">FAQ structured data</a></p>
 </section>
 
 <section class="qa" id="hapsigntool-signing-failure">
   <h2><a class="qn" href="#hapsigntool-signing-failure">Q17</a>hapsigntool 签名失败怎么逐项排查？</h2>
-  <div class="tldr">不要把签名失败当玄学。先拿 <code>hapsigntool -h</code>、<code>verify-profile</code> 和 <code>keytool</code> 的真实输出，再按模式词、证书有效期、key alias、证书链、Windows 路径五关排查。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>不要把签名失败当玄学。先拿 <code>hapsigntool -h</code>、<code>verify-profile</code> 和 <code>keytool</code> 的真实输出，再按模式词、证书有效期、key alias、证书链、Windows 路径五关排查。</div>
   <ol>
     <li><b>模式词</b>：<code>-mode</code> 使用 <code>localSign</code>，不是 <code>debug</code> 或 <code>release</code>。</li>
     <li><b>证书有效期</b>：用 <code>verify-profile</code> 读取 <code>not-before/not-after</code> 数字；SDK 调试模板曾停在 2023 年，过期时复制模板刷新有效期并更换 uuid。</li>
@@ -320,7 +346,7 @@ DevEco 或 CLI / SDK 版本:
 
 <section class="qa" id="ci-fake-green">
   <h2><a class="qn" href="#ci-fake-green">Q18</a>CI 显示全绿也可能是「假绿」？怎么识别和修复？</h2>
-  <div class="tldr">会。hmharness 曾连续 13 天 CI 假绿：库里一条无条件的 <code>process.exit(0)</code> 在断言跑完前击杀了测试宿主进程——CI 收到零退出码就判通过，五个潜伏缺陷被掩盖。修复 = 移除库内 process.exit + close 幂等化，另加 clean-room 发版验真自动化。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>会。hmharness 曾连续 13 天 CI 假绿：库里一条无条件的 <code>process.exit(0)</code> 在断言跑完前击杀了测试宿主进程——CI 收到零退出码就判通过，五个潜伏缺陷被掩盖。修复 = 移除库内 process.exit + close 幂等化，另加 clean-room 发版验真自动化。</div>
   <p><b>假绿的鉴别特征</b>：文件级失败但没有逐条测试结果——"全绿"可能只是"没跑到断言就被杀"。本机与 CI 同代码不同红绿，出问题的是裁判本身。</p>
   <p><b>修复三件套</b>：①统一句柄登记表，<code>closeOnce()</code> 按 LIFO 排干全部句柄，closed 标志门住写入侧；②库层代码绝不调用 <code>process.exit</code>，close 保持幂等；③回归测试钉死合同：挂起的连接被终止后进程必须还活着。</p>
   <p><b>发版验真</b>：补用例救不了退出码失真——验证通道本身不可信时，新用例只是被绕过的代码。hmharness 用 clean-room 发版验真：官方源 tarball 双指纹校验 → 全新目录隔离安装 → 15 包钉版核验 → 关键路径实跑 → 工件脱敏归档，11 个验真用例接进 <code>npm test</code>。修完 1037 个测试第一次真正全绿。</p>
@@ -330,7 +356,7 @@ DevEco 或 CLI / SDK 版本:
 
 <section class="qa" id="check-devices-triage">
   <h2><a class="qn" href="#check-devices-triage">Q19</a>安装后 <code>hmh check</code> 或 <code>hmh devices</code> 失败怎么排查？</h2>
-  <div class="tldr">先分四层：Node 版本、npm 包与 CLI 入口、无模型工具链探针、设备可见性。<code>hmh check</code> 不需要模型；<code>hmh devices</code> 返回无设备也不等于安装失败。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>先分四层：Node 版本、npm 包与 CLI 入口、无模型工具链探针、设备可见性。<code>hmh check</code> 不需要模型；<code>hmh devices</code> 返回无设备也不等于安装失败。</div>
   <ol>
     <li><b>运行时</b>：确认 Node &gt;= 22。低于该版本先处理运行时，不进入工具链排查。</li>
     <li><b>包与入口</b>：<code>npm list -g @hmharness/cli</code> 能读到包，<code>hmh --help</code> 能执行；这一层只证明 npm 包和入口存在。</li>
@@ -343,7 +369,7 @@ DevEco 或 CLI / SDK 版本:
 
 <section class="qa" id="mcp-serve-boundary">
   <h2><a class="qn" href="#mcp-serve-boundary">Q20</a><code>hmh mcp-serve</code> 默认暴露哪些工具？会不会绕过审批？</h2>
-  <div class="tldr">不会绕过审批。<code>hmh mcp-serve</code> 是给 MCP 宿主使用的鸿蒙工具箱出口：默认只暴露 <code>harmony_*</code> 域工具，不暴露 <code>run_command</code>、<code>write_file</code> 等通用工具；每次调用由宿主权限系统确认，server 侧硬墙仍在。</div>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>不会绕过审批。<code>hmh mcp-serve</code> 是给 MCP 宿主使用的鸿蒙工具箱出口：默认只暴露 <code>harmony_*</code> 域工具，不暴露 <code>run_command</code>、<code>write_file</code> 等通用工具；每次调用由宿主权限系统确认，server 侧硬墙仍在。</div>
   <ol>
     <li><b>默认工具面</b>：构建、装机、日志、签名、API 检索、雷达等 <code>harmony_*</code> 域工具；宿主已有的通用命令与文件工具不重复暴露。</li>
     <li><b>继续收窄</b>：用 <code>HMH_MCP_TOOLS</code> 按需限制工具列表，例如只开放 <code>harmony_build,harmony_ops</code>。</li>

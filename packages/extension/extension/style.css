@@ -16,55 +16,70 @@ body {
   margin: 0;
   padding: 14px;
   width: 340px; /* popup; sidepanel stretches beyond */
-  font: 13px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font: 0.8125rem/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
   background: var(--bg);
   color: var(--text);
 }
-h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+h1 { font-size: 0.875rem; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
 h1 .logo { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, #8ab4f8, #34a853); display: inline-block; }
 .status {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--card); margin-bottom: 10px;
 }
+/* the status dot: solid green = connected, a hollow red ring = not connected, a hollow
+   yellow ring = connecting. The shape carries the state too, so it still reads in forced
+   colors and for color-vision differences; ui.js keeps an aria-label on it in step. */
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
 .dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
-.dot.off { background: var(--err); }
-.dot.pair { background: var(--warn); }
+.dot.off { background: transparent; border: 2px solid var(--err); }
+.dot.pair { background: transparent; border: 2px solid var(--warn); }
 .status .txt { flex: 1; }
 .mono { font-family: ui-monospace, Consolas, monospace; }
-.row { display: flex; gap: 6px; margin-bottom: 8px; }
+.row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.lbl { color: var(--dim); font-size: 0.75rem; flex: none; }
+.grow { flex: 1; }
+.push { margin-left: auto; }
+/* buttons and inputs take the page font (the UA gives them one of their own) */
+button, input { font-family: inherit; }
 input {
   flex: 1; min-width: 0; padding: 7px 9px; border-radius: 7px;
   border: 1px solid var(--line); background: var(--card); color: var(--text);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
-input:focus { outline: 1px solid var(--acc); }
 button {
   padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line);
-  background: var(--card); color: var(--text); cursor: pointer; font-size: 13px;
+  background: var(--card); color: var(--text); cursor: pointer; font-size: 0.8125rem;
 }
 button:hover { border-color: var(--acc); }
+button:disabled { opacity: .5; cursor: default; }
 button.primary { background: var(--acc); color: #10131a; border-color: var(--acc); font-weight: 600; }
-.hint { color: var(--dim); font-size: 12px; margin: 6px 0 0; }
+/* one visible focus ring for every control */
+input:focus-visible, button:focus-visible, pre#out:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.hint { color: var(--dim); font-size: 0.75rem; margin: 6px 0 0; }
 .hint b { color: var(--text); font-weight: 600; }
 pre#out {
   margin: 8px 0 0; padding: 9px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--card);
   white-space: pre-wrap; word-break: break-all;
-  font: 12px/1.45 ui-monospace, Consolas, monospace; color: var(--dim);
+  font: 0.75rem/1.45 ui-monospace, Consolas, monospace; color: var(--dim);
   max-height: 220px; overflow: auto;
 }
 pre#out:empty { display: none; }
 .sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 
 /* — minimal chat (sidepanel): ChatGPT-extension-style — */
-body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction: column; padding: 0; }
+/* dvh: in a side panel the browser chrome can change the visible height while the page
+   is open; older engines keep the 100vh line */
+body.chat-layout { width: auto; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; padding: 0; }
+/* the settings drawer, the transcript and the composer live in <main>; the transcript is
+   the part that scrolls, the composer stays put */
+body.chat-layout > main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .top {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; border-bottom: 1px solid var(--line);
 }
-.top .name { font-weight: 600; font-size: 13px; }
+.top h1.name { display: block; margin: 0; font-weight: 600; font-size: 0.8125rem; }
 .top .dot { margin-left: auto; }
 .ghost {
   background: none; border: none; color: var(--text);
@@ -73,12 +88,12 @@ body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction
 }
 .ghost svg { display: block; }
 .ghost:hover { background: var(--card); color: var(--acc); }
-#settings { padding: 14px 14px 8px; border-bottom: 1px solid var(--line); background: var(--card); font-size: 13px; }
+#settings { padding: 14px 14px 8px; border-bottom: 1px solid var(--line); background: var(--card); font-size: 0.8125rem; }
 .set-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.set-row .dim { color: var(--text); font-size: 13px; flex: 1; }
+.set-row .txt { flex: 1; }
 .set-row .dim2 { color: var(--dim); }
-#settings input { padding: 9px 11px; font-size: 13px; }
-#settings button { padding: 9px 13px; font-size: 13px; }
+#settings input { padding: 9px 11px; font-size: 0.8125rem; }
+#settings button { padding: 9px 13px; font-size: 0.8125rem; }
 #chat {
   flex: 1; overflow-y: auto;
   display: flex; flex-direction: column;
@@ -88,27 +103,28 @@ body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction
   margin: auto; text-align: center; padding: 24px 10px;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
+#hero[hidden] { display: none; }
 .hero-icon {
-  width: 44px; height: 44px; border-radius: 12px; font-size: 22px; line-height: 44px;
+  width: 44px; height: 44px; border-radius: 12px; font-size: 1.375rem; line-height: 44px;
   background: linear-gradient(135deg, #8ab4f8, #34a853); color: #10131a;
 }
-.hero-title { font-size: 15px; font-weight: 600; }
-.hero-sub { font-size: 12px; color: var(--dim); margin-bottom: 14px; }
+.hero-title { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+.hero-sub { font-size: 0.75rem; color: var(--dim); margin: 0 0 14px; }
 .chips { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 260px; }
 .chip {
   padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--card); color: var(--text); cursor: pointer; font-size: 13px;
+  background: var(--card); color: var(--text); cursor: pointer; font-size: 0.8125rem;
   text-align: left;
 }
 .chip:hover { border-color: var(--acc); }
 .msg { max-width: 92%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
-.msg b { display: block; font-size: 11px; color: var(--dim); font-weight: 600; margin-bottom: 2px; }
+.msg b { display: block; font-size: 0.6875rem; color: var(--dim); font-weight: 600; margin-bottom: 2px; }
 .msg span { white-space: pre-wrap; word-break: break-word; }
 .msg.user { align-self: flex-end; border-color: #3c4a63; background: #243043; }
 .msg.bot { align-self: flex-start; }
 .msg.thinking { color: var(--dim); font-style: italic; white-space: pre-wrap; }
 .stop-btn {
-  font-size: 12px; padding: 3px 10px; border-radius: 6px;
+  font-size: 0.75rem; padding: 3px 10px; border-radius: 6px;
   border: 1px solid var(--err); color: var(--err); background: transparent;
   cursor: pointer; font-style: normal;
 }
@@ -116,6 +132,6 @@ body.chat-layout { width: auto; min-height: 100vh; display: flex; flex-direction
   display: flex; gap: 8px; padding: 10px 12px;
   border-top: 1px solid var(--line); background: var(--bg);
 }
-.composer input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.composer input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; font-size: 0.8125rem; }
 .composer button.primary { padding: 10px 14px; }
 body.chat-layout pre#out { max-height: 100px; }

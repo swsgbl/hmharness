@@ -143,9 +143,14 @@ export class RLMRuntime {
       createdAt: new Date().toISOString(),
       stateHash: stableHash({ vars: this.vars, log: this.log }),
       snapshot: {
+        // vars is `Record<string, unknown>` and the stateHash above is taken over
+        // the JSON serialization: the snapshot must be the JSON-normalized form
+        // (undefined keys dropped, Dates as ISO strings), so the JSON round-trip
+        // stays. materializeBudget() is a fresh literal of plain numbers, so there
+        // structuredClone() is exactly equivalent and reads as what it is: a copy.
         vars: JSON.parse(JSON.stringify(this.vars)),
         log: [...this.log],
-        budget: JSON.parse(JSON.stringify(this.materializeBudget())),
+        budget: structuredClone(this.materializeBudget()),
       },
     };
     this.checkpoints.push(cp);

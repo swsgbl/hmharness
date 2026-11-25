@@ -1971,7 +1971,7 @@ flags:
       // cooldown counts real SUBMISSIONS only - a 'staged' row means the last
       // attempt FAILED before creating a job (files parked, nothing trained),
       // so it must not block the retry that finally lands (2026-09-27)
-      const lastSubmit = [...localJobs].reverse().find((j) => String(j.status) !== 'staged');
+      const lastSubmit = localJobs.findLast((j) => String(j.status) !== 'staged');
       const lastAt = lastSubmit ? new Date(lastSubmit.time).getTime() : 0;
       const dueMs = cooldownDays * 86400000;
       if (Date.now() - lastAt < dueMs) { stdout.write(DIM(`冷却中（上次提交 ${cooldownDays} 天内）——本次跳过\n`)); return; }

@@ -102,7 +102,7 @@ export class Arc3RestBridge {
         signal: AbortSignal.timeout(30_000),
       });
     } catch (err) {
-      throw new Error(`E_ARC3_NETWORK: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`E_ARC3_NETWORK: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     }
     this.absorbCookies(res);
     if (!res.ok) {
@@ -124,7 +124,7 @@ export class Arc3RestBridge {
       headers: key ? { 'X-API-Key': key } : {},
       signal: AbortSignal.timeout(10_000),
     }).catch((err) => {
-      throw new Error(`E_ARC3_NETWORK: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`E_ARC3_NETWORK: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     });
     if (!res.ok) throw new Error(`E_ARC3_HTTP_${res.status}`);
     return res.text();

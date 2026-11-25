@@ -15,7 +15,11 @@ export const DOCK = `  /* ---- right column (W7): tabs 详情/文件/预览, col
   }
   function switchRightTab(tab) {
     Array.prototype.forEach.call(document.querySelectorAll('.rtab'), function (b) {
-      b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+      var on = b.getAttribute('data-tab') === tab;
+      b.classList.toggle('on', on);
+      // tab pattern: Tab lands on the selected tab only; the others are reached with the arrow keys
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
     });
     Array.prototype.forEach.call(document.querySelectorAll('.rtabpane'), function (p) {
       p.classList.toggle('on', p.id === 'rtab-' + tab + '-pane');
@@ -88,6 +92,21 @@ export const DOCK = `  /* ---- right column (W7): tabs 详情/文件/预览, col
   }
   Array.prototype.forEach.call(document.querySelectorAll('.rtab'), function (b) {
     b.onclick = function () { openRight(b.getAttribute('data-tab')); };
+  });
+  // tab pattern: Left/Right move between the tabs and select the one that lands under the
+  // focus; Home/End jump to the ends
+  document.getElementById('rtabs').addEventListener('keydown', function (e) {
+    if (e.isComposing) return;
+    var tabs = Array.prototype.slice.call(this.querySelectorAll('.rtab'));
+    var i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    var n = e.key === 'ArrowRight' ? (i + 1) % tabs.length
+          : e.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length
+          : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+    if (n < 0) return;
+    e.preventDefault();
+    tabs[n].focus();
+    tabs[n].click();
   });
   document.getElementById('rclose').onclick = closeRight;
   document.getElementById('rcollapse').onclick = function () {
