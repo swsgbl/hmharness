@@ -34,6 +34,9 @@ function safePath(p: string, cwd: string): string {
 export const readFileTool: Tool = {
   name: 'read_file',
   description: 'Read a text file. Returns the full content (truncated at 60k chars).',
+  // read-only: the loop may dedup an exact repeat, and only until something
+  // changes the world (readOnly on Tool, kernel/loop.ts)
+  readOnly: true,
   parameters: {
     type: 'object',
     properties: { path: { type: 'string', description: 'file path (absolute or relative to cwd)' } },
@@ -134,6 +137,7 @@ export const editFileTool: Tool = {
 export const listDirTool: Tool = {
   name: 'list_dir',
   description: 'List a directory: names with d/- prefix and size.',
+  readOnly: true,
   parameters: {
     type: 'object',
     properties: { path: { type: 'string', description: 'directory path (default cwd)' } },

@@ -39,6 +39,14 @@ export interface Tool {
    * approval unless their server is marked trusted.
    */
   needsApproval?(args: Record<string, unknown>, ctx?: ToolContext): boolean;
+  /**
+   * Read-only: the result depends only on (args, world state) and executing
+   * it never changes world state (read_file, list_dir). The loop's repeat
+   * dedup serves a cached result ONLY for readOnly tools, and only while no
+   * state-changing call has run since. Absent = state-changing: an exact
+   * repeat always executes for real.
+   */
+  readOnly?: boolean;
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>;
 }
 

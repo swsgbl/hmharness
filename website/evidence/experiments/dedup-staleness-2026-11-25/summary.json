@@ -1,0 +1,43 @@
+{
+  "title": "内核循环去重环: 真实会话历史上的过期缓存审计",
+  "date": "2026-11-25",
+  "question": "loop.ts 的相同调用去重环(2026-10-07 引入)把缓存的工具结果还给模型时, 自原始执行以来世界是否已经改变?",
+  "method": "对每个以 '[you already ran' 开头的工具结果, 在同一会话里找到同一 (工具, 参数) 调用的原始执行, 列出两者之间执行过的工具; 中间存在非只读工具(且不是这次重复调用本身)即记为过期命中。",
+  "scope": "一台维护者机器, HMH_HOME/sessions 下的全部会话文件。只发布计数, 不发布任何会话内容。",
+  "readOnlyToolsAssumed": ["read_file", "list_dir", "see_image", "web_search", "web_fetch"],
+  "results": {
+    "sessionFiles": 3521,
+    "sessionsWithToolCalls": 2135,
+    "toolCalls": 57144,
+    "cacheHits": 151,
+    "sessionsWithCacheHits": 50,
+    "staleHits": 147,
+    "cleanHits": 4
+  },
+  "staleHitsByTool": {
+    "run_command": 98,
+    "read_file": 25,
+    "edit_file": 7,
+    "desktop_screenshot": 5,
+    "harmony_build": 4,
+    "harmony_logs": 4,
+    "write_file": 1,
+    "harmony_vm_qemu": 1,
+    "harmony_devices": 1,
+    "mcp_anysearch_extract": 1
+  },
+  "reading": [
+    "151 次命中里 147 次(97.4%)发生在中间已有改变状态的工具执行之后: 模型拿到的是旧结果, 却被告知'你已经跑过了'。",
+    "run_command 98 次: 改完代码重跑同一条命令(测试/构建/状态查询), 拿回改动前的输出。",
+    "harmony_build 4 次: 构建工具没有被重新执行。",
+    "edit_file 7 次 / write_file 1 次: 一次编辑或写入被静默跳过。",
+    "去重器本来的目标(什么都没变的纯重复)只对应 4 次命中。"
+  ],
+  "limitations": [
+    "单机、单一使用者的会话历史; 其它使用者的比例可能不同。",
+    "'可能改变状态'按工具名保守判定: 只读名单之外的工具一律算作可能改变状态, 因此过期数只会被高估不会被低估; 但中间跑过的命令是否真的改变了相关状态, 未逐条核实。",
+    "只统计缓存实际命中并被记录在会话里的次数; 20 轮窗口之外或进程重启后的重复调用本就不会命中。"
+  ],
+  "fix": "PR: Tool.readOnly 声明 + 世界版本失效 —— 只缓存声明只读的工具, 且自缓存以来没有非只读调用执行、没有运行中注入; 回归测试 packages/kernel/src/__tests__/loop-dedup.test.ts",
+  "reproduce": "node website/evidence/experiments/dedup-staleness-2026-11-25/audit.mjs"
+}

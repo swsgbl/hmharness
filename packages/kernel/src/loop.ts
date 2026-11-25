@@ -160,7 +160,14 @@ export async function runLoop(opts: {
   // text conclusions). Ring of recent (tool+args) → result head; an EXACT
   // repeat returns the cached result with a note, saving a network call and
   // telling the model it already knows this.
-  const recentCalls = new Map<string, { head: string; isError: boolean; turn: number }>();
+  //
+  // 2026-11-25: the ring used to cache EVERY successful call and nothing
+  // invalidated it - so "edit → re-run the same command" (the core agent
+  // loop) got the PRE-edit result back. Only readOnly tools are cached now,
+  // and only while `world` is unchanged: every state-changing execution and
+  // every runtime injection bumps it.
+  const recentCalls = new Map<string, { head: string; isError: boolean; turn: number; world: number }>();
+  let world = 0;
   const callKey = (name: string, args: Record<string, unknown>) => {
     try { return name + ':' + JSON.stringify(args); } catch { return name + ':unserializable'; }
   };
@@ -183,6 +190,7 @@ export async function runLoop(opts: {
     for (const inj of opts.injections?.poll() ?? []) {
       working.push({ role: 'user', content: inj.text });
       events?.onInjected?.(inj.text);
+      world++; // the user acted out of band: whatever was read before may be gone
     }
 
     const compacted = opts.summarizeContext
@@ -241,6 +249,7 @@ export async function runLoop(opts: {
       if (pending) {
         working.push({ role: 'user', content: pending });
         events?.onInjected?.(pending);
+        world++;
         continue;
       }
       events?.onFinal?.(text, turn);
@@ -329,14 +338,18 @@ export async function runLoop(opts: {
       }
       planned.push(p);
     }
+    // A batch that contains any state-changing call leaves every cached read
+    // behind: bump the world BEFORE the cache lookups of this batch.
+    for (const p of planned) if (!p.skip && !registry.get(p.name)!.readOnly) world++;
     await Promise.all(planned.map(async (p) => {
       if (p.skip) return;
       // Re-verification breaker: an EXACT repeat (same tool, same args) of a
-      // recent successful call returns the cached head instead of re-running.
-      // The note tells the model WHY, so it stops trying to re-verify.
+      // recent successful readOnly call returns the cached head instead of
+      // re-running - but only if nothing has changed the world since. The note
+      // tells the model WHY, so it stops trying to re-verify.
       const key = callKey(p.name, p.args);
       const prev = recentCalls.get(key);
-      if (prev && !prev.isError && turn - prev.turn <= 20) {
+      if (registry.get(p.name)!.readOnly === true && prev && !prev.isError && prev.world === world && turn - prev.turn <= 20) {
         p.output = `[you already ran ${p.name} with these exact arguments at turn ${prev.turn}; re-running identical calls wastes time — here is what it returned]\n${prev.head}`;
         p.isError = false;
         return;
@@ -345,10 +358,10 @@ export async function runLoop(opts: {
         const r = await registry.get(p.name)!.execute(p.args, ctx);
         p.output = r.output;
         p.isError = r.isError === true;
-        // remember successful results for the dedup ring (errors go through
-        // the failed-command short-circuit instead)
-        if (!p.isError) {
-          recentCalls.set(key, { head: p.output.slice(0, RESULT_HEAD_CHARS), isError: false, turn });
+        // remember successful READ-ONLY results for the dedup ring (errors go
+        // through the failed-command short-circuit instead)
+        if (!p.isError && registry.get(p.name)!.readOnly === true) {
+          recentCalls.set(key, { head: p.output.slice(0, RESULT_HEAD_CHARS), isError: false, turn, world });
           if (recentCalls.size > 50) {
             // drop the oldest entries when the ring fills
             const firstKey = recentCalls.keys().next().value;
@@ -378,6 +391,7 @@ export async function runLoop(opts: {
     if (injected) {
       working.push({ role: 'user', content: injected });
       events?.onInjected?.(injected);
+      world++; // the user acted out of band: whatever was read before may be gone
     }
 
     // Idle detection: count consecutive turns where NO tool succeeded. A
