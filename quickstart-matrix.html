@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>hmharness Quickstart 验证矩阵：npm 安装、hmh check 与设备可见性</title>
 <meta name="description" content="hmharness 快速开始排障页：逐步核对 Node 版本、npm 包元数据、CLI help、hmh check 与 hmh devices，说明 2026-11-16 Windows 隔离前缀安装实测结果与每一步能证明什么。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/quickstart-matrix.html">
@@ -42,57 +44,81 @@
 }
 </script>
 <style>
-:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--ok:#7DDF9A;--warn:#F5C66B;--maxw:980px}
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--ok:#7DDF9A;--warn:#F5C66B;--maxw:980px;color-scheme:dark;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
 nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;min-height:60px;flex-wrap:wrap;gap:8px 16px;padding-top:8px;padding-bottom:8px;font-size:0.90625rem}
 .logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
 header{padding:60px 0 32px}
-.eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:1px}
-h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}
+.eyebrow{color:var(--cyan);font-size:0.8125rem;font-weight:700;letter-spacing:1px}
+h1{margin:10px 0 14px;font-size:clamp(1.75rem,4.5vw,2.625rem);line-height:1.22;color:#fff}
 .summary{max-width:760px;color:var(--dim)}
 .answer{margin:24px 0;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice)}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
 .btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}
 .btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
 section{padding:32px 0}
-h2{font-size:24px;color:#fff;margin-bottom:14px}
-p{color:var(--dim)}.summary,.answer{font-size:16px}
+h2{font-size:1.5rem;color:#fff;margin-bottom:14px}
+p{color:var(--dim)}.summary,.answer{font-size:1rem}
 .matrix{display:grid;gap:12px;margin-top:18px}
 .row{display:grid;grid-template-columns:150px 1fr 1fr;gap:14px;align-items:start;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}
-.row h3{font-size:15.5px;color:#fff;margin-bottom:5px}
-.row p{font-size:14.5px}
-.status{font-size:13px;font-weight:750;color:var(--ok)}
+.row h3{font-size:0.96875rem;color:#fff;margin-bottom:5px}
+.row p{font-size:0.90625rem}
+.status{font-size:0.8125rem;font-weight:750;color:var(--ok)}
 .status.partial{color:var(--warn)}
 code,pre{font-family:Consolas,"Cascadia Code",monospace}
 code{color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px}
 pre{margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(5,14,28,.82);color:var(--ice);overflow-x:auto;white-space:pre}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
 .panel{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
-.panel h3{font-size:16px;color:#fff;margin-bottom:8px}
-.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:14.5px}
+.panel h3{font-size:1rem;color:#fff;margin-bottom:8px}
+.panel li{margin:8px 0 0 20px;color:var(--dim);font-size:0.90625rem}
 .sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .sources div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}
-.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:0.90625rem}
 .boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
 .boundary li{margin:8px 0 0 20px;color:var(--dim)}
-footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:0.8125rem;text-align:center}
 footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 @media(max-width:700px){.row{grid-template-columns:1fr}.two{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}
+/* long unbreakable tokens and URLs wrap instead of widening the page */
+body{overflow-wrap:break-word}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+/* anchor targets (the skip link, the FAQ's Q-links) land clear of the sticky nav */
+html{scroll-padding-top:76px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.table-wrap:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,.skip{display:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+}
+pre code{background:none;padding:0;color:inherit;border-radius:0}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">跳到主要内容</a>
 <nav><div class="wrap">
   <div class="logo"><span>hm</span> hmharness</div>
   <div><a href="./">首页</a> · <a href="faq.html">FAQ</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
 </div></nav>
 
+<main>
 <header><div class="wrap">
-  <div class="eyebrow">QUICKSTART VERIFICATION MATRIX · SMOKE DATE 2026-11-16</div>
-  <h1>hmharness 快速开始验证矩阵</h1>
+  <div class="eyebrow" lang="en">QUICKSTART VERIFICATION MATRIX · SMOKE DATE 2026-11-16</div>
+  <h1 id="main" tabindex="-1">hmharness 快速开始验证矩阵</h1>
   <p class="summary">安装失败通常不是模型问题。本页把标准 npm 路径拆成可独立核对的五步，并给出一次 Windows 隔离前缀安装的真实读数：包能装、CLI 能解析，工具链检查不冒充设备可见，设备未连接也不冒充安装失败。</p>
   <div class="answer">2026-11-16 在 Windows / Node 24.19 / npm 12.2 上，用一个空 npm prefix 与独立 <code>HMH_HOME</code> 安装 <code>@hmharness/cli@0.23.50</code>：npm 元数据声明 Node &gt;= 22、bin 为 <code>hmh</code>；安装完成；<code>hmh --help</code> 正常；<code>hmh check</code> 不需要模型并报出 hdc、hvigorw、ohpm 与 cjpm 的状态；<code>hmh devices</code> 如实返回无设备。cjpm 版本探针失败被原样保留为本机排障信号，不包装成通过。</div>
   <div class="actions">
@@ -104,9 +130,9 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 </div></header>
 
 <section id="matrix"><div class="wrap">
-  <h2>五步验证矩阵</h2>
+  <h2 id="matrix-title">五步验证矩阵</h2>
   <p>“结果”列是 2026-11-16 一次本机 smoke；“你要证明”列才是其他用户应复用的判定标准。工具路径已从 smoke 记录中脱敏，矩阵只保留状态与判定。</p>
-  <div class="matrix" aria-label="Quickstart verification matrix">
+  <div class="matrix" role="group" aria-labelledby="matrix-title">
     <div class="row" data-check="runtime"><div><h3>运行时</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b>Node <code>24.19.0</code>，npm <code>12.2.0</code>，Windows_NT。</p></div><div><p><b>你要证明：</b>Node 满足 npm 元数据声明的 <code>&gt;=22</code>；低于 22 先升级 Node，再排查 hmharness。</p></div></div>
     <div class="row" data-check="package"><div><h3>包元数据</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b><code>npm view @hmharness/cli@0.23.50</code> 返回 version <code>0.23.50</code>、engines <code>&gt;=22</code>、bin <code>hmh -&gt; dist/main.js</code>。</p></div><div><p><b>你要证明：</b>公开 registry 可达，且你安装的版本、入口和 Node 要求一致。</p></div></div>
     <div class="row" data-check="install"><div><h3>隔离安装</h3><span class="status">PASS</span></div><div><p><b>Smoke 结果：</b>空 prefix 安装完成，新增 44 个包，耗时 4 秒；<code>npm list</code> 显示 <code>@hmharness/cli@0.23.50</code>。</p></div><div><p><b>你要证明：</b>依赖能解析、CLI 入口存在。全局安装用户用 <code>npm list -g @hmharness/cli</code> 核对版本。</p></div></div>
@@ -119,7 +145,7 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 <section id="standard-path"><div class="wrap">
   <h2>标准桌面复现命令</h2>
   <p>先做这组无模型检查，再进入 <code>hmh init</code> 和厂商配置；可把 prefix 换成任意空目录，避免污染全局环境。</p>
-  <pre>node --version
+  <pre tabindex="0" role="region" aria-label="复现命令"><code>node --version
 npm --version
 npm view @hmharness/cli@0.23.50 version engines bin --json
 
@@ -136,7 +162,7 @@ set HMH_HOME=%CD%\hmh-smoke-home
 export HMH_HOME="$PWD/hmh-smoke-home"
 ./hmh-smoke/node_modules/.bin/hmh --help
 ./hmh-smoke/node_modules/.bin/hmh check
-./hmh-smoke/node_modules/.bin/hmh devices</pre>
+./hmh-smoke/node_modules/.bin/hmh devices</code></pre>
   <p>全局安装后等价检查是 <code>npm list -g @hmharness/cli</code>、<code>hmh --help</code>、<code>hmh check</code>、<code>hmh devices</code>。需要求助时打开<a href="https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml">环境 Issue 模板</a>，按字段提交 OS/Node、npm list 结果、脱敏后的 check/devices 输出和第一个卡点；不要粘贴 API key、cookie、私人路径或设备/账号标识。自由讨论仍可使用 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>。</p>
 </div></section>
 
@@ -185,6 +211,8 @@ export HMH_HOME="$PWD/hmh-smoke-home"
     <li>hmharness 是独立社区开源项目（MIT），与华为、开放原子开源基金会无隶属、合作或背书关系。</li>
   </ul></div>
 </div></section>
+
+</main>
 
 <footer><div class="wrap">
   <a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="device-loop-proof.html">设备回路证明</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a>

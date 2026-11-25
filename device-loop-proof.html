@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1E3A">
 <title>hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall 的设备回路</title>
 <meta name="description" content="hmharness 模拟器设备回路证据页：公开记录 scaffold、schema_check、build、install、launch、hilog 回读 EntryAbility onCreate、uninstall 七步，并链接公开 e2e-device.mts、ROADMAP 与 DEVLOG。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/device-loop-proof.html">
@@ -44,51 +46,75 @@
 }
 </script>
 <style>
-:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--maxw:920px}
+:root{--navy:#0B1E3A;--cyan:#4FD8EB;--ice:#EAF4FA;--text:#DCE8F2;--dim:#8FA8C0;--card:rgba(13,32,58,.72);--line:rgba(79,216,235,.22);--maxw:920px;color-scheme:dark;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--navy);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.72}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
 nav{position:sticky;top:0;z-index:10;background:rgba(9,22,42,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;font-size:14.5px}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;min-height:60px;flex-wrap:wrap;gap:8px 16px;padding-top:8px;padding-bottom:8px;font-size:0.90625rem}
 .logo{font-weight:700;color:#fff}.logo span{color:var(--cyan)}
 header{padding:64px 0 34px}
-.eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:1px}
-h1{margin:10px 0 14px;font-size:clamp(28px,4.5vw,42px);line-height:1.22;color:#fff}
+.eyebrow{color:var(--cyan);font-size:0.8125rem;font-weight:700;letter-spacing:1px}
+h1{margin:10px 0 14px;font-size:clamp(1.75rem,4.5vw,2.625rem);line-height:1.22;color:#fff}
 .summary{max-width:720px;color:var(--dim)}
 .answer{margin:24px 0;border-left:3px solid var(--cyan);background:rgba(79,216,235,.08);padding:16px 18px;color:var(--ice)}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
 .btn{display:inline-block;padding:10px 18px;border-radius:999px;border:1px solid var(--line);color:var(--ice);font-weight:650}
 .btn-primary{background:linear-gradient(135deg,var(--cyan),#2FA8D8);color:#04121F;border-color:transparent}
 section{padding:32px 0}
-h2{font-size:24px;color:#fff;margin-bottom:14px}
-p{color:var(--dim)}.summary,.answer{font-size:16px}
+h2{font-size:1.5rem;color:#fff;margin-bottom:14px}
+p{color:var(--dim)}.summary,.answer{font-size:1rem}
 .steps{display:grid;gap:12px;margin-top:18px}
 .step{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:16px}
 .num{min-width:34px;height:34px;border-radius:50%;background:rgba(79,216,235,.14);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-weight:800}
-.step h3{font-size:16px;color:#fff;margin-bottom:4px}.step p{font-size:14.5px}
+.step h3{font-size:1rem;color:#fff;margin-bottom:4px}.step p{font-size:0.90625rem}
 code,pre{font-family:Consolas,"Cascadia Code",monospace}
 code{color:var(--cyan);background:rgba(79,216,235,.09);padding:1px 5px;border-radius:4px}
 pre{margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(5,14,28,.82);color:var(--ice);overflow-x:auto;white-space:pre}
 .sources{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .sources div{display:grid;grid-template-columns:190px 1fr;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card)}
-.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:14.5px}
+.sources div:last-child{border-bottom:0}.sources b{color:#fff}.sources span{font-size:0.90625rem}
 .boundary{border:1px solid var(--line);border-radius:8px;background:var(--card);padding:18px}
 .boundary li{margin:8px 0 0 20px;color:var(--dim)}
-footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:13px;text-align:center}
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:0.8125rem;text-align:center}
 footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 @media(max-width:620px){.step{grid-template-columns:1fr}.sources div{grid-template-columns:1fr}}
+/* long unbreakable tokens and URLs wrap instead of widening the page */
+body{overflow-wrap:break-word}
+/* skip link: off-screen until it has the keyboard focus, then fixed over the nav */
+.skip{position:fixed;left:16px;top:-64px;z-index:60;padding:10px 16px;background:var(--cyan);color:#04121F;font-weight:600;border-radius:0 0 10px 10px}
+.skip:focus{top:0}
+/* anchor targets (the skip link, the FAQ's Q-links) land clear of the sticky nav */
+html{scroll-padding-top:76px}
+/* headings wrap as a block and body text avoids a lone last word (ignored where unsupported) */
+h1,h2{text-wrap:balance}
+p,li{text-wrap:pretty}
+pre:focus-visible,.table-wrap:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+/* print: light text on a dark page would print as near-white on white paper */
+@media print{
+  :root{--navy:#fff;--text:#000;--dim:#222;--ice:#000;--cyan:#00335c;--card:#fff;--line:#999}
+  body{background:#fff}
+  nav,.skip{display:none}
+  a{color:#00335c;text-decoration:underline}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .table-wrap{overflow:visible}
+  table{min-width:0}
+}
+pre code{background:none;padding:0;color:inherit;border-radius:0}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">跳到主要内容</a>
 <nav><div class="wrap">
   <div class="logo"><span>hm</span> hmharness</div>
   <div><a href="./">首页</a> · <a href="evidence/">证据页</a> · <a href="https://github.com/swsgbl/hmharness">GitHub</a></div>
 </div></nav>
 
+<main>
 <header><div class="wrap">
-  <div class="eyebrow">设备回路证据索引 · EVIDENCE DATE 2026-09-05</div>
-  <h1>hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall</h1>
+  <div class="eyebrow">设备回路证据索引 · <span lang="en">EVIDENCE DATE 2026-09-05</span></div>
+  <h1 id="main" tabindex="-1">hmharness 鸿蒙模拟器全链路证明：scaffold 到 uninstall</h1>
   <p class="summary">本页回答一个具体问题：AI 生成的鸿蒙工程是否真的进了模拟器、启动了 Ability、打出了自己的日志，并在验证后清理？下面每一步都指向公开脚本或公开开发记录，不做口头承诺。</p>
   <div class="answer">可以。公开记录显示，hmharness 以 <code>127.0.0.1:5555</code> 模拟器为 hdc 目标，一次跑通 <code>scaffold → schema_check → build → install → launch → hilog → uninstall</code>，hilog 回读到应用自身的 <code>EntryAbility onCreate</code>，全链零人工介入。当前公开脚本仍可用来在你自己的 SDK 与模拟器环境中复现实验。</div>
   <div class="actions">
@@ -125,10 +151,10 @@ footer .legal{max-width:760px;margin:16px auto 0;line-height:1.8}
 <section id="reproduce"><div class="wrap">
   <h2>如何在你自己的环境复现</h2>
   <p>复现依赖你的本机工具链与模拟器状态；hmharness 不提供绕过厂商渠道的模拟器镜像下载。先确认 <code>hdc list targets</code> 能看到目标，再运行公开脚本：</p>
-  <pre>git clone https://github.com/swsgbl/hmharness.git
+  <pre tabindex="0" role="region" aria-label="复现命令"><code>git clone https://github.com/swsgbl/hmharness.git
 cd hmharness
 npm install &amp;&amp; npm run build
-npx tsx scripts/e2e-device.mts 127.0.0.1:5555</pre>
+npx tsx scripts/e2e-device.mts 127.0.0.1:5555</code></pre>
   <p>顺序执行到最终输出 <code>DEVICE E2E COMPLETE</code> 后，再核对 install、launch、hilog 与 uninstall 输出；若失败，保留脱敏后的第一步错误输出，并带到 <a href="https://github.com/swsgbl/hmharness/discussions/4">环境反馈 Discussion</a>。</p>
 </div></section>
 
@@ -143,6 +169,8 @@ npx tsx scripts/e2e-device.mts 127.0.0.1:5555</pre>
     </ul>
   </div>
 </div></section>
+
+</main>
 
 <footer><div class="wrap">
   <a href="./">hmharness 官网</a> · <a href="faq.html">FAQ</a> · <a href="evidence/">证据页</a> · <a href="llms.txt">llms.txt</a>
