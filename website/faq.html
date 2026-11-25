@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
-<meta name="description" content="hmharness 十九问：不用 DevEco Studio 能开发鸿蒙吗？命令行打包签名、CI/CD、hmh check 与 devices 排障、AI 编造鸿蒙 API 怎么防？认知层真的从经验学习吗？每个答案附证据链接。">
+<meta name="description" content="hmharness 二十问：不用 DevEco Studio 能开发鸿蒙吗？命令行打包签名、CI/CD、hmh check 与 devices 排障、hmh mcp-serve 默认工具面与审批边界、AI 编造鸿蒙 API 怎么防？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -129,6 +129,11 @@
       "@type": "Question",
       "name": "安装后 hmh check 或 hmh devices 失败怎么排查？",
       "acceptedAnswer": { "@type": "Answer", "text": "先分四层，不要混成一个安装失败：1. Node >= 22；2. npm list -g @hmharness/cli 与 hmh --help 验证包和入口；3. hmh check 是无模型的 hdc、hvigorw、ohpm、cjpm 工具链探针，缺 hdc、hvigorw 或 ohpm 时先安装或配置 SDK/DevEco CLI 并复跑；4. hmh devices 只看设备可见性，无设备是启动模拟器前的合法状态，不代表 npm 安装失败。cjpm 探针失败是本机工具信号，也不是包安装成功的证明。需要求助时使用 environment_report Issue 模板提交 OS、安装路线、npm list、脱敏 check/devices 输出和第一个卡点，不要提交密钥、cookie、私人路径或设备/账号标识。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmh mcp-serve 默认暴露哪些工具？会不会绕过审批？",
+      "acceptedAnswer": { "@type": "Answer", "text": "hmh mcp-serve 是给 Claude Code、Codex、Cursor 等 MCP 宿主使用的鸿蒙工具箱出口，不是另一个嵌套智能体循环。默认只暴露 harmony_* 域工具，例如构建、装机、日志、签名、API 检索和雷达；run_command、write_file 等通用工具不暴露，因为宿主自己有。可用 HMH_MCP_TOOLS 继续收窄工具面。每次调用由宿主自己的权限系统逐个确认，server 侧破坏性硬墙仍在；--yes 与 approval:auto 是显式扩大授权的例外，不是安全证明。外部调用会写入 insights/mcp-calls.jsonl，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 hmh 会话中运行。" }
     }
   ]
 }
@@ -171,8 +176,8 @@ footer .legal{max-width:760px;margin:18px auto 0;border-top:1px dashed var(--lin
 </div></nav>
 
 <header><div class="wrap">
-  <h1>hmharness 十九问</h1>
-  <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、hmh check 与 devices 首错分流、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案独立成块，AI 搜索引擎可直接摘引；每个说法附证据出处。</p>
+  <h1>hmharness 二十问</h1>
+  <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案独立成块，AI 搜索引擎可直接摘引；每个说法附证据出处。</p>
 </div></header>
 
 <main class="wrap">
@@ -334,6 +339,18 @@ DevEco 或 CLI / SDK 版本:
   </ol>
   <p>需要求助时打开<a href="https://github.com/swsgbl/hmharness/issues/new?template=environment_report.yml">环境 Issue 模板</a>，按字段提交 OS、安装路线、npm list、脱敏 check/devices 输出和第一个卡点；不要粘贴 API key、cookie、私人路径或设备/账号标识。自由讨论仍可用 <a href="https://github.com/swsgbl/hmharness/discussions/4">Discussion #4</a>。</p>
   <p class="src"><b>出处：</b><a href="https://swsgbl.github.io/hmharness/quickstart-matrix.html">Quickstart 验证矩阵</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README quickstart</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/.github/ISSUE_TEMPLATE/environment_report.yml">environment_report.yml</a></p>
+</section>
+
+<section class="qa" id="mcp-serve-boundary">
+  <h2><a class="qn" href="#mcp-serve-boundary">Q20</a><code>hmh mcp-serve</code> 默认暴露哪些工具？会不会绕过审批？</h2>
+  <div class="tldr">不会绕过审批。<code>hmh mcp-serve</code> 是给 MCP 宿主使用的鸿蒙工具箱出口：默认只暴露 <code>harmony_*</code> 域工具，不暴露 <code>run_command</code>、<code>write_file</code> 等通用工具；每次调用由宿主权限系统确认，server 侧硬墙仍在。</div>
+  <ol>
+    <li><b>默认工具面</b>：构建、装机、日志、签名、API 检索、雷达等 <code>harmony_*</code> 域工具；宿主已有的通用命令与文件工具不重复暴露。</li>
+    <li><b>继续收窄</b>：用 <code>HMH_MCP_TOOLS</code> 按需限制工具列表，例如只开放 <code>harmony_build,harmony_ops</code>。</li>
+    <li><b>审批位置</b>：每次调用由 Claude Code、Codex、Cursor 等宿主自己的权限系统逐个确认；server 侧破坏性硬墙仍在。<code>--yes</code> 与 <code>approval:auto</code> 是显式扩大授权，不是安全证明。</li>
+    <li><b>观测边界</b>：外部调用写入 <code>insights/mcp-calls.jsonl</code>，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 <code>hmh</code> 会话中运行。</li>
+  </ol>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「在 Claude Code / Codex 里用（MCP 服务器模式）」</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP MCP server 模式</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-07</a></p>
 </section>
 
 </main>
