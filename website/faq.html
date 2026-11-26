@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0B1E3A">
 <title>hmharness 常见问题 — 零 IDE 开发鸿蒙、命令行打包签名、CI/CD、认知层与自进化真实性</title>
-<meta name="description" content="hmharness 二十问：不用 DevEco Studio 能开发鸿蒙吗？命令行打包签名、CI/CD、hmh check 与 devices 排障、hmh mcp-serve 默认工具面与审批边界、AI 编造鸿蒙 API 怎么防？每个答案附证据链接。">
+<meta name="description" content="hmharness 二十一问：不用 DevEco Studio 能开发鸿蒙吗？命令行打包签名、CI/CD、hmh check 与 devices 排障、hmh mcp-serve 默认工具面与审批边界、代码与密钥的数据边界、AI 编造鸿蒙 API 怎么防？每个答案附证据链接。">
 <link rel="canonical" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="zh-CN" href="https://swsgbl.github.io/hmharness/faq.html">
 <link rel="alternate" hreflang="en" href="https://github.com/swsgbl/hmharness/blob/main/README.en.md">
@@ -136,6 +136,11 @@
       "@type": "Question",
       "name": "hmh mcp-serve 默认暴露哪些工具？会不会绕过审批？",
       "acceptedAnswer": { "@type": "Answer", "text": "hmh mcp-serve 是给 Claude Code、Codex、Cursor 等 MCP 宿主使用的鸿蒙工具箱出口，不是另一个嵌套智能体循环。默认只暴露 harmony_* 域工具，例如构建、装机、日志、签名、API 检索和雷达；run_command、write_file 等通用工具不暴露，因为宿主自己有。可用 HMH_MCP_TOOLS 继续收窄工具面。每次调用由宿主自己的权限系统逐个确认，server 侧破坏性硬墙仍在；--yes 与 approval:auto 是显式扩大授权的例外，不是安全证明。外部调用会写入 insights/mcp-calls.jsonl，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 hmh 会话中运行。" }
+    },
+    {
+      "@type": "Question",
+      "name": "hmharness 会把代码、密钥或日志发给谁？数据边界是什么？",
+      "acceptedAnswer": { "@type": "Answer", "text": "默认会自动发生的出站只有两处：你自己配置的 OpenAI 兼容模型端点（~/.hmharness/config.json 或环境变量 HMH_BASE_URL / HMH_API_KEY / HMH_MODEL；你的内容发往这里），以及启动时向 registry.npmjs.org 的版本检查（只发请求，不带会话内容）。提示词、智能体读到的文件内容、命令输出和设备日志会作为上下文发给该端点，工具输出还会记入本机 HMH_HOME/sessions/ 的会话日志；把 baseUrl 指向本机的 Ollama、LM Studio 或 vLLM，模型调用就不出本机。密钥以明文留在本机 config.json 或环境变量；构建、签名、装机和 hdc 日志在本机执行，签名用的 p12、pem、profile 不上传。只有洞察记录和数据集导出会对任务文本脱敏，会话日志和发给模型的上下文不做这层处理。hmh web start 或 hmh evolve-auto 会启动后台进化守护进程，启动约 30 秒后跑第一轮，之后默认每 6 小时跑一轮模型调用；评审与人标合计满 50 条且厂商支持云端微调时，会把偏好对上传到该厂商并提交训练任务，config.json 设 finetune.auto=false 可关闭。启动检查到新版本会自动升级（tui.autoUpdate=false 退回只提示）；其余出站按功能触发：web_search 把查询词发往 DuckDuckGo，失败时改用 Bing；MCP、web_fetch、ssh_run 访问你配置或批准的目标，ARC-AGI-3 直连 three.arcprize.org。以 v0.23.56（public main 提交 f43724f）为准，packages 源码里没有埋点或使用统计上报。不要把 token、cookie、私人路径贴进提示词、命令输出或 Issue。" }
     }
   ]
 }
@@ -202,8 +207,8 @@ pre code{background:none;padding:0;color:inherit;border-radius:0}
 </div></nav>
 
 <header><div class="wrap">
-  <h1 id="main" tabindex="-1">hmharness 二十问</h1>
-  <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案独立成块，AI 搜索引擎可直接摘引；每个说法附证据出处。</p>
+  <h1 id="main" tabindex="-1">hmharness 二十一问</h1>
+  <p>零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面、代码与密钥的数据边界、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3、手机远程——每个答案独立成块，AI 搜索引擎可直接摘引；每个说法附证据出处。</p>
 </div></header>
 
 <main class="wrap">
@@ -377,6 +382,22 @@ DevEco 或 CLI / SDK 版本:
     <li><b>观测边界</b>：外部调用写入 <code>insights/mcp-calls.jsonl</code>，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 <code>hmh</code> 会话中运行。</li>
   </ol>
   <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/main/README.md">README「在 Claude Code / Codex 里用（MCP 服务器模式）」</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/ROADMAP.md">ROADMAP MCP server 模式</a> · <a href="https://github.com/swsgbl/hmharness/blob/main/docs/DEVLOG.md">DEVLOG 2026-09-07</a></p>
+</section>
+
+<section class="qa" id="data-boundary">
+  <h2><a class="qn" href="#data-boundary">Q21</a>hmharness 会把代码、密钥或日志发给谁？数据边界是什么？</h2>
+  <div class="tldr"><span class="tldr-label">一句话答案</span>默认会自动发生的出站只有两处：你自己配置的模型端点（你的内容发往这里），和启动时向 npm registry 的版本检查（只发请求，不带会话内容）。提示词、智能体读到的文件内容、命令输出和设备日志会作为上下文发给模型端点；密钥、会话记录和技能状态留在本机 <code>HMH_HOME</code>。其余联网都由你启动的功能触发，<code>packages/</code> 源码里没有埋点或使用统计上报。</div>
+  <ol>
+    <li><b>模型端点：你的内容发往这里</b>。对话、视觉、进化、基准和可选的 embedding 检索，都只发往你在 <code>config.json</code> 里配置的厂商端点（单厂商也可以用环境变量 <code>HMH_BASE_URL / HMH_API_KEY / HMH_MODEL</code>）。把 <code>baseUrl</code> 指向本机的 Ollama、LM Studio 或 vLLM，模型调用就不出本机。</li>
+    <li><b>留在本机：密钥与状态</b>。密钥以明文存在 <code>HMH_HOME/config.json</code>（默认 <code>~/.hmharness</code>）或环境变量里，仓库零密钥。会话审计是 <code>HMH_HOME/sessions/</code> 下的追加式 JSONL，外部 MCP 调用记在 <code>insights/mcp-calls.jsonl</code>，记忆、技能和进化日志也都在 <code>HMH_HOME</code>。构建、签名、装机和 hdc 日志由本机工具链执行；签名用的 p12、pem、profile 只以路径交给本机 hapsigntool，不上传，发布版 / AGC 签名仍留在 DevEco。</li>
+    <li><b>后台进化会自动花额度</b>。<code>hmh web start</code> 或 <code>hmh evolve-auto</code> 会启动进化守护进程：启动约 30 秒后跑第一轮，之后默认每 6 小时一轮（同一时间只跑一轮，单轮最长 3 小时），每轮有几十次真实的模型调用和工具运行。评审与人标合计满 50 条、且你配置的厂商支持云端微调时，它会把导出的偏好对（提示与优选 / 否决回答）上传到该厂商并提交训练任务，默认 7 天冷却。在 <code>config.json</code> 里设 <code>finetune.auto=false</code> 可关闭无人值守的自动微调，<code>hmh web stop</code> 会停掉守护进程。</li>
+    <li><b>容易忽略：会进入模型上下文的内容</b>。智能体循环是「模型 ↔ 工具」往返，工具输出占上下文的大头。命令输出里回显的 token、私人路径、设备日志，以及交给视觉模型的截图，都会发给模型端点；工具输出还会记入本地会话日志。签名口令如果作为 <code>harmony_sign</code> 的工具参数传入，同样会经过模型。在同一会话里续聊（<code>hmh resume</code>、TUI、网页会话）时，之前的对话连同工具结果会作为历史重新发给模型端点。只有洞察记录和数据集导出会对任务文本做四类 token 形态的脱敏，会话日志和发给模型的上下文不做这层处理。</li>
+    <li><b>版本检查与其他按功能触发的出站</b>。启动时向 <code>registry.npmjs.org</code> 查询 <code>@hmharness/cli</code> 的最新版本并自动升级（<code>tui.autoUpdate=false</code> 退回只提示）；升级安装启动失败时，会把平台、Node 版本、安装路径和报错文本发给你配置的模型来生成修复命令。<code>web_search</code> 把查询词发往 DuckDuckGo，失败时改用 Bing，请求带桌面浏览器的 User-Agent；MCP 服务器、<code>web_fetch</code>、<code>ssh_run</code> 访问你配置或批准的目标；ARC-AGI-3 环境直连 <code>three.arcprize.org</code>；手机远程的互联网模式经 cloudflared 隧道（隧道程序从 GitHub Releases 下载），Web 端默认只绑定 <code>127.0.0.1</code>；<code>hmh ops</code> 生态雷达只读请求 GitHub、Gitee 等公开 API，<code>hmh ops stats</code> 读 npm 公开下载量；<code>hmh knowledge</code> 只读抓取华为开发者网站的 HarmonyOS 发布说明页。建 Issue / PR / Release 和 <code>ops_notify</code> 通知这类对外发布工具逐次审批。</li>
+    <li><b>会主动读取的本机信息</b>。<code>hmh providers</code> 会只读检查环境变量里的各家 API key、本机回环网关，以及 opencode 配置里的厂商 id、baseURL 和模型名；密钥不会被写进 <code>config.json</code>，加 <code>--scan</code> 写入的只有厂商名、baseUrl 和模型名。</li>
+    <li><b>没有的东西，可以自己核对</b>。以 <code>v0.23.56</code>（提交 <code>f43724f</code>）为准，16 个包的运行时外部依赖只有 <code>qrcode</code> 一个，没有埋点、使用统计或遥测 SDK。<code>packages/</code> 源码里搜到的 telemetry 字样，指的是动作门禁（默认关闭）写在本机轨迹里的记录，和几处「无遥测」的说明；<code>observability</code> 包只有 OpenTelemetry 兼容的本地数据结构，没有导出器；群智经验包默认是本机文件往返，只有你用 <code>hmh cognitive absorb --from=&lt;https-url&gt;</code> 指定地址时才下载。核对方法：读各包 <code>package.json</code> 的依赖，再列出 <code>packages/</code> 源码中全部 <code>https://</code> 主机：除了上面列到的，其余是内置厂商预设的端点、提示信息里的安装与文档链接，以及示例占位地址。</li>
+    <li><b>使用建议</b>。敏感仓库把 <code>baseUrl</code> 指向本地或自有网关；CI 用环境变量注入密钥，不提交 <code>config.json</code>；不要让命令回显密钥；Issue 和 Discussion 里不要贴 token、cookie、私人路径或设备 / 账号标识。数据可以自己管：历史会话可归档或删除（trash 可恢复），<code>hmh cognitive export|purge</code> 导出或清除认知库，<code>hmh state backup|restore</code> 备份与恢复进化状态。</li>
+  </ol>
+  <p class="src"><b>出处：</b><a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/README.md">README「快速开始 / 常用命令」</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/docs/ARCHITECTURE.md">ARCHITECTURE「隔离契约」</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/docs/PROVIDERS.md">PROVIDERS「本地推理」</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/cli/src/evolution-daemon.ts">evolution-daemon.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/cli/src/main.ts">main.ts（auto-finetune 门禁）</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/cli/src/update-check.ts">update-check.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/kernel/src/provider.ts">provider.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/domain-harmony/src/signing.ts">signing.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/kernel/src/session.ts">session.ts</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/agent/src/tools.ts">tools.ts（web_search 引擎顺序）</a> · <a href="https://github.com/swsgbl/hmharness/blob/f43724fa72e2a77b2a754173441591d678af0c5c/packages/evolution/src/insights.ts">insights.ts（脱敏规则）</a>（以上链接固定在 <code>f43724f</code>）</p>
 </section>
 
 </main>

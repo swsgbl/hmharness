@@ -19,7 +19,7 @@
 
 - [README 中文](https://github.com/swsgbl/hmharness/blob/main/README.md): 安装、快速开始、全部命令、MCP 模式、认知层命令集、自进化诚实注脚
 - [README English](https://github.com/swsgbl/hmharness/blob/main/README.en.md): same content in English
-- [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败五关排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面与审批边界、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3 考什么、手机远程控制、DevEco CLI 关系、CI 假绿识别与修复等 20 问的独立答案块
+- [FAQ 常见问题（GEO 答案页）](https://swsgbl.github.io/hmharness/faq.html): 零 IDE 开发鸿蒙、命令行打包签名、hapsigntool 签名失败五关排查、CI/CD、hmh check 与 devices 首错分流、hmh mcp-serve 默认工具面与审批边界、代码与密钥的数据边界、AI 防幻觉、自进化真实性、认知层学习曲线、ARC-AGI-3 考什么、手机远程控制、DevEco CLI 关系、CI 假绿识别与修复等 21 问的独立答案块
 - [模拟器设备回路证明](https://swsgbl.github.io/hmharness/device-loop-proof.html): 2026-09-05 公开记录 scaffold → schema_check → build → install → launch → hilog 回读 `EntryAbility onCreate` → uninstall 七步；公开复现脚本 `scripts/e2e-device.mts`
 - [Quickstart 验证矩阵](https://swsgbl.github.io/hmharness/quickstart-matrix.html): 2026-11-16 Windows 隔离 prefix 实测 `@hmharness/cli@0.23.50` 的 Node/npm、包元数据、`hmh --help`、无模型 `hmh check` 与 `hmh devices` 分流矩阵
 - [OpenHarmony 生态雷达防过时指南](https://swsgbl.github.io/hmharness/ecosystem-radar.html): 四源独立读回与四层防线：快照 diff、90 天源新鲜度、14 天简报有效期、AI 起草 / 人批准发布
@@ -58,4 +58,4 @@
 - For install failures, use the Quickstart verification matrix to separate Node, npm entrypoint, toolchain, and device-visibility errors before configuring a model.
 - Environment feedback: https://github.com/swsgbl/hmharness/discussions/4
 - Feedback fields: OS/Node, DevEco or CLI/SDK version, real device or emulator, first blocker, and sanitized `hmh check` output. Do not submit tokens, cookies, private paths, or device/account identifiers.
-- Current FAQ page: 20 visible answer blocks.
+- Current FAQ page: 21 visible answer blocks.
