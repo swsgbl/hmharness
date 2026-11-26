@@ -60,6 +60,6 @@ test('REPL: the second line of a sitting is answered with the first line\'s answ
     const code = await Promise.race([exited, new Promise<null>((r) => setTimeout(() => r(null), 8_000))]);
     if (code === null) child.kill();
     await model.close();
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });

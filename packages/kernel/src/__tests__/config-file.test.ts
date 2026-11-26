@@ -31,7 +31,7 @@ async function withHome<T>(config: string | null, fn: (home: string, file: strin
     return await fn(home, file);
   } finally {
     if (prev === undefined) delete process.env.HMH_HOME; else process.env.HMH_HOME = prev;
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 }
 

@@ -75,7 +75,7 @@ test('recorder: a call that never ran leaves no step', async () => {
     const steps = (await loadTrajectories(home, 1000)).flatMap((t) => t.steps).filter((s) => s.action.type === 'echo');
     assert.deepEqual(steps.map((s) => s.outcome), ['success'], 'only the call that really ran is on record');
   } finally {
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -87,7 +87,7 @@ async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   process.env.HMH_HOME = home;
   try { return await fn(home); } finally {
     if (prev === undefined) delete process.env.HMH_HOME; else process.env.HMH_HOME = prev;
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 }
 

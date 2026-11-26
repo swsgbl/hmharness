@@ -82,7 +82,7 @@ async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   process.env.HMH_HOME = home;
   try { return await fn(home); } finally {
     if (prev === undefined) delete process.env.HMH_HOME; else process.env.HMH_HOME = prev;
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 }
 

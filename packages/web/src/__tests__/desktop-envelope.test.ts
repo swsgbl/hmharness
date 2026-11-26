@@ -82,11 +82,26 @@ async function startHost(): Promise<Host> {
   });
   if (port === null) {
     child.kill();
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     throw new Error('desktop-host bootstrap failed');
   }
-  void child.on('exit', () => { void rm(home, { recursive: true, force: true }); void fake.close(); });
   return { port, child, home, fake };
+}
+
+/** Stop the host and remove its home INSIDE the test (2026-11-26). The removal
+ *  used to run fire-and-forget from the child's exit handler - after the test
+ *  had ended - and on Windows a recursive removal that starts the moment a
+ *  process exits can meet a file that is still listed (ENOTEMPTY). That failed
+ *  the whole file in CI while both its tests had passed. Awaited here, with
+ *  the retries fs.rm already has for exactly these transient errors. */
+async function stopHost(host: Host): Promise<void> {
+  const gone = host.child.exitCode !== null || host.child.signalCode !== null;
+  const exited = gone ? Promise.resolve() : new Promise<void>((resolve) => host.child.once('exit', () => resolve()));
+  host.child.kill();
+  await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 5000))]);
+  host.fake.closeAllConnections?.();
+  await new Promise<void>((resolve) => host.fake.close(() => resolve()));
+  await rm(host.home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
 /** 订阅 event: hmh 信封流(手工 SSE 解析;可选 Last-Event-ID)。 */
@@ -191,7 +206,7 @@ test('真实任务驱动:run.started → run.failed(provider 402)信封到达 SS
     assert.equal(ids.size, sub.envelopes.length, 'eventId 全局唯一');
     await sub.stop();
   } finally {
-    host.child.kill();
+    await stopHost(host);
   }
 });
 
@@ -215,6 +230,6 @@ test('信封走重放环:中途断线后 Last-Event-ID 补齐终态', async () =
     assert.ok(done, `补拉拿到终态(收到:${sub2.envelopes.map((e) => e.kind).join(',') || '无'})`);
     await sub2.stop();
   } finally {
-    host.child.kill();
+    await stopHost(host);
   }
 });
