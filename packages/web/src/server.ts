@@ -253,7 +253,7 @@ export async function startServer(opts: {
   // cwd isolation (no global chdir), crash containment, daemon death does
   // not kill the run. busy/queue/approval/inject/breaker are ALL per
   // session now; the old global single slot is gone.
-  interface QueuedItem { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string; images?: string[] }
+  interface QueuedItem { text: string; mode: string; yes: boolean; fresh: boolean; sessionId?: string; images?: string[]; ask?: boolean }
   interface SessionExec {
     busy: boolean;
     queue: QueuedItem[];
@@ -503,6 +503,8 @@ export async function startServer(opts: {
         task: item.text,
         mode: item.mode,
         yes: item.yes,
+        // "the caller said ask": makes the run ask even under config auto
+        ...(item.ask === true ? { ask: true } : {}),
         fresh: item.fresh,
         sessionId: item.fresh ? sid : thread.rolloutId ?? sid,
         cwd: thread.cwd,
@@ -1111,12 +1113,15 @@ export async function startServer(opts: {
         // what runs, queues, and echoes in the 'busy' SSE event
         const composed = prefix + imagePrefix + text;
         const mode = body.mode === 'auto' || body.mode === 'yolo' ? body.mode : body.yes === true ? 'auto' : 'ask';
+        // ask on purpose (the web UI's select): outranks a saved config on auto. Only
+        // a literal mode "ask" counts - a caller that sent nothing is left on the old rule.
+        const asksExplicitly = body.mode === 'ask' && body.yes !== true;
         // sessionId routes the task into ITS session's thread (deepseek-harness
         // semantics): a follow-up in a history view resumes that rollout, a
         // fresh session starts clean. The thread state lives server-side; the
         // browser view is just a projection of it.
         const sidIn = typeof (body as { sessionId?: unknown }).sessionId === 'string' ? String((body as { sessionId?: unknown }).sessionId).slice(0, 80) : undefined;
-        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn, ...(nativeImages.length ? { images: nativeImages } : {}) };
+        const item = { text: composed, mode, yes: body.yes === true, fresh: body.fresh === true, sessionId: sidIn, ...(asksExplicitly ? { ask: true } : {}), ...(nativeImages.length ? { images: nativeImages } : {}) };
         // W15: queueing is PER SESSION. A busy session queues the follow-up;
         // every OTHER session still starts immediately - sessions never wait
         // on each other (dsh parity). A session without an id gets a fresh

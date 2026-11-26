@@ -56,7 +56,7 @@ interface FakeEl {
   removeAttribute(k: string): void;
 }
 
-function fakePage(overlayIds: string[]): { doc: unknown; regions: FakeEl[]; overlays: FakeEl[] } {
+function fakePage(overlayIds: string[]): { doc: unknown; regions: FakeEl[]; overlays: FakeEl[]; body: FakeEl } {
   const mk = (id: string): FakeEl => {
     const on = new Set<string>();
     const el: FakeEl = {
@@ -67,10 +67,12 @@ function fakePage(overlayIds: string[]): { doc: unknown; regions: FakeEl[]; over
     };
     return el;
   };
-  const regions = ['#side', '#main', '#rightbar'].map(mk);
+  // element ids carry no '#': the drawer rule compares r.id with 'side'
+  const regions = ['side', 'main', 'rightbar'].map(mk);
   const overlays = overlayIds.map(mk);
-  const doc = { querySelectorAll: (sel: string) => (sel === '#side, #main, #rightbar' ? regions : overlays) };
-  return { doc, regions, overlays };
+  const body = mk('body');
+  const doc = { body, querySelectorAll: (sel: string) => (sel === '#side, #main, #rightbar' ? regions : overlays) };
+  return { doc, regions, overlays, body };
 }
 
 /** The function as the page receives it: cut from the serialized bundle, not the module —
@@ -128,10 +130,11 @@ test('modal overlays: the class observer re-derives the inert state on its own (
   const prev = globalThis.MutationObserver;
   (globalThis as any).MutationObserver = FakeObserver;
   try {
-    const { doc, regions, overlays } = fakePage(['#wspick', '#cmdpal', '#pairmod']);
+    const { doc, regions, overlays, body } = fakePage(['#wspick', '#cmdpal', '#pairmod']);
     const h = serialized('wireModalInert')(doc);
     const mo = FakeObserver.last!;
-    assert.deepEqual(mo.targets, overlays, 'every overlay is observed');
+    assert.deepEqual(mo.targets.slice(0, 3), overlays, 'every overlay is observed');
+    assert.equal(mo.targets[3], body, 'and the body (its class carries the phone drawer)');
     overlays[2].classList.add('on');
     mo.fire();
     assert.ok(regions.every((r) => r.attrs.inert === ''), 'opening anywhere is picked up');
@@ -146,8 +149,59 @@ test('modal overlays: the class observer re-derives the inert state on its own (
   }
 });
 
+test('phone drawer: while it is open only the page BEHIND it is inert - the sidebar stays live', () => {
+  const prev = globalThis.MutationObserver;
+  delete (globalThis as any).MutationObserver;
+  try {
+    const { doc, regions, body } = fakePage(['#wspick', '#cmdpal', '#pairmod']);
+    const h = serialized('wireModalInert')(doc);
+    const inertNow = () => regions.filter((r) => r.attrs.inert === '').map((r) => r.id);
+    assert.deepEqual(inertNow(), [], 'closed: nothing is inert');
+    body.classList.add('mobside');
+    h.sync();
+    assert.deepEqual(inertNow(), ['main', 'rightbar'], 'open: the page behind the backdrop, never the drawer itself');
+    body.classList.delete('mobside');
+    h.sync();
+    assert.deepEqual(inertNow(), [], 'closed again: the page is live');
+  } finally {
+    if (prev) (globalThis as any).MutationObserver = prev;
+  }
+});
+
+test('phone drawer behaves like a dialog: focus moves in and out, backdrop and Escape close it, widening folds it', () => {
+  const shell = part('shell.ts');
+  assert.ok(/function setDrawer\(open\) \{[^}]*classList\.toggle\('mobside', open\);\s*syncModals\(\);/.test(shell), 'syncModals() runs right after the class changes, before any focus move');
+  assert.ok(shell.includes("if (open) {\n      document.getElementById('newbtn').focus();") || /if \(open\) \{\s*document\.getElementById\('newbtn'\)\.focus\(\);/.test(shell), 'focus moves into the drawer when it opens');
+  assert.ok(shell.includes("document.getElementById('sideburger').focus();"), 'and back to the burger when it closes');
+  assert.ok(/document\.addEventListener\('click', function \(ev\) \{[^}]*mobside[^}]*t\.closest\('#side'\) \|\| t\.closest\('#sideburger'\)/.test(shell), 'a tap outside closes it; the burger\'s own click is exempt');
+  assert.ok(shell.includes("else if (document.body.classList.contains('mobside')) setDrawer(false);"), 'Escape closes it');
+  assert.ok(shell.includes("matchMedia('(max-width: 640px)')") && shell.includes('if (!q.matches) setDrawer(false);'), 'widening past the phone layout folds it away');
+});
+
+test('phone drawer: a click that opens it does not close it again (the burger click bubbles to the document)', () => {
+  // the handler order is target first (opens), then document (would close): the exempt
+  // clause is what keeps the drawer open - pin its exact shape
+  const shell = part('shell.ts');
+  const handler = shell.slice(shell.indexOf("document.addEventListener('click', function (ev) {\n    if (!document.body.classList.contains('mobside')) return;"));
+  assert.ok(handler.indexOf("t.closest('#sideburger')") < handler.indexOf('setDrawer(false);'), 'the burger is exempt BEFORE the close call');
+});
+
+test('lists and notices: file-tree rows are buttons, the queued notice renders once, the turn card names the task that ran', () => {
+  const dock = part('dock.ts'), sse = part('sse.ts'), composer = part('composer.ts');
+  assert.ok(/var row = document\.createElement\('button'\);\s*row\.type = 'button';\s*row\.className = 'frow ' \+ kind;/.test(dock), 'file-tree rows are native buttons');
+  assert.ok(dock.includes("row.setAttribute('aria-expanded',") && dock.includes("ic.setAttribute('aria-hidden', 'true');"), 'folders announce folding, the icon is decorative');
+  assert.equal((sse.match(/function noteQueued\(/g) || []).length, 1, 'one queued-notice function');
+  assert.ok(sse.includes('noteQueued(String(d.task || \'\'), d.position);') && composer.includes('noteQueued(text, res.d.position);'), 'both the SSE event and the POST response go through it');
+  assert.equal(((sse + composer).match(/el\('div', 'queued'/g) || []).length, 1, 'exactly one place renders the notice');
+  assert.ok(sse.includes('if (v.runningTask) v.lastTask = v.runningTask;') && sse.includes('v.runningTask = d.task;'), 'the turn card and regenerate button name the task that ran, not the queued one');
+  const core = part('core.ts');
+  assert.ok(/if \(w\.id === curWs\.id\) \{\s*x\.disabled = true;\s*x\.title = L \? L\.wsActive : 'active workspace';/.test(part('workspaces.ts')), 'the active workspace\'s remove button is disabled and says why');
+  assert.ok(core.includes("wsActive:'当前工作区,不能移除(先切换到别的工作区)'") && core.includes("wsActive:'active workspace - switch away before removing'"), 'in both languages');
+});
+
 test('modal overlays: the wiring targets exactly the three overlays and the three regions of the page', () => {
-  const wireSrc = uiLiteSource().slice(uiLiteSource().indexOf('function wireModalInert('));
+  const src = lf(uiLiteSource());
+  const wireSrc = src.slice(src.indexOf('function wireModalInert('));
   // quote-agnostic: tsx re-prints the literals with double quotes, strip-types keeps them
   const q = (sel: string): RegExp => new RegExp('querySelectorAll\\(["\u0027]' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\u0027]\\)');
   assert.ok(q('#side, #main, #rightbar').test(wireSrc), 'regions selector');

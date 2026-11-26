@@ -86,6 +86,8 @@ export const SSE = `  /* ---- remote-control token plumbing (2026-09-28): the fi
     // echo the running task as a user bubble so OTHER tabs see it too; the
     // submitting tab already painted it in sendTask (dedup within 3s)
     if (d.busy && d.task && v) {
+      // what is running in THIS session, as announced by the server
+      v.runningTask = d.task;
       v.lastTask = d.task;
       var now = Date.now();
       if (!(d.task === echoedTask && now - echoedAt < 3000)) {
@@ -95,9 +97,19 @@ export const SSE = `  /* ---- remote-control token plumbing (2026-09-28): the fi
       }
     }
   });
+  // One notice per queued task. The server broadcasts the 'queued' event AND answers
+  // the POST with the same fact; both used to render, so "已排队 #1 — …" showed twice.
+  var queuedNoteAt = {};
+  function noteQueued(task, position) {
+    var now = Date.now();
+    if (queuedNoteAt[task] && now - queuedNoteAt[task] < 3000) return;
+    queuedNoteAt[task] = now;
+    el('div', 'queued', (L.queuedHint || 'queued') + ' #' + position + ' \\u2014 ' + task, true);
+  }
   es.addEventListener('queued', function (e) {
     var d = JSON.parse(e.data);
-    el('div', 'queued', (L.queuedHint || 'queued') + ' #' + d.position + ' \u2014 ' + d.task, true);
+    route(d.sessionId); // the notice lands in the session that owns the queue
+    noteQueued(String(d.task || ''), d.position);
   });
   es.addEventListener('queue', function (e) {
     var d = JSON.parse(e.data);
@@ -307,6 +319,11 @@ export const SSE = `  /* ---- remote-control token plumbing (2026-09-28): the fi
     var v = route(d.sessionId);
     if (!v) return;
     flushStream();
+    // the turn card and the regenerate button describe the task that JUST ran. A
+    // follow-up queued while it ran had already replaced lastTask at submit time, so
+    // both used to name the queued task (until 0.23.54).
+    if (v.runningTask) v.lastTask = v.runningTask;
+    v.runningTask = '';
     window.__lastTaskOk = true; // run-state 2.0 terminal flash source
     closeToolGroup(v); // settle any trailing tool run into its folded group
     // Turn Card (UX pack 03: Request -> Plan -> Actions -> Verification ->

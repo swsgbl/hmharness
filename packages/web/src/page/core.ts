@@ -42,7 +42,7 @@ export const CORE = `(function () {
       // per-session render state (was global - the actual pollution bug)
       seq: 0, toolRegistry: {}, curBlock: null, curKind: null,
       pendingToolRow: null, parCount: 0, parBox: null, groupNames: {},
-      deliverables: [], lastTask: '', lastAssistantText: '', planText: '',
+      deliverables: [], lastTask: '', runningTask: '', lastAssistantText: '', planText: '',
     };
   }
   function viewFor(sid, create) {
@@ -114,7 +114,7 @@ export const CORE = `(function () {
           sesRename:'重命名', sesExport:'导出会话为 Markdown 文件', sesArchive:'归档(移入 archive,可查不占列表)', sesDelete:'删除(移入 trash,可恢复)', sesConfirmDel:'删除该会话?(文件移入 sessions/trash,可手动恢复)',
           wsAdd:'＋ 添加工作区', wsOpen:'在文件管理器中打开工作区', wsName:'名称(默认目录名)', wsPath:'或直接输入绝对路径, 回车前往', wsOk:'添加',
           pickTitle:'选择工作区目录', thisPC:'此电脑', cancel:'取消', up:'上一级',
-          wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
+          wsSwitch:'切换工作区', wsRemove:'移除注册(不删目录)', wsActive:'当前工作区,不能移除(先切换到别的工作区)', curSessions:'本工作区会话', otherSessions:'其他 / 未分组',
            navSet:'设置', navLabel:'RL 标注', labelTitle:'RL 奖励标注', labelHint:'对照每张卡片的【任务】与【回答】打分：★5=回答完全正确完成；★3=部分正确或不确定；★1=错误/没做/答非所问。人工评分用于校准奖励信号——RL 就绪门最后一个条件(需 100 条)。', labelDone:'✓ 已达 100 条,RL 门最后一格解锁!', labelEmpty:'(没有待标注的会话了——先跑几个任务再回来)', viewSet:'设置', setTitle:'设置', setModelTitle:'模型 / Providers', setPresetsTitle:'内置预设（一键添加）', setGeneralTitle:'常规',
            setLocaleLabel:'语言 locale', setApprovalLabel:'默认审批模式', setEvolveLabel:'自动进化间隔 autoEvolveEvery（0=关闭）', setPatchLabel:'代码级自进化 autoPatch（危险，默认关）', setSave:'保存', setSaved:'已保存 ✓', setFailed:'保存失败',
            provAdd:'＋ 新增 provider', provEdit:'编辑', provDelete:'删除', provSave:'保存', provCancel:'取消', provApiKeySet:'密钥已设置', provApiKeyNone:'未设置密钥', provAddPreset:'添加',
@@ -149,7 +149,7 @@ export const CORE = `(function () {
           sesRename:'Rename', sesExport:'export session as a Markdown file', sesArchive:'Archive (moves to archive/, out of the list)', sesDelete:'Delete (moves to trash/, recoverable)', sesConfirmDel:'Delete this session? (moved to sessions/trash, manually recoverable)',
           wsAdd:'＋ add workspace', wsOpen:'open the workspace in the file manager', wsName:'name (defaults to folder name)', wsPath:'or type an absolute path and press Enter', wsOk:'Add',
           pickTitle:'Choose workspace folder', thisPC:'This PC', cancel:'Cancel', up:'Up one level',
-          wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', curSessions:'this workspace', otherSessions:'other / ungrouped',
+          wsSwitch:'switch workspace', wsRemove:'unregister (keeps the folder)', wsActive:'active workspace - switch away before removing', curSessions:'this workspace', otherSessions:'other / ungrouped',
            navSet:'Settings', navLabel:'RL Labels', labelTitle:'RL Reward Labels', labelHint:'Judge each card by TASK vs ANSWER: ★5 = correct and complete; ★3 = partial or unsure; ★1 = wrong, missing, off-topic. Human scores calibrate the reward signal - the last RL readiness gate condition (100 needed).', labelDone:'\u2713 100 reached - the last RL gate slot unlocks!', labelEmpty:'(no sessions to label - run a few tasks first)', viewSet:'Settings', setTitle:'Settings', setModelTitle:'Models / Providers', setPresetsTitle:'Built-in presets (one-click add)', setGeneralTitle:'General',
            setLocaleLabel:'locale', setApprovalLabel:'default approval mode', setEvolveLabel:'auto-evolve every N insights (0=off)', setPatchLabel:'code-level self-evolution autoPatch (dangerous, off by default)', setSave:'Save', setSaved:'Saved ✓', setFailed:'Save failed',
            provAdd:'＋ add provider', provEdit:'Edit', provDelete:'Delete', provSave:'Save', provCancel:'Cancel', provApiKeySet:'api key set', provApiKeyNone:'no api key', provAddPreset:'Add',
@@ -178,43 +178,54 @@ export const CORE = `(function () {
    *  Japanese/Korean input). isComposing covers Chrome and Firefox; Safari delivers that
    *  confirming keydown after compositionend with keyCode 229, so that is checked too. */
   function enterConfirmed(e) { return e.key === 'Enter' && !e.isComposing && e.keyCode !== 229; }
+  // Every write below is null-safe. Parts of the page disappear while it is open: the
+  // welcome card's caption ids go away with the first "new session", and the detail
+  // pane's #dempty goes away the first time a tool row is clicked. One unguarded write
+  // then threw from inside renderState, and from that moment the tab dropped EVERY later
+  // state update - queue, busy, model, theme, workspace switch, the session list.
+  function txt(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
+  function ph(id, value) { var el = document.getElementById(id); if (el) el.placeholder = value; }
+  function attr(id, name, value) { var el = document.getElementById(id); if (el) el.setAttribute(name, value); }
   function setLabels(loc) {
     L = LABELS[loc === 'en' ? 'en' : 'zh'];
     document.title = L.title;
     // the page language follows the locale: assistive tech picks its voice from the html lang
     document.documentElement.lang = L.localeKey;
-    document.getElementById('app-title').textContent = L.title;
+    txt('app-title', L.title);
     updateSendBtn();
-    document.getElementById('ap-yes').textContent = L.approve;
-    document.getElementById('ap-no').textContent = L.deny;
-    document.getElementById('approval-req-label').textContent = L.approvalReq;
-    document.getElementById('clear').textContent = L.clear;
-    document.getElementById('input').placeholder = L.placeholder;
-    document.getElementById('new-label').textContent = L.newLabel;
-    document.getElementById('search').placeholder = L.searchPh;
-    document.getElementById('skills-label').textContent = L.skillsN;
-    document.getElementById('empty-title').textContent = L.emptyTitle;
-    document.getElementById('empty-sub').textContent = L.emptySub;
-    document.getElementById('ph-sessions').textContent = L.sessions;
-    document.getElementById('dempty').textContent = L.dempty;
-    document.getElementById('locale-chip').textContent = loc || 'zh';
-    document.getElementById('mode').options[0].text = L.ask;
-    document.getElementById('mode').options[1].text = L.auto;
-    document.getElementById('mode').options[2].text = L.modeYolo;
-    document.getElementById('ws-label').textContent = L.ws;
-    document.getElementById('board-title').textContent = L.viewBoard;
-    document.getElementById('dev-title').textContent = L.viewDev;
-    document.getElementById('sk-title').textContent = L.viewSk;
-    document.getElementById('board-refresh').textContent = '\\u21BB ' + L.refresh;
-    document.getElementById('dev-refresh').textContent = '\\u21BB ' + L.refresh;
-    document.getElementById('ph-sessions').textContent = L.curSessions;
-    document.getElementById('ph-other').textContent = L.otherSessions;
-    document.getElementById('ws-add').textContent = L.wsAdd;
-    document.getElementById('wsp-title').textContent = L.pickTitle;
-    document.getElementById('wsp-path').placeholder = L.wsPath;
-    document.getElementById('wsp-name').placeholder = L.wsName;
-    document.getElementById('wsp-cancel').textContent = L.cancel;
-    document.getElementById('wsp-ok').textContent = L.wsOk;
+    txt('ap-yes', L.approve);
+    txt('ap-no', L.deny);
+    txt('approval-req-label', L.approvalReq);
+    txt('clear', L.clear);
+    ph('input', L.placeholder);
+    txt('new-label', L.newLabel);
+    ph('search', L.searchPh);
+    txt('skills-label', L.skillsN);
+    txt('empty-title', L.emptyTitle);
+    txt('empty-sub', L.emptySub);
+    txt('ph-sessions', L.sessions);
+    txt('dempty', L.dempty);
+    txt('locale-chip', loc || 'zh');
+    var modeSel = document.getElementById('mode');
+    if (modeSel && modeSel.options) {
+      if (modeSel.options[0]) modeSel.options[0].text = L.ask;
+      if (modeSel.options[1]) modeSel.options[1].text = L.auto;
+      if (modeSel.options[2]) modeSel.options[2].text = L.modeYolo;
+    }
+    txt('ws-label', L.ws);
+    txt('board-title', L.viewBoard);
+    txt('dev-title', L.viewDev);
+    txt('sk-title', L.viewSk);
+    txt('board-refresh', '\u21BB ' + L.refresh);
+    txt('dev-refresh', '\u21BB ' + L.refresh);
+    txt('ph-sessions', L.curSessions);
+    txt('ph-other', L.otherSessions);
+    txt('ws-add', L.wsAdd);
+    txt('wsp-title', L.pickTitle);
+    ph('wsp-path', L.wsPath);
+    ph('wsp-name', L.wsName);
+    txt('wsp-cancel', L.cancel);
+    txt('wsp-ok', L.wsOk);
     labelled('input', L.a11yInput);
     labelled('search', L.searchPh);
     labelled('goal-input', L.a11yGoal);
@@ -224,10 +235,11 @@ export const CORE = `(function () {
     labelled('cmdpal', L.a11yCmdPal);
     labelled('cmdpal-in', L.a11yCmdPalIn);
     labelled('rightbar', L.a11yDock);
-    document.querySelector('#rtabs').setAttribute('aria-label', L.a11yTabs);
-    document.querySelector('#side nav').setAttribute('aria-label', L.a11yNav);
+    attr('rtabs', 'aria-label', L.a11yTabs);
+    var sideNav = document.querySelector('#side nav');
+    if (sideNav) sideNav.setAttribute('aria-label', L.a11yNav);
     // visible text ("zh") first, the action after it
-    document.getElementById('locale-chip').setAttribute('aria-label', (loc || 'zh') + ' · ' + L.a11yLocale);
+    attr('locale-chip', 'aria-label', (loc || 'zh') + ' · ' + L.a11yLocale);
     named('ws-new', L.pickTitle);
     named('ws-open', L.wsOpen);
     named('wscur', L.wsSwitch);
@@ -242,34 +254,34 @@ export const CORE = `(function () {
     named('goal-clear', L.a11yGoalClear);
     named('wsp-close', L.a11yClose);
     named('collapse', document.body.classList.contains('sidemin') ? L.a11yExpand : L.a11yCollapse);
-    // the model chip is named by the model it shows; the action is its tooltip
-    document.getElementById('model').title = L.a11yModel;
+    // the model chip is named by the model it shows; the action is its tooltip only
+    var modelChip = document.getElementById('model');
+    if (modelChip) modelChip.title = L.a11yModel;
     var navNames = { chat:L.navChat, board:L.navBoard, cognitive:L.navCog, devices:L.navDev, ssh:L.navSsh, skills:L.navSk, settings:L.navSet, label:L.navLabel };
     Array.prototype.forEach.call(document.querySelectorAll('.nav'), function (n) {
-      var txt = n.querySelector('.txt');
-      if (txt) txt.textContent = navNames[n.getAttribute('data-view')] || '';
+      var t = n.querySelector('.txt');
+      if (t) t.textContent = navNames[n.getAttribute('data-view')] || '';
     });
-    document.getElementById('viewchip').textContent =
-      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[curView] || curView;
+    txt('viewchip',
+      ({ chat:L.viewChat, board:L.viewBoard, devices:L.viewDev, ssh:L.viewSsh, skills:L.viewSk, settings:L.viewSet })[curView] || curView);
     // settings view chrome
-    document.getElementById('set-title').textContent = L.viewSet;
-    document.getElementById('set-model-title').textContent = L.setModelTitle;
-    document.getElementById('set-presets-title').textContent = L.setPresetsTitle;
-    document.getElementById('set-general-title').textContent = L.setGeneralTitle;
-    document.getElementById('set-locale-label').textContent = L.setLocaleLabel;
-    document.getElementById('set-approval-label').textContent = L.setApprovalLabel;
-    document.getElementById('set-evolve-label').textContent = L.setEvolveLabel;
-    document.getElementById('set-patch-label').textContent = L.setPatchLabel;
-    document.getElementById('set-save').textContent = L.setSave;
-    document.getElementById('prov-add').textContent = L.provAdd;
-    document.getElementById('rtab-detail').textContent = L.rtabDetail;
-    document.getElementById('rtab-files').textContent = L.rtabFiles;
-    document.getElementById('rtab-preview').textContent = L.rtabPreview;
+    txt('set-title', L.viewSet);
+    txt('set-model-title', L.setModelTitle);
+    txt('set-presets-title', L.setPresetsTitle);
+    txt('set-general-title', L.setGeneralTitle);
+    txt('set-locale-label', L.setLocaleLabel);
+    txt('set-approval-label', L.setApprovalLabel);
+    txt('set-evolve-label', L.setEvolveLabel);
+    txt('set-patch-label', L.setPatchLabel);
+    txt('set-save', L.setSave);
+    txt('prov-add', L.provAdd);
+    txt('rtab-detail', L.rtabDetail);
+    txt('rtab-files', L.rtabFiles);
+    txt('rtab-preview', L.rtabPreview);
     named('rcollapse', L.rcollapse);
     named('rclose', L.rclose);
     var pvh = document.querySelector('#pview .hint');
     if (pvh) pvh.textContent = L.pvHint;
-    if (document.getElementById('dempty')) document.getElementById('dempty').textContent = L.dempty;
   }
 
   /* ---- view switching / sidebar collapse ---- */

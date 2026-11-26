@@ -51,14 +51,39 @@ export const SHELL = `  // ---- sidebar actions ----
   wireExamples();
 
   // mobile drawer (docx P1 #10): hamburger toggles the sidebar overlay; picking
-  // a session or an example auto-closes it so the chat fills the phone screen
-  document.getElementById('sideburger').onclick = function () {
-    document.body.classList.toggle('mobside');
-  };
+  // a session or an example auto-closes it so the chat fills the phone screen.
+  // It behaves like a dialog: the page behind it is inert (wireModalInert watches
+  // the body class), focus moves in on open and back to the burger on close, and
+  // the backdrop or Escape closes it. Until 0.23.54 Tab walked the page behind
+  // the backdrop and a tap there hit whatever was underneath.
+  function setDrawer(open) {
+    document.body.classList.toggle('mobside', open);
+    syncModals(); // focus moves right after: the regions must be live again first
+    if (open) {
+      document.getElementById('newbtn').focus();
+    } else if (document.activeElement && document.getElementById('side').contains(document.activeElement)) {
+      document.getElementById('sideburger').focus();
+    }
+  }
+  document.getElementById('sideburger').onclick = function () { setDrawer(!document.body.classList.contains('mobside')); };
   document.getElementById('side').addEventListener('click', function (ev) {
     var s = ev.target.closest && ev.target.closest('.sess');
-    if (s && document.body.classList.contains('mobside')) document.body.classList.remove('mobside');
+    if (s && document.body.classList.contains('mobside')) setDrawer(false);
   });
+  // a tap anywhere outside the drawer (the backdrop: inert content passes it up) closes it.
+  // The burger's own click is exempt: it opens the drawer and then bubbles here.
+  document.addEventListener('click', function (ev) {
+    if (!document.body.classList.contains('mobside')) return;
+    var t = ev.target;
+    if (t && t.closest && (t.closest('#side') || t.closest('#sideburger'))) return;
+    setDrawer(false);
+  });
+  // the drawer only exists up to 640px: widen the window past that and it folds away
+  try {
+    var narrow = matchMedia('(max-width: 640px)');
+    var onWidth = function (q) { if (!q.matches) setDrawer(false); };
+    if (narrow.addEventListener) narrow.addEventListener('change', onWidth);
+  } catch (e) { /* no matchMedia: the burger still closes it */ }
 
   /* ---- phone pairing (2026-09-28, DSH Desktop pattern): topbar 📱 opens a
      modal; WiFi tab QRs the one-time /pair?token link (scan = connected,
@@ -285,6 +310,7 @@ export const SHELL = `  // ---- sidebar actions ----
       if (palOpen) closeCmdPal();
       else if (pel('wspick').classList.contains('on')) closePick();
       else if (pel('pairmod').classList.contains('on')) closePairModal();
+      else if (document.body.classList.contains('mobside')) setDrawer(false);
     }
   });
 

@@ -113,9 +113,13 @@ export async function handleFilesystemRoute(
       json(res, 400, { error: 'cannot delete the active workspace' });
       return true;
     }
-    setWsItems(wsItems.filter((w) => w.id !== body.id)); // was: wsItems = wsItems.filter(...)
+    // the filtered list is a NEW array: hand the same one to the server and to the
+    // caller. Until 0.23.54 the reply carried the old one, so the page's dropdown kept
+    // showing a workspace that was already gone until the next reload.
+    const next = wsItems.filter((w) => w.id !== body.id);
+    setWsItems(next); // was: wsItems = wsItems.filter(...)
     await saveWorkspaces();
-    json(res, 200, { ok: true, current: wsCurrent, items: wsItems });
+    json(res, 200, { ok: true, current: wsCurrent, items: next });
     return true;
   }
   if (req.method === 'GET' && url.pathname === '/api/fs') {

@@ -8,7 +8,7 @@
  * hmharness capability set, with a CONVERSATIONAL approval gate for the
  * dangerous ones: the model proposes, the user types 「确认」).
  */
-import { loadConfig, resolveProvider, chat, type ChatMessage, type ProviderConfig } from '@hmharness/kernel';
+import { loadConfig, resolveProvider, chat, sanitizeToolCalls, type ChatMessage, type ProviderConfig } from '@hmharness/kernel';
 import { formatPageSnapshot, summarizePage } from '@hmharness/extension';
 import type { ChatTurnInput, PageAct } from '@hmharness/extension';
 
@@ -240,20 +240,36 @@ export async function runChatTurn(
     if (outOfTime) step('已达单段时限,收尾汇报…');
     step(`第 ${round + 1} 轮思考中…(已用 ${Math.round((Date.now() - t0) / 1000)}s)`);
     const res = await chatImpl(provider, messages, last ? [] : [...tools], { timeoutMs: 120_000, retry: { attempts: 2 } });
+    // why the model stopped: 'length' means the output cap CUT the reply or a
+    // tool call's JSON mid-way, 'content_filter' an empty reply by design
+    const cut = res.finishReason === 'length';
     const calls = last ? [] : res.message.tool_calls ?? [];
     if (!calls.length) {
-      const text = res.message.content?.trim() || '(模型返回了空回复)';
+      const text = res.message.content?.trim();
+      if (!text) {
+        // "the model returned an empty reply" sends the user looking for a bug that is not there
+        if (res.finishReason === 'content_filter') return '模型供应商以内容安全为由中止了本次回复(content_filter),没有返回内容。换个说法再试一次。';
+        return '(模型返回了空回复)';
+      }
       // AUTONOMOUS CONTINUATION (round 49): the task is not done, the round
       // budget is — the panel auto-sends 「继续」 when it sees this sentinel,
-      // so the user hands over a task and gets it finished, no babysitting
-      return last ? text + '\n[[hmh:auto-continue]]' : text;
+      // so the user hands over a task and gets it finished, no babysitting.
+      // A reply the output cap severed joins it: a cut-off sentence is not a finished answer either.
+      return last || cut ? text + '\n[[hmh:auto-continue]]' : text;
     }
     step(`第 ${round + 1} 轮: ${calls.map((c) => c.function.name).join(', ')}`);
-    messages.push(res.message);
+    // the wire-boundary copy: arguments the output cap severed must not re-enter the
+    // next request raw - every strict provider 400s it (same rule as the main loop;
+    // the tool result below tells the model what happened)
+    messages.push({ ...res.message, tool_calls: sanitizeToolCalls(calls) });
     for (const call of calls) {
       let result: string;
+      // the parse is kept apart from the dispatch: only a PARSE failure can be the output cap's doing
+      let args: Record<string, unknown> = {};
+      let parseError: unknown = null;
+      try { args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>; } catch (err) { parseError = err; }
       try {
-        const args = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>;
+        if (parseError) throw parseError;
         if (pageFails >= 3 && (name => name === 'page_read' || name === 'page_act' || name === 'page_goto')(call.function.name)) {
           result = JSON.stringify({ ok: false, error: '页面通道连续失败(扩展断连?)——已熔断。请停止页面操作:基于已有信息回答,或让用户重连扩展后重试。' });
         } else {
@@ -262,7 +278,12 @@ export async function runChatTurn(
           else if (/^page_/.test(call.function.name)) pageFails = 0;
         }
       } catch (err) {
-        result = JSON.stringify({ ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 200) });
+        // arguments the output cap severed (finish_reason 'length'): the bare parse
+        // error reads as "be more careful", and the model repeats the same
+        // oversized call - name the real limit instead
+        result = parseError && cut
+          ? JSON.stringify({ ok: false, error: `模型单次输出长度已到上限,${call.function.name} 的参数在写完之前被截断。请大幅缩短参数(长文件分几次写)后重试。` })
+          : JSON.stringify({ ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 200) });
         if (/^page_/.test(call.function.name)) pageFails++;
       }
       messages.push({ role: 'tool', tool_call_id: call.id, content: result });

@@ -207,6 +207,10 @@ export interface Strings {
   webNotRunning: string;
   webRunning: (pid: number, port: number) => string;
   tuiWebLinked: (port: number) => string;
+  /** the evolution daemon rides with the web one: `web stop` stops it, `web status` reports it */
+  evoStopped: string;
+  evoRunning: (pid: number) => string;
+  evoNotRunning: string;
 }
 
 const zh: Strings = {
@@ -378,6 +382,9 @@ const zh: Strings = {
   webNotRunning: 'hmh web 未在运行',
   webRunning: (pid, port) => `hmh web 运行中 (pid ${pid}) → http://127.0.0.1:${port}`,
   tuiWebLinked: (port) => `网页端已就绪 → http://127.0.0.1:${port}（本对话可在浏览器继续;hmh web stop 停止）`,
+  evoStopped: '后台进化守护已停止(hmh web start 会重新拉起)',
+  evoRunning: (pid) => `后台进化守护运行中 (pid ${pid}) · hmh web stop 一并停止`,
+  evoNotRunning: '后台进化守护未在运行',
 };
 
 const en: Strings = {
@@ -549,6 +556,9 @@ const en: Strings = {
   webNotRunning: 'hmh web is not running',
   webRunning: (pid, port) => `hmh web running (pid ${pid}) -> http://127.0.0.1:${port}`,
   tuiWebLinked: (port) => `web UI ready -> http://127.0.0.1:${port} (this conversation continues in the browser; hmh web stop to stop)`,
+  evoStopped: 'evolution daemon stopped (hmh web start brings it back)',
+  evoRunning: (pid) => `evolution daemon running (pid ${pid}) · hmh web stop stops it too`,
+  evoNotRunning: 'evolution daemon is not running',
 };
 
 export function strings(locale: Locale = 'zh'): Strings {

@@ -81,3 +81,39 @@ test('filesystem routes served through the extracted module', async () => {
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('workspaces delete: the reply lists the workspaces that remain (the page renders the reply)', async () => {
+  // 2026-11-26, found in the end-to-end pass: the page keeps a removed workspace in its
+  // dropdown until reload, because the delete reply echoed the array from before the
+  // removal (the route hands the server a NEW filtered array but answered with the old one).
+  const home = await mkdtemp(join(tmpdir(), 'hmh-fs-routes-'));
+  await mkdir(join(home, 'sessions'), { recursive: true });
+  const extra = await mkdtemp(join(tmpdir(), 'hmh-fs-extra-'));
+  const prevHome = process.env.HMH_HOME;
+  process.env.HMH_HOME = home;
+  let close: (() => Promise<void>) | undefined;
+  try {
+    const handle = await startServer({ port: 0, host: '127.0.0.1' });
+    close = () => handle.close();
+    const base = `http://127.0.0.1:${handle.port}`;
+    const post = (path: string, body: unknown) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(body) });
+    const ids = (b: { items: Array<{ id: string }> }) => b.items.map((w) => w.id);
+
+    const added = (await (await post('/api/workspaces', { name: 'extra', path: extra })).json()) as { items: Array<{ id: string; name: string }>; error?: string };
+    assert.equal(added.error, undefined, 'second workspace registered');
+    const target = added.items.find((w) => w.name === 'extra')!;
+    assert.ok(target, 'it is in the add reply');
+
+    const del = (await (await post('/api/workspaces/delete', { id: target.id })).json()) as { ok: boolean; items: Array<{ id: string }>; error?: string };
+    assert.equal(del.error, undefined, 'removed');
+    assert.ok(!del.items.some((w) => w.id === target.id), 'the delete reply no longer lists the removed workspace');
+    const after = (await (await fetch(`${base}/api/workspaces`)).json()) as { items: Array<{ id: string }> };
+    assert.deepEqual(ids(del), ids(after), 'the reply is exactly the server state');
+  } finally {
+    if (close) await close();
+    if (prevHome === undefined) delete process.env.HMH_HOME;
+    else process.env.HMH_HOME = prevHome;
+    await rm(home, { recursive: true, force: true });
+    await rm(extra, { recursive: true, force: true });
+  }
+});

@@ -4,9 +4,10 @@
  * The evolution engine runs as a SILENT BACKGROUND PROCESS, exactly like the
  * web daemon. The user NEVER runs `hmh evolve` manually - it just happens.
  *
- * Lifecycle: starts automatically on `hmh tui` / `hmh web` / any command that
- * calls ensureEvolutionDaemon(). Runs one evolution cycle every
- * `evolution.autoEveryHours` hours (default 6h), then sleeps. After each
+ * Lifecycle: starts automatically on `hmh web start` (and `hmh evolve-auto`).
+ * Runs one evolution cycle every `evolution.autoEveryHours` hours (default
+ * 6h), then sleeps. `hmh web stop` stops it again (0.23.54: until then nothing
+ * could - it kept cycling, and spending model quota, after "stop"). After each
  * evolve cycle it also runs the auto-finetune gate (2026-09-25: labels past
  * threshold -> pairs exported -> uploaded -> cloud training submitted, all
  * unattended; `hmh auto-finetune` itself decides whether anything is due).
@@ -17,21 +18,35 @@
  * The runner is now plain CJS (require only) and verified with node --check.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
+import { identifyProcess, isAlive, killProcessTree } from './process-identity.ts';
 
 const EVOL_DAEMON_PID = 'evolution-daemon.pid';
 const EVOL_DAEMON_LOG = 'evolution-daemon.log';
+const RUNNER_NAME = 'evolution-daemon-runner';
 
+/** The pid of the RUNNING evolution daemon, or null. The pid file alone proves
+ *  nothing: it outlives its process (a runner killed on Windows gets no
+ *  SIGTERM, so it never cleans up after itself) and pids are reused. Until
+ *  0.23.54 a stranger wearing the old number read as "daemon alive" - evolution
+ *  silently never restarted - and `hmh web stop` would have killed it.
+ *  A command line that cannot be read at all keeps the old trust in the pid. */
 function daemonPid(home: string): number | null {
+  let pid: number;
   try {
-    const raw = readFileSync(join(home, EVOL_DAEMON_PID), 'utf8').trim();
-    const pid = Number(raw);
-    if (!Number.isFinite(pid)) return null;
-    // check alive (Windows: process.kill with signal 0 throws if dead)
-    try { process.kill(pid, 0); return pid; } catch { return null; }
+    const n = Number(readFileSync(join(home, EVOL_DAEMON_PID), 'utf8').trim());
+    if (!Number.isInteger(n) || n <= 0) return null;
+    pid = n;
   } catch { return null; }
+  if (!isAlive(pid)) return null;
+  return identifyProcess(pid, (cmd) => cmd.includes(RUNNER_NAME)) === 'other' ? null : pid;
+}
+
+/** The running daemon's pid (null when none) - read-only, for `hmh web status`. */
+export function evolutionDaemonPid(home: string = homeDir()): number | null {
+  return daemonPid(home);
 }
 
 export interface EvolDaemonStatus {
@@ -100,7 +115,7 @@ export function ensureEvolutionDaemon(): EvolDaemonStatus {
   const existing = daemonPid(home);
   if (existing) return { running: true, pid: existing, started: false };
 
-  const runnerPath = join(home, 'evolution-daemon-runner.cjs');
+  const { runnerPath, cwd } = evolutionSpawnOptions(home);
   const entryAbs = join(import.meta.dirname ?? '.', 'main.js');
   writeFileSync(runnerPath, daemonRunnerSource(EVOL_DAEMON_PID, entryAbs), 'utf8');
 
@@ -110,21 +125,40 @@ export function ensureEvolutionDaemon(): EvolDaemonStatus {
     detached: true,
     stdio: ['ignore', log, log],
     windowsHide: true,
+    cwd,
     env: { ...process.env, HMH_HOME: home },
   });
   child.unref();
   // the child inherited a dup of this fd; closing ours prevents the
-  // "Closing file descriptor on garbage collection" startup warnings
-  try { require('node:fs').closeSync(log); } catch { /* already gone */ }
+  // "Closing file descriptor on garbage collection" startup warnings.
+  // (An ESM module has no `require`: the old `require('node:fs').closeSync`
+  // here always threw and was swallowed by the empty catch.)
+  try { closeSync(log); } catch { /* already gone */ }
   return { running: true, pid: child.pid, started: true };
+}
+
+/** The runner file and the directory it is launched in. The runner's cwd is
+ *  inherited by every `hmh evolve` / `auto-finetune` child, and the bench
+ *  cases run their tools in it, so it must be a directory of the daemon's own -
+ *  not whichever folder happened to launch it (the Startup folder's, a
+ *  project's, the installed package's: a live cwd handle there blocks the next
+ *  upgrade on Windows). Created on demand. */
+export function evolutionSpawnOptions(home: string): { runnerPath: string; cwd: string } {
+  const cwd = join(home, 'evolution', 'scratch');
+  mkdirSync(cwd, { recursive: true });
+  return { runnerPath: join(home, `${RUNNER_NAME}.cjs`), cwd };
 }
 
 export function stopEvolutionDaemon(): boolean {
   const home = homeDir();
   const pid = daemonPid(home);
+  // gone either way: the file names a dead runner, or a stranger - and a
+  // stranger is NOT killed (the old code trusted the number)
+  try { unlinkSync(join(home, EVOL_DAEMON_PID)); } catch { /* absent */ }
   if (!pid) return false;
-  try { process.kill(pid); } catch { }
-  try { require('node:fs').unlinkSync(join(home, EVOL_DAEMON_PID)); } catch { }
+  // the whole tree: a cycle in flight is a child of the runner, and on Windows
+  // ending the runner alone left that child calling the model for up to 30 minutes
+  killProcessTree(pid);
   return true;
 }
 

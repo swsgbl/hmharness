@@ -42,6 +42,13 @@ export const WORKSPACES = `  /* ---- workspaces (the agent's project contexts) -
       x.title = L ? L.wsRemove : 'remove';
       // the name disambiguates: "remove" alone reads the same on every row
       x.setAttribute('aria-label', (L ? L.wsRemove : 'remove') + ' ' + w.name);
+      // the active workspace cannot be removed (the server refuses it): say so here
+      // instead of offering a button that can only end in an error dialog
+      if (w.id === curWs.id) {
+        x.disabled = true;
+        x.title = L ? L.wsActive : 'active workspace';
+        x.setAttribute('aria-label', (L ? L.wsActive : 'active workspace') + ' ' + w.name);
+      }
       x.onclick = function (ev) {
         ev.stopPropagation();
         fetch('/api/workspaces/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })

@@ -35,12 +35,34 @@ interface Payload {
    * server only sets this when the CHAT provider sees images; text-only
    * chats get their images described into the task text instead. */
   images?: string[];
+  /** The caller said "ask" on purpose (the web UI's mode select): the run asks before
+   *  every gated tool even when the saved config is on `auto`. Until 0.23.54 the saved
+   *  config won, so the select read "审批询问" while every tool call went through. */
+  ask?: boolean;
 }
 
 function emit(obj: Record<string, unknown>): void {
   try {
     process.stdout.write(JSON.stringify(obj) + '\n');
   } catch { /* daemon gone (EPIPE): keep running, the rollout is the record */ }
+}
+
+let steering: ReturnType<typeof createInterface> | null = null;
+
+/** End the process without cutting a handle mid-close. The stdin readline is what keeps
+ *  the event loop alive, so the old exit was `rl.close(); process.exit(0)` - and that
+ *  `process.exit()` crashed EVERY child on Windows at the end of EVERY task (libuv
+ *  assertion in async.c, exit code 0xC0000409; invisible while the final event had gone
+ *  out first). Now: close the readline, drop the interest in stdin, let stdout flush and
+ *  let Node end the process by itself. Anything still alive a moment later is cut off. */
+async function shutdown(code: number): Promise<never> {
+  try { steering?.close(); } catch { /* already closed */ }
+  process.stdin.pause();
+  (process.stdin as { unref?: () => void }).unref?.();
+  await new Promise<void>((done) => process.stdout.write('', () => done()));
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1000).unref();
+  return new Promise<never>(() => { /* the loop empties and the process ends */ });
 }
 
 async function main(): Promise<void> {
@@ -65,8 +87,8 @@ async function main(): Promise<void> {
   let approvalSeq = 0;
   const abort = new AbortController();
 
-  const rl = createInterface({ input: process.stdin });
-  rl.on('line', (line) => {
+  steering = createInterface({ input: process.stdin });
+  steering.on('line', (line) => {
     if (!line.trim()) return;
     try {
       const msg = JSON.parse(line) as { type?: string; text?: string; granted?: boolean; id?: number };
@@ -75,10 +97,13 @@ async function main(): Promise<void> {
       else if (msg.type === 'approval' && typeof msg.id === 'number') approvals.get(msg.id)?.(msg.granted === true);
     } catch { /* malformed line: ignore */ }
   });
-  rl.on('close', () => { /* daemon gone: no more steering, run continues */ });
+  steering.on('close', () => { /* daemon gone: no more steering, run continues */ });
 
   const cfg = await kernel.loadConfig();
-  const unattended = payload.yes || cfg.approval === 'auto';
+  // An explicit "ask" from the caller is the user's per-task intent and outranks the
+  // saved default. A caller that never said "ask" (older clients, plain API use) keeps
+  // the old rule: config auto means nobody is there to answer a dialog.
+  const unattended = payload.yes || (cfg.approval === 'auto' && payload.ask !== true);
   const { reg } = await buildRegistry({ announce: false });
 
   const result = await runAgentTask({
@@ -132,11 +157,7 @@ async function main(): Promise<void> {
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => (m.role === 'assistant' && m.tool_calls ? { role: 'assistant', content: m.content } : m)),
   });
-  // the stdin readline keeps the event loop alive forever - without this
-  // the child lingers after its final event and the session stays "busy"
-  rl.close();
-  process.stdout.write('', () => process.exit(0));
-  process.exit(0);
+  return shutdown(0);
 }
 
 main().catch((err) => {
@@ -144,5 +165,5 @@ main().catch((err) => {
   // the daemon can keep the session bound for export/next-task instead of
   // orphaning the rollout on disk
   emit({ kind: 'error', error: String(err).slice(0, 400), sessionId: (err as { sessionId?: string }).sessionId });
-  process.exit(1);
+  void shutdown(1);
 });

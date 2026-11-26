@@ -159,14 +159,19 @@ export const DOCK = `  /* ---- right column (W7): tabs 详情/文件/预览, col
   }
   /* ---- files tab: lazy workspace tree (server /api/fs?files=1) ---- */
   function fileRow(name, rel, path, kind) {
-    var row = document.createElement('div');
+    // a real button: every row does something (folder: fold/unfold, file: preview), so
+    // the keyboard has to reach it - they used to be divs with an onclick
+    var row = document.createElement('button');
+    row.type = 'button';
     row.className = 'frow ' + kind;
     var ic = document.createElement('span'); ic.className = 'fic';
+    ic.setAttribute('aria-hidden', 'true');
     ic.textContent = kind === 'dir' ? '\\uD83D\\uDCC1' : '\\uD83D\\uDCC4';
     var nm = document.createElement('span');
     nm.textContent = name;
     nm.title = rel;
     row.appendChild(ic); row.appendChild(nm);
+    if (kind === 'dir') row.setAttribute('aria-expanded', 'false');
     row.onclick = function () {
       if (kind === 'dir') {
         var kids = row.nextSibling;
@@ -174,6 +179,7 @@ export const DOCK = `  /* ---- right column (W7): tabs 详情/文件/预览, col
           var hidden = kids.style.display === 'none';
           kids.style.display = hidden ? '' : 'none';
           ic.textContent = hidden ? '\\uD83D\\uDCC2' : '\\uD83D\\uDCC1';
+          row.setAttribute('aria-expanded', hidden ? 'true' : 'false');
           return;
         }
         var box = document.createElement('div');
@@ -181,6 +187,7 @@ export const DOCK = `  /* ---- right column (W7): tabs 详情/文件/预览, col
         box.innerHTML = '<div class="hint">' + esc((L ? L.loading : '…')) + '</div>';
         row.after(box);
         ic.textContent = '\\uD83D\\uDCC2';
+        row.setAttribute('aria-expanded', 'true');
         loadTree(path, box);
       } else {
         openPreview(rel);

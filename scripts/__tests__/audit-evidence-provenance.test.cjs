@@ -214,3 +214,68 @@ test('CLI --strict fails on integrity only (end-to-end)', () => {
     assert.equal(code, 1);
   } finally { g.cleanup(); }
 });
+
+// ---- bytes as committed (2026-11-26) ----
+//
+// The three published manifests hashed CRLF working copies while the
+// repository held LF, so every fresh clone failed --strict; and a re-run of
+// --write rewrote each dataset's sourceCommit to the manifest's own commit.
+
+const { createHash } = require('node:crypto');
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+
+/** A real git repository holding one dataset, laid out like the website tree. */
+function gitFixture(rows) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hmh-evidence-git-'));
+  const file = path.join(root, 'evidence-ds-2026-10', 'raw', 'log.jsonl');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, rows.join('\n') + '\n');
+  const git = (args) => execFileSync('git',
+    ['-c', 'core.autocrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], { cwd: root, stdio: 'ignore' });
+  git(['init', '-q']);
+  git(['add', '-A']);
+  git(['commit', '-q', '-m', 'data']);
+  return { root, file, git, cleanup() { fs.rmSync(root, { recursive: true, force: true }); } };
+}
+
+test('a CRLF working copy is a checkout artefact: the hash describes the COMMITTED bytes', () => {
+  const f = gitFixture([JSON.stringify({ time: '2026-10-01T00:00:00Z' }), JSON.stringify({ time: '2026-10-02T00:00:00Z' })]);
+  try {
+    const committed = execFileSync('git', ['cat-file', 'blob', 'HEAD:evidence-ds-2026-10/raw/log.jsonl'], { cwd: f.root });
+    // the working copy as core.autocrlf=true leaves it on Windows
+    fs.writeFileSync(f.file, committed.toString('utf8').replace(/\n/g, '\r\n'));
+    assert.notEqual(sha256(fs.readFileSync(f.file)), sha256(committed), 'precondition: the bytes on disk really differ');
+    const d = audit(f.root, '2026-10-27T00:00:00Z', '2026-10-05T00:00:00Z').datasets[0];
+    assert.equal(d.files[0].sha256, sha256(committed));
+    assert.equal(d.files[0].bytes, committed.length, 'not the length of the converted copy');
+    assert.equal(d.status, 'OK');
+  } finally { f.cleanup(); }
+});
+
+test('a real local modification is not hidden behind the committed bytes', () => {
+  const row = JSON.stringify({ time: '2026-10-01T00:00:00Z' });
+  const f = gitFixture([row]);
+  try {
+    writeManifests(audit(f.root, '2026-10-27T00:00:00Z', '2026-10-05T00:00:00Z'));
+    // more than a line-ending difference: a record that was never committed
+    fs.appendFileSync(f.file, JSON.stringify({ time: '2026-10-03T00:00:00Z' }) + '\n');
+    assert.equal(audit(f.root, '2026-10-27T00:00:00Z', '2026-10-05T00:00:00Z').datasets[0].status, 'HASH_MISMATCH');
+  } finally { f.cleanup(); }
+});
+
+test('re-running --write after the manifest itself is committed leaves every provenance field alone', () => {
+  const f = gitFixture([JSON.stringify({ time: '2026-10-01T00:00:00Z' })]);
+  try {
+    const manifest = path.join(f.root, 'evidence-ds-2026-10', 'provenance-manifest.json');
+    // the real resolver here (no injected provenance): git is what is under test
+    writeManifests(auditEvidenceRoot(f.root, { now: new Date('2026-10-27T00:00:00Z') }));
+    const before = fs.readFileSync(manifest, 'utf8');
+    const first = JSON.parse(before);
+    assert.equal(first.sourceCommitSource, 'git-first-commit');
+    assert.equal(first.firstCommittedAtUtc, new Date(execFileSync('git', ['log', '-1', '--format=%aI'], { cwd: f.root, encoding: 'utf8' }).trim()).toISOString());
+    f.git(['add', '-A']);
+    f.git(['commit', '-q', '-m', 'manifest']);
+    writeManifests(auditEvidenceRoot(f.root, { now: new Date('2026-10-28T00:00:00Z') }));
+    assert.equal(fs.readFileSync(manifest, 'utf8'), before, 'byte-identical: the data did not change, so neither does its manifest');
+  } finally { f.cleanup(); }
+});
