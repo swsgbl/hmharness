@@ -155,3 +155,13 @@ deny-first 审批门禁做进 while 循环内核；破坏性命令模式硬拒�
 默认只暴露 `harmony_*` 域工具，例如构建、装机、日志、签名、API 检索和雷达；`run_command`、`write_file` 等通用工具不暴露，因为宿主自己有。可用 `HMH_MCP_TOOLS` 继续收窄工具面。每次调用由宿主自己的权限系统逐个确认，server 侧破坏性硬墙仍在；`--yes` 与 `approval:auto` 是显式扩大授权的例外，不是安全证明。
 
 外部调用会写入 `insights/mcp-calls.jsonl`，只做观测，不进入自进化门禁；记忆、技能和门禁只在原生 `hmh` 会话中运行。证据：public main 的 README「在 Claude Code / Codex 里用（MCP 服务器模式）」、ROADMAP MCP server 模式与 DEVLOG 2026-09-07。
+
+## hmharness 会把代码、密钥或日志发给谁？数据边界是什么？
+
+默认会自动发生的出站只有两处：你自己配置的 OpenAI 兼容模型端点（`~/.hmharness/config.json` 或环境变量 `HMH_BASE_URL / HMH_API_KEY / HMH_MODEL`；你的内容发往这里），以及启动时向 registry.npmjs.org 的版本检查（只发请求，不带会话内容）。提示词、智能体读到的文件内容、命令输出和设备日志会作为上下文发给模型端点，工具输出还会记入本机 `HMH_HOME/sessions/` 的会话日志；把 `baseUrl` 指向本机的 Ollama、LM Studio 或 vLLM，模型调用就不出本机。
+
+密钥以明文留在本机 `config.json` 或环境变量，仓库零密钥。构建、签名、装机和 hdc 日志在本机执行，签名用的 p12、pem、profile 只以路径交给本机 hapsigntool，不上传。只有洞察记录和数据集导出会对任务文本做四类 token 形态的脱敏，会话日志和发给模型的上下文不做这层处理。在同一会话里续聊（`hmh resume`、TUI、网页会话）时，之前的对话连同工具结果会作为历史重新发给模型端点。
+
+`hmh web start` 或 `hmh evolve-auto` 会启动后台进化守护进程，启动约 30 秒后跑第一轮，之后默认每 6 小时跑一轮模型调用；评审与人标合计满 50 条且厂商支持云端微调时，会把导出的偏好对上传到该厂商并提交训练任务，默认 7 天冷却；`config.json` 设 `finetune.auto=false` 可关闭无人值守的自动微调，`hmh web stop` 会停掉守护进程。启动时向 registry.npmjs.org 查版本，检查到新版本会自动升级（`tui.autoUpdate=false` 退回只提示）；升级安装启动失败时会把平台、Node 版本、安装路径和报错文本发给你配置的模型来生成修复命令。其余出站按功能触发：`web_search` 把查询词发往 DuckDuckGo，失败时改用 Bing；MCP、`web_fetch`、`ssh_run` 访问你配置或批准的目标；ARC-AGI-3 直连 three.arcprize.org；`hmh knowledge` 只读抓取华为开发者网站的 HarmonyOS 发布说明页。
+
+以 v0.23.56（public main 提交 f43724f）为准，`packages/` 源码里没有埋点或使用统计上报：16 个包的运行时外部依赖只有 `qrcode` 一个，telemetry 字样指的是动作门禁（默认关闭）写在本机轨迹里的记录；群智经验包默认是本机文件往返，只有你用 `hmh cognitive absorb --from=<https-url>` 指定地址时才下载。数据可以自己管：历史会话可归档或删除（trash 可恢复），`hmh cognitive export|purge` 导出或清除认知库，`hmh state backup|restore` 备份与恢复进化状态。不要把 token、cookie、私人路径贴进提示词、命令输出或 Issue。证据：v0.23.56（提交 f43724f）的 README「快速开始 / 常用命令」、docs/ARCHITECTURE.md「隔离契约」、docs/PROVIDERS.md「本地推理」与 packages/cli、packages/kernel 对应源文件。
