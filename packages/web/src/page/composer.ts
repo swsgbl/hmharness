@@ -102,11 +102,9 @@ export const COMPOSER = `  // ---- composer ----
       body: JSON.stringify(body)
     }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
       .then(function (res) {
-        if (res.d && res.d.queued) {
-          el('div', 'queued', (L.queuedHint || 'queued') + ' #' + res.d.position + ' \u2014 ' + text, true);
-        } else if (res.status === 409) {
-          el('div', 'err', L.alreadyRunning);
-        }
+        // the SSE 'queued' event and this response report the same fact: one notice
+        if (res.d && res.d.queued) noteQueued(text, res.d.position);
+        else if (res.status === 409) el('div', 'err', L.alreadyRunning);
       })
       .catch(function (err) { el('div', 'err', String(err)); });
   }

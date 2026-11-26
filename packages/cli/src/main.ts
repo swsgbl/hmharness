@@ -521,8 +521,10 @@ usage:
   hmh readiness              the RL gate: six conditions measured from real evidence (V2 M11)
   hmh pipeline "<task>"      role pipeline: plan→code→test→review→judge (+repair loop,
                              VERDICT gate) - V3 first slice (ADR-0006)
-  hmh web start|stop|status   web UI as a silent background daemon (no window,
-                             survives closing everything; log ~/.hmharness/web.log)
+  hmh web start|stop|status [--port=7788]
+                             web UI as a silent background daemon (no window,
+                             survives closing everything; log ~/.hmharness/web.log);
+                             stop also stops the background evolution daemon
   hmh web [--port=7788]       web UI in the foreground (debugging)
   hmh tui [--no-web]      fullscreen terminal UI (slash palette, mouse wheel);
                            also starts the web UI in the background (--no-web skips)
@@ -560,7 +562,20 @@ flags:
   --yes / -y          auto-approve gated tools (else they prompt; non-TTY denies)
   --locale=zh|en      override the UI locale for this run
   --help | -h         this help
+  --version | -v      print the version and exit
 `);
+    return;
+  }
+  if (cmd === 'version' || cmd === '--version' || cmd === '-v' || cmd === '-V') {
+    // until 0.23.54 this fell through into the interactive REPL
+    const { createRequire } = await import('node:module');
+    stdout.write(`hmh ${(createRequire(import.meta.url)('../package.json').version as string) ?? ''}\n`);
+    return;
+  }
+  if (cmd && cmd.startsWith('-')) {
+    // an option nobody knows used to fall through into the interactive REPL
+    process.stderr.write(`hmh: unknown option ${cmd} (hmh --help lists the commands and flags)\n`);
+    process.exitCode = 2;
     return;
   }
   if (cmd === 'init') {
@@ -1143,9 +1158,9 @@ flags:
     }
     if (sub === 'start' || sub === 'stop') {
       // 后台守护(与 hmh web start 同款):装完扩展后终端侧零操作常驻
-      const pArg = rest.find((a) => a.startsWith('--port='));
-      const port = pArg ? Number(pArg.slice(7)) : undefined;
+      const { parsePort } = await import('./web-daemon.ts');
       const ed = await import('./extension-daemon.ts');
+      const port = parsePort(rest, ed.DEFAULT_EXTENSION_PORT);
       if (sub === 'stop') {
         const w = ed.stopWatchdog();
         const killed = ed.stopExtensionDaemon(port);
@@ -1154,7 +1169,7 @@ flags:
         return;
       }
       const { probeExtensionDaemon, ensureExtensionDaemon, startWatchdog, installScheduledWatchdog, DEFAULT_EXTENSION_PORT } = ed;
-      const p = port ?? DEFAULT_EXTENSION_PORT;
+      const p = port;
       const already = await probeExtensionDaemon(p);
       if (already.up) { stdout.write(`✓ 扩展桥已在运行: 127.0.0.1:${p} — 无需重复启动\n`); return; }
       const r = await ensureExtensionDaemon(p);
@@ -1732,7 +1747,10 @@ flags:
   }
   if (cmd === 'web') {
     await initHome();
-    const port = Number(rest.find((a) => a.startsWith('--port='))?.slice(7) ?? 7788);
+    // --port=N; an empty or out-of-range value is the default (until 0.23.54 a
+    // bare `--port=` silently became port 0)
+    const { parsePort } = await import('./web-daemon.ts');
+    const port = parsePort(rest, 7788);
     // remote control (2026-09-28): --exposure=lan|wan opens the UI to other
     // devices; web.token in config.json is the auth (REQUIRED for lan/wan).
     // CLI flags win over config: --exposure / --token=... / --token-gen.
@@ -1801,22 +1819,34 @@ flags:
       return;
     }
     if (sub === 'stop') {
-      stdout.write(stopWebDaemon() ? t.webStopped + '\n' : t.webNotRunning + '\n');
+      // The evolution daemon rides along (`web start` brings it up): stopping the
+      // UI stops it too. Until 0.23.54 nothing could - it kept cycling, and
+      // spending model quota, after "stop".
+      const { stopEvolutionDaemon } = await import('./evolution-daemon.ts');
+      const evoStopped = stopEvolutionDaemon();
+      // the port asked for, not always the default one: `web stop --port=7799`
+      // used to stop 7788 (until 0.23.54) - the main instance instead of the dev one
+      stdout.write(stopWebDaemon(port) ? t.webStopped + '\n' : t.webNotRunning + '\n');
+      if (evoStopped) stdout.write(t.evoStopped + '\n');
       return;
     }
     if (sub === 'status') {
-      const up = await hmhWebUp(Number.isFinite(port) ? port : 7788);
+      const up = await hmhWebUp(port);
       stdout.write(up ? t.webRunning(readWebPid() || 0, port) + '\n' : t.webNotRunning + '\n');
       // stale-daemon warning: the daemon is a code snapshot from spawn time;
       // after an upgrade it keeps serving old code until restarted. The
       // comparison uses the SERVED process's self-reported version.
       const { webDaemonStale } = await import('./web-daemon.ts');
-      const v = await webDaemonStale(Number.isFinite(port) ? port : 7788);
+      const v = await webDaemonStale(port);
       if (up && v.stale) {
         stdout.write(YELLOW(`⚠ daemon is running v${v.daemon} but CLI is v${v.cli} — stale code (new features missing). Run: hmh web stop && hmh web start\n`));
       } else if (up && v.daemon) {
         stdout.write(DIM(`daemon v${v.daemon}\n`));
       }
+      // the evolution daemon runs on its own schedule and is otherwise invisible
+      const { evolutionDaemonPid } = await import('./evolution-daemon.ts');
+      const evoPid = evolutionDaemonPid();
+      stdout.write(DIM((evoPid ? t.evoRunning(evoPid) : t.evoNotRunning) + '\n'));
       return;
     }
     if (sub === 'start') {
@@ -1827,7 +1857,7 @@ flags:
       if (ex) passThrough.push(ex);
       const tk = rest.find((a) => a.startsWith('--token='));
       if (tk) passThrough.push(tk);
-      const r = startWebDaemon(Number.isFinite(port) ? port : 7788, undefined, passThrough);
+      const r = startWebDaemon(port, undefined, passThrough);
     // 2026-09-23: evolution runs silently alongside the web daemon - the
     // user never triggers `hmh evolve` manually (zero-config direction fix)
     try { const { ensureEvolutionDaemon } = await import('./evolution-daemon.ts');
@@ -1837,7 +1867,7 @@ flags:
       if (r.already) {
         stdout.write(t.webRunning(r.pid, port) + '\n');
       } else {
-        stdout.write(t.webStarted(Number.isFinite(port) ? port : 7788, join(homeDir(), 'web.log')) + '\n');
+        stdout.write(t.webStarted(port, join(homeDir(), 'web.log')) + '\n');
       }
       return;
     }
@@ -1848,7 +1878,7 @@ flags:
     const ver = (cr(import.meta.url)('../package.json').version as string) ?? '';
     try {
       await startServer({
-        port: Number.isFinite(port) ? port : 7788,
+        port: port,
         host: exposure === 'loopback' ? '127.0.0.1' : '0.0.0.0',
         version: ver,
       });
@@ -2234,7 +2264,10 @@ flags:
       try {
         rows = (await readFile(pairsFile, 'utf8')).trim().split('\n').filter(Boolean).map((l: string) => JSON.parse(l));
       } catch { stdout.write('no dpo-pairs.jsonl - run: hmh reward export-dpo\n'); return; }
-      const outDir = rest[1] ? require('node:path').resolve(rest[1]) : join(home, 'evolution', 'dpo-export');
+      // (an ESM module has no `require`: with a directory argument this line
+      // threw ReferenceError and the command died)
+      const { resolve: resolvePath } = await import('node:path');
+      const outDir = rest[1] ? resolvePath(rest[1]) : join(home, 'evolution', 'dpo-export');
       const { mkdir, writeFile: wf2 } = await import('node:fs/promises');
       await mkdir(outDir, { recursive: true });
       const train = rows.filter((r) => r.split !== 'eval');

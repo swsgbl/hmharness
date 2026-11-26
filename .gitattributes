@@ -1,0 +1,13 @@
+# Evidence raw files are bytes, not text.
+#
+# Each dataset directory records the sha256 of its raw/ files in
+# provenance-manifest.json. A line-ending conversion on checkout silently broke
+# that record once: the manifests written on 2026-10-27 hashed CRLF working
+# copies (core.autocrlf=true) while the repository held LF, so every fresh
+# clone failed `node scripts/audit-evidence-provenance.cjs website --strict`
+# (found and fixed 2026-11-26). These paths are now byte-exact in every
+# checkout; scripts/audit-evidence-provenance.cjs additionally hashes the
+# committed bytes, so a stale working copy cannot bring the bug back.
+website/evidence/raw/** -text
+website/evidence-ds-*/raw/** -text
+website/evidence-new/raw/** -text

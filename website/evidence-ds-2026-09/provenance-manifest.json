@@ -9,13 +9,13 @@
   "firstCommittedAtUtc": "2026-09-24T18:38:47.000Z",
   "sourceCommit": "b04fefdb7fb98725a7ddca39d7fa5ef58cf2d9b8",
   "sourceCommitSource": "git-first-commit",
-  "datasetFingerprint": "9b7e5fc23cd0e914",
+  "datasetFingerprint": "d05dc189c09d9fbe",
   "maxEventTime": "2026-09-14T08:40:47.415Z",
   "files": [
     {
       "path": "evidence-ds-2026-09/raw/insights.jsonl",
-      "sha256": "1524c80699fe13fe96e42e2828fa1e5e1de45b17aeebc6498bf9a0992db3471d",
-      "bytes": 349618,
+      "sha256": "077dda2c689b1c6f265aca255d3a817b5d6c9043641ce083f4280e2152d38bd6",
+      "bytes": 349160,
       "nonEmptyLines": 458,
       "recordsWithEventTime": 458,
       "minEventTime": "2026-08-26T11:57:15.342Z",
@@ -23,8 +23,8 @@
     },
     {
       "path": "evidence-ds-2026-09/raw/log.jsonl",
-      "sha256": "c9c009f47636d6bd8f4d1996beddef1d3c7fab4ac58385f79fdfae16830f5a16",
-      "bytes": 501579,
+      "sha256": "6e6609013c651904d4c9aeb532582bc46383dc60ada7bf5b8a18d3d2f14b01fe",
+      "bytes": 501485,
       "nonEmptyLines": 94,
       "recordsWithEventTime": 94,
       "minEventTime": "2026-08-26T17:42:17.903Z",
@@ -32,8 +32,8 @@
     },
     {
       "path": "evidence-ds-2026-09/raw/pareto-entries.jsonl",
-      "sha256": "238e22e5503fbd43d45485102ce56dcae0fa351b28c0f6c9348e9d0e231cf243",
-      "bytes": 4962,
+      "sha256": "2cb3cbd5a0e3f495bd1f54a849caa8096c68e6a7830a932565fce0c4376998a7",
+      "bytes": 4958,
       "nonEmptyLines": 4,
       "recordsWithEventTime": 4,
       "minEventTime": "2026-09-14T05:27:01.461Z",

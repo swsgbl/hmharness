@@ -14,6 +14,8 @@ import { pathToFileURL } from 'node:url';
 import { openSync, readFileSync, unlinkSync, writeFileSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { homeDir } from '@hmharness/kernel';
+import { daemonCwd } from './daemon-cwd.ts';
+import { identifyProcess, isAlive, killProcessTree, type ProcessIdentity } from './process-identity.ts';
 
 export const DEFAULT_EXTENSION_PORT = 7789;
 
@@ -26,13 +28,23 @@ export function readExtensionPid(): number {
   }
 }
 
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+/** Is the process the bridge of ours (`main.js extension serve`), or one of
+ *  its watchdogs (the detached one, or the scheduled task's entry script)?
+ *  Every kill below is gated on this. The bridge used to be stopped BLIND:
+ *  `extension stop` and the watchdog's 60s sweep taskkilled whatever the pid
+ *  file or the port named - a stranger behind a stale pid, or another program
+ *  that happened to sit on 7789, killed over and over, once a minute. */
+function bridgeIdentity(pid: number): ProcessIdentity {
+  return identifyProcess(pid, (cmd) =>
+    /(^|\s)extension\s+serve\b/.test(cmd)
+    || /extension-watchdog-task\.cjs/.test(cmd)
+    || (/extension-daemon\.js/.test(cmd) && /runWatchdogLoop/.test(cmd)));
+}
+
+/** May the holder of the bridge port be evicted? Only something we can name as
+ *  ours; where the command line cannot be read, the old trust stands off Windows. */
+function evictable(id: ProcessIdentity): boolean {
+  return id === 'self' || (id === 'unknown' && process.platform !== 'win32');
 }
 
 /** Probe the bridge: up only if /v1/status answers as OUR protocol (hmext/1).
@@ -76,22 +88,35 @@ export async function waitExtensionPortFree(port = DEFAULT_EXTENSION_PORT, maxMs
 export function stopExtensionDaemon(port = DEFAULT_EXTENSION_PORT): boolean {
   const pid = readExtensionPid();
   let killed = false;
-  if (pid && alive(pid)) {
-    if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-    else {
-      try { process.kill(pid); } catch { /* gone */ }
+  if (pid && isAlive(pid)) {
+    // only the bridge of OURS: a stale pid file plus a reused pid names a stranger
+    if (bridgeIdentity(pid) !== 'other') {
+      killProcessTree(pid);
+      killed = true;
+    } else {
+      console.error(`[extension] extension.pid names pid ${pid}, which is not an hmh bridge - left alone`);
     }
-    killed = true;
   }
   try { unlinkSync(join(homeDir(), 'extension.pid')); } catch { /* absent */ }
+  // a stale pid file while the port is still held: evict only our own orphan.
+  // A foreign program on the port is NOT ours to kill - and the watchdog
+  // runs this every minute, so a blind kill here meant killing it once a minute
   const owner = portOwnerPid(port);
   if (owner && owner !== pid) {
-    try {
-      spawn('taskkill', ['/PID', String(owner), '/T', '/F'], { windowsHide: true });
+    if (evictable(bridgeIdentity(owner))) {
+      killProcessTree(owner);
       killed = true;
-    } catch { /* best effort */ }
+    } else {
+      console.error(`[extension] port ${port} is held by a non-hmh process - not evicting`);
+    }
   }
   return killed;
+}
+
+/** Is the port held by a process that is not ours (so no bridge may be spawned into it)? */
+function foreignHolder(port: number): boolean {
+  const owner = portOwnerPid(port);
+  return !!owner && !evictable(bridgeIdentity(owner));
 }
 
 /** Spawn the bridge detached (no window). extraArgs carries --port through. */
@@ -102,7 +127,7 @@ function spawnExtensionDaemon(entry: string, port: number): number {
     detached: true,
     stdio: ['ignore', log, log],
     windowsHide: true,
-    cwd: process.cwd(),
+    cwd: daemonCwd(process.cwd(), entry),
   });
   child.unref();
   try { closeSync(log); } catch { /* already gone */ }
@@ -134,12 +159,15 @@ function cliVersion(): string {
 export async function ensureExtensionDaemon(port = DEFAULT_EXTENSION_PORT, entry = process.argv[1]): Promise<ExtensionProbe> {
   const pid = readExtensionPid();
   const served = await probeExtensionDaemon(port);
-  const stale = pid > 0 && alive(pid) && recordedVersion() !== cliVersion();
+  // stale = a bridge of OURS from an older CLI (a stranger behind the pid file is not a stale bridge)
+  const stale = pid > 0 && isAlive(pid) && recordedVersion() !== cliVersion() && bridgeIdentity(pid) !== 'other';
   if (served.up && !stale) return served;
-  if (stale) {
-    stopExtensionDaemon(port);
-    await waitExtensionPortFree(port);
-  }
+  // dead or stale: clear whatever is OURS off the port, then bring the bridge back
+  stopExtensionDaemon(port);
+  await waitExtensionPortFree(port);
+  // someone else holds the port: stay down. A bridge spawned into it only dies
+  // on EADDRINUSE - and from the watchdog that meant a dead spawn once a minute
+  if (foreignHolder(port)) return { up: false, connected: false };
   spawnExtensionDaemon(entry, port);
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 500));
@@ -152,7 +180,8 @@ export async function ensureExtensionDaemon(port = DEFAULT_EXTENSION_PORT, entry
 /** Simple start (no staleness handling): used by the explicit `start` command. */
 export function startExtensionDaemon(port = DEFAULT_EXTENSION_PORT, entry = process.argv[1]): { already: boolean; pid: number } {
   const pid = readExtensionPid();
-  if (pid && alive(pid)) return { already: true, pid };
+  // "already running" only for the bridge of ours (a stale pid file may name a stranger)
+  if (pid && isAlive(pid) && bridgeIdentity(pid) !== 'other') return { already: true, pid };
   return { already: false, pid: spawnExtensionDaemon(entry, port) };
 }
 
@@ -174,8 +203,10 @@ export async function runWatchdogLoop(port: number, entry: string): Promise<neve
   const wp = watchdogPidPath();
   try {
     const existing = Number(readFileSync(wp, 'utf8').trim());
-    if (Number.isFinite(existing) && existing > 0 && existing !== process.pid && alive(existing)) {
-      process.exit(0); // another watchdog is on duty
+    // another watchdog is on duty - but only a real one: a stranger behind a stale
+    // pid file used to make every new watchdog exit at once, leaving nobody on duty
+    if (Number.isFinite(existing) && existing > 0 && existing !== process.pid && isAlive(existing) && bridgeIdentity(existing) !== 'other') {
+      process.exit(0);
     }
   } catch { /* no pid file yet */ }
   writeFileSync(wp, String(process.pid));
@@ -183,11 +214,13 @@ export async function runWatchdogLoop(port: number, entry: string): Promise<neve
     try {
       const served = await probeExtensionDaemon(port);
       const pid = readExtensionPid();
-      const stale = pid > 0 && alive(pid) && recordedVersion() !== cliVersion();
+      const stale = pid > 0 && isAlive(pid) && recordedVersion() !== cliVersion() && bridgeIdentity(pid) !== 'other';
       if (!served.up || stale) {
-        if (stale) stopExtensionDaemon(port);
+        // what is ours gets cleared off the port (a hung bridge included); a
+        // foreign holder is left alone and no doomed spawn is made into it
+        stopExtensionDaemon(port);
         await waitExtensionPortFree(port, 3000);
-        spawnExtensionDaemon(entry, port);
+        if (!foreignHolder(port)) spawnExtensionDaemon(entry, port);
       }
     } catch { /* a watchdog that throws is a watchdog that dies — never */ }
     await new Promise((r) => setTimeout(r, 60_000));
@@ -199,13 +232,13 @@ export function startWatchdog(port = DEFAULT_EXTENSION_PORT, entry = process.arg
   try {
     const wp = watchdogPidPath();
     const existing = Number(readFileSync(wp, 'utf8').trim());
-    if (Number.isFinite(existing) && existing > 0 && alive(existing)) return existing;
+    if (Number.isFinite(existing) && existing > 0 && isAlive(existing) && bridgeIdentity(existing) !== 'other') return existing;
   } catch { /* none yet */ }
   const log = openSync(join(homeDir(), 'extension-watchdog.log'), 'a');
   const child = spawn(process.execPath, [
     '-e',
     `import('${pathToFileURL(entry).href.replace(/main\.js$/, 'extension-daemon.js')}').then(m => m.runWatchdogLoop(${port}, ${JSON.stringify(entry)}))`,
-  ], { detached: true, stdio: ['ignore', log, log], windowsHide: true });
+  ], { detached: true, stdio: ['ignore', log, log], windowsHide: true, cwd: daemonCwd(process.cwd(), entry) });
   child.unref();
   try { closeSync(log); } catch { /* gone */ }
   return child.pid ?? 0;
@@ -268,9 +301,9 @@ export function stopWatchdog(): boolean {
   try {
     const wp = watchdogPidPath();
     const pid = Number(readFileSync(wp, 'utf8').trim());
-    if (Number.isFinite(pid) && pid > 0 && alive(pid)) {
-      if (process.platform === 'win32') spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-      else process.kill(pid);
+    // only a watchdog of ours gets killed - a stale pid file may name anyone
+    if (Number.isFinite(pid) && pid > 0 && isAlive(pid) && bridgeIdentity(pid) !== 'other') {
+      killProcessTree(pid);
       try { unlinkSync(wp); } catch { /* absent */ }
       return true;
     }

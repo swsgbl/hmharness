@@ -13,6 +13,12 @@ import { deadlineSignal } from './deadline.ts';
 export interface ChatResponse {
   message: ChatMessage;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+  /** Why the model stopped, as the provider reports it: 'stop' (natural end),
+   *  'length' (the output cap CUT the reply or a tool call's JSON mid-way),
+   *  'content_filter', 'tool_calls', ... Absent when the provider reports none.
+   *  Until 0.23.54 both parse paths dropped it, so a truncated reply reached
+   *  every caller dressed as a complete one. */
+  finishReason?: string;
 }
 
 export type DeltaKind = 'text' | 'reasoning' | 'reset';
@@ -187,6 +193,7 @@ export async function chat(
           ...(choice.message?.tool_calls ? { tool_calls: choice.message.tool_calls } : {}),
         },
         usage: data.usage,
+        ...(choice.finish_reason ? { finishReason: String(choice.finish_reason) } : {}),
       };
     } catch (err) {
       lastError = String(err);
@@ -224,6 +231,7 @@ async function consumeStream(
   let text = '';
   let reasoning = '';
   let usage: ChatResponse['usage'];
+  let finishReason: string | undefined;
   // tool_calls accumulate across deltas, keyed by their index in the stream.
   const calls = new Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }>();
   // Idle guard rather than a total cap: generation length is unbounded.
@@ -256,6 +264,10 @@ async function consumeStream(
           continue; // keep-alive comment or malformed line
         }
         if (chunk.usage) usage = chunk.usage;
+        // the reason rides the LAST choice - usually one whose delta is empty,
+        // so it has to be read before the empty-delta skip below
+        const reason = chunk.choices?.[0]?.finish_reason;
+        if (reason) finishReason = String(reason);
         const delta = chunk.choices?.[0]?.delta;
         if (!delta) continue;
         if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
@@ -301,6 +313,7 @@ async function consumeStream(
       ...(ordered.length > 0 ? { tool_calls: ordered } : {}),
     },
     usage,
+    ...(finishReason ? { finishReason } : {}),
   };
 }
 

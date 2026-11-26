@@ -5,8 +5,9 @@
  * guard on obviously destructive one-liners; approvals live in the kernel.
  */
 import { exec } from 'node:child_process';
-import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chatVision, homeDir, isBareProbe, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 import { cognitiveQueryTool } from './cognitive-tools.ts';
@@ -74,8 +75,14 @@ export const writeFileTool: Tool = {
         const bak = p + '.bak-' + new Date().toISOString().replace(/[:.]/g, '-');
         await copyFile(p, bak).then(() => { backupNote = ` (backup: ${bak})`; }).catch(() => { /* first write */ });
       }
+      // a new file in a folder that does not exist yet is the normal shape of new
+      // work (a first module under a new directory). Until 0.23.54 it failed with
+      // ENOENT and cost a round trip through a shell mkdir - a dead end without one
+      const parent = dirname(p);
+      const newDir = !existsSync(parent);
+      if (newDir) await mkdir(parent, { recursive: true });
       await writeFile(p, String(args.content ?? ''), 'utf8');
-      return { output: `wrote ${String(args.content ?? '').length} chars to ${p}${backupNote}` };
+      return { output: `wrote ${String(args.content ?? '').length} chars to ${p}${newDir ? ' (created directory ' + parent + ')' : ''}${backupNote}` };
     } catch (err) {
       return { output: String(err), isError: true };
     }

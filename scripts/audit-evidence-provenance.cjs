@@ -59,8 +59,44 @@ function listJsonl(dir) {
   });
 }
 
+// Is this directory inside a git work tree? (asked once per root)
+const gitWorkTree = new Map();
+function inGitWorkTree(root) {
+  if (!gitWorkTree.has(root)) {
+    let yes = false;
+    try { yes = execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true'; }
+    catch { yes = false; }
+    gitWorkTree.set(root, yes);
+  }
+  return gitWorkTree.get(root);
+}
+
+const fold = (buf) => Buffer.from(buf.toString('latin1').replace(/\r\n/g, '\n'), 'latin1');
+
+/** The bytes a hash has to describe: what is COMMITTED, when the file is
+ *  tracked. A working copy that differs from the committed blob only by line
+ *  endings is a checkout artefact (core.autocrlf on Windows), not different
+ *  data - but hashing it is exactly what produced manifests that matched no
+ *  clone: the three datasets' manifests of 2026-10-27 carried the sha256 of
+ *  CRLF copies while the repository held LF (found 2026-11-26, so every fresh
+ *  clone failed --strict). A working copy with any OTHER difference is a real
+ *  local modification: its own bytes are hashed and the audit reports it.
+ *  Untracked files (a dataset not committed yet): the working bytes. */
+function evidenceBytes(file, root) {
+  const disk = fs.readFileSync(file);
+  if (!inGitWorkTree(root)) return disk;
+  const rel = path.relative(root, file).split(path.sep).join('/');
+  let blob = null;
+  try {
+    blob = execFileSync('git', ['cat-file', 'blob', 'HEAD:' + rel], { cwd: root, maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { blob = null; }
+  if (blob && !blob.equals(disk) && fold(blob).equals(fold(disk))) return blob;
+  return disk;
+}
+
 function inspect(file, root) {
-  const raw = fs.readFileSync(file, 'utf8');
+  const bytes = evidenceBytes(file, root);
+  const raw = bytes.toString('utf8');
   const lines = raw.split(/\r?\n/).filter((s) => s.trim());
   const times = [], errors = [];
   for (let i = 0; i < lines.length; i++) {
@@ -70,8 +106,8 @@ function inspect(file, root) {
   times.sort();
   return {
     path: path.relative(root, file).split(path.sep).join('/'),
-    sha256: crypto.createHash('sha256').update(raw).digest('hex'),
-    bytes: Buffer.byteLength(raw), nonEmptyLines: lines.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+    bytes: bytes.length, nonEmptyLines: lines.length,
     recordsWithEventTime: times.length, parseErrorCount: errors.length, parseErrors: errors.slice(0, 20),
     minEventTime: times[0] || null, maxEventTime: times[times.length - 1] || null,
   };
@@ -93,11 +129,17 @@ function pageGeneratedAt(dir) {
   } catch { return null; }
 }
 
+/** When the DATA of a dataset first entered git: the earliest commit that added
+ *  a file under its raw/. Asked of the whole directory instead, the answer
+ *  drifted to whatever was added there most recently - the manifest itself,
+ *  once it was committed (found 2026-11-26: a re-run of --write rewrote
+ *  sourceCommit / firstCommittedAtUtc of every dataset to its own commit). */
 function gitFirstCommit(root, relDir) {
   try {
-    const out = execFileSync('git', ['log', '--diff-filter=A', '--format=%H %aI', '-1', '--', relDir],
+    const out = execFileSync('git', ['log', '--diff-filter=A', '--format=%H %aI', '--reverse', '--', relDir + '/raw'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const m = /^([0-9a-f]{40}) (.+)$/.exec(out);
+    // (--reverse is applied AFTER -n, so the limit is left off and the first line taken)
+    const m = /^([0-9a-f]{40}) (.+)$/.exec(out.split('\n')[0]);
     return m ? { sha: m[1], date: new Date(m[2]).toISOString() } : null;
   } catch { return null; }
 }

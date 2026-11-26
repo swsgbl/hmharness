@@ -410,24 +410,31 @@ export function createMotion(win?: any, doc?: any) {
 
 /** The three modal overlays (#wspick, #cmdpal, #pairmod) are custom overlays, not <dialog>
  *  (modern-web-guidance `accessibility`): while one carries the .on class, the regions behind
- *  it are inert, so Tab and assistive tech cannot reach the background. The state is always
- *  re-derived from the overlay classes — never stored — so no open/close path can leave the
- *  page inert by mistake. `sync()` is returned for the close paths that move focus back into
- *  the page right away (the observer only runs a microtask later). */
+ *  it are inert, so Tab and assistive tech cannot reach the background. The phone's sidebar
+ *  drawer (body.mobside) gets the same treatment for #main and #rightbar - Tab used to walk
+ *  the page behind its backdrop. The state is always re-derived from the classes — never
+ *  stored — so no open/close path can leave the page inert by mistake. `sync()` is returned
+ *  for the close paths that move focus back into the page right away (the observer only
+ *  runs a microtask later). */
 export function wireModalInert(doc?: any) {
   var d = doc || document;
   var regions = Array.prototype.slice.call(d.querySelectorAll('#side, #main, #rightbar'));
   var overlays = Array.prototype.slice.call(d.querySelectorAll('#wspick, #cmdpal, #pairmod'));
+  var body = d.body;
   var mo: any = null;
   function sync() {
-    var open = overlays.some(function (o: any) { return o.classList.contains('on'); });
+    var modal = overlays.some(function (o: any) { return o.classList.contains('on'); });
+    var drawer = !!(body && body.classList && body.classList.contains('mobside'));
     regions.forEach(function (r: any) {
-      if (open) r.setAttribute('inert', ''); else r.removeAttribute('inert');
+      // the drawer IS the sidebar: only what lies behind it goes inert
+      var off = modal || (drawer && r.id !== 'side');
+      if (off) r.setAttribute('inert', ''); else r.removeAttribute('inert');
     });
   }
   if (typeof MutationObserver === 'function' && overlays.length) {
     mo = new MutationObserver(sync);
     overlays.forEach(function (o: any) { mo.observe(o, { attributes: true, attributeFilter: ['class'] }); });
+    if (body) mo.observe(body, { attributes: true, attributeFilter: ['class'] });
   }
   sync();
   return { sync, disconnect() { if (mo) mo.disconnect(); } };

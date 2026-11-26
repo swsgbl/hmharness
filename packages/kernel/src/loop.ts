@@ -88,15 +88,21 @@ export function sanitizeToolCalls<T extends { function: { arguments: string } }>
   });
 }
 
+/** Appended to a final answer the output cap severed (finish_reason 'length'):
+ *  the one place the user learns the reply is not whole. */
+export const TRUNCATED_TAIL = '\n\n[Reply truncated: the model hit its output length limit. Send "continue" to have it pick up where it stopped.]';
+
 export async function runLoop(opts: {
   provider: ProviderConfig;
   registry: RegistryLike;
   messages: ChatMessage[];
   ctx: ToolContext;
   maxTurns?: number;
-  /** AbortSignal: when fired, the loop stops at the next turn boundary and
-   *  returns with reason "interrupted". Use for user-initiated cancellation
-   *  (Esc key, /queue skip, web API interrupt). */
+  /** AbortSignal: when fired, the loop stops and returns with reason
+   *  "interrupted" - at the next turn boundary, or right away if the model
+   *  call is in flight (the call is cut and the stop is honoured at once).
+   *  Use for user-initiated cancellation (Esc key, /queue skip, web API
+   *  interrupt). */
   signal?: AbortSignal;
   /** Explicit transcript budget override (chars). Default: scales with the
    *  model's context window (window.ts registry / provider.contextWindow). */
@@ -216,12 +222,23 @@ export async function runLoop(opts: {
       });
     }
 
-    const chatRes = await modelCall(provider, compacted, tools, {
-      onDelta: events?.onDelta,
-      // the abort must pierce the in-flight call, not just turn boundaries -
-      // a hung provider stream otherwise holds the session busy forever
-      ...(opts.signal ? { signal: opts.signal } : {}),
-    });
+    let chatRes: Awaited<ReturnType<typeof modelCall>>;
+    try {
+      chatRes = await modelCall(provider, compacted, tools, {
+        onDelta: events?.onDelta,
+        // the abort must pierce the in-flight call, not just turn boundaries -
+        // a hung provider stream otherwise holds the session busy forever
+        ...(opts.signal ? { signal: opts.signal } : {}),
+      });
+    } catch (err) {
+      // The abort pierces this call by design, so a stop that lands while the model
+      // is streaming arrives HERE as a rejected request. Until 0.23.54 it escaped the
+      // loop as a provider failure: the web UI showed "provider: request aborted …
+      // task child exit 1" for a stop the user had pressed on purpose. It is the same
+      // stop as one noticed at a turn boundary - keep what was built and say so.
+      if (opts.signal?.aborted) { reason = 'interrupted'; break; }
+      throw err;
+    }
     usage.promptTokens += chatRes.usage?.prompt_tokens ?? 0;
     usage.completionTokens += chatRes.usage?.completion_tokens ?? 0;
     // Usage fallback: many OpenAI-compatible gateways never report usage
@@ -241,7 +258,7 @@ export async function runLoop(opts: {
 
     const calls = message.tool_calls ?? [];
     if (calls.length === 0) {
-      const text = message.content ?? '';
+      let text = message.content ?? '';
       // A runtime-steering injection may have arrived while this turn was in
       // flight; honor it by continuing instead of ending (codex Enter while
       // the last answer streams). Only end when the queue is empty.
@@ -251,6 +268,17 @@ export async function runLoop(opts: {
         events?.onInjected?.(pending);
         world++;
         continue;
+      }
+      // The output cap cut the answer mid-sentence (finish_reason 'length').
+      // Nothing else on the wire says so, and until 0.23.54 the severed text
+      // reached every surface dressed as a complete reply. The marker travels
+      // as a text delta: the web UI, the TUI and the one-shot task render the
+      // STREAM and never the returned text, so a tail appended to the return
+      // value alone was seen nowhere. This also keeps the return equal to what
+      // was streamed. The stored transcript keeps the raw message.
+      if (chatRes.finishReason === 'length') {
+        events?.onDelta?.('text', TRUNCATED_TAIL);
+        text += TRUNCATED_TAIL;
       }
       events?.onFinal?.(text, turn);
       return { text, turns: turn, toolUses, messages: working, usage, reason: 'final' };
@@ -303,9 +331,11 @@ export async function runLoop(opts: {
         p.isError = true;
         p.skip = true;
       } else if (badArgs) {
-        p.output = rawArgs
-          ? `unparseable tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON): ${rawArgs.slice(0, 200)}`
-          : `empty tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON)`;
+        p.output = chatRes.finishReason === 'length'
+          ? `the ${name} call was cut off by the model's output length limit before its JSON arguments were complete. Repeat it with a much smaller payload (split a long file into several smaller writes).`
+          : rawArgs
+            ? `unparseable tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON): ${rawArgs.slice(0, 200)}`
+            : `empty tool arguments for ${name} (arguments must be valid JSON — repeat the call with complete JSON)`;
         p.isError = true;
         p.skip = true;
       } else {

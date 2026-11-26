@@ -122,6 +122,8 @@ export const HEAD = `<!doctype html>
      button stays in the tab order, a visibility:hidden one never reaches the keyboard */
   .wsi .wsx { position:absolute; right:5px; top:5px; opacity:0; pointer-events:none; background:none; border:0; color:var(--dim); cursor:pointer; font-size:13px; padding:0 4px; border-radius:4px; }
   .wsi:hover .wsx, .wsi .wsx:focus-visible { opacity:1; pointer-events:auto; }
+  .wsi .wsx:disabled { opacity:0; pointer-events:none; }
+  .wsi:hover .wsx:disabled { opacity:.35; pointer-events:auto; cursor:default; }
   .wsi .wsx:hover { color:var(--err); }
   .wsadd { display:block; width:100%; text-align:left; background:none; font-family:inherit; border:0; border-top:1px dashed var(--line); color:var(--dim); font-size:12px; padding:6px 8px; cursor:pointer; margin-top:2px; }
   .wsadd:hover { color:var(--accent); }
@@ -422,7 +424,7 @@ export const HEAD = `<!doctype html>
   #dempty { color:var(--dim); font-size:12px; margin:auto; text-align:center; padding:0 18px; }
   /* ---- files tab (workspace tree, lazy dirs) ---- */
   #ftree { padding:6px 8px; font-family:var(--mono); font-size:12px; }
-  .frow { display:flex; gap:7px; align-items:center; padding:3px 8px; border-radius:6px; cursor:pointer; white-space:nowrap; overflow:hidden; }
+  .frow { display:flex; width:100%; text-align:left; background:none; border:0; color:inherit; font:inherit; gap:7px; align-items:center; padding:3px 8px; border-radius:6px; cursor:pointer; white-space:nowrap; overflow:hidden; }
   .frow:hover { background:var(--panel2); }
   .frow .fic { flex:none; }
   .frow.dir { color:var(--text); }
