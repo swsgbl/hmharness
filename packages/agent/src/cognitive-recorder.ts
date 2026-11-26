@@ -62,6 +62,8 @@ export class CognitiveRunRecorder {
     const table = new Map<string, { sum: number; n: number }>();
     for (const traj of trajectories) {
       for (const s of traj.steps) {
+        // only steps with an outcome teach anything ('unknown' = nothing was tried)
+        if (s.outcome !== 'success' && s.outcome !== 'failure') continue;
         const t = s.action.type;
         const agg = table.get(t) ?? { sum: 0, n: 0 };
         agg.sum += s.outcome === 'success' ? 1 : 0;
@@ -114,6 +116,21 @@ export class CognitiveRunRecorder {
       prediction: this.predict(toolName),
       env: envForTool(toolName),
     });
+  }
+
+  /** loop onToolResult for a call that never ran - refused by the action
+   *  gate, or declined by the user. The open step is dropped: nothing was
+   *  tried, so there is no outcome to learn from. Recorded as a failure it
+   *  fed the very statistics the gate is built from (every refusal of
+   *  `web_search` was one more failed `web_search`), and a blocked action type
+   *  could never recover (2026-11-26). */
+  skip(toolName: string): void {
+    for (const key of this.open.keys()) {
+      if (key.startsWith(`${toolName}#`)) {
+        this.open.delete(key);
+        return;
+      }
+    }
   }
 
   /** loop onToolResult: close the matching step (same tool, FIFO) */

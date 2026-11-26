@@ -5,7 +5,7 @@
  * guard on obviously destructive one-liners; approvals live in the kernel.
  */
 import { exec } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -283,46 +283,193 @@ async function execCommand(command: string, args: Record<string, unknown>, ctx: 
   }
 }
 
-/** Zero-dependency web search: DuckDuckGo HTML endpoint, no API key. */
-export const webSearchTool: Tool = {
-  name: 'web_search',
-  description:
-    'Search the web (DuckDuckGo, no key). Returns top results as: title | url | snippet. Use for current events, docs, versions - anything not knowable offline.',
-  parameters: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'search query' },
-      count: { type: 'number', description: 'max results (default 6, max 10)' },
-    },
-    required: ['query'],
-  },
-  async execute(args) {
-    const q = String(args.query ?? '').trim();
-    if (!q) return { output: 'query required', isError: true };
-    const n = Math.min(Math.max(Number(args.count ?? 6), 1), 10);
-    try {
-      const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!res.ok) return { output: 'search: HTTP ' + res.status, isError: true };
-      const html = await res.text();
-      const out: string[] = [];
-      const re = new RegExp('class="result__a"[^>]*href="([^"]+)"[^>]*>([\\s\\S]*?)</a>[\\s\\S]*?class="result__snippet"[^>]*>([\\s\\S]*?)</a>', 'g');
-      let m: RegExpExecArray | null;
-      const strip = (t: string) => t.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
-      while ((m = re.exec(html)) && out.length < n) {
-        let url = m[1];
-        const uddg = /uddg=([^&]+)/.exec(url);
-        if (uddg) { try { url = decodeURIComponent(uddg[1]); } catch { /* keep raw */ } }
-        out.push((out.length + 1) + '. ' + strip(m[2]) + ' | ' + url + ' | ' + strip(m[3]).slice(0, 200));
-      }
-      return { output: out.length ? out.join('\n') : 'no results (try a different query)' };
-    } catch (err) {
-      return { output: 'search failed: ' + String(err).slice(0, 160), isError: true };
-    }
-  },
+/** A search engine that needs no key: where to ask, and how to read the answer. */
+export interface SearchEngine {
+  name: string;
+  /** the request prefix - the encoded query is appended */
+  endpoint: string;
+  parse: (html: string, n: number) => string[];
+}
+
+const BROWSER_HEADERS = {
+  // a desktop browser: anything else gets a mobile or stripped layout
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.8,zh-CN;q=0.6',
 };
+
+const decodeEntities = (t: string): string => t
+  .replace(/<[^>]+>/g, '')
+  .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&ensp;|&nbsp;|&#0183;/g, ' ').replace(/&#\d+;/g, '')
+  .trim();
+
+/** DuckDuckGo's HTML endpoint: `result__a` links, each followed by a `result__snippet`. */
+export function parseDuckDuckGo(html: string, n: number): string[] {
+  const out: string[] = [];
+  const re = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) && out.length < n) {
+    let url = m[1];
+    const uddg = /uddg=([^&]+)/.exec(url);
+    if (uddg) { try { url = decodeURIComponent(uddg[1]); } catch { /* keep raw */ } }
+    out.push(`${out.length + 1}. ${decodeEntities(m[2])} | ${url} | ${decodeEntities(m[3]).slice(0, 200)}`);
+  }
+  return out;
+}
+
+/** A Bing result link is the page itself, or a click-tracking redirect whose
+ *  `u=a1<base64url>` parameter carries the real address. */
+function bingDirectUrl(href: string): string {
+  const m = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(href);
+  if (!m) return href;
+  try {
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(b64 + '='.repeat((4 - (b64.length % 4)) % 4), 'base64').toString('utf8');
+  } catch { return href; }
+}
+
+/** Bing's result page: one `<li class="b_algo">` per result. Inside a result
+ *  the title is the first `<h2><a href>`, the snippet a `<p class="b_lineclamp…">`
+ *  (or `b_paractl`). Results are split first and parsed one by one, so a result
+ *  without a snippet can never borrow the next result's. */
+export function parseBing(html: string, n: number): string[] {
+  const out: string[] = [];
+  for (const chunk of html.split('<li class="b_algo"').slice(1)) {
+    if (out.length >= n) break;
+    const title = /<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(chunk);
+    if (!title) continue;
+    const snippet = /<p class="(?:b_lineclamp|b_paractl)[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(chunk);
+    const text = decodeEntities(title[2]);
+    if (!text) continue;
+    // the attribute is HTML-escaped on the real page (&amp;u=…): unescape before reading it
+    const href = title[1].replace(/&amp;/g, '&');
+    out.push(`${out.length + 1}. ${text} | ${bingDirectUrl(href)} | ${snippet ? decodeEntities(snippet[1]).slice(0, 200) : ''}`.replace(/ \| $/, ''));
+  }
+  return out;
+}
+
+/** Keyless engines, tried in order. Bing is the fallback because DuckDuckGo
+ *  is unreachable from a large part of the world: on the machine this was
+ *  written on (China) every single `web_search` failed - 0 of 23 - and the
+ *  self-evolution layer learned to block the tool for it (2026-11-26). */
+export const DEFAULT_SEARCH_ENGINES: SearchEngine[] = [
+  { name: 'DuckDuckGo', endpoint: 'https://html.duckduckgo.com/html/?q=', parse: parseDuckDuckGo },
+  { name: 'Bing', endpoint: 'https://www.bing.com/search?q=', parse: parseBing },
+];
+
+const ENGINE_DOWN_MS = 10 * 60_000;
+const engineStateFile = (home: string): string => join(home, 'search-engines.json');
+
+/** Which engines are known to be unreachable from this machine, and until
+ *  when. Remembered across processes: without it every task would first sit
+ *  out the DuckDuckGo timeout before falling back to Bing. */
+export function readEngineState(home?: string): Record<string, number> {
+  if (!home) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(engineStateFile(home), 'utf8')) as { down?: Record<string, number> };
+    return parsed.down ?? {};
+  } catch { return {}; }
+}
+
+function markEngineDown(home: string | undefined, name: string, down: Record<string, number>): void {
+  down[name] = Date.now() + ENGINE_DOWN_MS;
+  if (!home) return;
+  try { writeFileSync(engineStateFile(home), JSON.stringify({ down }), 'utf8'); } catch { /* the breaker stays in memory */ }
+}
+
+/** `web_search` over a list of engines (the default list, or one a test points at its own server). */
+export function createWebSearchTool(engines: SearchEngine[], opts: { timeoutMs?: number } = {}): Tool {
+  // 8 s: a reachable engine answers in 1-3 s; an unreachable one (blocked
+  // regionally) holds the connection until the limit, and that wait is what
+  // the first search of every process pays before the fallback
+  const timeoutMs = opts.timeoutMs ?? 8_000;
+  return {
+    name: 'web_search',
+    description:
+      'Search the web (no key). Returns top results as: title | url | snippet. Use for current events, docs, versions - anything not knowable offline.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'search query' },
+        count: { type: 'number', description: 'max results (default 6, max 10)' },
+      },
+      required: ['query'],
+    },
+    async execute(args, ctx) {
+      const q = String(args.query ?? '').trim();
+      if (!q) return { output: 'query required', isError: true };
+      const n = Math.min(Math.max(Number(args.count ?? 6), 1), 10);
+      const down = readEngineState(ctx?.home);
+      const failures: string[] = [];
+      let anyAnswered = false;
+      for (const engine of engines) {
+        if ((down[engine.name] ?? 0) > Date.now()) {
+          failures.push(`${engine.name}: unreachable earlier`);
+          continue;
+        }
+        try {
+          const res = await fetch(engine.endpoint + encodeURIComponent(q), { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+          if (!res.ok) {
+            failures.push(`${engine.name}: HTTP ${res.status}`);
+            // only the engine's own trouble opens the breaker; a 4xx is about this request
+            if (res.status >= 500 || res.status === 429) markEngineDown(ctx?.home, engine.name, down);
+            continue;
+          }
+          anyAnswered = true;
+          const results = engine.parse(await res.text(), n);
+          if (results.length > 0) {
+            if (down[engine.name]) { delete down[engine.name]; markEngineStateCleared(ctx?.home, down); }
+            return { output: results.join('\n') };
+          }
+          failures.push(`${engine.name}: no results`);
+        } catch (err) {
+          failures.push(`${engine.name}: ${describeFetchError(err).slice(0, 120)}`);
+          markEngineDown(ctx?.home, engine.name, down);
+        }
+      }
+      // every engine that answered found nothing: that is about the query, not the network
+      if (anyAnswered && !failures.some((f) => !f.endsWith('no results'))) return { output: 'no results (try a different query)' };
+      return { output: 'search failed: ' + failures.join('; '), isError: true };
+    },
+  };
+}
+
+function markEngineStateCleared(home: string | undefined, down: Record<string, number>): void {
+  if (!home) return;
+  try { writeFileSync(engineStateFile(home), JSON.stringify({ down }), 'utf8'); } catch { /* best effort */ }
+}
+
+export const webSearchTool: Tool = createWebSearchTool(DEFAULT_SEARCH_ENGINES);
+
+/** What a failed fetch failed ON (2026-11-26). Node's fetch reports every
+ *  network-level failure as the same line - "TypeError: fetch failed" - and
+ *  hides the reason in `cause`. Of 19 web_fetch failures on record, 11 said
+ *  exactly that: sites this network reaches only through a proxy (the cause
+ *  was ECONNRESET), so the model could not tell an unreachable host from a
+ *  slow one and retried the same URL. The shapes below are the ones Node
+ *  actually produces: cause `{ code: 'ECONNREFUSED', message: 'connect
+ *  ECONNREFUSED 127.0.0.1:52858' }`, `'ENOTFOUND'` / `'getaddrinfo ENOTFOUND
+ *  <host>'`, `'ECONNRESET'` / `'read ECONNRESET'`, and undici's own
+ *  `UND_ERR_CONNECT_TIMEOUT` / `ConnectTimeoutError`. */
+export function describeFetchError(err: unknown): string {
+  const reasons: string[] = [];
+  for (let e = err, i = 0; e != null && i < 5; e = (e as { cause?: unknown }).cause, i++) {
+    const { name, code } = e as { name?: unknown; code?: unknown };
+    const message = String((e as { message?: unknown }).message ?? '').replace(/\s+/g, ' ').trim();
+    // the wrapper's "fetch failed" only says that it failed - the cause says why
+    if (!message || message === 'fetch failed') continue;
+    const reason = typeof code === 'string' ? `${code} ${message}` : typeof name === 'string' ? `${name}: ${message}` : message;
+    if (!reasons.includes(reason)) reasons.push(reason);
+  }
+  const detail = (reasons.length ? reasons : [String(err)]).join(' <- ').slice(0, 200);
+  const all = detail.toLowerCase();
+  const meaning = /enotfound|eai_again|getaddrinfo/.test(all) ? 'host name not resolved from this network'
+    : /timeout|timed out|aborted|und_err_connect|und_err_headers|und_err_body/.test(all) ? 'no answer within the time limit from this network'
+    : /cert|tls|ssl/.test(all) ? 'TLS or certificate problem'
+    : /econnrefused|econnreset|epipe|ehostunreachable|enetunreachable|econnaborted/.test(all) ? 'connection refused or reset'
+    : '';
+  return 'fetch failed: ' + detail + (meaning ? ' (' + meaning + ' - a proxy or a mirror may be needed from this machine)' : '');
+}
 
 /** Fetch a URL and return readable text (tags stripped, entities decoded,
  *  size-bounded). Pairs with web_search: search finds, fetch reads. */
@@ -364,7 +511,7 @@ export const webFetchTool: Tool = {
       text = text.replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim();
       return { output: text.slice(0, max) + (text.length > max ? '\n...[truncated at ' + max + ' chars]' : '') };
     } catch (err) {
-      return { output: 'fetch failed: ' + String(err).slice(0, 160), isError: true };
+      return { output: describeFetchError(err), isError: true };
     }
   },
 };

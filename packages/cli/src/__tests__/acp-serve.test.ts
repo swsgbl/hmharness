@@ -64,7 +64,16 @@ function stubRun(seen: AcpRunTaskArgs[], waitMs = 0): AcpRunTask {
       turns: 1,
       toolUses: 1,
       sessionId: 'hmh-rollout-1',
-      messages: [{ role: 'assistant' as const, content: 'hello done' }],
+      // the REAL contract of runAgentTask (LoopResult.messages): [system prompt,
+      // ...the replayed history, the user's line, ...this turn's new messages].
+      // A stub that returned only the new answer kept this suite green for two
+      // months while production handed back the input array (2026-11-26).
+      messages: [
+        { role: 'system' as const, content: 'the system prompt of this run' },
+        ...(a.resumeMessages ?? []),
+        { role: 'user' as const, content: a.prompt },
+        { role: 'assistant' as const, content: 'hello done' },
+      ],
     };
   };
 }
@@ -87,7 +96,7 @@ test('acp: initialize handshake echoes the client version and declares capabilit
     // notifications (no id) never emit responses
     await srv.handle({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: 'nope' } });
     assert.equal(frames.length, 3);
-  } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
+  } finally { await dropHome(); await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });
 
 test('acp: session/load restores a prior rollout (host reconnects instead of respawning)', async () => {
@@ -105,7 +114,7 @@ test('acp: session/load restores a prior rollout (host reconnects instead of res
     // unknown rollout still loads (runner falls back to a fresh session)
     await srv.handle({ jsonrpc: '2.0', id: 3, method: 'session/load', params: { sessionId: 'rollout-gone' } });
     assert.equal(frames.find((f) => f.id === 3)!.result.sessionId, 'rollout-gone');
-  } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
+  } finally { await dropHome(); await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });
 
 test('acp: one prompt streams the full update sequence and resumes the next turn', async () => {
@@ -131,9 +140,15 @@ test('acp: one prompt streams the full update sequence and resumes the next turn
     await srv.handle({ jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: sid, prompt: [{ type: 'text', text: 'again' }] } });
     assert.equal(seen.length, 2);
     assert.equal(seen[1]!.sessionId, 'hmh-rollout-1');
-    assert.equal((seen[1]!.resumeMessages as Array<{ content: string }>)[0]!.content, 'hello done');
+    // what the second prompt continues from: the first request and the answer
+    // to it - and no system prompt (each turn brings its own; the thread used
+    // to collect one more copy of it on every turn)
+    assert.deepEqual(seen[1]!.resumeMessages, [
+      { role: 'user', content: 'do it' },
+      { role: 'assistant', content: 'hello done' },
+    ]);
     assert.equal(frames.find((f) => f.id === 3)!.result.stopReason, 'end_turn');
-  } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
+  } finally { await dropHome(); await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });
 
 test('acp: cancel aborts the running turn -> stopReason cancelled; session frees for the next prompt', async () => {
@@ -156,7 +171,7 @@ test('acp: cancel aborts the running turn -> stopReason cancelled; session frees
     // session is free again: a follow-up prompt runs to completion
     await srv.handle({ jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: sid, prompt: [{ type: 'text', text: 'next' }] } });
     assert.equal(frames.find((f) => f.id === 3)!.result.stopReason, 'end_turn');
-  } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
+  } finally { await dropHome(); await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });
 
 test('acp: permission rejection denies the gated tool, allow passes it', async () => {
@@ -179,5 +194,5 @@ test('acp: permission rejection denies the gated tool, allow passes it', async (
       const chunks = frames.filter((f) => f.method === 'session/update').map((f) => f.params.update.content.text);
       assert.equal(chunks.at(-1), expect);
     }
-  } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
+  } finally { await dropHome(); await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });

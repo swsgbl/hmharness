@@ -17,7 +17,11 @@ export interface LoopEvents {
   onAssistant?(m: ChatMessage): void;
   onDelta?(kind: DeltaKind, chunk: string): void;
   onToolCall?(name: string, args: Record<string, unknown>): void;
-  onToolResult?(name: string, output: string, isError: boolean): void;
+  /** `notRun` is set when the tool NEVER executed: 'gate' (refused by the
+   *  action gate) or 'declined' (the user did not approve it). The output is
+   *  still the model's tool result, but a listener that learns from outcomes
+   *  must not read it as the tool failing. */
+  onToolResult?(name: string, output: string, isError: boolean, notRun?: 'gate' | 'declined'): void;
   /** Called when a tool requested approval. granted=false means denied. */
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
   /** Called when the pre-execution action gate was consulted (v0.24 P2A):
@@ -92,6 +96,42 @@ export function sanitizeToolCalls<T extends { function: { arguments: string } }>
  *  the one place the user learns the reply is not whole. */
 export const TRUNCATED_TAIL = '\n\n[Reply truncated: the model hit its output length limit. Send "continue" to have it pick up where it stopped.]';
 
+/** The loop's own control notes steer ONE run. They are not conversation, and
+ *  they must not ride into the next one: a stale "context is running low - wrap
+ *  up" read by a later task in the same thread makes it wind down before it
+ *  began. What a caller gets back is the thread without them. */
+const TRANSIENT_NOTE = /^\[(?:context budget|turn checkpoint|intent only|empty reply)\]/;
+function conversationOf(working: ChatMessage[]): ChatMessage[] {
+  return working.filter((m) => !(m.role === 'system' && TRANSIENT_NOTE.test(String(m.content ?? ''))));
+}
+
+/** Weak-model guards (2026-11-26). The loop ends the moment the model replies
+ *  without a tool call - and two replies are not answers. A weak model gives
+ *  both: it only ANNOUNCES what it is about to do ("我来重命名…") and waits
+ *  for a turn that never comes, or it returns nothing at all once the work is
+ *  done. In an A/B on a local 9B model 2 of 3 runs ended that way; across 78
+ *  real turns of glm-5.3 neither shape occurred once. Each is met with
+ *  corrective notes, under conditions narrow enough that a real answer is
+ *  never mistaken for either. */
+// One short line that opens with a first-person statement of intent, optionally
+// behind an acknowledgement ("好的，我来…", "Sure, let me…"). Anything that
+// could be content disqualifies it: a second line, a colon (both widths), a
+// question, a code block - and a negation, because "I will not …" is an answer.
+const INTENT_ONLY = /^(?:(?:好的|没问题|明白|收到|行|OK|Sure|Alright|Certainly|Of course)[,，!！。\s]*)?(?:我(?:来|将|会|马上|这就|即将|现在)|让我|现在(?:开始|我来|就)|接下来(?:我|将|会|就)|I'?ll|I will|I am going to|I'?m going to|Let me)/i;
+const NEGATION = /\b(?:not|won't|can't|cannot|never)\b|不会|不能|无法|不便|拒绝/i;
+export function isIntentOnly(text: string): boolean {
+  return text.length <= 120 && !/[\n:：?？]|```/.test(text) && !NEGATION.test(text) && INTENT_ONLY.test(text);
+}
+export const INTENT_ONLY_NOTE = '[intent only] That reply only stated what you are about to do, and no tool was called, so nothing was done. Either do it now with tool calls, or - if you are waiting for the user - say in one sentence what you are waiting for and stop.';
+export const EMPTY_REPLY_NOTE = '[empty reply] The last reply was empty. If the task is done, answer with what was done. If it is not, continue with the next tool call.';
+/** Shown in place of a reply that stayed empty: silence is not an answer. */
+export const NO_ANSWER_NOTE = '[No answer: the model returned an empty reply. Send "continue" or rephrase.]';
+const EMPTY_REPLY_RETRIES = 2;
+/** Plan mode asks the model to state a plan and stop: an announcement is the
+ *  right answer there. The directive rides in the messages of the task. */
+const inPlanMode = (messages: ChatMessage[]): boolean =>
+  messages.some((m) => m.role === 'system' && String(m.content ?? '').startsWith('[plan mode]'));
+
 export async function runLoop(opts: {
   provider: ProviderConfig;
   registry: RegistryLike;
@@ -159,6 +199,9 @@ export async function runLoop(opts: {
   let turn = 0;
   let idleTurns = 0; // consecutive turns with no successful tool calls
   let reason: 'final' | 'idle' | 'turn-valve' | 'token-valve' | 'interrupted' = 'final';
+  let emptyReplies = 0; // weak-model guard 1: empty replies re-asked so far
+  let nudged = false; // weak-model guard 2: one "announce and stop" correction per run
+  const planMode = inPlanMode(opts.messages);
 
   // Re-verification loop breaker (2026-10-07 export: 108 tool calls in 5
   // user turns, 20+ turns re-deriving the SAME fact because the earlier tool
@@ -258,6 +301,11 @@ export async function runLoop(opts: {
 
     const calls = message.tool_calls ?? [];
     if (calls.length === 0) {
+      // The answer joins the conversation before anything else happens: a
+      // follow-up has to see what was answered here. Until 0.23.56 the final
+      // reply was never added to the working transcript, so every continuation
+      // of a thread lost the one message that mattered most.
+      working.push({ role: 'assistant', content: message.content ?? null });
       let text = message.content ?? '';
       // A runtime-steering injection may have arrived while this turn was in
       // flight; honor it by continuing instead of ending (codex Enter while
@@ -279,9 +327,38 @@ export async function runLoop(opts: {
       if (chatRes.finishReason === 'length') {
         events?.onDelta?.('text', TRUNCATED_TAIL);
         text += TRUNCATED_TAIL;
+        events?.onFinal?.(text, turn);
+        return { text, turns: turn, toolUses, messages: conversationOf(working), usage, reason: 'final' };
+      }
+      // Weak-model guard 1 - the empty reply (2026-11-26). A 9B model finished
+      // its edits and then returned no text and no tool call, and the loop
+      // took that for a final answer: the user was shown nothing at all. The
+      // empty step goes back out of the transcript (a content-less assistant
+      // message is not a valid history item) and the model is asked again,
+      // twice at most - a model with nothing to say gets to say so.
+      if (!text.trim()) {
+        if (emptyReplies < EMPTY_REPLY_RETRIES) {
+          emptyReplies++;
+          working.pop();
+          working.push({ role: 'system', content: EMPTY_REPLY_NOTE });
+          continue;
+        }
+        events?.onDelta?.('text', NO_ANSWER_NOTE);
+        text = NO_ANSWER_NOTE;
+      } else if (toolUses === 0 && !nudged && !planMode && isIntentOnly(text.trim())) {
+        // Weak-model guard 2 - "announce and stop" (2026-11-26). Asked to
+        // rename a function, the same model answered "我来重命名…" and
+        // stopped: it had stated the intent and waited for a turn. Nothing
+        // has run yet in this task and the reply is a bare statement of
+        // intent, so it is told once to act (or to say what it is waiting
+        // for). After any tool has run the same sentence may be a legitimate
+        // last word, and a plan-mode reply is a plan - neither is touched.
+        nudged = true;
+        working.push({ role: 'system', content: INTENT_ONLY_NOTE });
+        continue;
       }
       events?.onFinal?.(text, turn);
-      return { text, turns: turn, toolUses, messages: working, usage, reason: 'final' };
+      return { text, turns: turn, toolUses, messages: conversationOf(working), usage, reason: 'final' };
     }
 
     // Poison control: invalid-JSON arguments must never enter the transcript
@@ -301,6 +378,7 @@ export async function runLoop(opts: {
       output: string;
       isError: boolean;
       skip: boolean; // denied or invalid - never executed
+      notRun?: 'gate' | 'declined'; // set when it did not run for a reason that is not the tool's
     }
     const planned: Planned[] = [];
     for (const call of calls) {
@@ -355,6 +433,7 @@ export async function runLoop(opts: {
           p.output = `[action gate] ${refused}`;
           p.isError = true;
           p.skip = true;
+          p.notRun = 'gate';
         } else if (tool.needsApproval?.(args, ctx)) {
           // Safe default: with no gate wired in, risky tools are denied.
           const granted = opts.approval ? await opts.approval.ask(name, args) : false;
@@ -363,6 +442,7 @@ export async function runLoop(opts: {
             p.output = 'User declined this action. Ask how to proceed or find a non-destructive alternative.';
             p.isError = true;
             p.skip = true;
+            p.notRun = 'declined';
           }
         }
       }
@@ -405,7 +485,7 @@ export async function runLoop(opts: {
     }));
     for (const p of planned) {
       toolUses++;
-      events?.onToolResult?.(p.name, p.output, p.isError);
+      events?.onToolResult?.(p.name, p.output, p.isError, p.notRun);
       working.push({
         role: 'tool',
         tool_call_id: p.call.id,
@@ -452,5 +532,5 @@ export async function runLoop(opts: {
       ? `Turn limit reached (${executedTurns} turns). The session is preserved — send another message to continue.`
       : `Token budget limit reached (~${usage.promptTokens + usage.completionTokens} tokens). The session is preserved — send another message to continue.`;
   events?.onFinal?.(text, executedTurns);
-  return { text, turns: executedTurns, toolUses, messages: working, usage, reason };
+  return { text, turns: executedTurns, toolUses, messages: conversationOf(working), usage, reason };
 }

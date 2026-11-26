@@ -29,6 +29,7 @@ export {
   makeApproval,
   liveYolo,
   nativeRegistry,
+  extendConversation,
   runAgentTask,
   spawnBase,
   toServerConfig,

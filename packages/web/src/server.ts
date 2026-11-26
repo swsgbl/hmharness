@@ -8,7 +8,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
-import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm } from 'node:fs/promises';
+import { readdir, readFile, rename, mkdir, writeFile, stat, open, rm, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -16,7 +16,7 @@ import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import {
-  homeDir, chatSeesImages, isBareProbe, loadConfig, loadTranscript, resolveProvider, listProviders, setChatRoute,
+  homeDir, chatSeesImages, isBareProbe, loadConfig, loadTranscript, replayableConversation, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
   saveProvider, deleteProvider, patchConfig, getGoal, setGoal, isProviderAuthError,
   findSessionFile, listSessions, exportSessionMarkdown, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
@@ -329,25 +329,40 @@ export async function startServer(opts: {
   let wsItems: WsItem[] = [];
   let wsCurrent = '';
   const wsFile = join(home, 'workspaces.json');
-  const saveWorkspaces = () =>
-    writeFile(wsFile, JSON.stringify({ current: wsCurrent, items: wsItems }, null, 2), 'utf8');
+  // a file that could not be read is never written over blindly: a copy of
+  // what was there is kept beside it before the first deliberate save
+  let wsFileUnreadable = false;
+  const saveWorkspaces = async (): Promise<void> => {
+    if (wsFileUnreadable) {
+      wsFileUnreadable = false;
+      try { await copyFile(wsFile, `${wsFile}.unreadable-${Date.now()}`); } catch { /* nothing to keep */ }
+    }
+    await writeFile(wsFile, JSON.stringify({ current: wsCurrent, items: wsItems }, null, 2), 'utf8');
+  };
   const currentWs = (): WsItem | undefined => wsItems.find((w) => w.id === wsCurrent);
   // workspace file surface: search/read/attachments all resolve against the
   // active workspace (or the server cwd when none is selected)
   const wsRoot = () => currentWs()?.path ?? process.cwd();
   const insideWs = (p: string) => insideRoot(wsRoot(), p);
-  try {
-    const d = JSON.parse(await readFile(wsFile, 'utf8')) as { current?: string; items?: WsItem[] };
-    wsItems = Array.isArray(d.items) ? d.items : [];
-    wsCurrent = typeof d.current === 'string' ? d.current : '';
-  } catch {
-    wsItems = [];
-    wsCurrent = '';
+  // read with care: a BOM is ignored (Windows tools write one), and a file
+  // that cannot be parsed is left exactly as it is. It used to be read as
+  // "no workspaces", seeded with one and written straight back over.
+  let wsText: string | null = null;
+  try { wsText = await readFile(wsFile, 'utf8'); } catch { /* no file yet */ }
+  if (wsText !== null && wsText.trim()) {
+    try {
+      const d = JSON.parse(wsText.replace(/^\uFEFF/, '')) as { current?: string; items?: WsItem[] };
+      wsItems = Array.isArray(d.items) ? d.items : [];
+      wsCurrent = typeof d.current === 'string' ? d.current : '';
+    } catch {
+      wsFileUnreadable = true;
+      console.error(`[web] ${wsFile} 无法解析：本次从默认工作区开始，该文件未被改动（下次保存工作区前会先留一份副本）`);
+    }
   }
   if (!wsItems.length) {
     wsItems = [{ id: `ws-${Math.random().toString(36).slice(2, 8)}`, name: basename(process.cwd()) || 'workspace', path: process.cwd() }];
     wsCurrent = wsItems[0].id;
-    await saveWorkspaces();
+    if (!wsFileUnreadable) await saveWorkspaces();
   }
   if (!wsItems.some((w) => w.id === wsCurrent)) wsCurrent = wsItems[0].id;
   {
@@ -464,7 +479,9 @@ export async function startServer(opts: {
         if (file) {
           const tr = await loadTranscript(file);
           if (tr) {
-            thread.conversation = tr.messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+            // the rollout AS THE MODEL MAY READ IT BACK: every turn with its
+            // tool results, minus any call whose result never landed
+            thread.conversation = replayableConversation(tr.messages);
             thread.rolloutId = tr.id ?? sid;
             if (tr.cwd) thread.cwd = tr.cwd;
           }
@@ -580,7 +597,7 @@ export async function startServer(opts: {
         thread.rolloutId = String(ev.sessionId ?? sid);
         broadcast('final', {
           text: ev.text, sessionId: sid, runId, turns: ev.turns, toolUses: ev.toolUses, usage: ev.usage,
-          turnsInThread: Math.floor(thread.conversation.length / 2),
+          turnsInThread: thread.conversation.filter((m) => m.role === 'user').length,
         });
         // desktop 桥:交付物先于终态(artifact.created ← 任务在会话 cwd 留下的
         // git 变更;Desktop 的终态不回退规则保证 completed 不被拉回 running)

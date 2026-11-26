@@ -150,12 +150,10 @@ async function main(): Promise<void> {
     turns: result.turns,
     toolUses: result.toolUses,
     usage: result.usage,
-    // user/assistant turns only, assistant tool_calls stripped - the next
-    // run prepends its own system prompt and must not inherit dangling
-    // tool-call pairs (same trimming the old in-process path did)
-    messages: (result.messages ?? [])
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => (m.role === 'assistant' && m.tool_calls ? { role: 'assistant', content: m.content } : m)),
+    // the whole conversation as a provider takes it back (no system prompt, no
+    // dangling tool-call pair): the thread keeps the assistant's steps AND the
+    // tool results, so a follow-up does not re-derive what is already known
+    messages: kernel.replayableConversation(result.messages),
   });
   return shutdown(0);
 }

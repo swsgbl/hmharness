@@ -34,11 +34,68 @@ function applyLocaleOverride(cfg: HmhConfig): HmhConfig {
   return env === 'zh' || env === 'en' ? { ...cfg, locale: env } : cfg;
 }
 
+/** config text -> the object at its top level. A UTF-8 BOM in front of the file
+ *  is ignored: Windows tools write one there (PowerShell 5.1
+ *  `Out-File -Encoding UTF8`), and JSON.parse rejects the file over it. An
+ *  empty file is a config that has not been filled in yet. */
+function parseConfigText(text: string): Record<string, unknown> {
+  if (!text.trim()) return {};
+  const parsed = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('顶层必须是一个 JSON 对象');
+  return parsed as Record<string, unknown>;
+}
+
+const configWarningShown = new Set<string>();
+
+/** Where `loadConfig` says that a config could not be parsed: stderr, so every
+ *  surface (CLI, TUI, daemon log) shows it. Tests listen on the seam instead of
+ *  replacing `process.stderr.write`, which does not take reliably under a
+ *  test runner. */
+let configWarning: (line: string) => void = (line) => { process.stderr.write(line); };
+
+/** @internal test seam: capture the warning (and forget what was already shown). */
+export function setConfigWarningSinkForTests(sink: ((line: string) => void) | null): void {
+  configWarning = sink ?? ((line) => { process.stderr.write(line); });
+  configWarningShown.clear();
+}
+
+/** config.json for a read-modify-write. No file yet is a fresh config; a file
+ *  that cannot be parsed STOPS the change. It used to be read as `{}` and the
+ *  change written back over it - one `/lang` on a BOM-prefixed config erased
+ *  every provider and key in it (2026-11-26). */
+async function readConfigObject(file: string): Promise<Record<string, unknown>> {
+  let text: string;
+  try { text = await readFile(file, 'utf8'); }
+  catch { return {}; }
+  try {
+    return parseConfigText(text);
+  } catch (err) {
+    throw new Error(`${file} 无法解析，已取消本次修改以免覆盖你的配置（${err instanceof Error ? err.message : String(err)}）。请先修复该文件`);
+  }
+}
+
+/** The same object for a caller that only READS config.json (a budget, a
+ *  threshold): never throws - a missing or unparseable file reads as `{}` - and
+ *  ignores the BOM like everyone else. Evolution limits used to fall back to
+ *  "unlimited" whenever the file carried one. */
+export async function readConfigObjectSafe(file: string): Promise<Record<string, unknown>> {
+  try { return await readConfigObject(file); } catch { return {}; }
+}
+
+/** Parse the text of a JSON file written by people as well as by hmharness: a
+ *  leading UTF-8 BOM is ignored. Throws on anything else. */
+export function parseJsonText(text: string): unknown {
+  return JSON.parse(text.replace(/^\uFEFF/, ''));
+}
+
 export async function loadConfig(): Promise<HmhConfig> {
   const home = homeDir();
   const file = join(home, 'config.json');
+  let text: string;
+  try { text = await readFile(file, 'utf8'); }
+  catch { return applyLocaleOverride(defaultConfig()); }
   try {
-    const raw = JSON.parse(await readFile(file, 'utf8')) as HmhConfig;
+    const raw = parseConfigText(text) as unknown as HmhConfig;
     const merged: HmhConfig = { ...defaultConfig(), ...raw, provider: { ...defaultConfig().provider, ...raw.provider } };
     // The legacy top-level `provider` is DERIVED from the routed provider
     // whenever routing resolves. A fossil `provider` block holding a
@@ -49,7 +106,14 @@ export async function loadConfig(): Promise<HmhConfig> {
     const routed = chatRoute ? merged.providers?.[chatRoute] : undefined;
     if (routed?.baseUrl) merged.provider = { ...routed };
     return applyLocaleOverride(merged);
-  } catch {
+  } catch (err) {
+    // Never silent. The defaults are used, which means no provider and no key
+    // is in effect - that has to be said out loud, once, or the user only sees
+    // models vanishing from the list with no explanation.
+    if (!configWarningShown.has(file)) {
+      configWarningShown.add(file);
+      configWarning(`hmh: ${file} 无法解析（${err instanceof Error ? err.message : String(err)}），本次使用默认配置——配置的供应商与密钥都不生效；请修复该文件\n`);
+    }
     return applyLocaleOverride(defaultConfig());
   }
 }
@@ -62,12 +126,7 @@ export async function loadConfig(): Promise<HmhConfig> {
 export async function setChatRoute(name: string): Promise<HmhConfig> {
   const home = homeDir();
   const file = join(home, 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   if (!raw.providers || !(name in (raw.providers as Record<string, unknown>))) {
     throw new Error(`unknown provider "${name}" - configure it under providers in config.json first`);
   }
@@ -82,12 +141,7 @@ export async function setChatRoute(name: string): Promise<HmhConfig> {
  */
 export async function setLocale(locale: 'zh' | 'en'): Promise<HmhConfig> {
   const file = join(homeDir(), 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   raw.locale = locale;
   await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
   return loadConfig();
@@ -101,12 +155,7 @@ export async function setLocale(locale: 'zh' | 'en'): Promise<HmhConfig> {
 export async function addProviders(items: Array<{ name: string; baseUrl: string; model: string; apiKey?: string }>): Promise<{ cfg: HmhConfig; added: string[] }> {
   const home = homeDir();
   const file = join(home, 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   const providers = (raw.providers ?? {}) as Record<string, unknown>;
   const added: string[] = [];
   for (const it of items) {
@@ -132,12 +181,7 @@ export async function upsertProvider(input: { name: string; baseUrl: string; mod
   if (!/^https?:\/\//.test(baseUrl)) throw new Error('baseUrl must start with http(s)://');
   if (!model) throw new Error('model required');
   const file = join(homeDir(), 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   const providers = (raw.providers ?? {}) as Record<string, unknown>;
   const existing = (providers[name] ?? {}) as Record<string, unknown>;
   const next: Record<string, unknown> = {
@@ -169,12 +213,7 @@ export async function saveProvider(name: string, p: { baseUrl: string; model: st
   if (!/^https?:\/\//.test(p.baseUrl)) throw new Error('baseUrl must start with http:// or https://');
   if (!p.model) throw new Error('model must not be empty');
   const file = join(homeDir(), 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   const providers = (raw.providers ?? {}) as Record<string, unknown>;
   const existing = (providers[name] ?? {}) as Record<string, unknown>;
   const next: Record<string, unknown> = {
@@ -201,12 +240,7 @@ export async function saveProvider(name: string, p: { baseUrl: string; model: st
  *  dangling. Returns the refreshed config. */
 export async function deleteProvider(name: string): Promise<HmhConfig> {
   const file = join(homeDir(), 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   const providers = (raw.providers ?? {}) as Record<string, unknown>;
   if (!(name in providers)) throw new Error(`unknown provider "${name}"`);
   delete providers[name];
@@ -233,12 +267,7 @@ export async function deleteProvider(name: string): Promise<HmhConfig> {
  */
 export async function patchConfig(partial: Record<string, unknown>): Promise<HmhConfig> {
   const file = join(homeDir(), 'config.json');
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    /* fresh config */
-  }
+  const raw = await readConfigObject(file);
   const { evolution, ...top } = partial;
   Object.assign(raw, top);
   if (evolution !== undefined && typeof evolution === 'object' && evolution !== null) {

@@ -62,6 +62,27 @@ export async function recordInsight(home: string, insight: Insight): Promise<voi
   await appendFile(join(dir, 'insights.jsonl'), JSON.stringify(clean) + '\n', 'utf8');
 }
 
+/** A record off disk as the rest of the code may use it. A line that parses
+ *  but carries something else - an older schema without `toolsUsed`, a torn
+ *  write - is put into shape HERE: it used to pass through as typed, and one
+ *  such line crashed every later evolution cycle on `for (const t of
+ *  i.toolsUsed)` (2026-11-26). Non-objects are dropped. */
+function asInsight(raw: unknown): Insight | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  return {
+    ...o,
+    time: str(o.time),
+    session: str(o.session),
+    task: str(o.task),
+    outcome: (typeof o.outcome === 'string' ? o.outcome : 'ok') as Insight['outcome'],
+    turns: typeof o.turns === 'number' ? o.turns : 0,
+    toolUses: typeof o.toolUses === 'number' ? o.toolUses : 0,
+    toolsUsed: Array.isArray(o.toolsUsed) ? o.toolsUsed.filter((t): t is string => typeof t === 'string') : [],
+  } as Insight;
+}
+
 /** Read recent insights as structured records (the evolve loop's raw feed). */
 export async function readInsights(home: string, limit = 40): Promise<Insight[]> {
   try {
@@ -69,11 +90,14 @@ export async function readInsights(home: string, limit = 40): Promise<Insight[]>
     const lines = text.trim().split('\n').filter(Boolean).slice(-limit);
     const out: Insight[] = [];
     for (const l of lines) {
+      let parsed: unknown;
       try {
-        out.push(JSON.parse(l) as Insight);
+        parsed = JSON.parse(l);
       } catch {
-        /* skip corrupt line */
+        continue; // skip corrupt line
       }
+      const insight = asInsight(parsed);
+      if (insight) out.push(insight);
     }
     return out;
   } catch {

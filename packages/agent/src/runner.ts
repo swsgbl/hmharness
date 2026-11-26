@@ -9,6 +9,8 @@ import {
   chatSeesImages,
   homeDir,
   loadConfig,
+  loadTranscript,
+  replayableConversation,
   resolveProvider,
   getGoal,
   mcpServerTools,
@@ -331,7 +333,7 @@ export interface RunnerEvents {
   onLine?(line: string): void;
   onDelta?(kind: DeltaKind, chunk: string): void;
   onToolCall?(name: string, args: Record<string, unknown>): void;
-  onToolResult?(name: string, output: string, isError: boolean): void;
+  onToolResult?(name: string, output: string, isError: boolean, notRun?: 'gate' | 'declined'): void;
   onApproval?(name: string, args: Record<string, unknown>, granted: boolean): void;
   /** A runtime-steering user message entered the running loop's transcript. */
   onInjected?(message: string): void;
@@ -387,6 +389,22 @@ export interface AgentTaskOptions {
   goal?: string | null;
 }
 
+/** The conversation after a task: what was there before, the user's line, and
+ *  the turns the task added. `result.messages` is [system prompt, ...the
+ *  replayed prefix, the user's line, ...new turns]; only the new turns extend
+ *  a thread - the next task replays the prefix itself and prepends its own
+ *  system prompt. `prefix` is what the task was handed as `resumeMessages`
+ *  (a plan directive rides in it and is not part of the thread). This is the
+ *  one place the TUI, the REPL and the ACP host build their history. */
+export function extendConversation(
+  previous: ChatMessage[],
+  task: string,
+  result: { messages: ChatMessage[] },
+  prefix: ChatMessage[] = previous,
+): ChatMessage[] {
+  return [...previous, { role: 'user', content: task }, ...replayableConversation(result.messages.slice(1 + prefix.length + 1))];
+}
+
 /** Run one full agent task end-to-end; audit + insight recording included. */
 export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult & { sessionId: string; toolsUsed: string[] }> {
   const cfg = opts.cfg ?? (await loadConfig());
@@ -398,8 +416,8 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   if (injectChannel) injectChannel.active = true; // channel is live for this task
   // resume = append to the same rollout; a missing/unreadable id falls back
   // to a fresh session so a renamed-away file never breaks the conversation
-  const session = (opts.sessionId ? await Session.resume(ctx.home, opts.sessionId) : null)
-    ?? Session.create(ctx.home, ctx.cwd, cfg.provider.model, opts.forkFrom ? { forkedFrom: opts.forkFrom } : {});
+  const resumed = opts.sessionId ? await Session.resume(ctx.home, opts.sessionId) : null;
+  const session = resumed ?? Session.create(ctx.home, ctx.cwd, cfg.provider.model, opts.forkFrom ? { forkedFrom: opts.forkFrom } : {});
   // session-level goal: explicit opts.goal wins; otherwise the persisted
   // goal (HMH_HOME/goals.json) carries over into resumed/forked sessions
   const goal = opts.goal ?? (await getGoal(ctx.home, session.id));
@@ -495,9 +513,16 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // chat model can actually see them; a text-only chat model must receive
   // text the caller already described
   const nativeImages = chatSeesImages(resolveProvider(cfg, 'chat')) ? opts.images : undefined;
+  // Continuing a session means continuing its CONVERSATION. A caller that hands
+  // over only the session id (the browser sidebar) used to get a fresh context
+  // every time: the rollout grew, the model saw one message. `resumeMessages`,
+  // when given, is the caller's own history and wins - an empty array is a
+  // deliberate fresh start (the web's "new task").
+  const resume = opts.resumeMessages
+    ?? (resumed ? replayableConversation((await loadTranscript(resumed.file))?.messages ?? []) : []);
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
-    ...(opts.resumeMessages ?? []),
+    ...resume,
     { role: 'user', content: opts.task, ...(nativeImages && nativeImages.length ? { images: nativeImages } : {}) },
   ];
 
@@ -556,17 +581,27 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         cogRec.call(name, args);
         events.onToolCall?.(name, args);
       },
-      onToolResult: (name, output, isError) => {
-        if (isError) {
-          const list = toolErrors.get(name) ?? [];
-          list.push(output.split('\n')[0].slice(0, 120));
-          toolErrors.set(name, list);
-          traj.emit('error.observed', 'tool', { name, preview: brief(output, 160) });
-        }
+      onToolResult: (name, output, isError, notRun) => {
         void session.tool(name, output, isError);
-        traj.emit('tool.completed', 'tool', { name, isError, preview: brief(output, 120) });
-        cogRec.result(name, output, isError);
-        events.onToolResult?.(name, output, isError);
+        if (notRun) {
+          // Refused by the action gate or declined by the user: the tool never
+          // ran, so this is not the tool failing. It used to be recorded as one
+          // and learned from - a gate refusal of `web_search` became another
+          // failed `web_search` in the statistics the gate is built from, so a
+          // blocked action type could never recover (2026-11-26).
+          traj.emit('tool.completed', 'tool', { name, isError, notRun, preview: brief(output, 120) });
+          cogRec.skip(name);
+        } else {
+          if (isError) {
+            const list = toolErrors.get(name) ?? [];
+            list.push(output.split('\n')[0].slice(0, 120));
+            toolErrors.set(name, list);
+            traj.emit('error.observed', 'tool', { name, preview: brief(output, 160) });
+          }
+          traj.emit('tool.completed', 'tool', { name, isError, preview: brief(output, 120) });
+          cogRec.result(name, output, isError);
+        }
+        events.onToolResult?.(name, output, isError, notRun);
       },
       onApproval: (name, args, granted) => {
         void session.approval(name, granted);
@@ -712,12 +747,15 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
       /* insight count is best-effort */
     }
   }
-  // messages rides along so cross-task callers (web thread mode) can extend
-  // their conversation with the assistant turns - without it the caller could
-  // only ever see the final text and every follow-up lost the answers (the
-  // web conversation bug, 2026-09-27).
-  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage, messages });
-  return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)], messages };
+  // The conversation rides along so cross-task callers (web thread mode, the
+  // TUI, the REPL, ACP hosts) can extend their thread with the assistant turns.
+  // It is the transcript the LOOP had - [system, ...replayed prefix, the user's
+  // line, ...assistant steps, tool results, the answer]. Until 0.23.56 the
+  // input array was returned here instead: every follow-up in every surface
+  // then saw the user's earlier lines and not one thing the assistant had done.
+  const conversation = result.messages;
+  events.onFinal?.({ text: result.text, turns: result.turns, toolUses: result.toolUses, sessionId: session.id, usage: result.usage, messages: conversation });
+  return { ...result, sessionId: session.id, toolsUsed: [...new Set(toolsUsed)] };
 }
 
 /** One background evolution cycle (auto-triggered). Logs to the evolution

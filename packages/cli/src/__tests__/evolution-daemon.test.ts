@@ -19,9 +19,63 @@ test('daemon runner is valid plain CJS (0.14.25 regression: top-level await + ES
     assert.ok(!/^\s*await\s+import\(/.test(src), 'no top-level await');
     // the two cycles are scheduled: evolve first, then the finetune gate
     assert.ok(src.includes("'evolve'") && src.includes("'auto-finetune', '--submit'"));
-    assert.match(src, /String\(evo\.err\)\.slice\(0, 120\)/, 'the cycle log names the error object, not "[object Object]"');
+    // one cycle at a time, and a cap far above a slow real cycle (30 min killed
+    // every runner cycle on the machine this was diagnosed on)
+    assert.match(src, /if \(busy\) \{[^\n]*still running/);
+    assert.match(src, /HMH_EVOLVE_TIMEOUT_MS \|\| 3 \* 60 \* 60 \* 1000/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** Run the generated runner once against a stand-in for `hmh` and collect its log. */
+function runRunnerOnce(home: string, fake: string, env: Record<string, string>): Promise<string> {
+  const fakeEntry = join(home, 'fake-main.js');
+  writeFileSync(fakeEntry, fake, 'utf8');
+  const runner = join(home, 'runner.cjs');
+  writeFileSync(runner, daemonRunnerSource('evolution-daemon.pid', fakeEntry), 'utf8');
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [runner], { env: { ...process.env, HMH_HOME: home, HMH_FIRST_CYCLE_MS: '200', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout!.on('data', (d: Buffer) => { out += d.toString(); });
+    child.stderr!.on('data', (d: Buffer) => { out += d.toString(); });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('runner said nothing in time:\n' + out)); }, 20_000);
+    const check = (): void => {
+      if (/finetune gate/.test(out)) { clearTimeout(timer); child.kill(); resolve(out); }
+    };
+    child.stdout!.on('data', check);
+    child.stderr!.on('data', check);
+  });
+}
+
+test('the runner says WHY a cycle ended: the exit code or killed-at-the-limit, how long, and the last output', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'hmh-evo-log-'));
+  try {
+    // a stand-in for `hmh evolve` / `hmh auto-finetune`
+    const fake = [
+      "const args = process.argv.slice(2);",
+      "if (args[0] === 'evolve') {",
+      "  console.log('step 1: baseline');",
+      "  console.log('step 2: proposals');",
+      "  if (process.env.FAKE_MODE === 'hang') { setInterval(function () {}, 1000); }",   // never returns
+      "  else {",
+      "    console.error('boom: provider is gone');",
+      "    process.exit(3);",
+      "  }",
+      "}",
+      "console.log('nothing due');",
+    ].join('\n');
+    const failed = await runRunnerOnce(home, fake, { FAKE_MODE: 'fail' });
+    assert.match(failed, /evolve cycle started/);
+    assert.match(failed, /evolve cycle FAILED after \d+ (s|min) - exit 3 \| last output: step 1: baseline \| step 2: proposals \| boom: provider is gone/);
+    assert.doesNotMatch(failed, /\[object Object\]/, 'no opaque error object in the log');
+    assert.match(failed, /finetune gate \(\d+ (s|min)\): not due/);
+
+    // a cycle that never comes back is killed at the limit, and the log says so
+    const hung = await runRunnerOnce(home, fake, { FAKE_MODE: 'hang', HMH_EVOLVE_TIMEOUT_MS: '1500' });
+    assert.match(hung, /evolve cycle FAILED after (1|2|3) s - KILLED at the 2 s limit \| last output: step 1: baseline \| step 2: proposals/);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
   }
 });
 
