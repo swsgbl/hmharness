@@ -300,7 +300,7 @@ async function firefoxFlow(
   });
 }
 
-test('real browser: extension installs, pairs via popup, serves agent tools', { timeout: 300_000 }, async (t) => {
+test('real browser: extension installs, pairs via popup, serves agent tools', { timeout: 420_000 }, async (t) => {
   // HMH_TEST_BROWSERS=browseros,chrome,edge narrows the set (debugging aid)
   const filter = process.env.HMH_TEST_BROWSERS?.split(',').map((s) => s.trim());
   const browsers = findBrowserBinaries().filter((b) => !filter || filter.includes(b.name));
@@ -345,13 +345,16 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
         let proc: ChildProcess | null = null;
         let cdp: InstanceType<typeof CdpBrowser> | null = null;
         try {
-          // Launch retry (2 attempts, fresh profile each): real-browser spawns
+          // Launch retry (3 attempts, fresh profile each): real-browser spawns
           // race on busy machines — Chrome occasionally dies before writing
           // DevToolsActivePort (5 observed transients in one day, always
           // green on rerun with identical code). A retry turns an
-          // environmental dice-roll into a deterministic gate.
+          // environmental dice-roll into a deterministic gate. Until
+          // 0.23.58 it was 2 attempts of 20 s, and on 2026-11-26 a loaded CI
+          // runner (the whole suite in parallel, a fresh profile) needed
+          // longer than both: each attempt now waits 30 s.
           let cdpPort = 0;
-          for (let attempt = 0; attempt < 2 && !(cdpPort > 0); attempt++) {
+          for (let attempt = 0; attempt < 3 && !(cdpPort > 0); attempt++) {
             if (proc) { try { proc.kill(); } catch { /* already gone */ } await new Promise((r) => setTimeout(r, 500)); }
             const profile = mkdtempSync(join(tmpdir(), 'ext-real-profile-'));
             activeProfile = profile;
@@ -374,9 +377,9 @@ test('real browser: extension installs, pairs via popup, serves agent tools', { 
                 cdpPort = Number(txt.split(/\r?\n/)[0]);
                 return cdpPort > 0;
               } catch { return false; }
-            }, 20_000);
+            }, 30_000);
           }
-          assert.ok(cdpPort > 0, 'DevToolsActivePort never appeared (2 attempts, fresh profile each)');
+          assert.ok(cdpPort > 0, 'DevToolsActivePort never appeared (3 attempts, fresh profile each)');
 
           // 1. find OUR SW among the extension targets (BrowserOS ships builtins)
           cdp = new CdpBrowser({ port: cdpPort });
