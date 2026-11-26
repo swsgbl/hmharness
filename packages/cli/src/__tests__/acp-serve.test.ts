@@ -64,7 +64,16 @@ function stubRun(seen: AcpRunTaskArgs[], waitMs = 0): AcpRunTask {
       turns: 1,
       toolUses: 1,
       sessionId: 'hmh-rollout-1',
-      messages: [{ role: 'assistant' as const, content: 'hello done' }],
+      // the REAL contract of runAgentTask (LoopResult.messages): [system prompt,
+      // ...the replayed history, the user's line, ...this turn's new messages].
+      // A stub that returned only the new answer kept this suite green for two
+      // months while production handed back the input array (2026-11-26).
+      messages: [
+        { role: 'system' as const, content: 'the system prompt of this run' },
+        ...(a.resumeMessages ?? []),
+        { role: 'user' as const, content: a.prompt },
+        { role: 'assistant' as const, content: 'hello done' },
+      ],
     };
   };
 }
@@ -131,7 +140,13 @@ test('acp: one prompt streams the full update sequence and resumes the next turn
     await srv.handle({ jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: sid, prompt: [{ type: 'text', text: 'again' }] } });
     assert.equal(seen.length, 2);
     assert.equal(seen[1]!.sessionId, 'hmh-rollout-1');
-    assert.equal((seen[1]!.resumeMessages as Array<{ content: string }>)[0]!.content, 'hello done');
+    // what the second prompt continues from: the first request and the answer
+    // to it - and no system prompt (each turn brings its own; the thread used
+    // to collect one more copy of it on every turn)
+    assert.deepEqual(seen[1]!.resumeMessages, [
+      { role: 'user', content: 'do it' },
+      { role: 'assistant', content: 'hello done' },
+    ]);
     assert.equal(frames.find((f) => f.id === 3)!.result.stopReason, 'end_turn');
   } finally { await dropHome(); await rm(home, { recursive: true, force: true }); }
 });

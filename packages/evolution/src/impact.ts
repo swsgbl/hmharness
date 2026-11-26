@@ -20,6 +20,7 @@
  */
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readConfigObjectSafe } from '@hmharness/kernel';
 import type { Insight } from './insights.ts';
 
 /* ---------------- evolution budget gate ---------------- */
@@ -38,13 +39,13 @@ export interface EvolutionBudget {
  *  silently unlimited. */
 export async function readBudget(home: string): Promise<EvolutionBudget & { cyclesToday: number }> {
   const budget: EvolutionBudget & { cyclesToday: number } = { cyclesToday: 0 };
-  try {
-    const cfg = JSON.parse(await readFile(join(home, 'config.json'), 'utf8')) as {
-      evolutionBudget?: EvolutionBudget & { cyclesPerDay?: number; tokensPerCycle?: number };
-    };
-    budget.maxCyclesPerDay = cfg.evolutionBudget?.maxCyclesPerDay ?? cfg.evolutionBudget?.cyclesPerDay;
-    budget.maxTokensPerCycle = cfg.evolutionBudget?.maxTokensPerCycle ?? cfg.evolutionBudget?.tokensPerCycle;
-  } catch { /* no config / no budget - unlimited */ }
+  // through the kernel's reader (BOM-tolerant): a config.json carrying one
+  // used to fail this read, and the limits read as "unlimited"
+  const cfg = (await readConfigObjectSafe(join(home, 'config.json'))) as {
+    evolutionBudget?: EvolutionBudget & { cyclesPerDay?: number; tokensPerCycle?: number };
+  };
+  budget.maxCyclesPerDay = cfg.evolutionBudget?.maxCyclesPerDay ?? cfg.evolutionBudget?.cyclesPerDay;
+  budget.maxTokensPerCycle = cfg.evolutionBudget?.maxTokensPerCycle ?? cfg.evolutionBudget?.tokensPerCycle;
   const today = new Date().toISOString().slice(0, 10);
   try {
     const text = await readFile(join(home, 'evolution', 'log.jsonl'), 'utf8');

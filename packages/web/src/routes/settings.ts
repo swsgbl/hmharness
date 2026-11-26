@@ -14,10 +14,8 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { execFile } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
-  isBareProbe, setChatRoute, resolveProvider, saveProvider, deleteProvider, patchConfig,
+  isBareProbe, setChatRoute, setLocale, resolveProvider, saveProvider, deleteProvider, patchConfig,
   type HmhConfig,
 } from '@hmharness/kernel';
 
@@ -42,7 +40,7 @@ export async function handleSettingsRoute(
   res: ServerResponse,
   deps: SettingsRouteDeps,
 ): Promise<boolean> {
-  const { cfg, home, json, readBody, broadcast, stateObject } = deps;
+  const { cfg, json, readBody, broadcast, stateObject } = deps;
 
   if (req.method === 'GET' && url.pathname === '/api/devices') {
     // Read-only device inventory via hdc (local dev tool). Never mutates.
@@ -114,15 +112,16 @@ export async function handleSettingsRoute(
       json(res, 400, { error: 'locale must be zh|en' });
       return true;
     }
-    const file = join(home, 'config.json');
-    let raw: Record<string, unknown> = {};
+    // the kernel does the read-modify-write: it keeps every other field, and
+    // it REFUSES the change when config.json cannot be parsed. This route used
+    // to read a broken file as `{}` and write that back - one click on the
+    // language switch erased every provider (2026-11-26).
     try {
-      raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
-    } catch {
-      /* fresh config */
+      await setLocale(body.locale);
+    } catch (err) {
+      json(res, 500, { error: String(err).slice(0, 300) });
+      return true;
     }
-    raw.locale = body.locale;
-    await writeFile(file, JSON.stringify(raw, null, 2) + '\n', 'utf8');
     cfg.locale = body.locale;
     broadcast('state', await stateObject());
     json(res, 200, { ok: true, locale: body.locale });

@@ -15,7 +15,7 @@
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chat, loadConfig, type ProviderConfig } from '@hmharness/kernel';
+import { chat, loadConfig, readConfigObjectSafe, type ProviderConfig } from '@hmharness/kernel';
 import { listCases, matchCase, seedCases, type BenchCase } from './bench.ts';
 import { deleteDraft, listCanary, listDrafts, listSkills, promoteSkill, rollbackSkill, skillsToPrompt, unpromoteSkill, writeDraft } from './skills.ts';
 import { appendMemory, readNotes } from './memory.ts';
@@ -250,12 +250,12 @@ export async function runEvolution(opts: {
   // minimum train pass rate closes that hole. Configurable via
   // config.json evolution.minPassRate (default 0.6).
   let minPassRate = 0.6;
-  try {
-    const cfg = JSON.parse(await readFile(join(home, 'config.json'), 'utf8')) as { evolution?: { minPassRate?: number } };
-    if (typeof cfg.evolution?.minPassRate === 'number' && cfg.evolution.minPassRate >= 0 && cfg.evolution.minPassRate <= 1) {
-      minPassRate = cfg.evolution.minPassRate;
-    }
-  } catch { /* default floor */ }
+  // through the kernel's reader: a config.json with a BOM used to fail this
+  // read and leave the floor at its default without a word
+  const evolutionCfg = (await readConfigObjectSafe(join(home, 'config.json'))) as { evolution?: { minPassRate?: number } };
+  if (typeof evolutionCfg.evolution?.minPassRate === 'number' && evolutionCfg.evolution.minPassRate >= 0 && evolutionCfg.evolution.minPassRate <= 1) {
+    minPassRate = evolutionCfg.evolution.minPassRate;
+  }
 
   // 5. A/B gate each proposal on the train set.
   const draftsMd = new Map<string, string>();

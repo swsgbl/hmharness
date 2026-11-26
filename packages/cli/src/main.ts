@@ -62,7 +62,7 @@ import {
   type CaseRunner,
 } from '@hmharness/evolution';
 import { harmonyTools } from '@hmharness/domain-harmony';
-import { baseTools, buildRegistry, buildSystemPrompt, runAgentTask, strings, type Locale } from '@hmharness/agent';
+import { baseTools, buildRegistry, buildSystemPrompt, extendConversation, runAgentTask, strings, type Locale } from '@hmharness/agent';
 
 const DIM = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const BOLD = (s: string) => `\x1b[1m${s}\x1b[0m`;
@@ -80,6 +80,14 @@ async function uiStrings(): Promise<ReturnType<typeof strings>> {
   const cfg = await loadConfig();
   return strings((cfg.locale ?? 'zh') as Locale);
 }
+
+/** M4 B7: the plan-first directive. It rides ahead of the resumed history and is
+ *  NOT part of the thread: every task re-applies it, and it is left out when
+ *  the conversation is extended. */
+const PLAN_DIRECTIVE: ChatMessage = {
+  role: 'system',
+  content: '[plan mode] Before ANY tool use, present a concrete plan (2-5 numbered steps). Then STOP and wait for the user to confirm before executing. Only execute after explicit confirmation.',
+};
 
 interface TaskOptions {
   yes?: boolean;
@@ -120,7 +128,7 @@ async function runTask(task: string, taskOpts: TaskOptions = {}): Promise<{ mess
     cfg,
     yes: taskOpts.yes,
     resumeMessages: [
-      ...(taskOpts.plan ? [{ role: 'system' as const, content: '[plan mode] Before ANY tool use, present a concrete plan (2-5 numbered steps). Then STOP and wait for the user to confirm before executing. Only execute after explicit confirmation.' }] : []),
+      ...(taskOpts.plan ? [PLAN_DIRECTIVE] : []),
       ...(taskOpts.resumeMessages ?? []),
     ],
     sessionId: taskOpts.sessionId,
@@ -425,7 +433,7 @@ async function repl(yes: boolean, initialHistory?: ChatMessage[], initialSession
         // only the NEW turns (past the replayed prefix) extend history.
         pendingFork = false;
         forkAll = false;
-        history = [...history, { role: 'user', content: line }, ...r.messages.slice((planMode ? 1 : 0) + history.length + 2)];
+        history = extendConversation(history, line, r, planMode ? [PLAN_DIRECTIVE, ...history] : history);
         // one rollout per REPL conversation (codex thread semantics)
         currentSessionId = r.sessionId;
       } catch (err) {

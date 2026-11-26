@@ -468,3 +468,35 @@ export async function loadTranscript(file: string): Promise<SessionTranscript | 
   }
   return out.id ? out : null;
 }
+
+/**
+ * A conversation as a provider accepts it back as history - whatever it comes
+ * from (a session log, a finished run, a thread a caller kept). Only the
+ * conversation roles: no system prompt (the next run brings its own), and no
+ * dangling tool-call pair - an assistant call whose result never landed (the
+ * run was killed mid-batch) is dropped together with the call, because a strict
+ * provider rejects the whole request over it. Every surface continues a thread
+ * through this one function (2026-11-26).
+ */
+export function replayableConversation(messages: ChatMessage[]): ChatMessage[] {
+  const requested = new Set(messages.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).map((c) => c.id) : [])));
+  const answered = new Set(messages.flatMap((m) => (m.role === 'tool' && m.tool_call_id && requested.has(m.tool_call_id) ? [m.tool_call_id] : [])));
+  return messages.flatMap((m): ChatMessage[] => {
+    if (m.role === 'system') return [];
+    if (m.role === 'tool') return m.tool_call_id && answered.has(m.tool_call_id) ? [m] : [];
+    if (m.role === 'assistant' && m.tool_calls) {
+      const calls = m.tool_calls.filter((c) => answered.has(c.id));
+      if (calls.length === m.tool_calls.length) return [m];
+      const { tool_calls: _dropped, ...rest } = m;
+      if (calls.length) return [{ ...rest, tool_calls: calls }];
+      // No call survived. A step that also carries no text now says nothing at
+      // all, and a content-less assistant message without tool_calls is exactly
+      // what a strict provider rejects - so it leaves the conversation.
+      return typeof rest.content === 'string' && rest.content.trim() ? [rest] : [];
+    }
+    // The same for a step that never had a call: an empty reply used to end a
+    // run and sits in older logs as an assistant line with no text.
+    if (m.role === 'assistant') return typeof m.content === 'string' && m.content.trim() ? [m] : [];
+    return [m];
+  });
+}

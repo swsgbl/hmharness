@@ -25,7 +25,7 @@ import readline from 'node:readline';
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { homeDir, loadConfig, type ChatMessage } from '@hmharness/kernel';
-import { buildRegistry, runAgentTask, type RunnerEvents } from '@hmharness/agent';
+import { buildRegistry, extendConversation, runAgentTask, type RunnerEvents } from '@hmharness/agent';
 
 /* ------------------------------------------------------------------ *
  * Host-browser window recycling (BrowserOS "workspace window" answer)
@@ -404,7 +404,9 @@ export function createAcpServer(opts: CreateAcpServerOptions): { handle(msg: unk
             approvalAsk,
           });
           session.hmhId = r.sessionId;
-          session.messages = r.messages;
+          // the thread grows by this turn's new messages only: storing the whole
+          // return value re-fed the previous system prompts into every later prompt
+          session.messages = extendConversation(session.messages ?? [], prompt, r);
           ok({ stopReason: session.abort.signal.aborted ? 'cancelled' : 'end_turn' });
         } catch (e) {
           // the turn still completes — with an honest error message in the

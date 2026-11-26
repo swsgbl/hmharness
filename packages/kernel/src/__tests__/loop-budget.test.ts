@@ -38,17 +38,22 @@ test('loop injects budget wrap-up message when context exceeds 80%', async () =>
     { role: 'system', content: filler },
     { role: 'user', content: 'do it' },
   ];
+  const seen: ChatMessage[][] = [];
+  const base = fakeChat();
   const result = await runLoop({
     provider: glmWindow,
     registry: registry as never,
     messages,
     ctx: { cwd: '.', home: '.' },
-    chatImpl: fakeChat(),
+    chatImpl: async (cfg: unknown, msgs: ChatMessage[]) => { seen.push(msgs); return base(cfg, msgs); },
   });
   // after noop executes: 90k filler + 50k tool output > 80% of 163k budget
-  const wrapup = result.messages.find((m) => (m.content ?? '').includes('Context is running low'));
-  assert.ok(wrapup, 'budget wrap-up message injected');
+  const wrapup = seen.flat().find((m) => (m.content ?? '').includes('Context is running low'));
+  assert.ok(wrapup, 'the model was shown the wrap-up note');
   assert.equal(wrapup!.role, 'system');
+  // the note steers THIS run only. Handed back inside the conversation it would
+  // be read by every later task in the thread as a standing order to wrap up.
+  assert.ok(!result.messages.some((m) => (m.content ?? '').includes('Context is running low')), 'the note is not part of the conversation a follow-up continues from');
 });
 
 test('auto-continue: model calling tools past the soft limit keeps going until it gives a final answer', async () => {
@@ -67,17 +72,23 @@ test('auto-continue: model calling tools past the soft limit keeps going until i
     }
     return { message: { role: 'assistant' as const, content: 'all done after 50 productive turns' }, usage: { prompt_tokens: 10, completion_tokens: 5 } };
   };
+  const seen: ChatMessage[][] = [];
   const result = await runLoop({
     provider: glmWindow, // soft limit 40
     registry: registry as never,
     messages: [{ role: 'user', content: 'long task' }],
     ctx: { cwd: '.', home: '.' },
-    chatImpl: chat,
+    chatImpl: async (_cfg: unknown, msgs: ChatMessage[]) => { seen.push(msgs); return chat(); },
   });
   assert.equal(result.turns, 51, 'ran past the 40-turn soft limit to 51 (50 tool calls + 1 final)');
   assert.match(result.text, /all done/);
-  const checkpoint = result.messages.find((m) => (m.content ?? '').includes('turn checkpoint'));
-  assert.ok(checkpoint, 'soft checkpoint message injected');
+  const checkpoint = seen.flat().find((m) => (m.content ?? '').includes('turn checkpoint'));
+  assert.ok(checkpoint, 'the model was shown the soft checkpoint');
+  assert.ok(!result.messages.some((m) => (m.content ?? '').includes('turn checkpoint')), 'the checkpoint is not carried into the conversation');
+  // the conversation a follow-up continues from ends with the answer
+  const last = result.messages[result.messages.length - 1];
+  assert.equal(last.role, 'assistant');
+  assert.match(last.content ?? '', /all done after 50 productive turns/);
 });
 
 test('hard turn valve: safety cap stops even if the model keeps calling tools', async () => {

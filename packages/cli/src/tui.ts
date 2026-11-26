@@ -14,9 +14,9 @@ import { stdin, stdout } from 'node:process';
 import { basename, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { parseMouse, isMousePrefix, dispatchClick, clearRegions, addClickRegion } from './tui-mouse.ts';
-import { loadConfig, homeDir, resolveProvider, listProviders, saveProvider, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type HmhConfig, type SessionSummary } from '@hmharness/kernel';
+import { loadConfig, homeDir, resolveProvider, listProviders, saveProvider, setChatRoute, setLocale, PROVIDER_PRESETS, addProviders, detectLocalProviders, latestSession, listSessions, loadTranscript, replayableConversation, transcriptChars, compactMessages, adaptiveContextChars, getGoal, setGoal, clearGoal, isProviderAuthError, type ChatMessage, type HmhConfig, type SessionSummary } from '@hmharness/kernel';
 import { listDrafts, listSkills, runBench, runEvolution } from '@hmharness/evolution';
-import { buildRegistry, runAgentTask, strings, type Locale } from '@hmharness/agent';
+import { buildRegistry, extendConversation, runAgentTask, strings, type Locale } from '@hmharness/agent';
 import { ensureWebDaemon, DEFAULT_WEB_PORT } from './web-daemon.ts';
 import { renderMarkdown } from './markdown.ts';
 import { formatRow, initialPickerState, pickerKey, reducePicker, toolbarLine, visibleRows, type PickerState } from './resume-picker.ts';
@@ -2252,7 +2252,7 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
       rt.setStatus(`↑${result.usage.promptTokens} ↓${result.usage.completionTokens} tok · ${result.turns} turns · ${result.toolUses} tools`);
       // the plan directive rides in resumeBase but is NOT part of the thread:
       // history keeps only real messages (the next task re-applies it)
-      history = [...(forkResume ?? history), { role: 'user', content: line }, ...result.messages.slice(resumeBase.length + 2)];
+      history = extendConversation(forkResume ?? history, line, result, resumeBase);
     } catch (err) {
       rt.setBusy(false);
       currentInject = null;
@@ -2281,8 +2281,9 @@ export async function tui(yes: boolean, noWeb = false, opts: { resumeAtStart?: b
     // forever (audit), but the in-memory thread is compacted to the model
     // budget immediately - the loop would do this on the next call anyway;
     // doing it here keeps /usage, fork copies and memory footprint honest
-    // from the first turn
-    history = compactMessages(tr.messages, adaptiveContextChars(resolveProvider(cfg, 'chat')));
+    // from the first turn. A call whose result never landed (the run was
+    // killed mid-batch) is dropped with its call: a provider rejects the pair.
+    history = compactMessages(replayableConversation(tr.messages), adaptiveContextChars(resolveProvider(cfg, 'chat')));
     currentSessionId = tr.id;
     rt.clearScreen();
     // long sessions render from the tail so the visible window stays usable

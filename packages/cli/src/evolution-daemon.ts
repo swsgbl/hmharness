@@ -70,22 +70,45 @@ const home = process.env.HMH_HOME || join(require('node:os').homedir(), '.hmharn
 const hmhBin = process.execPath;
 const hmhEntry = ${entryJson};
 const HOURS = Number(process.env.HMH_EVOLVE_EVERY_HOURS || 6);
+// How long one evolve cycle may take. It was 30 minutes until 0.23.56 - and on
+// the machine this was diagnosed on (2026-11-26) EVERY runner cycle died at
+// exactly that limit, while the same cycles started from inside the app (no
+// limit) ran to completion. A healthy cycle is dozens of real model calls plus
+// tool runs; the cap has to be far above a slow one, and the interval (hours)
+// keeps the next one from piling on.
+const CYCLE_TIMEOUT_MS = Number(process.env.HMH_EVOLVE_TIMEOUT_MS || 3 * 60 * 60 * 1000);
+const FIRST_CYCLE_MS = Number(process.env.HMH_FIRST_CYCLE_MS || 30000);
 function stamp() { return new Date().toISOString(); }
+var ANSI = /\\u001b\\[[0-9;]*m/g;
+function duration(ms) { return ms < 60000 ? Math.round(ms / 1000) + ' s' : Math.round(ms / 60000) + ' min'; }
+// the last lines of a command's output, on one line: what a killed or failed
+// cycle was doing when it stopped - the log used to hold only "Command failed"
+function tailOf(out, n) {
+  return String(out || '').replace(ANSI, '').split(/\\r?\\n/).map(function (l) { return l.trim(); }).filter(Boolean).slice(-n).join(' | ');
+}
 function runHmh(args, timeoutMs) {
   return new Promise((resolve) => {
-    execFile(hmhBin, [hmhEntry, ...args], { timeout: timeoutMs, windowsHide: true }, (err, stdout, stderr) => {
-      resolve({ err, out: String(stdout || '') + String(stderr || '') });
+    const started = Date.now();
+    execFile(hmhBin, [hmhEntry, ...args], { timeout: timeoutMs, windowsHide: true, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ err, out: String(stdout || '') + String(stderr || ''), ms: Date.now() - started });
     });
   });
 }
+// one cycle at a time: a long cycle must not be overlapped by the next tick
+// (two concurrent cycles would race the same files and double the model spend)
+var busy = false;
 async function cycle() {
+  if (busy) { console.log(stamp(), 'evolve cycle skipped - the previous one is still running'); return; }
+  busy = true;
   try {
-    // 30min: a HEALTHY evolve cycle does 40+ real judge/model calls and can
-    // exceed the old 10min cap — the 401 era finished in seconds (every trap
-    // failed fast), so 600s never bit until the fix landed and real work
-    // resumed. The cap must cover real work, not the failure mode.
-    const evo = await runHmh(['evolve'], 1800000);
-    console.log(stamp(), 'evolve cycle done', evo.err ? ('err ' + String(evo.err).slice(0, 120)) : '');
+    console.log(stamp(), 'evolve cycle started');
+    const evo = await runHmh(['evolve'], CYCLE_TIMEOUT_MS);
+    if (evo.err) {
+      const why = evo.err.killed ? 'KILLED at the ' + duration(CYCLE_TIMEOUT_MS) + ' limit' : 'exit ' + (evo.err.code === undefined ? String(evo.err.signal) : String(evo.err.code));
+      console.error(stamp(), 'evolve cycle FAILED after ' + duration(evo.ms) + ' - ' + why + ' | last output: ' + tailOf(evo.out, 8));
+    } else {
+      console.log(stamp(), 'evolve cycle done in ' + duration(evo.ms) + ' | ' + tailOf(evo.out, 4));
+    }
   } catch (e) { console.error(stamp(), 'evolve error:', String(e).slice(0, 200)); }
   // finetune gate after every evolve cycle - the command itself decides
   // (labels threshold, no running job, cooldown, kill-switch) so an
@@ -93,11 +116,12 @@ async function cycle() {
   try {
     const ft = await runHmh(['auto-finetune', '--submit'], 900000);
     const interesting = ft.out.split('\\n').filter((l) => l.includes('\\u2713') || l.includes('\\u5fae\\u8c03') || l.includes('ERR')).slice(0, 3);
-    console.log(stamp(), 'finetune gate:', interesting.join(' | ') || 'not due');
+    console.log(stamp(), 'finetune gate (' + duration(ft.ms) + '):', ft.err ? 'FAILED ' + tailOf(ft.out, 3) : (interesting.join(' | ') || 'not due'));
   } catch (e) { console.error(stamp(), 'finetune error:', String(e).slice(0, 200)); }
+  busy = false;
 }
 writeFileSync(join(home, '${pidFile}'), String(process.pid));
-setTimeout(cycle, 30000);
+setTimeout(cycle, FIRST_CYCLE_MS);
 setInterval(cycle, HOURS * 3600000);
 process.on('SIGTERM', () => { try { unlinkSync(join(home, '${pidFile}')); } catch {} process.exit(0); });
 process.on('SIGINT', () => { try { unlinkSync(join(home, '${pidFile}')); } catch {} process.exit(0); });
