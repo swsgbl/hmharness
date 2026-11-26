@@ -8,12 +8,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { mkdtemp, readFile, rm, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MAIN = fileURLToPath(new URL('../main.ts', import.meta.url));
+/** The version `hmh --version` must print - read from the package under test, never a literal.
+ *  A literal ('0.23.53') shipped with the first 0.23.54 tag: green on the PR, where the version
+ *  still was 0.23.53, and red on the release commit, where the bump had changed it - the
+ *  publish gate refused the release (2026-11-26). Same file main.ts reads (one level up from here). */
+const PACKAGE_VERSION = (createRequire(import.meta.url)('../../package.json') as { version?: string }).version;
 
 function cli(args: string[], home: string): Promise<{ code: number | null; out: string; err: string }> {
   return new Promise((resolve) => {
@@ -37,11 +43,12 @@ async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
 }
 
 test('hmh --version (and -v, version) prints the version and exits 0 - it used to open the interactive REPL', async () => {
+  assert.match(PACKAGE_VERSION ?? '', /^\d+\.\d+\.\d+$/, 'precondition: the package under test carries a real version');
   await withHome(async (home) => {
     for (const flag of ['--version', '-v', '-V', 'version']) {
       const r = await cli([flag], home);
       assert.equal(r.code, 0, `${flag}: exit code (stderr: ${r.err.slice(0, 200)})`);
-      assert.equal(r.out.trim(), 'hmh 0.23.53', `${flag}: one line, the version from the installed package`);
+      assert.equal(r.out.trim(), 'hmh ' + PACKAGE_VERSION, `${flag}: one line, the version of the package under test`);
     }
   });
 });
