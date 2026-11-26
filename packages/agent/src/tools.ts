@@ -423,7 +423,7 @@ export function createWebSearchTool(engines: SearchEngine[], opts: { timeoutMs?:
           }
           failures.push(`${engine.name}: no results`);
         } catch (err) {
-          failures.push(`${engine.name}: ${String(err).slice(0, 80)}`);
+          failures.push(`${engine.name}: ${describeFetchError(err).slice(0, 120)}`);
           markEngineDown(ctx?.home, engine.name, down);
         }
       }
@@ -440,6 +440,36 @@ function markEngineStateCleared(home: string | undefined, down: Record<string, n
 }
 
 export const webSearchTool: Tool = createWebSearchTool(DEFAULT_SEARCH_ENGINES);
+
+/** What a failed fetch failed ON (2026-11-26). Node's fetch reports every
+ *  network-level failure as the same line - "TypeError: fetch failed" - and
+ *  hides the reason in `cause`. Of 19 web_fetch failures on record, 11 said
+ *  exactly that: sites this network reaches only through a proxy (the cause
+ *  was ECONNRESET), so the model could not tell an unreachable host from a
+ *  slow one and retried the same URL. The shapes below are the ones Node
+ *  actually produces: cause `{ code: 'ECONNREFUSED', message: 'connect
+ *  ECONNREFUSED 127.0.0.1:52858' }`, `'ENOTFOUND'` / `'getaddrinfo ENOTFOUND
+ *  <host>'`, `'ECONNRESET'` / `'read ECONNRESET'`, and undici's own
+ *  `UND_ERR_CONNECT_TIMEOUT` / `ConnectTimeoutError`. */
+export function describeFetchError(err: unknown): string {
+  const reasons: string[] = [];
+  for (let e = err, i = 0; e != null && i < 5; e = (e as { cause?: unknown }).cause, i++) {
+    const { name, code } = e as { name?: unknown; code?: unknown };
+    const message = String((e as { message?: unknown }).message ?? '').replace(/\s+/g, ' ').trim();
+    // the wrapper's "fetch failed" only says that it failed - the cause says why
+    if (!message || message === 'fetch failed') continue;
+    const reason = typeof code === 'string' ? `${code} ${message}` : typeof name === 'string' ? `${name}: ${message}` : message;
+    if (!reasons.includes(reason)) reasons.push(reason);
+  }
+  const detail = (reasons.length ? reasons : [String(err)]).join(' <- ').slice(0, 200);
+  const all = detail.toLowerCase();
+  const meaning = /enotfound|eai_again|getaddrinfo/.test(all) ? 'host name not resolved from this network'
+    : /timeout|timed out|aborted|und_err_connect|und_err_headers|und_err_body/.test(all) ? 'no answer within the time limit from this network'
+    : /cert|tls|ssl/.test(all) ? 'TLS or certificate problem'
+    : /econnrefused|econnreset|epipe|ehostunreachable|enetunreachable|econnaborted/.test(all) ? 'connection refused or reset'
+    : '';
+  return 'fetch failed: ' + detail + (meaning ? ' (' + meaning + ' - a proxy or a mirror may be needed from this machine)' : '');
+}
 
 /** Fetch a URL and return readable text (tags stripped, entities decoded,
  *  size-bounded). Pairs with web_search: search finds, fetch reads. */
@@ -481,7 +511,7 @@ export const webFetchTool: Tool = {
       text = text.replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim();
       return { output: text.slice(0, max) + (text.length > max ? '\n...[truncated at ' + max + ' chars]' : '') };
     } catch (err) {
-      return { output: 'fetch failed: ' + String(err).slice(0, 160), isError: true };
+      return { output: describeFetchError(err), isError: true };
     }
   },
 };
