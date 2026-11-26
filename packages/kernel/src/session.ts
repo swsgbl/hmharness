@@ -360,7 +360,7 @@ export async function listSessions(home: string, opts: ListSessionsOptions = {})
   const anchor = opts.cursor ? decodeSessionCursor(opts.cursor) : null;
   // The page after an anchor is everything that follows that row in the
   // sorted list - taken by POSITION, so it holds whatever settles a tie. Until
-  // 0.23.57 the position was rebuilt by comparing timestamps with the
+  // 0.23.58 the position was rebuilt by comparing timestamps with the
   // cursor's, which carries whole milliseconds only: modification times carry
   // fractions of one, so a session updated in the anchor's own millisecond a
   // moment earlier was skipped on "load more". Only when the anchor row itself

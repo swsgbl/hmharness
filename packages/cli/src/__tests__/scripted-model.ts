@@ -64,8 +64,15 @@ export const text = (m: ChatMessage): string => (typeof m.content === 'string' ?
 export const requestsFor = (model: Scripted, userText: string): Seen[] =>
   model.seen.filter((s) => s.tools > 0 && s.messages.some((m) => m.role === 'user' && text(m) === userText));
 
+/** These tests start the REAL entry points from source - tsx compiles the whole
+ *  CLI on the way up, with no cache on a fresh runner - and check WHAT happens,
+ *  never how fast. A 30 s wait was not enough on a loaded CI runner: on
+ *  2026-11-26 the wait for the second line of the REPL timed out inside the
+ *  publish run's own test gate, and the release was refused over it. */
+export const PATIENCE_MS = 180_000;
+
 /** Poll until the condition holds; resolves false (and says why) at the deadline. */
-export async function until(what: string, pred: () => boolean, ms = 30_000): Promise<boolean> {
+export async function until(what: string, pred: () => boolean, ms = PATIENCE_MS): Promise<boolean> {
   const t0 = Date.now();
   while (!pred()) {
     if (Date.now() - t0 > ms) { console.error(`   (timed out after ${ms}ms waiting for: ${what})`); return false; }

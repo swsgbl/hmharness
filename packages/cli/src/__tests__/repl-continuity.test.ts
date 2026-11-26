@@ -26,7 +26,12 @@ function repl(home: string): ChildProcess {
   });
 }
 
-test('REPL: the second line of a sitting is answered with the first line\'s answer in view', async () => {
+// A release was refused over this test once (v0.23.57, 2026-11-26): its waits
+// were 30 s, and the publish run's own test gate needed longer on a loaded
+// runner. It checks what the REPL does with a second line, never how fast - so
+// every wait is patient (PATIENCE_MS) and the whole test has a ceiling far
+// above any of them.
+test('REPL: the second line of a sitting is answered with the first line\'s answer in view', { timeout: 15 * 60_000 }, async () => {
   const home = await mkdtemp(join(tmpdir(), 'hmh-repl-conv-'));
   const empty = join(home, 'empty-dir');
   await mkdir(empty);
@@ -46,6 +51,10 @@ test('REPL: the second line of a sitting is answered with the first line\'s answ
     assert.ok(await until('the REPL is up', () => /hmh>/.test(out)), 'the REPL prompt appeared');
     child.stdin!.write('first\n');
     assert.ok(await until('the first line is answered', () => requestsFor(model, 'first').length >= 2), 'two model requests for the first line');
+    // the way a user drives it: the second line is typed once the first answer is
+    // on screen and the prompt is back - not while the REPL is still winding the
+    // first task down
+    assert.ok(await until('the prompt is back after the first answer', () => (out.match(/hmh> /g) ?? []).length >= 2 && out.includes('DONE turn 1')), 'the first answer was shown and the prompt returned');
     child.stdin!.write('second\n');
     assert.ok(await until('the second line reaches the model', () => requestsFor(model, 'second').length >= 1), 'the model was asked about the second line');
     const req = requestsFor(model, 'second')[0]!.messages;
@@ -57,7 +66,7 @@ test('REPL: the second line of a sitting is answered with the first line\'s answ
     assert.ok(out.includes('DONE turn 1'), 'and the user saw it');
   } finally {
     try { child.stdin!.end('/exit\n'); } catch { /* gone */ }
-    const code = await Promise.race([exited, new Promise<null>((r) => setTimeout(() => r(null), 8_000))]);
+    const code = await Promise.race([exited, new Promise<null>((r) => setTimeout(() => r(null), 15_000))]);
     if (code === null) child.kill();
     await model.close();
     await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
