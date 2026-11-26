@@ -54,7 +54,7 @@ export const SHELL = `  // ---- sidebar actions ----
   // a session or an example auto-closes it so the chat fills the phone screen.
   // It behaves like a dialog: the page behind it is inert (wireModalInert watches
   // the body class), focus moves in on open and back to the burger on close, and
-  // the backdrop or Escape closes it. Until 0.23.54 Tab walked the page behind
+  // the backdrop or Escape closes it. Until 0.23.55 Tab walked the page behind
   // the backdrop and a tap there hit whatever was underneath.
   function setDrawer(open) {
     document.body.classList.toggle('mobside', open);

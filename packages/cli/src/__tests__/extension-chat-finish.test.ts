@@ -5,7 +5,7 @@ import type { ChatTurnInput } from '@hmharness/extension';
 
 /** What the sidebar brain does with finish_reason (2026-11-26).
  *
- *  The provider layer dropped the reason until 0.23.54, so the panel could not
+ *  The provider layer dropped the reason until 0.23.55, so the panel could not
  *  tell a reply the output cap severed from a finished one: half a sentence came
  *  back as the whole answer, and a content-filtered reply read as a bug
  *  ("模型返回了空回复"). The severed tool arguments then went back into the
@@ -29,7 +29,7 @@ const INPUT: ChatTurnInput = { message: '总结这个页面', history: [] };
 const DEPS = { readPage: async () => ({ title: 'T' }), act: async () => { throw new Error('不应触发'); } };
 
 test('a reply the output cap severed joins the auto-continue chain instead of passing as the whole answer', async () => {
-  // round 1 of 50 - not the last round, so before 0.23.54 this came back as a FINAL answer
+  // round 1 of 50 - not the last round, so before 0.23.55 this came back as a FINAL answer
   const { impl } = rawChat([{ message: { role: 'assistant', content: '第一步先打开' }, finishReason: 'length' }]);
   const reply = await runChatTurn(CFG, INPUT, DEPS, impl as never);
   assert.equal(reply, '第一步先打开\n[[hmh:auto-continue]]', 'the panel auto-sends 「继续」 on this sentinel');

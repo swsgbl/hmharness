@@ -6,7 +6,7 @@
  *
  * Lifecycle: starts automatically on `hmh web start` (and `hmh evolve-auto`).
  * Runs one evolution cycle every `evolution.autoEveryHours` hours (default
- * 6h), then sleeps. `hmh web stop` stops it again (0.23.54: until then nothing
+ * 6h), then sleeps. `hmh web stop` stops it again (0.23.55: until then nothing
  * could - it kept cycling, and spending model quota, after "stop"). After each
  * evolve cycle it also runs the auto-finetune gate (2026-09-25: labels past
  * threshold -> pairs exported -> uploaded -> cloud training submitted, all
@@ -30,7 +30,7 @@ const RUNNER_NAME = 'evolution-daemon-runner';
 /** The pid of the RUNNING evolution daemon, or null. The pid file alone proves
  *  nothing: it outlives its process (a runner killed on Windows gets no
  *  SIGTERM, so it never cleans up after itself) and pids are reused. Until
- *  0.23.54 a stranger wearing the old number read as "daemon alive" - evolution
+ *  0.23.55 a stranger wearing the old number read as "daemon alive" - evolution
  *  silently never restarted - and `hmh web stop` would have killed it.
  *  A command line that cannot be read at all keeps the old trust in the pid. */
 function daemonPid(home: string): number | null {

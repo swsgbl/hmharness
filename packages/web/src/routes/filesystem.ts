@@ -114,7 +114,7 @@ export async function handleFilesystemRoute(
       return true;
     }
     // the filtered list is a NEW array: hand the same one to the server and to the
-    // caller. Until 0.23.54 the reply carried the old one, so the page's dropdown kept
+    // caller. Until 0.23.55 the reply carried the old one, so the page's dropdown kept
     // showing a workspace that was already gone until the next reload.
     const next = wsItems.filter((w) => w.id !== body.id);
     setWsItems(next); // was: wsItems = wsItems.filter(...)

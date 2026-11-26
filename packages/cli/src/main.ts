@@ -567,7 +567,7 @@ flags:
     return;
   }
   if (cmd === 'version' || cmd === '--version' || cmd === '-v' || cmd === '-V') {
-    // until 0.23.54 this fell through into the interactive REPL
+    // until 0.23.55 this fell through into the interactive REPL
     const { createRequire } = await import('node:module');
     stdout.write(`hmh ${(createRequire(import.meta.url)('../package.json').version as string) ?? ''}\n`);
     return;
@@ -1747,7 +1747,7 @@ flags:
   }
   if (cmd === 'web') {
     await initHome();
-    // --port=N; an empty or out-of-range value is the default (until 0.23.54 a
+    // --port=N; an empty or out-of-range value is the default (until 0.23.55 a
     // bare `--port=` silently became port 0)
     const { parsePort } = await import('./web-daemon.ts');
     const port = parsePort(rest, 7788);
@@ -1820,12 +1820,12 @@ flags:
     }
     if (sub === 'stop') {
       // The evolution daemon rides along (`web start` brings it up): stopping the
-      // UI stops it too. Until 0.23.54 nothing could - it kept cycling, and
+      // UI stops it too. Until 0.23.55 nothing could - it kept cycling, and
       // spending model quota, after "stop".
       const { stopEvolutionDaemon } = await import('./evolution-daemon.ts');
       const evoStopped = stopEvolutionDaemon();
       // the port asked for, not always the default one: `web stop --port=7799`
-      // used to stop 7788 (until 0.23.54) - the main instance instead of the dev one
+      // used to stop 7788 (until 0.23.55) - the main instance instead of the dev one
       stdout.write(stopWebDaemon(port) ? t.webStopped + '\n' : t.webNotRunning + '\n');
       if (evoStopped) stdout.write(t.evoStopped + '\n');
       return;

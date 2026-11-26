@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { writeFileTool } from '../tools.ts';
 
 test('write_file creates the missing parent directories (a new file under a new folder is normal work, not ENOENT)', async () => {
-  // Until 0.23.54 this failed with "ENOENT: no such file or directory" and cost
+  // Until 0.23.55 this failed with "ENOENT: no such file or directory" and cost
   // a round trip through a shell mkdir - a dead end wherever no shell tool is wired
   const ws = await mkdtemp(join(tmpdir(), 'hmh-wf-'));
   const ctx = { cwd: ws, home: join(ws, 'home') };

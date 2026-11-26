@@ -201,7 +201,7 @@ test('the `web stop` command hands its --port to the daemon stop, and stops the 
   const src = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
   const web = src.slice(src.indexOf("if (cmd === 'web') {"));
   const stopBranch = web.slice(web.indexOf("if (sub === 'stop') {"), web.indexOf("if (sub === 'status') {"));
-  assert.match(stopBranch, /stopWebDaemon\(port\)/, 'the parsed port - until 0.23.54 this was stopWebDaemon(), always the default port');
+  assert.match(stopBranch, /stopWebDaemon\(port\)/, 'the parsed port - until 0.23.55 this was stopWebDaemon(), always the default port');
   assert.match(stopBranch, /stopEvolutionDaemon\(\)/, 'the evolution daemon rides along');
   assert.match(web, /const port = parsePort\(rest, 7788\);/, 'one parser for the whole command');
   assert.doesNotMatch(src, /Number\.isFinite\(port\) \? port : 7788/, 'no second reading of --port beside parsePort');
@@ -216,7 +216,7 @@ test('hmh extension stop: a stranger behind the pid file survives, and a foreign
   try {
     writeFileSync(join(home, 'extension.pid'), String(other.pid), 'utf8');
     await waitUntil(() => isAlive(other.pid!), 'stranger up');
-    // the bridge's own port: before 0.23.54 the watchdog taskkilled such a listener every minute
+    // the bridge's own port: before 0.23.55 the watchdog taskkilled such a listener every minute
     const killed = await withHome(home, async () => stopExtensionDaemon(holder.port));
     await settle();
     assert.ok(isAlive(other.pid!), 'the stranger behind the pid file is NOT killed');

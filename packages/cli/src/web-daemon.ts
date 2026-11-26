@@ -45,7 +45,7 @@ export function readWebPid(): number {
  *  old blind taskkill kept murdering them on every version-aware restart
  *  (the "并行活动又抢了端口" port war). The same test now guards the pid file:
  *  a stale web.pid plus a reused pid names a stranger, which `hmh web stop`
- *  used to kill (0.23.54). */
+ *  used to kill (0.23.55). */
 function webDaemonIdentity(pid: number): ProcessIdentity {
   return identifyProcess(pid, (cmd) => cmd.includes(' web ') || /main\.js(\.ts)?\s+web\b/.test(cmd) || /\bweb\b\s*--port=/.test(cmd));
 }

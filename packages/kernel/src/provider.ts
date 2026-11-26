@@ -16,7 +16,7 @@ export interface ChatResponse {
   /** Why the model stopped, as the provider reports it: 'stop' (natural end),
    *  'length' (the output cap CUT the reply or a tool call's JSON mid-way),
    *  'content_filter', 'tool_calls', ... Absent when the provider reports none.
-   *  Until 0.23.54 both parse paths dropped it, so a truncated reply reached
+   *  Until 0.23.55 both parse paths dropped it, so a truncated reply reached
    *  every caller dressed as a complete one. */
   finishReason?: string;
 }

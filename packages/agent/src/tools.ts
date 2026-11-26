@@ -76,7 +76,7 @@ export const writeFileTool: Tool = {
         await copyFile(p, bak).then(() => { backupNote = ` (backup: ${bak})`; }).catch(() => { /* first write */ });
       }
       // a new file in a folder that does not exist yet is the normal shape of new
-      // work (a first module under a new directory). Until 0.23.54 it failed with
+      // work (a first module under a new directory). Until 0.23.55 it failed with
       // ENOENT and cost a round trip through a shell mkdir - a dead end without one
       const parent = dirname(p);
       const newDir = !existsSync(parent);

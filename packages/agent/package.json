@@ -1,6 +1,6 @@
 {
   "name": "@hmharness/agent",
-  "version": "0.23.54",
+  "version": "0.23.55",
   "description": "hmharness agent execution layer: base tools, system prompt, sub-agent spawn, and the shared task runner that frontends (cli, web) drive.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,16 +15,16 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@hmharness/cognitive": "0.23.54",
-    "@hmharness/domain-harmony": "0.23.54",
-    "@hmharness/domain-ops": "0.23.54",
-    "@hmharness/evolution": "0.23.54",
-    "@hmharness/kernel": "0.23.54",
-    "@hmharness/observability": "0.23.54",
-    "@hmharness/sandbox": "0.23.54",
-    "@hmharness/lsp": "0.23.54",
-    "@hmharness/browser": "0.23.54",
-    "@hmharness/extension": "0.23.54"
+    "@hmharness/cognitive": "0.23.55",
+    "@hmharness/domain-harmony": "0.23.55",
+    "@hmharness/domain-ops": "0.23.55",
+    "@hmharness/evolution": "0.23.55",
+    "@hmharness/kernel": "0.23.55",
+    "@hmharness/observability": "0.23.55",
+    "@hmharness/sandbox": "0.23.55",
+    "@hmharness/lsp": "0.23.55",
+    "@hmharness/browser": "0.23.55",
+    "@hmharness/extension": "0.23.55"
   },
   "files": [
     "dist"

@@ -36,7 +36,7 @@ interface Payload {
    * chats get their images described into the task text instead. */
   images?: string[];
   /** The caller said "ask" on purpose (the web UI's mode select): the run asks before
-   *  every gated tool even when the saved config is on `auto`. Until 0.23.54 the saved
+   *  every gated tool even when the saved config is on `auto`. Until 0.23.55 the saved
    *  config won, so the select read "审批询问" while every tool call went through. */
   ask?: boolean;
 }

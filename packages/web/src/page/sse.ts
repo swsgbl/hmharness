@@ -321,7 +321,7 @@ export const SSE = `  /* ---- remote-control token plumbing (2026-09-28): the fi
     flushStream();
     // the turn card and the regenerate button describe the task that JUST ran. A
     // follow-up queued while it ran had already replaced lastTask at submit time, so
-    // both used to name the queued task (until 0.23.54).
+    // both used to name the queued task (until 0.23.55).
     if (v.runningTask) v.lastTask = v.runningTask;
     v.runningTask = '';
     window.__lastTaskOk = true; // run-state 2.0 terminal flash source

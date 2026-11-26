@@ -2,7 +2,7 @@
  * runLoop × abort during the model call (2026-11-26, found in the web end-to-end pass).
  *
  * The abort signal "pierces the in-flight call" so a hung stream can never hold a
- * session busy. Until 0.23.54 that pierce arrived at the loop as a REJECTED model call
+ * session busy. Until 0.23.55 that pierce arrived at the loop as a REJECTED model call
  * and escaped as a provider failure: pressing Stop while the answer streamed showed
  * "provider: request aborted (external signal) … task child exit 1" instead of the
  * "interrupted by user" result. A stop is a stop wherever it lands.

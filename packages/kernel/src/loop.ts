@@ -232,7 +232,7 @@ export async function runLoop(opts: {
       });
     } catch (err) {
       // The abort pierces this call by design, so a stop that lands while the model
-      // is streaming arrives HERE as a rejected request. Until 0.23.54 it escaped the
+      // is streaming arrives HERE as a rejected request. Until 0.23.55 it escaped the
       // loop as a provider failure: the web UI showed "provider: request aborted …
       // task child exit 1" for a stop the user had pressed on purpose. It is the same
       // stop as one noticed at a turn boundary - keep what was built and say so.
@@ -270,7 +270,7 @@ export async function runLoop(opts: {
         continue;
       }
       // The output cap cut the answer mid-sentence (finish_reason 'length').
-      // Nothing else on the wire says so, and until 0.23.54 the severed text
+      // Nothing else on the wire says so, and until 0.23.55 the severed text
       // reached every surface dressed as a complete reply. The marker travels
       // as a text delta: the web UI, the TUI and the one-shot task render the
       // STREAM and never the returned text, so a tail appended to the return

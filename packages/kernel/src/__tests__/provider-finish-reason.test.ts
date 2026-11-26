@@ -1,7 +1,7 @@
 /**
  * finish_reason must survive the provider layer (2026-11-26).
  *
- * Until 0.23.54 both parse paths dropped it: the buffered path never read
+ * Until 0.23.55 both parse paths dropped it: the buffered path never read
  * `choices[0].finish_reason`, and the streaming path skipped every chunk
  * whose delta was empty - which is exactly where the reason arrives. So a
  * reply the output cap severed (finish_reason "length") reached the loop, the
