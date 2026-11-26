@@ -329,6 +329,13 @@ test('resume picker modal: loads rollouts from HMH_HOME, arrows + Enter pick, Es
     await a.user('first alpha task');
     const b = Session.create(dir, process.cwd(), 'm');
     await b.user('second beta task');
+    // Two rollouts written back to back land on the same clock tick 40% of the
+    // time on Windows - the very same modification time - and the list order
+    // then came down to a random id (this test picked beta in CI once,
+    // 2026-11-26). Pin the times the rows below rely on: beta newer.
+    const { utimes } = await import('node:fs/promises');
+    await utimes(a.file, new Date('2026-06-01T00:00:00Z'), new Date('2026-06-01T00:00:00Z'));
+    await utimes(b.file, new Date('2026-06-01T00:00:02Z'), new Date('2026-06-01T00:00:02Z'));
     const h = await makeTui();
     try {
       const pickP = h.rt.openResumePicker();

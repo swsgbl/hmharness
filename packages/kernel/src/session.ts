@@ -293,7 +293,7 @@ function stampToDate(id: string): number {
   return m ? Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`) : 0;
 }
 
-interface Candidate { id: string; file: string; createdMs: number; updatedMs: number }
+interface Candidate { id: string; file: string; createdMs: number; updatedMs: number; bornMs: number }
 
 /** Walk sessions/YYYY/MM/DD/*.jsonl plus legacy flat sessions/*.jsonl,
  *  skipping trash/archive and non-date dirs. Returns newest-first candidates
@@ -308,8 +308,9 @@ async function collectCandidates(home: string, sort: 'updated' | 'created'): Pro
     const id = file.split(/[\\/]/).pop()!.replace(/\.jsonl$/, '');
     const createdMs = stampToDate(id);
     let updatedMs = createdMs;
-    try { updatedMs = (await stat(file)).mtimeMs; } catch { return; }
-    out.push({ id, file, createdMs, updatedMs });
+    let bornMs = 0;
+    try { const st = await stat(file); updatedMs = st.mtimeMs; bornMs = st.birthtimeMs; } catch { return; }
+    out.push({ id, file, createdMs, updatedMs, bornMs });
   };
   let rootEntries: string[] = [];
   try { rootEntries = await readdir(root); } catch { return { list: [], scanned, capped }; }
@@ -334,7 +335,14 @@ async function collectCandidates(home: string, sort: 'updated' | 'created'): Pro
     }
   }
   const key = sort === 'created' ? (c: Candidate) => c.createdMs : (c: Candidate) => c.updatedMs;
-  out.sort((a, b) => key(b) - key(a) || (a.id < b.id ? 1 : -1));
+  // Newest first. Two files written back to back land on the same clock tick
+  // often enough to matter - 40% of the time on the Windows machine this was
+  // measured on (2026-11-26) - and a tie used to be settled by the random
+  // id, so the resume list showed the OLDER session first in a fifth of such
+  // pairs. Inside one tick the file created later is the newer session; a
+  // tie that survives both is settled by id, so the order never depends on
+  // the directory scan. (Creation time comes from the same stat call.)
+  out.sort((a, b) => key(b) - key(a) || (b.bornMs - a.bornMs) || (a.id < b.id ? 1 : -1));
   return { list: out, scanned: out.length, capped };
 }
 
@@ -350,15 +358,24 @@ export async function listSessions(home: string, opts: ListSessionsOptions = {})
   const sort = opts.sort ?? 'updated';
   const { list, capped } = await collectCandidates(home, sort);
   const anchor = opts.cursor ? decodeSessionCursor(opts.cursor) : null;
+  // The page after an anchor is everything that follows that row in the
+  // sorted list - taken by POSITION, so it holds whatever settles a tie. Until
+  // 0.23.57 the position was rebuilt by comparing timestamps with the
+  // cursor's, which carries whole milliseconds only: modification times carry
+  // fractions of one, so a session updated in the anchor's own millisecond a
+  // moment earlier was skipped on "load more". Only when the anchor row itself
+  // is gone (deleted between two pages) is its position rebuilt from the key.
+  const anchorIdx = anchor ? list.findIndex((c) => c.id === anchor.i) : -1;
   const items: SessionSummary[] = [];
   let lastEmitted: { ts: string; id: string } | null = null;
   let exhausted = true;
-  for (let idx = 0; idx < list.length; idx++) {
+  for (let idx = anchorIdx >= 0 ? anchorIdx + 1 : 0; idx < list.length; idx++) {
     const c = list[idx];
     const ts = sort === 'created' ? c.createdMs : c.updatedMs;
-    if (anchor) {
+    if (anchor && anchorIdx < 0) {
       const at = Date.parse(anchor.t);
-      if (ts > at || (ts === at && c.id >= anchor.i)) continue;
+      // later than the anchor's millisecond, or inside it and ahead by the id rule
+      if (ts >= at + 1 || (ts >= at && c.id >= anchor.i)) continue;
     }
     const head = await readSessionHead(c.file);
     if (!head) continue;
