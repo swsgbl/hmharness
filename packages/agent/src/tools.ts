@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 import { chatVision, homeDir, isBareProbe, isVisionRefusal, loadConfig, resolveProvider, visionProviderChain, type ProviderConfig, type Tool, type ToolContext } from '@hmharness/kernel';
 import { cognitiveQueryTool } from './cognitive-tools.ts';
 import { rlmWorkspaceTool } from './rlm-tool.ts';
+import { outboundFetch } from './proxy-fetch.ts';
 
 const execCb = promisify(exec);
 
@@ -408,7 +409,7 @@ export function createWebSearchTool(engines: SearchEngine[], opts: { timeoutMs?:
           continue;
         }
         try {
-          const res = await fetch(engine.endpoint + encodeURIComponent(q), { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+          const res = await outboundFetch(engine.endpoint + encodeURIComponent(q), { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
           if (!res.ok) {
             failures.push(`${engine.name}: HTTP ${res.status}`);
             // only the engine's own trouble opens the breaker; a 4xx is about this request
@@ -489,8 +490,10 @@ export const webFetchTool: Tool = {
     const url = String(args.url ?? '').trim();
     if (!/^https?:\/\//i.test(url)) return { output: 'only http(s) URLs are supported', isError: true };
     const max = Math.min(Math.max(Number(args.maxChars ?? 12_000), 500), 40_000);
+    // through the machine's proxy when one is configured (proxy-fetch.ts): a
+    // network that reaches a site only through a proxy used to read "fetch failed"
     try {
-      const res = await fetch(url, {
+      const res = await outboundFetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', Accept: 'text/html,application/json,text/plain,*/*' },
         signal: AbortSignal.timeout(20_000),
         redirect: 'follow',

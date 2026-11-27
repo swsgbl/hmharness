@@ -63,13 +63,24 @@ test('the runner says WHY a cycle ended: the exit code or killed-at-the-limit, h
       "    process.exit(3);",
       "  }",
       "}",
-      "console.log('nothing due');",
+      // the gate's real ending: a failing upload says so on its LAST line, behind three headers
+      "if (process.env.FAKE_MODE === 'uploadfail') {",
+      "  console.log('微调后端：智谱（bigmodel.cn）（provider glm）');",
+      "  console.log('微调候选 glm-5.4 不可用（微调模型不存在），自动改试下一个');",
+      "  console.log('云端微调模型：glm-4-flash');",
+      "  console.log('评审标签：664 条评审 + 208 条历史人标');",
+      "  console.log('上传失败：Error: HTTP 500: 文件上传失败');",
+      "} else { console.log('nothing due'); }",
     ].join('\n');
     const failed = await runRunnerOnce(home, fake, { FAKE_MODE: 'fail' });
     assert.match(failed, /evolve cycle started/);
     assert.match(failed, /evolve cycle FAILED after \d+ (s|min) - exit 3 \| last output: step 1: baseline \| step 2: proposals \| boom: provider is gone/);
     assert.doesNotMatch(failed, /\[object Object\]/, 'no opaque error object in the log');
-    assert.match(failed, /finetune gate \(\d+ (s|min)\): not due/);
+    assert.match(failed, /finetune gate \(\d+ (s|min)\): nothing due/, 'the log carries what the gate ended with');
+
+    // a gate that fails says so in the log - not the three header lines that mention fine-tuning
+    const uploadFailed = await runRunnerOnce(home, fake, { FAKE_MODE: 'uploadfail' });
+    assert.match(uploadFailed, /finetune gate \(\d+ (s|min)\): .*上传失败：Error: HTTP 500: 文件上传失败/, 'the failing ending reaches the log');
 
     // a cycle that never comes back is killed at the limit, and the log says so
     const hung = await runRunnerOnce(home, fake, { FAKE_MODE: 'hang', HMH_EVOLVE_TIMEOUT_MS: '1500' });
