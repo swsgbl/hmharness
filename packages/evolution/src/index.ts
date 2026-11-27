@@ -25,4 +25,5 @@ export * from './context-evolution.ts';
 export * from './rl-governance.ts';
 export * from './policy-optimizer.ts';
 export * from './cloud-finetune.ts';
+export * from './finetune-gate.ts';
 export * from './cognitive-audit.ts';

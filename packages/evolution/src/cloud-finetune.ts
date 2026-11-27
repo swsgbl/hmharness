@@ -22,8 +22,21 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DpoPair } from './reward-model.ts';
 import type { ProviderConfig } from '@hmharness/kernel';
+import { gateNow } from './finetune-gate.ts';
 
 /* ---------------- backend abstraction ---------------- */
+
+/** A provider that has switched its fine-tuning service off. Recorded as a
+ *  fact with its source: the product must not keep knocking on a door the
+ *  provider closed (see finetune-gate.ts). */
+export interface FineTuneRetirement {
+  /** ISO date from which the service is gone altogether. */
+  since: string;
+  /** where the provider says so. */
+  source: string;
+  /** the provider's wording, kept verbatim. */
+  quote: string;
+}
 
 /** One provider's fine-tuning dialect. Everything provider-specific lives
  * here; the transport and job flow above it are generic. */
@@ -40,8 +53,10 @@ export interface FineTuneBackend {
   /** Serialize pairs into this provider's DPO JSONL. */
   dpoJsonl(pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string;
   /** Does this API error text mean "this model is not fine-tunable here"?
-   * Used by the zero-side-effect model probe. */
+   *  Used by the zero-side-effect model probe. */
   modelRejected(errorText: string): boolean;
+  /** Set once the provider retires the service. */
+  retired?: FineTuneRetirement;
 }
 
 const zhipuDpoJsonl = (pairs: Array<Pick<DpoPair, 'prompt' | 'chosen' | 'rejected'>>): string => {
@@ -85,6 +100,15 @@ export const ZHIPU_BACKEND: FineTuneBackend = {
   modelLadder: (mainModel) => [...new Set([mainModel, 'glm-4-flash', 'glm-4.5-air'].filter(Boolean))],
   dpoJsonl: zhipuDpoJsonl,
   modelRejected: (text) => /微调模型不存在|微调功能未开放|无权限|not found/i.test(text),
+  // Read on the provider's own page on 2026-11-27. Observed from this machine:
+  // job creation answered HTTP 500 from 2026-09-26, uploads HTTP 500 from
+  // 2026-10-08 on - a 3-row file included - while the evolution daemon kept
+  // retrying every cycle for 50 days without one line that said why.
+  retired: {
+    since: '2026-11-16',
+    source: 'https://docs.bigmodel.cn/cn/guide/tools/fine-tuning',
+    quote: '微调与部署服务将于 2026 年 11 月 16 日下线。自 2026 年 10 月 16 日起，平台将不再支持创建、修改或删除微调任务、微调数据及私有实例，现有信息仍可查看。',
+  },
 };
 
 /** Registry - one entry per provider dialect, matched against the user's
@@ -261,7 +285,7 @@ export async function cancelFineTuneJob(opts: {
 /* ---------------- model auto-selection ---------------- */
 
 /**
- * Model auto-selection (user direction 2026-09-25: novices never pick a
+ * Model auto-selection (decided 2026-09-25: novices never pick a
  * fine-tune base). Candidates: the user's MAIN model first - if the API
  * rejects it the ladder silently falls to the next documented fine-tunable
  * base. The probe POSTs {model, training_file:"file-probe-invalid"} -
@@ -310,17 +334,24 @@ export async function pickFineTuneModel(opts: {
 /* ---------------- local job ledger ---------------- */
 
 /** Append-only record of jobs this machine submitted (audit trail: what was
- * trained, on which file, when - survives provider console churn). */
+ * trained, on which file, when - survives provider console churn). The row is
+ * stamped with the clock the gate reads (finetune-gate.ts gateNow): ledger
+ * and decision must share one clock, or a cooldown compares two different
+ * times. */
 export async function recordFineTuneJob(home: string, job: FineTuneJob, extra: Record<string, unknown> = {}): Promise<void> {
   const dir = join(home, 'evolution');
   await mkdir(dir, { recursive: true });
-  const row = { time: new Date().toISOString(), ...job, ...extra };
+  const row = { time: new Date(gateNow()).toISOString(), ...job, ...extra };
   await appendFile(join(dir, 'finetune-jobs.jsonl'), JSON.stringify(row) + '\n', 'utf8');
 }
 
 export async function readLocalFineTuneJobs(home: string): Promise<Array<FineTuneJob & { time: string }>> {
   try {
     const text = await readFile(join(home, 'evolution', 'finetune-jobs.jsonl'), 'utf8');
-    return text.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    // one torn line must not blank the whole ledger: the cooldown below reads it,
+    // and "no history" there means "may submit again today"
+    return text.split('\n').filter(Boolean).flatMap((l) => {
+      try { return [JSON.parse(l) as FineTuneJob & { time: string }]; } catch { return []; }
+    });
   } catch { return []; }
 }

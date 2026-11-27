@@ -14,11 +14,10 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, basename, isAbsolute, resolve, dirname } from 'node:path';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { networkInterfaces } from 'node:os';
 import {
   homeDir, chatSeesImages, isBareProbe, loadConfig, loadTranscript, replayableConversation, resolveProvider, listProviders, setChatRoute,
   setLocale, addProviders, detectLocalProviders, chatVision, visionProviderChain, isVisionRefusal,
-  saveProvider, deleteProvider, patchConfig, getGoal, setGoal, isProviderAuthError,
+  saveProvider, deleteProvider, patchConfig, getGoal, setGoal, isProviderAuthError, pickLanAddress,
   findSessionFile, listSessions, exportSessionMarkdown, PROVIDER_PRESETS, type ChatMessage, type HmhConfig,
 } from '@hmharness/kernel';
 import { listDrafts, listSkills, readInsights, labelableSessions, labelSession, readLabels } from '@hmharness/evolution';
@@ -77,23 +76,11 @@ function transportIp(req: IncomingMessage): string {
 }
 const isRfc1918 = (a: string) => /^10\./.test(a) || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
 
-/** The LAN address a phone on the same WiFi can actually reach. Enumerating
-   os.networkInterfaces() naively grabs the FIRST IPv4 — on machines with
-   Tailscale/VMware/WSL that is a virtual adapter the phone cannot route to
-   (the 2026-09-28 "QR scans but page won't load" bug: we QR'd the Tailscale
-   100.x address). Prefer real physical adapters, RFC1918 only. */
-function preferredLanAddress(): string {
-  const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
-  let fallback = '';
-  for (const [name, list] of Object.entries(networkInterfaces())) {
-    for (const n of list ?? []) {
-      if (n.family !== 'IPv4' || n.internal || !isRfc1918(n.address)) continue;
-      if (!VIRTUAL.test(name)) return n.address;
-      if (!fallback) fallback = n.address;
-    }
-  }
-  return fallback;
-}
+/** The LAN address a phone on the same WiFi can actually reach. One rule for
+ *  every surface, kept in the kernel (lan-address.ts): this copy used to
+ *  stop its list of virtual adapters at Tailscale/VMware/WSL, and on
+ *  2026-11-26 the QR carried a proxy tunnel's address (singbox_tun). */
+const preferredLanAddress = (): string => pickLanAddress();
 function requestIsFromLoopbackTransport(req: IncomingMessage): boolean {
   const ip = transportIp(req);
   return ip === '127.0.0.1' || ip === '::1' || ip === '';

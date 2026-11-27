@@ -111,12 +111,15 @@ async function cycle() {
     }
   } catch (e) { console.error(stamp(), 'evolve error:', String(e).slice(0, 200)); }
   // finetune gate after every evolve cycle - the command itself decides
-  // (labels threshold, no running job, cooldown, kill-switch) so an
-  // unattended run is always safe and cheap when nothing is due
+  // (labels threshold, no running job, cooldown, kill switch, a retired
+  // provider) so an unattended run is always safe and cheap when nothing is due
   try {
     const ft = await runHmh(['auto-finetune', '--submit'], 900000);
-    const interesting = ft.out.split('\\n').filter((l) => l.includes('\\u2713') || l.includes('\\u5fae\\u8c03') || l.includes('ERR')).slice(0, 3);
-    console.log(stamp(), 'finetune gate (' + duration(ft.ms) + '):', ft.err ? 'FAILED ' + tailOf(ft.out, 3) : (interesting.join(' | ') || 'not due'));
+    // The ENDING of the output is what happened: submitted, files reused,
+    // upload failed, provider retired, nothing due. Until 0.23.59 the first
+    // three lines that mentioned fine-tuning were logged instead, and 50 days
+    // of "上传失败" (2026-10-08 .. 11-27) hid behind the same three lines.
+    console.log(stamp(), 'finetune gate (' + duration(ft.ms) + '):', tailOf(ft.out, 3));
   } catch (e) { console.error(stamp(), 'finetune error:', String(e).slice(0, 200)); }
   busy = false;
 }

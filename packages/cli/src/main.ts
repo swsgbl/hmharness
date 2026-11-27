@@ -25,6 +25,7 @@ import readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { readFile } from 'node:fs/promises';
 import { mkdir, rm } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stopWebDaemon, startWebDaemon, hmhWebUp, readWebPid, ensureWebDaemon } from './web-daemon.ts';
@@ -1786,22 +1787,12 @@ flags:
       await patchConfig({ web: { exposure, token: webToken } });
     }
     if (exposure !== 'loopback') {
-      // print the phone-ready access info once; the LAN IP shown must be the
-      // one a phone on the same WiFi can route to (virtual adapters like
-      // Tailscale/VMware excluded — see server.ts preferredLanAddress).
-      const osMod = await import('node:os');
-      const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
-      const isRfc1918 = (a: string) => /^10\./.test(a) || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
-      let lanIp = '';
-      let virtualFallback = '';
-      for (const [name, list] of Object.entries(osMod.networkInterfaces())) {
-        for (const n of list ?? []) {
-          if (n.family !== 'IPv4' || n.internal || !isRfc1918(n.address)) continue;
-          if (!VIRTUAL.test(name)) { lanIp = lanIp || n.address; }
-          else { virtualFallback = virtualFallback || n.address; }
-        }
-      }
-      lanIp = lanIp || virtualFallback;
+      // print the phone-ready access info once; the LAN IP comes from the one
+      // rule every surface shares (kernel lan-address.ts). Until 0.23.59
+      // this was a second copy with a shorter list of virtual adapters: on
+      // 2026-11-26 the banner sent the phone to a proxy tunnel's address.
+      const { pickLanAddress } = await import('@hmharness/kernel');
+      const lanIp = pickLanAddress();
       stdout.write(YELLOW('手机连接：打开 http://127.0.0.1:' + port + ' 点 📱 扫二维码（WiFi 直连免密码；互联网模式任何网络可用）\n'));
       if (lanIp) stdout.write(YELLOW(`WiFi 地址：http://${lanIp}:${port}（手机与电脑同一 WiFi）\n`));
       if (exposure === 'wan') stdout.write(YELLOW('互联网模式：启动后自动建立免费隧道（trycloudflare.com），无需公网 IP/端口转发\n'));
@@ -1978,8 +1969,13 @@ flags:
 
     if (rest.includes('--status')) {
       if (!ft) { stdout.write('云端微调：你当前配置的模型供应商暂不支持微调（已支持：' + supportedList + '）。其余功能不受影响。\n'); return; }
-      const jobs = await CF.listFineTuneJobs({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, limit: 10 });
+      // a retired provider: say so first; the history stays readable while the provider keeps it
+      const retiredStatus = CF.fineTuneRetirementNotice(ft.backend, new Date(CF.gateNow()));
+      if (retiredStatus) stdout.write(retiredStatus + '\n');
       const local = await CF.readLocalFineTuneJobs(home);
+      let jobs: import('@hmharness/evolution').FineTuneJob[] = [];
+      try { jobs = await CF.listFineTuneJobs({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, limit: 10 }); }
+      catch (err) { stdout.write(DIM('（云端任务列表读取失败：' + String(err).slice(0, 120) + '）\n')); }
       stdout.write('云端微调任务（' + ft.backend.label + '，最近 ' + jobs.length + ' 条）：\n');
       for (const j of jobs) stdout.write('  ' + (j.id ?? '?').padEnd(38) + ' ' + String(j.status ?? '?').padEnd(12) + ' ' + String(j.model ?? '') + (j.fine_tuned_model ? ' → ' + j.fine_tuned_model : '') + '\n');
       if (local.length) { stdout.write('本机提交记录：\n'); for (const l of local) stdout.write('  ' + l.time + '  ' + (l.id ?? '?') + ' ' + String(l.status ?? '') + '\n'); }
@@ -1994,25 +1990,26 @@ flags:
       return;
     }
     stdout.write('微调后端：' + ft.backend.label + '（provider ' + ft.providerName + '）\n');
+    // A provider that switched its fine-tuning off is answered here, with no
+    // request at all (finetune-gate.ts). Until 0.23.59 the evolution daemon
+    // called this after every cycle for 50 days against a retired service:
+    // 150 MB read, three API calls, a failed upload - and nothing recorded.
+    const retirement = CF.fineTuneRetirementNotice(ft.backend, new Date(CF.gateNow()));
+    if (retirement) { stdout.write(retirement + '\n'); return; }
 
     // unattended safety rails (2026-09-25 "configure one key, forget it"):
-    // kill-switch finetune.auto=false, at most one active cloud job, and a
-    // cooldown between submissions - the daemon calls this same command, so
-    // a run that is "not due" exits here without any API cost.
-    const ftCfg = (cfgFT as { finetune?: { auto?: boolean; cooldownDays?: number; maxPairs?: number } }).finetune ?? {};
+    // kill-switch finetune.auto=false, a cooldown after every real submission,
+    // at most one active cloud job, and a day's wait after a failed attempt.
+    // The daemon calls this same command, so a run that is "not due" exits
+    // here without any API cost.
+    const ftCfg = (cfgFT as { finetune?: { auto?: boolean; cooldownDays?: number; maxPairs?: number; retryHours?: number } }).finetune ?? {};
     const submit = rest.includes('--submit');
     const cooldownDays = ftCfg.cooldownDays ?? 7;
     const maxPairs = Math.min(ftCfg.maxPairs ?? 4000, 20000);
-    if (submit && ftCfg.auto === false) { stdout.write('自动微调已关闭（config finetune.auto=false）——本次跳过\n'); return; }
+    const ledger = await CF.readLocalFineTuneJobs(home);
+    const gate = CF.decideFineTuneGate(ledger, { submit, auto: ftCfg.auto, cooldownDays, retryHours: ftCfg.retryHours, now: CF.gateNow() });
+    if (!gate.ok) { stdout.write(DIM(gate.reason + '\n')); return; }
     if (submit) {
-      const localJobs = await CF.readLocalFineTuneJobs(home);
-      // cooldown counts real SUBMISSIONS only - a 'staged' row means the last
-      // attempt FAILED before creating a job (files parked, nothing trained),
-      // so it must not block the retry that finally lands (2026-09-27)
-      const lastSubmit = localJobs.findLast((j) => String(j.status) !== 'staged');
-      const lastAt = lastSubmit ? new Date(lastSubmit.time).getTime() : 0;
-      const dueMs = cooldownDays * 86400000;
-      if (Date.now() - lastAt < dueMs) { stdout.write(DIM(`冷却中（上次提交 ${cooldownDays} 天内）——本次跳过\n`)); return; }
       try {
         const running = (await CF.listFineTuneJobs({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, limit: 20 }))
           .some((j) => ['queued', 'running', 'pending', 'training'].includes(String(j.status ?? '').toLowerCase()));
@@ -2048,34 +2045,55 @@ flags:
 
     // pairs: reuse dpo-pairs.jsonl, exporting it fresh if absent (zero-config)
     const pairsFile = join(home, 'evolution', 'dpo-pairs.jsonl');
-    try { await readFile(pairsFile, 'utf8'); } catch {
+    if (!(await access(pairsFile).then(() => true, () => false))) {
       const { execFile: efFT } = await import('node:child_process');
       stdout.write(DIM('正在导出偏好对（hmh reward export-dpo）…\n'));
       await new Promise<void>(r => efFT(process.execPath, [import.meta.filename ?? '', 'reward', 'export-dpo'], { timeout: 300000 }, () => r()));
     }
-    let rows: Array<{ prompt: string; chosen: string; rejected: string; split?: string; source?: string }> = [];
-    try { rows = (await readFile(pairsFile, 'utf8')).trim().split('\n').filter(Boolean).map((l: string) => JSON.parse(l)); } catch { /* re-export failed */ }
-    if (!rows.length) { stdout.write(RED('偏好对导出为空——先运行 hmh judge 积累评审标签\n')); return; }
-    const trainRows = rows.filter((r) => r.split !== 'eval').slice(0, maxPairs);
-    const evalRows = rows.filter((r) => r.split === 'eval').slice(0, 1000); // validation loss needs a sample, not the whole set
-    stdout.write('偏好对：' + rows.length + (trainRows.length < rows.filter((r) => r.split !== 'eval').length ? DIM('（本次训练用前 ' + maxPairs + ' 条控制成本）') : '') + '（train ' + trainRows.length + ' / eval ' + evalRows.length + (evalRows.length < rows.filter((r) => r.split === 'eval').length ? DIM('（抽样 1000）') : '') + '）\n');
+    // streamed: only the rows this attempt trains on are kept in memory, and a
+    // torn line is skipped and counted instead of blanking the whole read
+    // (the old read parsed all 150 MB at once; one bad line and it saw "empty")
+    let head: Awaited<ReturnType<typeof CF.readDpoPairsHead>> = { train: [], eval: [], trainTotal: 0, evalTotal: 0, bad: 0 };
+    try { head = await CF.readDpoPairsHead(pairsFile, { train: maxPairs, eval: 1000 }); } catch { /* re-export failed */ }
+    const trainRows = head.train;
+    const evalRows = head.eval; // validation loss needs a sample, not the whole set
+    if (!trainRows.length) { stdout.write(RED('偏好对导出为空——先运行 hmh judge 积累评审标签\n')); return; }
+    if (head.bad) stdout.write(DIM('（' + head.bad + ' 行解析失败，已跳过）\n'));
+    stdout.write('偏好对：' + (head.trainTotal + head.evalTotal) + (trainRows.length < head.trainTotal ? DIM('（本次训练用前 ' + maxPairs + ' 条控制成本）') : '') + '（train ' + trainRows.length + ' / eval ' + evalRows.length + (evalRows.length < head.evalTotal ? DIM('（抽样 1000）') : '') + '）\n');
 
     const trainJsonl = ft.backend.dpoJsonl(trainRows);
     const evalJsonl = ft.backend.dpoJsonl(evalRows);
     stdout.write('本地预估 token：train ~' + CF.estimateTokens(trainJsonl).toLocaleString() + ' / eval ~' + CF.estimateTokens(evalJsonl).toLocaleString() + DIM('（上传后以官方分词统计为准）') + '\n');
 
-    // upload (free) - provider token stats come back exact
     const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
-    let upTrain: import('@hmharness/evolution').UploadedFile;
+    const digest = CF.pairsDigest(trainJsonl, evalJsonl);
+    // Files an earlier attempt uploaded for exactly these rows are reused: an
+    // attempt that fails at the next step used to upload the same bytes again
+    // every cycle (13 identical training files in one account, 2026-10-05..07).
+    const reuse = CF.reusableUploads(ledger, digest);
+    let upTrain: import('@hmharness/evolution').UploadedFile | null = null;
     let upEval: import('@hmharness/evolution').UploadedFile | null = null;
     try {
-      upTrain = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-train-${stamp}.jsonl`, jsonl: trainJsonl });
-      stdout.write(GREEN('✓') + ' 训练文件已上传：' + upTrain.id + '（' + upTrain.samples + ' 样本，官方统计 ' + upTrain.tokens.toLocaleString() + ' tokens）\n');
+      if (reuse.trainFile) {
+        upTrain = { id: reuse.trainFile, bytes: -1, samples: trainRows.length, tokens: 0 };
+        stdout.write(DIM('复用上次已上传的训练文件：' + reuse.trainFile + '（偏好对未变）\n'));
+      } else {
+        upTrain = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-train-${stamp}.jsonl`, jsonl: trainJsonl });
+        stdout.write(GREEN('✓') + ' 训练文件已上传：' + upTrain.id + '（' + upTrain.samples + ' 样本，官方统计 ' + upTrain.tokens.toLocaleString() + ' tokens）\n');
+      }
       if (evalRows.length) {
-        upEval = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-eval-${stamp}.jsonl`, jsonl: evalJsonl });
-        stdout.write(GREEN('✓') + ' 验证文件已上传：' + upEval.id + '（' + upEval.samples + ' 样本）\n');
+        if (reuse.evalFile) {
+          upEval = { id: reuse.evalFile, bytes: -1, samples: evalRows.length, tokens: 0 };
+          stdout.write(DIM('复用上次已上传的验证文件：' + reuse.evalFile + '\n'));
+        } else {
+          upEval = await CF.uploadFineTuneFile({ backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, filename: `hmh-dpo-eval-${stamp}.jsonl`, jsonl: evalJsonl });
+          stdout.write(GREEN('✓') + ' 验证文件已上传：' + upEval.id + '（' + upEval.samples + ' 样本）\n');
+        }
       }
     } catch (err) {
+      // An upload failure is a ledger row too. 200 cycles once stopped here
+      // and left nothing behind, so the history read as if nothing had run.
+      await CF.recordFineTuneJob(home, { id: 'upload-failed-' + stamp, status: 'upload-failed', model }, { trainFile: upTrain?.id, evalFile: upEval?.id, pairs: trainRows.length + evalRows.length, pairsDigest: digest, error: String(err).slice(0, 200) });
       stdout.write(RED('上传失败：' + String(err) + '\n'));
       return;
     }
@@ -2093,7 +2111,7 @@ flags:
         backend: ft.backend, apiKey: ft.apiKey, baseUrl: ft.baseUrl, model,
         trainingFile: upTrain.id, validationFile: upEval?.id, suffix: 'hmh',
       });
-      await CF.recordFineTuneJob(home, job, { model, trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length });
+      await CF.recordFineTuneJob(home, job, { model, trainFile: upTrain.id, evalFile: upEval?.id, pairs: trainRows.length + evalRows.length, pairsDigest: digest });
       stdout.write(GREEN('✓') + ' 微调任务已创建：' + (job.id ?? '?') + '（状态 ' + String(job.status ?? '?') + '）\n');
       stdout.write('训练完成后，用返回的模型编码（fine_tuned_model）即可直接调用。\n');
       stdout.write(DIM('查看进度：hmh auto-finetune --status\n'));
@@ -2106,7 +2124,7 @@ flags:
       // path (and console datasets do NOT see API-uploaded files - two
       // separate systems). The uploaded files stay valid, so record
       // them: a retry if the API channel ever opens must NOT re-upload.
-      await CF.recordFineTuneJob(home, { id: 'staged-' + stamp, status: 'staged', model }, { trainFile: upTrain.id, evalFile: upEval?.id, pairs: rows.length, error: msg.slice(0, 200) });
+      await CF.recordFineTuneJob(home, { id: 'staged-' + stamp, status: 'staged', model }, { trainFile: upTrain.id, evalFile: upEval?.id, pairs: trainRows.length + evalRows.length, pairsDigest: digest, error: msg.slice(0, 200) });
       stdout.write(RED('任务创建失败：' + msg.slice(0, 160) + '\n'));
       if (/参数校验解析异常/.test(msg)) {
         // 2026-09-27 实测定案：充值后该 500 依旧——智谱 API 建任务通道对
