@@ -11,7 +11,7 @@ hmharness — an open-source (MIT) self-evolving agent framework for HarmonyOS/O
 ```bash
 npm install                # workspace bootstrap
 npm run typecheck          # tsc -p tsconfig.json --noEmit
-npm test                   # full unit suite (CI gate; 1269 tests at time of writing)
+npm test                   # full unit suite (CI gate; 1277 tests at time of writing)
 npm run build              # topological per-package build; scripts/fix-dts.mjs runs after each package
 npm run hmh -- <cmd>       # run CLI from source via tsx
 ```
