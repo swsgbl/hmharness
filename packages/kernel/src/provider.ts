@@ -132,6 +132,12 @@ export async function chat(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     // user cancellation outranks resilience: never start (or retry) after abort
     if (external?.aborted) throw new Error('provider: request aborted (external signal)');
+    // A backoff waits BETWEEN attempts only: after the last one there is
+    // nothing left to wait for. It used to sleep once more anyway - up to 62 s
+    // of nothing before the caller heard the failure (measured 2026-11-27: a
+    // call to an unreachable endpoint took 158.7 s where the policy sums to
+    // about 95 s).
+    const moreAttempts = attempt + 1 < MAX_RETRIES;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? cfg.timeoutMs ?? 120_000);
     // the external signal links into this attempt's controller so the abort
@@ -162,13 +168,13 @@ export async function chat(
         // parseRetryAfterMs for why x-ratelimit-reset is deliberately ignored.
         const delay = parseRetryAfterMs(res.headers.get('retry-after')) || Math.min(30_000, 2000 * Math.pow(2, attempt));
         lastError = `HTTP 429 (rate limited): ${(await res.text()).slice(0, 200)}`;
-        await sleep(delay + Math.random() * 1000); // jitter
+        if (moreAttempts) await sleep(delay + Math.random() * 1000); // jitter
         continue;
       }
       if (res.status >= 500) {
         const delay = Math.min(30_000, 2000 * Math.pow(2, attempt));
         lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
-        await sleep(delay + Math.random() * 1000);
+        if (moreAttempts) await sleep(delay + Math.random() * 1000);
         continue;
       }
       if (res.status === 401 && !cfg.authHeader && authScheme === 'bearer' && cfg.apiKey) {
@@ -206,7 +212,7 @@ export async function chat(
         // the retry does not append a second copy of the same answer
         if (emitted) opts.onDelta?.('reset', '');
         const delay = Math.min(60_000, BASE_MS * Math.pow(2, attempt));
-        await sleep(delay + Math.random() * Math.min(2000, BASE_MS));
+        if (moreAttempts) await sleep(delay + Math.random() * Math.min(2000, BASE_MS));
         continue;
       }
       throw err; // permanent error (bad JSON, logic error): don't retry
@@ -372,7 +378,7 @@ export async function chatVision(
       }
       if (res.status === 429 || res.status >= 500) {
         lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
-        await sleep(1500 * (attempt + 1));
+        if (attempt + 1 < 2) await sleep(1500 * (attempt + 1));
         continue;
       }
       if (!res.ok) throw new Error(`provider: HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -383,7 +389,7 @@ export async function chatVision(
     } catch (err) {
       lastError = String(err);
       if (!/abort|fetch failed|ECONN|timeout/i.test(lastError)) throw err;
-      await sleep(1500 * (attempt + 1));
+      if (attempt + 1 < 2) await sleep(1500 * (attempt + 1));
     }
   }
   throw new Error(`provider: vision call failed after retry (${cfg.baseUrl}): ${lastError}`);

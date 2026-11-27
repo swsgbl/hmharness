@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { textAssertionEvaluator, commandEvaluator, llmJudgeEvaluator, scoreFromEvidence, evaluateRun, EVIDENCE_RANK } from '../index.ts';
@@ -63,8 +63,7 @@ test('evaluateRun: judges from the trajectory RECORD (metrics, not self-report) 
     rec.emit('run.started', 'user', { task: 'build the workspace app' });
     rec.emit('tool.requested', 'tool', { name: 'harmony_build' });
     rec.emit('tool.completed', 'tool', { name: 'harmony_build', isError: false });
-    rec.finish({ success: true, reason: 'final' }, { turns: 1, toolUses: 1 });
-    await new Promise((r) => setTimeout(r, 200));
+    await rec.finish({ success: true, reason: 'final' }, { turns: 1, toolUses: 1 });
 
     const result = await evaluateRun(home, rec.runId);
     assert.equal(result.passed, true, 'clean run passes');
@@ -75,24 +74,46 @@ test('evaluateRun: judges from the trajectory RECORD (metrics, not self-report) 
     rec2.emit('tool.completed', 'tool', { name: 'x', isError: true });
     rec2.emit('tool.completed', 'tool', { name: 'y', isError: true });
     rec2.emit('error.observed', 'tool', { name: 'x' });
-    rec2.finish({ success: false, reason: 'error', error: 'boom' }, { toolUses: 2 });
-    await new Promise((r) => setTimeout(r, 200));
+    await rec2.finish({ success: false, reason: 'error', error: 'boom' }, { toolUses: 2 });
     const result2 = await evaluateRun(home, rec2.runId);
     assert.equal(result2.passed, false);
     assert.ok(result2.failures.length >= 2, 'outcome failure + tool ratio failure recorded');
 
-    // both verdicts are part of the auditable record (drain the async
-    // append queues FIRST - judge summaries are written fire-and-forget)
-    await new Promise((r) => setTimeout(r, 400));
+    // both verdicts are part of the auditable record: evaluateRun settles each
+    // judge record before it returns, so there is nothing left to wait for
     const store = jsonlTrajectoryStore(home);
     const runs = await store.listRuns(10);
     const judgeRuns = runs.filter((r) => r.task.startsWith('(judge)'));
     assert.equal(judgeRuns.length, 2, 'one judge-run per evaluated run');
     const judged = await store.getRun(judgeRuns[0].runId);
     assert.deepEqual(judged.events.map((e) => e.type).filter((t) => t.startsWith('judge.')), ['judge.started', 'judge.completed']);
-    // let every recorder queue drain before the temp dir is removed (Windows
-    // rmdir races pending appends -> ENOTEMPTY)
-    await new Promise((r) => setTimeout(r, 500));
+  } finally {
+    for (let i = 0; i < 3; i++) {
+      try { await rm(home, { recursive: true, force: true }); break; } catch { await new Promise((r) => setTimeout(r, 300)); }
+    }
+  }
+});
+
+test('evaluateRun: the judge run is on disk the moment it returns - nothing waited for', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hmh-eval-'));
+  try {
+    const { createTrajectoryRecorder } = await import('@hmharness/observability');
+    // a healthy run
+    const rec = createTrajectoryRecorder(home, { task: 'a healthy run' });
+    rec.emit('run.started', 'user', { task: 'a healthy run' });
+    rec.emit('tool.completed', 'tool', { name: 'x', isError: false });
+    await rec.finish({ success: true, reason: 'final' }, { turns: 1, toolUses: 1 });
+    const runs = join(home, 'runs');
+    const subject = new Set(await readdir(runs));
+
+    await evaluateRun(home, rec.runId);
+
+    // read at once: no sleep, nothing else awaited
+    const judge = (await readdir(runs)).filter((id) => !subject.has(id));
+    assert.equal(judge.length, 1, 'the judge run has its directory the instant evaluateRun returned');
+    const lines = (await readFile(join(runs, judge[0]!, 'trajectory.jsonl'), 'utf8')).split('\n').filter(Boolean);
+    assert.equal((JSON.parse(lines.at(-1)!) as { type: string }).type, 'run.completed', 'the end event is the last line on disk');
+    assert.match(await readFile(join(runs, judge[0]!, 'summary.json'), 'utf8'), /"success"\s*:\s*true/, 'and so is the summary');
   } finally {
     for (let i = 0; i < 3; i++) {
       try { await rm(home, { recursive: true, force: true }); break; } catch { await new Promise((r) => setTimeout(r, 300)); }

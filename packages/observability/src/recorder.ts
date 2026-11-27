@@ -21,6 +21,27 @@ export interface TrajectoryRecorder {
   finish(outcome: RunOutcome, metrics?: RunMetrics): Promise<void>;
 }
 
+/** How long a caller waits for a run record to settle. A healthy disk needs
+ *  about ten milliseconds for a typical record, under a hundred for a long one;
+ *  past this the caller goes on and the record catches up on its own - an audit
+ *  trail must never hold up the work it describes. */
+export const RECORD_SETTLE_MS = 2_000;
+
+/** Wait for a recorder's finish(), but never past `ms`, and never throw: says
+ *  what happened. A record that could not be written is something to report
+ *  from here, not an error to raise over the task it describes. */
+export async function settleRecord(write: Promise<void>, ms = RECORD_SETTLE_MS): Promise<'settled' | 'failed' | 'timed out'> {
+  let timer: NodeJS.Timeout | undefined;
+  const limit = new Promise<'timed out'>((resolve) => { timer = setTimeout(() => resolve('timed out'), ms); });
+  const done: Promise<'settled' | 'failed'> = write.then(() => 'settled', () => 'failed');
+  try {
+    return await Promise.race([done, limit]);
+  } finally {
+    // a timer left running would keep a one-shot process alive for the rest of the limit
+    clearTimeout(timer);
+  }
+}
+
 export function newRunId(now = new Date()): string {
   const t = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
   return `run_${t}_${randomBytes(3).toString('hex')}`;
