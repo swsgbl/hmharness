@@ -8,7 +8,7 @@
  * runBenchCase(): the existing bench gate semantics through the Evaluator
  * contract, so evolution and evaluation share one assertion core.
  */
-import { jsonlTrajectoryStore, createTrajectoryRecorder, type Trajectory } from '@hmharness/observability';
+import { jsonlTrajectoryStore, createTrajectoryRecorder, settleRecord, type Trajectory } from '@hmharness/observability';
 import { textAssertionEvaluator, type TextAssertionInput, type EvaluationResult, type Evidence } from './index.ts';
 
 /** Score a run from its recorded trajectory metrics (hard evidence only). */
@@ -55,7 +55,11 @@ export async function evaluateRun(
     subjectRunId: runId, evaluator: 'trajectory-metrics',
     passed: result.passed, score: result.score, failures: result.failures.map((f) => f.reason),
   });
-  rec.finish({ success: result.passed, reason: 'final' });
+  // the verdict is on disk before the caller hears it: the recorder is a
+  // fire-and-forget queue until its finish() is awaited (same contract as the
+  // agent runner) - a caller listing `runs/` right after this call used to be
+  // able to miss the judge run entirely
+  await settleRecord(rec.finish({ success: result.passed, reason: 'final' }));
   return { ...result, runId };
 }
 

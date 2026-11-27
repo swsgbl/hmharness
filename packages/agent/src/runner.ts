@@ -27,7 +27,7 @@ import {
   type McpServerImport,
   type ToolContext,
 } from '@hmharness/kernel';
-import { brief, createTrajectoryRecorder } from '@hmharness/observability';
+import { brief, createTrajectoryRecorder, settleRecord } from '@hmharness/observability';
 import { CognitiveRunRecorder } from './cognitive-recorder.ts';
 import { readFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -621,8 +621,9 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
         await session.assistant(m.content ?? null, m.tool_calls, chatProvider.model);
       },
     },
-  }).catch((err: unknown) => {
-    traj.finish({ success: false, reason: 'error', error: brief(String(err), 200) }, { toolUses: toolsUsed.length });
+  }).catch(async (err: unknown) => {
+    // the failure is on record before it surfaces - same reason as below
+    await settleRecord(traj.finish({ success: false, reason: 'error', error: brief(String(err), 200) }, { toolUses: toolsUsed.length }));
     // The rollout EXISTS on disk (session/create + the user event were written
     // before the loop started), but the throw used to hide its id from every
     // caller — the TUI never bound currentSessionId on the error path, so
@@ -634,10 +635,21 @@ export async function runAgentTask(opts: AgentTaskOptions): Promise<LoopResult &
   // of silently vanishing into a channel nothing drains
   if (injectChannel) injectChannel.active = false;
   if (actionGate) traj.emit('gate.summary', 'system', actionGate.stats());
-  traj.finish(
+  // The run record is on disk before the task is reported done: finish() resolves
+  // once the recorder's queue - every append and the summary write - has
+  // drained. It used to be fired without the await, and the recorder is a
+  // fire-and-forget queue: measured 2026-11-27 on the released code, at the
+  // instant the task returned the record was still incomplete in 22 of 40 runs
+  // (37 of 40 with every core busy) - the last events, or the summary, landed
+  // a moment later. A reader of `runs/` right after a task (a test, a list
+  // refresh, an export) would find its tail missing; on a slow CI runner one did.
+  // The record is an audit trail: if it cannot be written - or takes absurdly
+  // long - the task itself still stands and the answer is not held up for it
+  // (settleRecord bounds the wait).
+  await settleRecord(traj.finish(
     { success: result.reason === 'final', reason: result.reason },
     { turns: result.turns, toolUses: result.toolUses, promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens },
-  );
+  ));
   // cognitive trajectory + episodic index land AFTER the observability
   // recorder settles, still before onFinal so callers can rely on both
   await cogRec.finish(result.reason === 'final', { turns: result.turns, toolUses: result.toolUses, task: opts.task });
